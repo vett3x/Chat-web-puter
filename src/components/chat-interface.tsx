@@ -97,26 +97,40 @@ export function ChatInterface() {
         model: selectedModel 
       });
 
+      console.log('Puter response:', response);
+      console.log('Response type:', typeof response);
+      console.log('Response keys:', response && typeof response === 'object' ? Object.keys(response) : 'N/A');
+
       // Extract the message content from the response object
-      let messageContent: string;
+      let messageContent: string = '';
+      
       if (typeof response === 'string') {
         messageContent = response;
       } else if (response && typeof response === 'object') {
         // Try different possible content properties
-        if ('content' in response && response.content) {
+        if (response.content && typeof response.content === 'string') {
           messageContent = response.content;
-        } else if ('message' in response && response.message) {
+        } else if (response.message && typeof response.message === 'string') {
           messageContent = response.message;
-        } else if (typeof (response as any).toString === 'function') {
-          messageContent = (response as any).toString();
         } else {
-          // Fallback: try to extract any string value from the object
-          const stringValues = Object.values(response).filter(val => typeof val === 'string');
-          messageContent = stringValues.length > 0 ? stringValues[0] : 'Error: No se pudo obtener la respuesta';
+          // Try to convert to string
+          try {
+            messageContent = String(response.content || response.message || response);
+          } catch (e) {
+            messageContent = 'Error: No se pudo procesar la respuesta';
+          }
         }
       } else {
         messageContent = 'Error: Respuesta inválida del servidor';
       }
+
+      // Ensure messageContent is always a string
+      if (typeof messageContent !== 'string') {
+        messageContent = String(messageContent);
+      }
+
+      console.log('Extracted message content:', messageContent);
+      console.log('Message content type:', typeof messageContent);
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
