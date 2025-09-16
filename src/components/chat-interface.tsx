@@ -100,6 +100,13 @@ export function ChatInterface() {
       console.log('Puter response:', response);
       console.log('Response type:', typeof response);
       console.log('Response keys:', response && typeof response === 'object' ? Object.keys(response) : 'N/A');
+      
+      // Log specific properties
+      if (response && typeof response === 'object') {
+        console.log('response.content:', response.content);
+        console.log('response.message:', response.message);
+        console.log('typeof response.content:', typeof response.content);
+      }
 
       // Extract the message content from the response object
       let messageContent: string = '';
@@ -107,30 +114,44 @@ export function ChatInterface() {
       if (typeof response === 'string') {
         messageContent = response;
       } else if (response && typeof response === 'object') {
-        // Try different possible content properties
+        // First check if content exists and is a string
         if (response.content && typeof response.content === 'string') {
           messageContent = response.content;
-        } else if (response.message && typeof response.message === 'string') {
+        } 
+        // Then check if message exists and is a string
+        else if (response.message && typeof response.message === 'string') {
           messageContent = response.message;
-        } else {
-          // Try to convert to string
+        }
+        // If content exists but is not a string, try to stringify it properly
+        else if (response.content) {
           try {
-            messageContent = String(response.content || response.message || response);
+            messageContent = JSON.stringify(response.content);
           } catch (e) {
-            messageContent = 'Error: No se pudo procesar la respuesta';
+            messageContent = String(response.content);
+          }
+        }
+        // Last resort: try to find any string property
+        else {
+          const stringProps = Object.entries(response).find(([key, value]) => 
+            typeof value === 'string' && value.length > 0 && key !== 'id' && key !== 'type' && key !== 'model'
+          );
+          if (stringProps) {
+            messageContent = stringProps[1] as string;
+          } else {
+            messageContent = 'Error: No se pudo extraer el contenido de la respuesta';
           }
         }
       } else {
         messageContent = 'Error: Respuesta inválida del servidor';
       }
 
-      // Ensure messageContent is always a string
-      if (typeof messageContent !== 'string') {
-        messageContent = String(messageContent);
+      // Final safety check
+      if (typeof messageContent !== 'string' || messageContent === '[object Object]') {
+        messageContent = 'Error: No se pudo procesar la respuesta correctamente';
       }
 
-      console.log('Extracted message content:', messageContent);
-      console.log('Message content type:', typeof messageContent);
+      console.log('Final message content:', messageContent);
+      console.log('Final message content type:', typeof messageContent);
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
