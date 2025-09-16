@@ -24,11 +24,20 @@ const AVAILABLE_MODELS = [
   { value: 'claude-3-7-opus', label: 'Claude 3.7 Opus' },
 ];
 
+interface PuterAIResponse {
+  message: string;
+  usage?: any;
+  finish_reason?: string;
+  via_ai_chat_service?: string;
+  toString?: () => string;
+  valueOf?: () => string;
+}
+
 declare global {
   interface Window {
     puter: {
       ai: {
-        chat: (message: string, options: { model: string }) => Promise<string>;
+        chat: (message: string, options: { model: string }) => Promise<PuterAIResponse | string>;
       };
     };
   }
@@ -83,9 +92,21 @@ export function ChatInterface() {
         model: selectedModel 
       });
 
+      // Extract the message content from the response object
+      let messageContent: string;
+      if (typeof response === 'string') {
+        messageContent = response;
+      } else if (response && typeof response === 'object' && 'message' in response) {
+        messageContent = response.message;
+      } else if (response && typeof (response as any).toString === 'function') {
+        messageContent = (response as any).toString();
+      } else {
+        messageContent = 'Error: No se pudo obtener la respuesta';
+      }
+
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: response,
+        content: messageContent,
         role: 'assistant',
         model: selectedModel,
         timestamp: new Date(),
