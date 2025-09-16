@@ -34,8 +34,6 @@ interface PuterAIResponse {
   stop_sequence?: string;
   usage?: any;
   message?: string;
-  toString?: () => string;
-  valueOf?: () => string;
 }
 
 declare global {
@@ -99,59 +97,20 @@ export function ChatInterface() {
 
       console.log('Puter response:', response);
       console.log('Response type:', typeof response);
-      console.log('Response keys:', response && typeof response === 'object' ? Object.keys(response) : 'N/A');
       
-      // Log specific properties
-      if (response && typeof response === 'object') {
-        console.log('response.content:', response.content);
-        console.log('response.message:', response.message);
-        console.log('typeof response.content:', typeof response.content);
-      }
-
-      // Extract the message content from the response object
+      // Extract the message content from the response
       let messageContent: string = '';
       
       if (typeof response === 'string') {
         messageContent = response;
-      } else if (response && typeof response === 'object') {
-        // First check if content exists and is a string
-        if (response.content && typeof response.content === 'string') {
-          messageContent = response.content;
-        } 
-        // Then check if message exists and is a string
-        else if (response.message && typeof response.message === 'string') {
-          messageContent = response.message;
-        }
-        // If content exists but is not a string, try to stringify it properly
-        else if (response.content) {
-          try {
-            messageContent = JSON.stringify(response.content);
-          } catch (e) {
-            messageContent = String(response.content);
-          }
-        }
-        // Last resort: try to find any string property
-        else {
-          const stringProps = Object.entries(response).find(([key, value]) => 
-            typeof value === 'string' && value.length > 0 && key !== 'id' && key !== 'type' && key !== 'model'
-          );
-          if (stringProps) {
-            messageContent = stringProps[1] as string;
-          } else {
-            messageContent = 'Error: No se pudo extraer el contenido de la respuesta';
-          }
-        }
+      } else if (response && typeof response === 'object' && 'content' in response) {
+        // Direct access to content property
+        messageContent = response.content || 'Sin contenido';
       } else {
-        messageContent = 'Error: Respuesta inválida del servidor';
+        messageContent = 'Error: Formato de respuesta no reconocido';
       }
 
-      // Final safety check
-      if (typeof messageContent !== 'string' || messageContent === '[object Object]') {
-        messageContent = 'Error: No se pudo procesar la respuesta correctamente';
-      }
-
-      console.log('Final message content:', messageContent);
-      console.log('Final message content type:', typeof messageContent);
+      console.log('Extracted content:', messageContent);
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
