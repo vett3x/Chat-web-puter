@@ -24,6 +24,11 @@ const AVAILABLE_MODELS = [
   { value: 'claude-3-7-opus', label: 'Claude 3.7 Opus' },
 ];
 
+interface PuterMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
 interface PuterAIResponse {
   id?: string;
   type?: string;
@@ -40,7 +45,7 @@ declare global {
   interface Window {
     puter: {
       ai: {
-        chat: (message: string, options: { model: string }) => Promise<PuterAIResponse | string>;
+        chat: (messages: PuterMessage[], options: { model: string }) => Promise<PuterAIResponse | string>;
       };
     };
   }
@@ -91,7 +96,21 @@ export function ChatInterface() {
     setIsLoading(true);
 
     try {
-      const response = await window.puter.ai.chat(inputMessage, { 
+      // Convert messages to Puter format (array of objects with role and content)
+      const puterMessages: PuterMessage[] = [
+        ...messages.map(msg => ({
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content
+        })),
+        {
+          role: 'user' as const,
+          content: inputMessage
+        }
+      ];
+
+      console.log('Sending messages to Puter:', puterMessages);
+
+      const response = await window.puter.ai.chat(puterMessages, { 
         model: selectedModel 
       });
 
