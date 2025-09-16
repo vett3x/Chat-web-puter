@@ -25,10 +25,15 @@ const AVAILABLE_MODELS = [
 ];
 
 interface PuterAIResponse {
-  message: string;
+  id?: string;
+  type?: string;
+  role?: string;
+  model?: string;
+  content?: string;
+  stop_reason?: string;
+  stop_sequence?: string;
   usage?: any;
-  finish_reason?: string;
-  via_ai_chat_service?: string;
+  message?: string;
   toString?: () => string;
   valueOf?: () => string;
 }
@@ -96,12 +101,21 @@ export function ChatInterface() {
       let messageContent: string;
       if (typeof response === 'string') {
         messageContent = response;
-      } else if (response && typeof response === 'object' && 'message' in response) {
-        messageContent = response.message;
-      } else if (response && typeof (response as any).toString === 'function') {
-        messageContent = (response as any).toString();
+      } else if (response && typeof response === 'object') {
+        // Try different possible content properties
+        if ('content' in response && response.content) {
+          messageContent = response.content;
+        } else if ('message' in response && response.message) {
+          messageContent = response.message;
+        } else if (typeof (response as any).toString === 'function') {
+          messageContent = (response as any).toString();
+        } else {
+          // Fallback: try to extract any string value from the object
+          const stringValues = Object.values(response).filter(val => typeof val === 'string');
+          messageContent = stringValues.length > 0 ? stringValues[0] : 'Error: No se pudo obtener la respuesta';
+        }
       } else {
-        messageContent = 'Error: No se pudo obtener la respuesta';
+        messageContent = 'Error: Respuesta inválida del servidor';
       }
 
       const assistantMessage: Message = {
