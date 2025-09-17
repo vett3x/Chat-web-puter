@@ -99,7 +99,7 @@ export function ChatInterface({
       .order('created_at', { ascending: true });
 
     if (error) {
-      console.error('Error fetching messages:', error);
+      console.error('Error fetching messages:', error.message || error.details || error);
       toast.error('Error al cargar los mensajes de la conversación.');
       setMessages([]);
     } else {
@@ -146,7 +146,7 @@ export function ChatInterface({
       .single();
 
     if (error) {
-      console.error('Error creating new conversation:', error);
+      console.error('Error creating new conversation:', error.message || error.details || error);
       toast.error('Error al crear una nueva conversación.');
       return null;
     }
@@ -158,29 +158,38 @@ export function ChatInterface({
   const saveMessageToDB = async (convId: string, msg: Message) => {
     if (!userId) {
       toast.error('Usuario no autenticado.');
-      return;
+      return null;
     }
-    const { error } = await supabase.from('messages').insert({
-      id: msg.id,
+    const { data, error } = await supabase.from('messages').insert({
       conversation_id: convId,
       user_id: userId,
       role: msg.role,
       content: msg.content,
       model: msg.model,
-      created_at: msg.timestamp.toISOString(),
-    });
+      // 'type' has a default value in the DB, so it's optional here
+      // 'created_at' has a default value in the DB, so it's optional here
+    }).select('id, content, role, model, created_at').single(); // Select to get the generated ID and created_at
 
     if (error) {
-      console.error('Error saving message:', error);
+      console.error('Error saving message:', error.message || error.details || error);
       toast.error('Error al guardar el mensaje en la base de datos.');
+      return null;
     }
+    return {
+      id: data.id,
+      content: data.content,
+      role: data.role as 'user' | 'assistant',
+      model: data.model || undefined,
+      timestamp: new Date(data.created_at),
+    };
   };
 
   const sendMessage = async () => {
     if (!inputMessage.trim() || isLoading || !isPuterReady || !userId) return;
 
+    const tempUserMessageId = Date.now().toString();
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: tempUserMessageId, // Temporary ID for immediate UI update
       content: inputMessage,
       role: 'user',
       timestamp: new Date(),
@@ -199,7 +208,17 @@ export function ChatInterface({
         return;
       }
     }
-    await saveMessageToDB(currentConvId, userMessage);
+
+    const savedUserMessage = await saveMessageToDB(currentConvId, userMessage);
+    if (!savedUserMessage) {
+      setIsLoading(false);
+      // Optionally remove the temporary message if saving failed
+      setMessages(prev => prev.filter(msg => msg.id !== tempUserMessageId));
+      return;
+    }
+    // Replace temporary user message with the one from DB (with actual ID and timestamp)
+    setMessages(prev => prev.map(msg => msg.id === tempUserMessageId ? savedUserMessage : msg));
+
 
     try {
       // Fetch all messages for context, including the newly sent user message
@@ -211,7 +230,7 @@ export function ChatInterface({
         .order('created_at', { ascending: true });
 
       if (historyError) {
-        console.error('Error fetching conversation history for AI context:', historyError);
+        console.error('Error fetching conversation history for AI context:', historyError.message || historyError.details || historyError);
         toast.error('Error al cargar el historial para el contexto de la IA.');
         setIsLoading(false);
         return;
@@ -244,15 +263,17 @@ export function ChatInterface({
       }
 
       const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: (Date.now() + 1).toString(), // Temporary ID for immediate UI update
         content: messageContent,
         role: 'assistant',
         model: selectedModel,
         timestamp: new Date(),
       };
 
-      await saveMessageToDB(currentConvId, assistantMessage);
-      setMessages(prev => [...prev, assistantMessage]);
+      const savedAssistantMessage = await saveMessageToDB(currentConvId, assistantMessage);
+      if (savedAssistantMessage) {
+        setMessages(prev => [...prev, savedAssistantMessage]);
+      }
 
     } catch (error) {
       console.error('Error sending message:', error);
