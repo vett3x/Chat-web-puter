@@ -75,7 +75,8 @@ export function ChatInterface({
   const [selectedModel, setSelectedModel] = useState('claude-sonnet-4');
   const [isLoading, setIsLoading] = useState(false);
   const [isPuterReady, setIsPuterReady] = useState(false);
-  const [isContextLoading, setIsContextLoading] = useState(false); // New state for context loading
+  const [isContextLoading, setIsContextLoading] = useState(false);
+  const [isContextInitialized, setIsContextInitialized] = useState(false); // New state to track if context is loaded
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -91,6 +92,7 @@ export function ChatInterface({
 
   const fetchMessages = useCallback(async (convId: string) => {
     setIsLoading(true);
+    setIsContextInitialized(false); // Reset context state when fetching a new conversation
     const { data, error } = await supabase
       .from('messages')
       .select('id, content, role, model, created_at')
@@ -112,6 +114,7 @@ export function ChatInterface({
           timestamp: new Date(msg.created_at),
         }))
       );
+      setIsContextInitialized(true); // Context is now initialized for this conversation
     }
     setIsLoading(false);
   }, [userId]);
@@ -121,6 +124,7 @@ export function ChatInterface({
       fetchMessages(conversationId);
     } else {
       setMessages([]); // Clear messages if no conversation is selected
+      setIsContextInitialized(false); // Reset context state
     }
   }, [conversationId, userId, fetchMessages]);
 
@@ -131,7 +135,7 @@ export function ChatInterface({
         scrollElement.scrollTop = scrollElement.scrollHeight;
       }
     }
-  }, [messages, isLoading, isContextLoading]); // Include loading states to trigger scroll
+  }, [messages, isLoading, isContextLoading]);
 
   const createNewConversationInDB = async (initialMessageContent: string) => {
     if (!userId) {
@@ -200,8 +204,12 @@ export function ChatInterface({
     setIsLoading(true);
 
     let currentConvId = conversationId;
+    let shouldFetchContextFromDB = false;
+
     if (!currentConvId) {
-      // Create a new conversation if none is selected
+      // This is the very first message, so a new conversation will be created.
+      // We need to fetch context from DB for this new conversation.
+      shouldFetchContextFromDB = true;
       currentConvId = await createNewConversationInDB(userMessage.content);
       if (!currentConvId) {
         setIsLoading(false);
@@ -221,33 +229,45 @@ export function ChatInterface({
 
 
     try {
-      // Fetch all messages for context, including the newly sent user message
-      const { data: historyData, error: historyError } = await supabase
-        .from('messages')
-        .select('content, role')
-        .eq('conversation_id', currentConvId)
-        .eq('user_id', userId)
-        .order('created_at', { ascending: true });
+      let puterMessages: PuterMessage[] = [];
 
-      if (historyError) {
-        console.error('Error fetching conversation history for AI context:', historyError.message || historyError.details || historyError);
-        toast.error('Error al cargar el historial para el contexto de la IA.');
-        setIsLoading(false);
-        return;
+      if (!isContextInitialized || shouldFetchContextFromDB) {
+        setIsContextLoading(true); // Show context loading indicator
+        const { data: historyData, error: historyError } = await supabase
+          .from('messages')
+          .select('content, role')
+          .eq('conversation_id', currentConvId)
+          .eq('user_id', userId)
+          .order('created_at', { ascending: true });
+
+        if (historyError) {
+          console.error('Error fetching conversation history for AI context:', historyError.message || historyError.details || historyError);
+          toast.error('Error al cargar el historial para el contexto de la IA.');
+          setIsLoading(false);
+          setIsContextLoading(false);
+          return;
+        }
+        puterMessages = historyData.map(msg => ({
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content
+        }));
+        setIsContextInitialized(true); // Context is now initialized for this conversation
+      } else {
+        // Context is already initialized, use current in-memory messages
+        puterMessages = messages.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }));
+        // The latest user message (savedUserMessage) is already included in `messages`
+        // when `isContextInitialized` is true, so no explicit check/push is needed here.
       }
-
-      const puterMessages: PuterMessage[] = historyData.map(msg => ({
-        role: msg.role as 'user' | 'assistant',
-        content: msg.content
-      }));
 
       console.log('Sending messages to Puter (with context):', puterMessages);
 
-      setIsContextLoading(true); // Indicate that context is being processed by AI
       const response = await window.puter.ai.chat(puterMessages, {
         model: selectedModel
       });
-      setIsContextLoading(false);
+      setIsContextLoading(false); // Ensure it's turned off after AI call
 
       console.log('Puter response:', response);
 
@@ -280,7 +300,7 @@ export function ChatInterface({
       toast.error('Error al enviar el mensaje. Por favor, intenta de nuevo.');
     } finally {
       setIsLoading(false);
-      setIsContextLoading(false);
+      setIsContextLoading(false); // Ensure it's turned off
     }
   };
 
@@ -294,6 +314,7 @@ export function ChatInterface({
   const startNewChat = () => {
     setMessages([]);
     onNewConversationCreated(null as any); // Indicate no conversation selected, will create new on next message
+    setIsContextInitialized(false); // Reset context state for new chat
     toast.success('Nuevo chat iniciado');
   };
 
