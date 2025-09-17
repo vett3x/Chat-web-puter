@@ -1,13 +1,15 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot, User, Loader2 } from 'lucide-react';
+import { Send, Bot, User, Loader2, MessageSquarePlus } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useSession } from '@/components/session-context-provider';
 
 interface Message {
   id: string;
@@ -55,16 +57,28 @@ declare global {
   }
 }
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  userId: string | undefined;
+  conversationId: string | null;
+  onNewConversationCreated: (conversationId: string) => void;
+  onConversationTitleUpdate: (conversationId: string, newTitle: string) => void;
+}
+
+export function ChatInterface({
+  userId,
+  conversationId,
+  onNewConversationCreated,
+  onConversationTitleUpdate,
+}: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [selectedModel, setSelectedModel] = useState('claude-sonnet-4');
   const [isLoading, setIsLoading] = useState(false);
   const [isPuterReady, setIsPuterReady] = useState(false);
+  const [isContextLoading, setIsContextLoading] = useState(false); // New state for context loading
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Check if Puter is available
     const checkPuter = () => {
       if (typeof window !== 'undefined' && window.puter) {
         setIsPuterReady(true);
@@ -75,18 +89,95 @@ export function ChatInterface() {
     checkPuter();
   }, []);
 
+  const fetchMessages = useCallback(async (convId: string) => {
+    setIsLoading(true);
+    const { data, error } = await supabase
+      .from('messages')
+      .select('id, content, role, model, created_at')
+      .eq('conversation_id', convId)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching messages:', error);
+      toast.error('Error al cargar los mensajes de la conversación.');
+      setMessages([]);
+    } else {
+      setMessages(
+        data.map((msg) => ({
+          id: msg.id,
+          content: msg.content,
+          role: msg.role as 'user' | 'assistant',
+          model: msg.model || undefined,
+          timestamp: new Date(msg.created_at),
+        }))
+      );
+    }
+    setIsLoading(false);
+  }, [userId]);
+
   useEffect(() => {
-    // Auto scroll to bottom when new messages are added
+    if (conversationId && userId) {
+      fetchMessages(conversationId);
+    } else {
+      setMessages([]); // Clear messages if no conversation is selected
+    }
+  }, [conversationId, userId, fetchMessages]);
+
+  useEffect(() => {
     if (scrollAreaRef.current) {
       const scrollElement = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
       if (scrollElement) {
         scrollElement.scrollTop = scrollElement.scrollHeight;
       }
     }
-  }, [messages]);
+  }, [messages, isLoading, isContextLoading]); // Include loading states to trigger scroll
+
+  const createNewConversationInDB = async (initialMessageContent: string) => {
+    if (!userId) {
+      toast.error('Usuario no autenticado.');
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('conversations')
+      .insert({ user_id: userId, title: initialMessageContent.substring(0, 50) + '...' })
+      .select('id, title')
+      .single();
+
+    if (error) {
+      console.error('Error creating new conversation:', error);
+      toast.error('Error al crear una nueva conversación.');
+      return null;
+    }
+    onNewConversationCreated(data.id);
+    onConversationTitleUpdate(data.id, data.title); // Update sidebar with new title
+    return data.id;
+  };
+
+  const saveMessageToDB = async (convId: string, msg: Message) => {
+    if (!userId) {
+      toast.error('Usuario no autenticado.');
+      return;
+    }
+    const { error } = await supabase.from('messages').insert({
+      id: msg.id,
+      conversation_id: convId,
+      user_id: userId,
+      role: msg.role,
+      content: msg.content,
+      model: msg.model,
+      created_at: msg.timestamp.toISOString(),
+    });
+
+    if (error) {
+      console.error('Error saving message:', error);
+      toast.error('Error al guardar el mensaje en la base de datos.');
+    }
+  };
 
   const sendMessage = async () => {
-    if (!inputMessage.trim() || isLoading || !isPuterReady) return;
+    if (!inputMessage.trim() || isLoading || !isPuterReady || !userId) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -99,32 +190,49 @@ export function ChatInterface() {
     setInputMessage('');
     setIsLoading(true);
 
+    let currentConvId = conversationId;
+    if (!currentConvId) {
+      // Create a new conversation if none is selected
+      currentConvId = await createNewConversationInDB(userMessage.content);
+      if (!currentConvId) {
+        setIsLoading(false);
+        return;
+      }
+    }
+    await saveMessageToDB(currentConvId, userMessage);
+
     try {
-      // Convert messages to Puter format (array of objects with role and content)
-      const puterMessages: PuterMessage[] = [
-        ...messages.map(msg => ({
-          role: msg.role as 'user' | 'assistant',
-          content: msg.content
-        })),
-        {
-          role: 'user' as const,
-          content: inputMessage
-        }
-      ];
+      // Fetch all messages for context, including the newly sent user message
+      const { data: historyData, error: historyError } = await supabase
+        .from('messages')
+        .select('content, role')
+        .eq('conversation_id', currentConvId)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true });
 
-      console.log('Sending messages to Puter:', puterMessages);
+      if (historyError) {
+        console.error('Error fetching conversation history for AI context:', historyError);
+        toast.error('Error al cargar el historial para el contexto de la IA.');
+        setIsLoading(false);
+        return;
+      }
 
-      const response = await window.puter.ai.chat(puterMessages, { 
-        model: selectedModel 
+      const puterMessages: PuterMessage[] = historyData.map(msg => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content
+      }));
+
+      console.log('Sending messages to Puter (with context):', puterMessages);
+
+      setIsContextLoading(true); // Indicate that context is being processed by AI
+      const response = await window.puter.ai.chat(puterMessages, {
+        model: selectedModel
       });
+      setIsContextLoading(false);
 
       console.log('Puter response:', response);
-      console.log('Response type:', typeof response);
-      
-      // Extract the message content from the response
+
       let messageContent: string = '';
-      
-      // Acceder a la estructura correcta: response.message.content[0].text
       if (response && typeof response === 'object' && response.message) {
         if (response.message.content && Array.isArray(response.message.content) && response.message.content.length > 0) {
           messageContent = response.message.content[0].text || 'Sin contenido';
@@ -135,8 +243,6 @@ export function ChatInterface() {
         messageContent = 'Error: Formato de respuesta no reconocido';
       }
 
-      console.log('Extracted content:', messageContent);
-
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: messageContent,
@@ -145,12 +251,15 @@ export function ChatInterface() {
         timestamp: new Date(),
       };
 
+      await saveMessageToDB(currentConvId, assistantMessage);
       setMessages(prev => [...prev, assistantMessage]);
+
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error('Error al enviar el mensaje. Por favor, intenta de nuevo.');
     } finally {
       setIsLoading(false);
+      setIsContextLoading(false);
     }
   };
 
@@ -161,14 +270,15 @@ export function ChatInterface() {
     }
   };
 
-  const clearChat = () => {
+  const startNewChat = () => {
     setMessages([]);
-    toast.success('Chat limpiado');
+    onNewConversationCreated(null as any); // Indicate no conversation selected, will create new on next message
+    toast.success('Nuevo chat iniciado');
   };
 
   if (!isPuterReady) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
           <p className="text-muted-foreground">Cargando Puter AI...</p>
@@ -177,10 +287,20 @@ export function ChatInterface() {
     );
   }
 
+  if (!userId) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <p className="text-muted-foreground">Por favor, inicia sesión para chatear.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="container mx-auto max-w-4xl h-screen flex flex-col p-4">
-      <Card className="flex-1 flex flex-col">
-        <CardHeader className="flex-shrink-0">
+    <div className="flex flex-col h-full">
+      <Card className="flex-1 flex flex-col border-none shadow-none">
+        <CardHeader className="flex-shrink-0 border-b">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Bot className="h-6 w-6" />
@@ -199,8 +319,8 @@ export function ChatInterface() {
                   ))}
                 </SelectContent>
               </Select>
-              <Button variant="outline" size="sm" onClick={clearChat}>
-                Limpiar
+              <Button variant="outline" size="sm" onClick={startNewChat}>
+                <MessageSquarePlus className="h-4 w-4 mr-2" /> Nuevo Chat
               </Button>
             </div>
           </div>
@@ -209,7 +329,7 @@ export function ChatInterface() {
         <CardContent className="flex-1 flex flex-col p-0">
           <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
             <div className="space-y-4">
-              {messages.length === 0 ? (
+              {messages.length === 0 && !isLoading ? (
                 <div className="text-center text-muted-foreground py-8">
                   <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>¡Hola! Soy Claude AI. ¿En qué puedo ayudarte hoy?</p>
@@ -257,7 +377,7 @@ export function ChatInterface() {
                   </div>
                 ))
               )}
-              {isLoading && (
+              {isLoading && !isContextLoading && ( // Show "Escribiendo..." when AI is generating response
                 <div className="flex gap-3 justify-start">
                   <div className="flex gap-3 max-w-[80%]">
                     <div className="flex-shrink-0">
@@ -274,6 +394,23 @@ export function ChatInterface() {
                   </div>
                 </div>
               )}
+              {isContextLoading && ( // Show "Cargando Contexto..." when fetching history for AI
+                <div className="flex gap-3 justify-start">
+                  <div className="flex gap-3 max-w-[80%]">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center">
+                        <Bot className="h-4 w-4 text-secondary-foreground" />
+                      </div>
+                    </div>
+                    <div className="bg-muted rounded-lg p-3">
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-sm">Cargando contexto...</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </ScrollArea>
 
@@ -284,12 +421,12 @@ export function ChatInterface() {
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Escribe tu mensaje aquí..."
-                disabled={isLoading}
+                disabled={isLoading || !userId}
                 className="flex-1"
               />
-              <Button 
-                onClick={sendMessage} 
-                disabled={isLoading || !inputMessage.trim()}
+              <Button
+                onClick={sendMessage}
+                disabled={isLoading || !inputMessage.trim() || !userId}
                 size="icon"
               >
                 {isLoading ? (
