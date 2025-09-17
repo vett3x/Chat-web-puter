@@ -1,9 +1,11 @@
-import { createMiddlewareClient } from '@supabase/ssr/dist/main';
+import { createServerComponentClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { cookies } from 'next/headers';
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
-  const supabase = createMiddlewareClient({ req, res });
+  // Para middleware, usamos createServerComponentClient con cookies
+  const supabase = createServerComponentClient({ cookies });
 
   const {
     data: { session },
