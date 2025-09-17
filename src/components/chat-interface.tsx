@@ -38,14 +38,18 @@ interface PuterAIResponse {
   stop_reason?: string;
   stop_sequence?: string;
   usage?: any;
-  message?: string;
+  message?: {
+    content: Array<{
+      text: string;
+    }>;
+  };
 }
 
 declare global {
   interface Window {
     puter: {
       ai: {
-        chat: (messages: PuterMessage[], options: { model: string }) => Promise<PuterAIResponse | string>;
+        chat: (messages: PuterMessage[], options: { model: string }) => Promise<PuterAIResponse>;
       };
     };
   }
@@ -120,11 +124,13 @@ export function ChatInterface() {
       // Extract the message content from the response
       let messageContent: string = '';
       
-      if (typeof response === 'string') {
-        messageContent = response;
-      } else if (response && typeof response === 'object' && 'content' in response) {
-        // Direct access to content property
-        messageContent = response.content || 'Sin contenido';
+      // Acceder a la estructura correcta: response.message.content[0].text
+      if (response && typeof response === 'object' && response.message) {
+        if (response.message.content && Array.isArray(response.message.content) && response.message.content.length > 0) {
+          messageContent = response.message.content[0].text || 'Sin contenido';
+        } else {
+          messageContent = 'Sin contenido';
+        }
       } else {
         messageContent = 'Error: Formato de respuesta no reconocido';
       }
