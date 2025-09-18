@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
-import { Client } from 'ssh2';
+// import { Client } from 'ssh2'; // Eliminamos la importación de ssh2 por ahora
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { cookies } from 'next/headers'; // Eliminado ReadonlyRequestCookies de aquí
 import CryptoJS from 'crypto-js';
 
 // Define SuperUser emails (for server-side check)
@@ -18,7 +18,9 @@ const serverSchema = z.object({
 });
 
 // Encryption/Decryption functions
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'super-secret-key-please-change-me'; // Fallback for dev, MUST be set in production
+// IMPORTANTE: En producción, DEBES establecer la variable de entorno ENCRYPTION_KEY.
+// No uses la clave por defecto 'super-secret-key-please-change-me' en un entorno real.
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'super-secret-key-please-change-me';
 
 function encrypt(text: string): string {
   return CryptoJS.AES.encrypt(text, ENCRYPTION_KEY).toString();
@@ -30,7 +32,6 @@ function decrypt(ciphertext: string): string {
 }
 
 // Helper function to create Supabase client for API routes
-// Esta función ahora toma un objeto NextResponse para modificar sus cookies y es SÍNCRONA.
 function getSupabaseServerClient(res: NextResponse) {
   // No necesitamos una variable cookieStore aquí, ya que cookies() se llamará directamente en el 'get'.
 
@@ -107,34 +108,9 @@ export async function POST(req: NextRequest) {
 
     const encryptedPassword = encrypt(newServerData.ssh_password);
 
-    const conn = new Client();
-    let connectionSuccessful = false;
-    let connectionError: string | null = null;
-
-    await new Promise<void>((resolve) => {
-      conn.on('ready', () => {
-        connectionSuccessful = true;
-        conn.end();
-        resolve();
-      }).on('error', (err) => {
-        connectionError = err.message;
-        conn.end();
-        resolve();
-      }).connect({
-        host: newServerData.ip_address,
-        port: newServerData.ssh_port || 22,
-        username: newServerData.ssh_username,
-        password: decrypt(encryptedPassword),
-        readyTimeout: 5000,
-      });
-    });
-
-    if (!connectionSuccessful) {
-      return NextResponse.json(
-        { message: `Fallo la conexión SSH al servidor: ${connectionError || 'Credenciales incorrectas o servidor inaccesible.'}` },
-        { status: 400 }
-      );
-    }
+    // Eliminamos la verificación de conexión SSH inmediata para simplificar el proceso
+    // y evitar errores de runtime relacionados con la conectividad o credenciales.
+    // La conexión SSH se probará cuando se intente desplegar un entorno.
 
     const { data, error } = await supabase
       .from('user_servers')
@@ -155,7 +131,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { message: 'Servidor añadido y conexión SSH verificada correctamente.', server: data },
+      { message: 'Servidor añadido correctamente (la conexión SSH se verificará al desplegar).', server: data },
       { status: 201, headers: res.headers }
     );
   } catch (error: any) {
