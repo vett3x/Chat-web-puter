@@ -48,7 +48,7 @@ export function MessageContent({ content, isNew, aiResponseSpeed }: MessageConte
   const renderableParts = React.useMemo(() => {
     console.log("MessageContent: Type of content received:", typeof content);
     if (typeof content === 'string') {
-      const parsedParts: Array<{ type: 'text' | 'code'; value?: string; language?: string; filename?: string; code?: string; }> = [];
+      const parsedParts: RenderablePart[] = [];
       let lastIndex = 0;
       let match;
       
@@ -58,12 +58,12 @@ export function MessageContent({ content, isNew, aiResponseSpeed }: MessageConte
         console.log("MessageContent: Regex match found:", match);
         if (match.index > lastIndex) {
           parsedParts.push({
-            type: 'text' as const,
-            value: content.substring(lastIndex, match.index),
+            type: 'text',
+            text: content.substring(lastIndex, match.index),
           });
         }
         parsedParts.push({
-          type: 'code' as const,
+          type: 'code',
           language: match[1],
           filename: match[2],
           code: (match[3] || '').trim(),
@@ -73,36 +73,23 @@ export function MessageContent({ content, isNew, aiResponseSpeed }: MessageConte
 
       if (lastIndex < content.length) {
         parsedParts.push({
-          type: 'text' as const,
-          value: content.substring(lastIndex),
+          type: 'text',
+          text: content.substring(lastIndex),
         });
       }
 
       if (parsedParts.length === 0 && content) {
-        parsedParts.push({ type: 'text' as const, value: content });
+        parsedParts.push({ type: 'text', text: content });
       }
-      // Map to the RenderablePart union type
-      return parsedParts.map(p => {
-        if (p.type === 'text') {
-          return { type: 'text', text: p.value || '' } as PuterTextContentPart;
-        }
-        return {
-          type: 'code',
-          language: p.language,
-          filename: p.filename,
-          code: p.code || '',
-        } as CodeBlockPart;
-      });
+      return parsedParts;
     } else if (Array.isArray(content)) {
       console.log("MessageContent: Content is an array, not parsing for code blocks within string.");
       // If content is already an array of PuterContentPart, ensure it's mapped to RenderablePart
       return content.map(part => {
         if (part.type === 'text') return part as PuterTextContentPart;
         if (part.type === 'image_url') return part as PuterImageContentPart;
-        // If there are other types in PuterContentPart that should be handled, add them here.
-        // For now, assuming only text and image_url come from Puter directly.
-        // If Puter AI starts returning code blocks as structured parts, this needs adjustment.
-        return { type: 'text', text: JSON.stringify(part) } as PuterTextContentPart; // Fallback
+        // Fallback for unknown parts, should not happen if PuterContentPart is well-defined
+        return { type: 'text', text: JSON.stringify(part) } as PuterTextContentPart; 
       });
     }
     return [];
