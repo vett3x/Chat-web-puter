@@ -187,17 +187,17 @@ export function DraggableFolderItem({
         onDragEnter={(e) => onDragEnter(e, folder.id)}
         onDragLeave={(e) => onDragLeave(e, folder.id)}
       >
-        <CardContent className="p-2 flex items-center justify-between gap-2">
+        <CardContent className="py-1.5 px-2 flex items-center justify-between gap-1"> {/* Adjusted padding and gap */}
           <div className="flex items-center flex-1 overflow-hidden" onClick={() => setIsExpanded(!isExpanded)}>
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 flex-shrink-0"
+              className="h-6 w-6 flex-shrink-0" // Adjusted button size
               onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
             >
-              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />} {/* Adjusted icon size */}
             </Button>
-            <Folder className="h-4 w-4 mr-2 flex-shrink-0" />
+            <Folder className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" /> {/* Adjusted icon size and margin */}
             {isEditing ? (
               <Input
                 value={editingName}
@@ -209,7 +209,7 @@ export function DraggableFolderItem({
                   }
                 }}
                 onBlur={handleSaveEdit}
-                className="flex-1 bg-sidebar-background text-sidebar-foreground h-8"
+                className="flex-1 bg-sidebar-background text-sidebar-foreground h-7 text-sm" // Adjusted height and font size
               />
             ) : (
               <span className="text-sm font-medium truncate flex-1" onClick={() => onSelectFolder(folder.id)}>
@@ -217,21 +217,21 @@ export function DraggableFolderItem({
               </span>
             )}
           </div>
-          <div className="flex-shrink-0 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex-shrink-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"> {/* Adjusted gap */}
             {isEditing ? (
               <>
-                <Button variant="ghost" size="icon" onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleSaveEdit(); }} className="h-7 w-7">
-                  <Save className="h-4 w-4" />
+                <Button variant="ghost" size="icon" onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleSaveEdit(); }} className="h-6 w-6"> {/* Adjusted button size */}
+                  <Save className="h-3.5 w-3.5" /> {/* Adjusted icon size */}
                 </Button>
-                <Button variant="ghost" size="icon" onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsEditing(false); setEditingName(folder.name); }} className="h-7 w-7">
-                  <X className="h-4 w-4" />
+                <Button variant="ghost" size="icon" onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsEditing(false); setEditingName(folder.name); }} className="h-6 w-6"> {/* Adjusted button size */}
+                  <X className="h-3.5 w-3.5" /> {/* Adjusted icon size */}
                 </Button>
               </>
             ) : (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-7 w-7">
-                    <MoreVertical className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" className="h-6 w-6"> {/* Adjusted button size */}
+                    <MoreVertical className="h-3.5 w-3.5" /> {/* Adjusted icon size */}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48 bg-popover text-popover-foreground border-border">

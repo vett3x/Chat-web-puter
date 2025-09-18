@@ -423,17 +423,17 @@ export function ConversationSidebar({
                 onDragEnter={(e) => handleDragEnter(e, null)}
                 onDragLeave={(e) => handleDragLeave(e, null)}
               >
-                <CardContent className="p-2 flex items-center justify-between gap-2">
+                <CardContent className="py-1.5 px-2 flex items-center justify-between gap-1"> {/* Adjusted padding and gap */}
                   <div className="flex items-center flex-1 overflow-hidden">
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 flex-shrink-0"
+                      className="h-6 w-6 flex-shrink-0" // Adjusted button size
                       onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsGeneralExpanded(!isGeneralExpanded); }}
                     >
-                      {isGeneralExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      {isGeneralExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />} {/* Adjusted icon size */}
                     </Button>
-                    <MessageSquare className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <MessageSquare className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" /> {/* Adjusted icon size and margin */}
                     <span className="text-sm font-medium truncate flex-1">General</span>
                   </div>
                 </CardContent>
