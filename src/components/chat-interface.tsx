@@ -2,31 +2,30 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input'; // Mantener Input si se usa en otro lugar, pero usaremos Textarea para el chat
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot, User, Loader2, Sparkles } from 'lucide-react'; // Importar Sparkles para el logo de Anthropic
+import { Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/components/session-context-provider';
 import { MessageContent } from './message-content';
-import { Textarea } from '@/components/ui/textarea'; // Importar Textarea
+import { Textarea } from '@/components/ui/textarea';
 
 interface Message {
   id: string;
+  conversation_id?: string; // Añadido para rastrear a qué conversación pertenece el mensaje
   content: string;
   role: 'user' | 'assistant';
   model?: string;
   timestamp: Date;
   isNew?: boolean;
-  isTyping?: boolean; // Para el indicador de carga en línea
+  isTyping?: boolean;
 }
 
-// Reestructuración de los modelos para incluir información de la empresa y logos
 const AI_PROVIDERS = [
   {
     company: 'Anthropic',
-    logo: Sparkles, // Usamos Sparkles como logo placeholder
+    logo: Sparkles,
     models: [
       { value: 'claude-sonnet-4', label: 'Claude Sonnet 4' },
       { value: 'claude-opus-4', label: 'Claude Opus 4' },
@@ -34,17 +33,8 @@ const AI_PROVIDERS = [
       { value: 'claude-3-7-opus', label: 'Claude 3.7 Opus' },
     ],
   },
-  // Puedes añadir más proveedores aquí si es necesario
-  // {
-  //   company: 'Google',
-  //   logo: Bot, // Otro icono de ejemplo
-  //   models: [
-  //     { value: 'gemini-pro', label: 'Gemini Pro' }
-  //   ]
-  // }
 ];
 
-// Extraer todos los valores de los modelos para el estado inicial
 const ALL_MODEL_VALUES = AI_PROVIDERS.flatMap(provider => provider.models.map(model => model.value));
 
 interface PuterMessage {
@@ -77,9 +67,10 @@ export function ChatInterface({
 }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
-  const [selectedModel, setSelectedModel] = useState(ALL_MODEL_VALUES[0]); // Seleccionar el primer modelo por defecto
+  const [selectedModel, setSelectedModel] = useState(ALL_MODEL_VALUES[0]);
   const [isLoading, setIsLoading] = useState(false);
   const [isPuterReady, setIsPuterReady] = useState(false);
+  const [isSendingFirstMessageOfNewConversation, setIsSendingFirstMessageOfNewConversation] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -93,11 +84,10 @@ export function ChatInterface({
     checkPuter();
   }, []);
 
-  const fetchMessages = useCallback(async (convId: string) => {
-    setIsLoading(true);
+  const getMessagesFromDB = useCallback(async (convId: string) => {
     const { data, error } = await supabase
       .from('messages')
-      .select('id, content, role, model, created_at')
+      .select('id, content, role, model, created_at, conversation_id')
       .eq('conversation_id', convId)
       .eq('user_id', userId)
       .order('created_at', { ascending: true });
@@ -105,28 +95,35 @@ export function ChatInterface({
     if (error) {
       console.error('Error fetching messages:', error.message || error.details || error);
       toast.error('Error al cargar los mensajes de la conversación.');
-      setMessages([]);
-    } else {
-      setMessages(
-        data.map((msg) => ({
-          id: msg.id,
-          content: msg.content,
-          role: msg.role as 'user' | 'assistant',
-          model: msg.model || undefined,
-          timestamp: new Date(msg.created_at),
-        }))
-      );
+      return [];
     }
-    setIsLoading(false);
+    return data.map((msg) => ({
+      id: msg.id,
+      conversation_id: msg.conversation_id,
+      content: msg.content,
+      role: msg.role as 'user' | 'assistant',
+      model: msg.model || undefined,
+      timestamp: new Date(msg.created_at),
+    }));
   }, [userId]);
 
   useEffect(() => {
-    if (conversationId && userId) {
-      fetchMessages(conversationId);
-    } else {
-      setMessages([]);
-    }
-  }, [conversationId, userId, fetchMessages]);
+    const loadMessages = async () => {
+      if (conversationId && userId) {
+        setIsLoading(true);
+        const fetchedMsgs = await getMessagesFromDB(conversationId);
+        // Solo actualiza los mensajes si no estamos en medio de enviar el primer mensaje de una nueva conversación
+        // O si los mensajes obtenidos de la DB no están vacíos (es una conversación existente con historial)
+        if (!isSendingFirstMessageOfNewConversation || fetchedMsgs.length > 0) {
+          setMessages(fetchedMsgs);
+        }
+        setIsLoading(false);
+      } else if (!conversationId) {
+        setMessages([]);
+      }
+    };
+    loadMessages();
+  }, [conversationId, userId, getMessagesFromDB, isSendingFirstMessageOfNewConversation]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -183,39 +180,42 @@ export function ChatInterface({
   const sendMessage = async () => {
     if (!inputMessage.trim() || isLoading || !isPuterReady || !userId) return;
 
-    setIsLoading(true); // Deshabilita el botón de enviar
-
-    const tempUserMessageId = `user-${Date.now()}`;
-    const userMessage: Message = {
-      id: tempUserMessageId,
-      content: inputMessage,
-      role: 'user',
-      timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+    const messageToSend = inputMessage;
     setInputMessage('');
 
     let currentConvId = conversationId;
+    let isNewConversation = false;
+
     if (!currentConvId) {
-      currentConvId = await createNewConversationInDB(userMessage.content);
+      isNewConversation = true;
+      setIsSendingFirstMessageOfNewConversation(true); // Establecer la bandera
+      currentConvId = await createNewConversationInDB(messageToSend);
       if (!currentConvId) {
         setIsLoading(false);
-        setMessages(prev => prev.filter(msg => msg.id !== tempUserMessageId)); // Eliminar mensaje de usuario si falla la creación
+        setIsSendingFirstMessageOfNewConversation(false); // Limpiar la bandera en caso de fallo
+        setInputMessage(messageToSend); // Restaurar el mensaje en el input
         return;
       }
     }
 
     const finalConvId = currentConvId;
-    saveMessageToDB(finalConvId, userMessage).then(savedData => {
-      if (savedData) {
-        setMessages(prev => prev.map(msg => msg.id === tempUserMessageId ? { ...msg, id: savedData.id, timestamp: savedData.timestamp } : msg));
-      }
-    });
+
+    const tempUserMessageId = `user-${Date.now()}`;
+    const userMessage: Message = {
+      id: tempUserMessageId,
+      conversation_id: finalConvId,
+      content: messageToSend,
+      role: 'user',
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, userMessage]);
 
     const tempAssistantId = `assistant-${Date.now()}`;
     const placeholderMessage: Message = {
       id: tempAssistantId,
+      conversation_id: finalConvId,
       content: '',
       role: 'assistant',
       model: selectedModel,
@@ -244,9 +244,9 @@ export function ChatInterface({
         content: "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante."
       };
 
-      const response = await window.puter.ai.chat([systemMessage, ...puterMessages], { model: selectedModel });
+      const response = await window.puter.ai.chat([systemMessage, ...puterMessages, { role: 'user', content: messageToSend }], { model: selectedModel });
+      console.log('Puter AI response:', response); // Para depuración
 
-      // Enhanced check for empty or unexpected AI response, potentially due to a security challenge
       if (!response || (typeof response === 'object' && Object.keys(response).length === 0)) {
         throw new Error('La respuesta de la IA está vacía o tuvo un formato inesperado. Si es tu primera interacción en una nueva sesión, podría ser necesario completar una verificación de seguridad (ej. CAPTCHA) en el popup de Puter AI.');
       }
@@ -273,6 +273,8 @@ export function ChatInterface({
 
       setMessages(prev => prev.map(msg => msg.id === tempAssistantId ? { ...msg, ...assistantMessageData, isTyping: false, isNew: true } : msg));
 
+      // Guardar el mensaje del usuario y del asistente en la DB
+      await saveMessageToDB(finalConvId, userMessage); // Guardar el mensaje del usuario
       saveMessageToDB(finalConvId, assistantMessageData).then(savedData => {
         if (savedData) {
           setMessages(prev => prev.map(msg => msg.id === tempAssistantId ? { ...msg, id: savedData.id, timestamp: savedData.timestamp } : msg));
@@ -282,9 +284,12 @@ export function ChatInterface({
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Ocurrió un error desconocido.';
       toast.error(errorMessage);
-      setMessages(prev => prev.map(msg => msg.id === tempAssistantId ? { ...msg, content: `Error: ${errorMessage}`, isTyping: false } : msg));
+      setMessages(prev => prev.map(msg => msg.id === tempAssistantId ? { ...msg, content: `Error: ${errorMessage}`, isTyping: false, isNew: true } : msg));
     } finally {
-      setIsLoading(false); // Habilita el botón de enviar
+      setIsLoading(false);
+      if (isNewConversation) {
+        setIsSendingFirstMessageOfNewConversation(false); // Limpiar la bandera
+      }
     }
   };
 
@@ -318,11 +323,9 @@ export function ChatInterface({
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* La cabecera con el título y el selector de modelo se ha eliminado */}
-
       <div className="flex-1 min-h-0 relative">
         <ScrollArea className="h-full" ref={scrollAreaRef}>
-          <div className="p-4 space-y-4 pb-32"> {/* Aumentado padding-bottom para el cuadro flotante */}
+          <div className="p-4 space-y-4 pb-32">
             {messages.length === 0 && !isLoading ? (
               <div className="text-center text-muted-foreground py-8">
                 <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -381,7 +384,6 @@ export function ChatInterface({
           </div>
         </ScrollArea>
 
-        {/* Cuadro de entrada flotante */}
         <div className="absolute bottom-16 left-0 right-0 flex justify-center px-4">
           <div className="w-full max-w-3xl bg-card rounded-xl border border-input shadow-lg p-2 flex items-center gap-2 
                         focus-within:ring-2 focus-within:ring-green-500 focus-within:ring-offset-2 focus-within:ring-offset-background 
