@@ -379,8 +379,8 @@ export function ChatInterface({
         </CardHeader>
 
         <CardContent className="flex-1 p-0 min-h-0">
-          <ScrollArea className="h-full p-4" ref={scrollAreaRef}>
-            <div className="space-y-4">
+          <ScrollArea className="h-full" ref={scrollAreaRef}>
+            <div className="space-y-4 p-4">
               {messages.length === 0 && !isLoading ? (
                 <div className="text-center text-muted-foreground py-8">
                   <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
