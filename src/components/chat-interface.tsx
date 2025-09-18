@@ -395,7 +395,7 @@ export function ChatInterface({
               </SelectTrigger>
               <SelectContent>
                 {AI_PROVIDERS.map((provider, providerIndex) => (
-                  <React.Fragment key={provider.company}>
+                  <SelectGroup key={provider.company}> {/* Envuelto en SelectGroup */}
                     <SelectLabel className="flex items-center gap-2 font-bold text-foreground">
                       <provider.logo className="h-4 w-4" />
                       {provider.company}
@@ -406,7 +406,7 @@ export function ChatInterface({
                       </SelectItem>
                     ))}
                     {providerIndex < AI_PROVIDERS.length - 1 && <SelectSeparator />}
-                  </React.Fragment>
+                  </SelectGroup>
                 ))}
               </SelectContent>
             </Select>
