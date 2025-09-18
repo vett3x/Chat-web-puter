@@ -5,11 +5,12 @@ import { CodeBlock } from './code-block';
 
 interface MessageContentProps {
   content: string;
+  isNew?: boolean;
 }
 
 const codeBlockRegex = /```(\w+)(?::([\w./-]+))?\n([\s\S]*?)\n```/g;
 
-export function MessageContent({ content }: MessageContentProps) {
+export function MessageContent({ content, isNew }: MessageContentProps) {
   const parts = [];
   let lastIndex = 0;
   let match;
@@ -53,6 +54,7 @@ export function MessageContent({ content }: MessageContentProps) {
               language={part.language || ''}
               filename={part.filename}
               code={part.code}
+              isNew={isNew}
             />
           );
         }

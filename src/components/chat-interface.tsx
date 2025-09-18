@@ -18,6 +18,7 @@ interface Message {
   role: 'user' | 'assistant';
   model?: string;
   timestamp: Date;
+  isNew?: boolean;
 }
 
 const AVAILABLE_MODELS = [
@@ -262,6 +263,7 @@ export function ChatInterface({
         role: 'assistant',
         model: selectedModel,
         timestamp: new Date(),
+        isNew: true,
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -403,7 +405,7 @@ export function ChatInterface({
                           : 'bg-muted'
                       }`}
                     >
-                      <MessageContent content={message.content} />
+                      <MessageContent content={message.content} isNew={!!message.isNew} />
                       {message.model && (
                         <div className="text-xs opacity-70 mt-2">
                           {AVAILABLE_MODELS.find(m => m.value === message.model)?.label}

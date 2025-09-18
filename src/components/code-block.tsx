@@ -12,14 +12,20 @@ interface CodeBlockProps {
   language: string;
   code: string;
   filename?: string;
+  isNew?: boolean;
 }
 
-export function CodeBlock({ language, code, filename }: CodeBlockProps) {
+export function CodeBlock({ language, code, filename, isNew }: CodeBlockProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [isOpen, setIsOpen] = useState(true);
-  const [displayedCode, setDisplayedCode] = useState('');
+  const [displayedCode, setDisplayedCode] = useState(isNew ? '' : code);
 
   useEffect(() => {
+    if (!isNew) {
+      setDisplayedCode(code);
+      return;
+    }
+
     setDisplayedCode('');
     let timeoutId: NodeJS.Timeout;
 
@@ -29,7 +35,7 @@ export function CodeBlock({ language, code, filename }: CodeBlockProps) {
         if (i < code.length) {
           setDisplayedCode((prev) => prev + code.charAt(i));
           i++;
-          const delay = Math.random() * 15 + 5; // Velocidad de escritura aleatoria para un efecto más natural
+          const delay = 1; // Velocidad de escritura muy rápida
           timeoutId = setTimeout(typeCharacter, delay);
         }
       };
@@ -41,7 +47,7 @@ export function CodeBlock({ language, code, filename }: CodeBlockProps) {
         clearTimeout(timeoutId);
       }
     };
-  }, [code]);
+  }, [code, isNew]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(code).then(() => {
