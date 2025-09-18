@@ -39,9 +39,9 @@ const AI_PROVIDERS = [
   //   company: 'Google',
   //   logo: Bot, // Otro icono de ejemplo
   //   models: [
-  //     { value: 'gemini-pro', label: 'Gemini Pro' },
-  //   ],
-  // },
+  //     { value: 'gemini-pro', label: 'Gemini Pro' }
+  //   ]
+  // }
 ];
 
 // Extraer todos los valores de los modelos para el estado inicial
@@ -388,7 +388,7 @@ export function ChatInterface({
               onKeyPress={handleKeyPress}
               placeholder="Pregunta a Claude AI..."
               disabled={isLoading || !userId}
-              className="flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none min-h-[50px] max-h-[200px] overflow-y-auto bg-transparent"
+              className="flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none max-h-[200px] overflow-y-auto bg-transparent"
               rows={1}
             />
             <Select value={selectedModel} onValueChange={setSelectedModel}>
