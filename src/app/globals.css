@@ -39,6 +39,10 @@
 
     --destructive-foreground: 0 0% 98%;
 
+    --info: 214 91% 95%;
+
+    --info-foreground: 216 91% 35%;
+
     --border: 0 0% 89.8%;
 
     --input: 0 0% 89.8%;
@@ -106,6 +110,10 @@
     --destructive: 0 62.8% 30.6%; /* Keep destructive as is for now */
 
     --destructive-foreground: 0 0% 98%;
+
+    --info: 216 91% 25%;
+
+    --info-foreground: 214 91% 85%;
 
     --border: 220 10% 15%; /* Darker gray for borders */
 
