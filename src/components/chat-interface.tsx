@@ -32,27 +32,11 @@ interface PuterMessage {
   content: string;
 }
 
-interface PuterAIResponse {
-  id?: string;
-  type?: string;
-  role?: string;
-  model?: string;
-  content?: string;
-  stop_reason?: string;
-  stop_sequence?: string;
-  usage?: any;
-  message?: {
-    content: Array<{
-      text: string;
-    }>;
-  };
-}
-
 declare global {
   interface Window {
     puter: {
       ai: {
-        chat: (messages: PuterMessage[], options: { model: string }) => Promise<PuterAIResponse>;
+        chat: (messages: PuterMessage[], options: { model: string }) => Promise<any>;
       };
     };
   }
@@ -255,7 +239,15 @@ export function ChatInterface({
       });
       setIsContextLoading(false);
 
-      const messageContent = response?.message?.content?.[0]?.text || 'Sin contenido';
+      let messageContent = 'Sin contenido';
+      if (response && response.message && Array.isArray(response.message.content) && response.message.content.length > 0 && response.message.content[0].text) {
+        messageContent = response.message.content[0].text;
+      } else if (response && typeof response.content === 'string') {
+        messageContent = response.content;
+      } else {
+        console.error('Unexpected AI response format:', response);
+        throw new Error('La respuesta de la IA tuvo un formato inesperado.');
+      }
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),

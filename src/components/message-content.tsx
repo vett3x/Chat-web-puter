@@ -17,16 +17,16 @@ export function MessageContent({ content }: MessageContentProps) {
   while ((match = codeBlockRegex.exec(content)) !== null) {
     if (match.index > lastIndex) {
       parts.push({
-        type: 'text',
+        type: 'text' as const,
         value: content.substring(lastIndex, match.index),
       });
     }
 
     parts.push({
-      type: 'code',
+      type: 'code' as const,
       language: match[1],
       filename: match[2],
-      code: match[3].trim(),
+      code: (match[3] || '').trim(),
     });
 
     lastIndex = match.index + match[0].length;
@@ -34,13 +34,13 @@ export function MessageContent({ content }: MessageContentProps) {
 
   if (lastIndex < content.length) {
     parts.push({
-      type: 'text',
+      type: 'text' as const,
       value: content.substring(lastIndex),
     });
   }
 
   if (parts.length === 0) {
-    parts.push({ type: 'text', value: content });
+    parts.push({ type: 'text' as const, value: content });
   }
 
   return (
