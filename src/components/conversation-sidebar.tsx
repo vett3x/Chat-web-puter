@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, MessageSquare, Loader2, Edit, Save, X, Trash2, Folder, List, Archive } from 'lucide-react';
+import { Plus, MessageSquare, Loader2, Edit, Save, X, Trash2, Folder, List, Archive, MoreVertical, MoveRight } from 'lucide-react';
 import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -21,9 +21,17 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu';
 import { ProfileDropdown } from './profile-dropdown';
 import { Skeleton } from '@/components/ui/skeleton';
-import { FolderItem } from './folder-item'; // Importar el nuevo componente FolderItem
+import { FolderItem } from './folder-item';
 
 interface Conversation {
   id: string;
@@ -228,6 +236,30 @@ export function ConversationSidebar({
     setDeletingConversationId(null);
   };
 
+  const handleMoveConversation = async (conversationId: string, targetFolderId: string | null) => {
+    if (!userId) {
+      toast.error('Usuario no autenticado.');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('conversations')
+      .update({ folder_id: targetFolderId })
+      .eq('id', conversationId)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error moving conversation:', error);
+      toast.error('Error al mover la conversación.');
+    } else {
+      toast.success('Conversación movida.');
+      fetchConversationsAndFolders(); // Re-fetch to update both lists
+      if (selectedConversationId === conversationId) {
+        onSelectConversation(null); // Deselect if the moved conversation was selected
+      }
+    }
+  };
+
   const handleSelectFolder = (folderId: string | null) => {
     setSelectedFolderId(folderId);
     setViewMode('folder');
@@ -387,38 +419,69 @@ export function ConversationSidebar({
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setDeletingConversationId(conversation.id);
-                                    }}
-                                    className={cn(
-                                      "h-7 w-7 text-destructive hover:bg-destructive/10",
-                                      selectedConversationId === conversation.id ? "text-sidebar-primary-foreground hover:bg-sidebar-accent hover:text-destructive" : "text-destructive hover:bg-destructive/10"
-                                    )}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7">
+                                    <MoreVertical className="h-4 w-4" />
                                   </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Esta acción no se puede deshacer. Esto eliminará permanentemente tu conversación y todos sus mensajes.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel onClick={() => setDeletingConversationId(null)}>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDeleteConversation(conversation.id)}>
-                                      Eliminar
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48 bg-popover text-popover-foreground border-border">
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelectConversation(conversation.id); }}>
+                                    <MessageSquare className="mr-2 h-4 w-4" /> Abrir
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuTrigger asChild>
+                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                      <MoveRight className="mr-2 h-4 w-4" /> Mover a
+                                    </DropdownMenuItem>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent side="right" align="start" className="w-48 bg-popover text-popover-foreground border-border">
+                                    <DropdownMenuLabel>Mover a Carpeta</DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => handleMoveConversation(conversation.id, null)}>
+                                      (Sin carpeta)
+                                    </DropdownMenuItem>
+                                    {folders.map(f => (
+                                      <DropdownMenuItem key={f.id} onClick={() => handleMoveConversation(conversation.id, f.id)}>
+                                        {f.name}
+                                      </DropdownMenuItem>
+                                    ))}
+                                  </DropdownMenuContent>
+                                  <DropdownMenuSeparator />
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setDeletingConversationId(conversation.id);
+                                        }}
+                                        className={cn(
+                                          "h-7 w-7 text-destructive hover:bg-destructive/10",
+                                          selectedConversationId === conversation.id ? "text-sidebar-primary-foreground hover:bg-sidebar-accent hover:text-destructive" : "text-destructive hover:bg-destructive/10"
+                                        )}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Esta acción no se puede deshacer. Esto eliminará permanentemente tu conversación y todos sus mensajes.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel onClick={() => setDeletingConversationId(null)}>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDeleteConversation(conversation.id)}>
+                                          Eliminar
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </>
                           )}
                         </div>
@@ -446,7 +509,7 @@ export function ConversationSidebar({
                       subfolders={folders}
                       onFolderUpdated={fetchConversationsAndFolders}
                       onFolderDeleted={fetchConversationsAndFolders}
-                      onConversationMoved={fetchConversationsAndFolders}
+                      onConversationMoved={handleMoveConversation}
                       onCreateSubfolder={createNewFolder}
                       allFolders={folders}
                     />

@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-  DropdownMenuLabel, // Importar DropdownMenuLabel
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
@@ -23,7 +23,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Folder, ChevronRight, ChevronDown, Edit, Save, X, Trash2, Plus, MessageSquare, MoreVertical, MoveRight } from 'lucide-react'; // Importar MoveRight
+import { Folder, ChevronRight, ChevronDown, Edit, Save, X, Trash2, Plus, MessageSquare, MoreVertical, MoveRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -54,7 +54,7 @@ interface FolderItemProps {
   subfolders: Folder[]; // All folders, filtered by parent_id inside
   onFolderUpdated: () => void; // Callback to refresh parent list
   onFolderDeleted: () => void; // Callback to refresh parent list
-  onConversationMoved: () => void; // Callback when a conversation is moved
+  onConversationMoved: (conversationId: string, targetFolderId: string | null) => void; // Centralized callback
   onCreateSubfolder: (parentId: string) => void;
   allFolders: Folder[]; // For "move to folder" dropdown
 }
@@ -69,7 +69,7 @@ export function FolderItem({
   subfolders,
   onFolderUpdated,
   onFolderDeleted,
-  onConversationMoved,
+  onConversationMoved, // Use the centralized function
   onCreateSubfolder,
   allFolders,
 }: FolderItemProps) {
@@ -142,27 +142,6 @@ export function FolderItem({
       onSelectFolder(null);
     }
     setIsDeleting(false);
-  };
-
-  const handleMoveConversation = async (conversationId: string, targetFolderId: string | null) => {
-    if (!userId) {
-      toast.error('Usuario no autenticado.');
-      return;
-    }
-
-    const { error } = await supabase
-      .from('conversations')
-      .update({ folder_id: targetFolderId })
-      .eq('id', conversationId)
-      .eq('user_id', userId);
-
-    if (error) {
-      console.error('Error moving conversation:', error);
-      toast.error('Error al mover la conversación.');
-    } else {
-      toast.success('Conversación movida.');
-      onConversationMoved();
-    }
   };
 
   const paddingLeft = `${level * 1.25 + 0.5}rem`; // Indent based on level
@@ -313,11 +292,11 @@ export function FolderItem({
                     <DropdownMenuContent side="right" align="start" className="w-48 bg-popover text-popover-foreground border-border">
                       <DropdownMenuLabel>Mover a Carpeta</DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => handleMoveConversation(conversation.id, null)}>
+                      <DropdownMenuItem onClick={() => onConversationMoved(conversation.id, null)}>
                         (Sin carpeta)
                       </DropdownMenuItem>
                       {allFolders.filter(f => f.id !== folder.id).map(f => (
-                        <DropdownMenuItem key={f.id} onClick={() => handleMoveConversation(conversation.id, f.id)}>
+                        <DropdownMenuItem key={f.id} onClick={() => onConversationMoved(conversation.id, f.id)}>
                           {f.name}
                         </DropdownMenuItem>
                       ))}
