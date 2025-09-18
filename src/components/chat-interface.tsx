@@ -76,7 +76,7 @@ export function ChatInterface({
   const [isLoading, setIsLoading] = useState(false);
   const [isPuterReady, setIsPuterReady] = useState(false);
   const [isContextLoading, setIsContextLoading] = useState(false);
-  const [isContextInitialized, setIsContextInitialized] = useState(false); // New state to track if context is loaded
+  const [isContextInitialized, setIsContextInitialized] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -92,7 +92,7 @@ export function ChatInterface({
 
   const fetchMessages = useCallback(async (convId: string) => {
     setIsLoading(true);
-    setIsContextInitialized(false); // Reset context state when fetching a new conversation
+    setIsContextInitialized(false);
     const { data, error } = await supabase
       .from('messages')
       .select('id, content, role, model, created_at')
@@ -114,7 +114,7 @@ export function ChatInterface({
           timestamp: new Date(msg.created_at),
         }))
       );
-      setIsContextInitialized(true); // Context is now initialized for this conversation
+      setIsContextInitialized(true);
     }
     setIsLoading(false);
   }, [userId]);
@@ -123,8 +123,8 @@ export function ChatInterface({
     if (conversationId && userId) {
       fetchMessages(conversationId);
     } else {
-      setMessages([]); // Clear messages if no conversation is selected
-      setIsContextInitialized(false); // Reset context state
+      setMessages([]);
+      setIsContextInitialized(false);
     }
   }, [conversationId, userId, fetchMessages]);
 
@@ -155,7 +155,7 @@ export function ChatInterface({
       return null;
     }
     onNewConversationCreated(data.id);
-    onConversationTitleUpdate(data.id, data.title); // Update sidebar with new title
+    onConversationTitleUpdate(data.id, data.title);
     return data.id;
   };
 
@@ -170,9 +170,7 @@ export function ChatInterface({
       role: msg.role,
       content: msg.content,
       model: msg.model,
-      // 'type' has a default value in the DB, so it's optional here
-      // 'created_at' has a default value in the DB, so it's optional here
-    }).select('id, content, role, model, created_at').single(); // Select to get the generated ID and created_at
+    }).select('id, content, role, model, created_at').single();
 
     if (error) {
       console.error('Error saving message:', error.message || error.details || error);
@@ -193,7 +191,7 @@ export function ChatInterface({
 
     const tempUserMessageId = Date.now().toString();
     const userMessage: Message = {
-      id: tempUserMessageId, // Temporary ID for immediate UI update
+      id: tempUserMessageId,
       content: inputMessage,
       role: 'user',
       timestamp: new Date(),
@@ -205,7 +203,7 @@ export function ChatInterface({
 
     let currentConvId = conversationId;
     let shouldFetchContextFromDB = false;
-    let tempAssistantMessageId: string | null = null; // Declare outside try block
+    let tempAssistantMessageId: string | null = null;
 
     if (!currentConvId) {
       shouldFetchContextFromDB = true;
@@ -226,6 +224,7 @@ export function ChatInterface({
 
     try {
       let puterMessages: PuterMessage[] = [];
+      const currentMessages = [...messages, savedUserMessage];
 
       if (!isContextInitialized || shouldFetchContextFromDB) {
         setIsContextLoading(true);
@@ -237,11 +236,7 @@ export function ChatInterface({
           .order('created_at', { ascending: true });
 
         if (historyError) {
-          console.error('Error fetching conversation history for AI context:', historyError.message || historyError.details || historyError);
-          toast.error('Error al cargar el historial para el contexto de la IA.');
-          setIsLoading(false);
-          setIsContextLoading(false);
-          return;
+          throw new Error('Error al cargar el historial para el contexto de la IA.');
         }
         puterMessages = historyData.map(msg => ({
           role: msg.role as 'user' | 'assistant',
@@ -249,36 +244,22 @@ export function ChatInterface({
         }));
         setIsContextInitialized(true);
       } else {
-        puterMessages = messages.map(msg => ({
+        puterMessages = currentMessages.map(msg => ({
           role: msg.role,
           content: msg.content
         }));
       }
-
-      console.log('Sending messages to Puter (with context):', puterMessages);
 
       const response = await window.puter.ai.chat(puterMessages, {
         model: selectedModel
       });
       setIsContextLoading(false);
 
-      console.log('Puter response:', response);
+      let messageContent = response?.message?.content?.[0]?.text || 'Sin contenido';
 
-      let messageContent: string = '';
-      if (response && typeof response === 'object' && response.message) {
-        if (response.message.content && Array.isArray(response.message.content) && response.message.content.length > 0) {
-          messageContent = response.message.content[0].text || 'Sin contenido';
-        } else {
-          messageContent = 'Sin contenido';
-        }
-      } else {
-        messageContent = 'Error: Formato de respuesta no reconocido';
-      }
-
-      // Create a temporary assistant message for streaming
       tempAssistantMessageId = (Date.now() + 1).toString();
       const streamingAssistantMessage: Message = {
-          id: tempAssistantMessageId, // Start with empty content
+          id: tempAssistantMessageId,
           content: '',
           role: 'assistant',
           model: selectedModel,
@@ -286,33 +267,27 @@ export function ChatInterface({
       };
       setMessages(prev => [...prev, streamingAssistantMessage]);
 
-      // Start streaming simulation
-      let currentStreamedContent = '';
       let charIndex = 0;
-      const fullMessageContent = messageContent;
-
       const typingInterval = setInterval(() => {
-          if (charIndex < fullMessageContent.length) {
-              currentStreamedContent += fullMessageContent[charIndex];
+          if (charIndex < messageContent.length) {
               setMessages(prev =>
                   prev.map(msg =>
                       msg.id === tempAssistantMessageId
-                          ? { ...msg, content: currentStreamedContent }
+                          ? { ...msg, content: messageContent.substring(0, charIndex + 1) }
                           : msg
                   )
               );
               charIndex++;
           } else {
               clearInterval(typingInterval);
-              // Streaming finished, now save the final message to DB
               const finalAssistantMessage: Message = {
-                  id: tempAssistantMessageId!, // Use the same temp ID, assert non-null
-                  content: fullMessageContent,
+                  id: tempAssistantMessageId!,
+                  content: messageContent,
                   role: 'assistant',
                   model: selectedModel,
                   timestamp: new Date(),
               };
-              saveMessageToDB(currentConvId, finalAssistantMessage).then(savedMsg => {
+              saveMessageToDB(currentConvId!, finalAssistantMessage).then(savedMsg => {
                   if (savedMsg) {
                       setMessages(prev =>
                           prev.map(msg =>
@@ -320,17 +295,16 @@ export function ChatInterface({
                           )
                       );
                   }
-                  setIsLoading(false); // Only set isLoading to false after streaming and saving
+                  setIsLoading(false);
               });
           }
-      }, 20); // Velocidad de escritura: 20ms por carácter
+      }, 20);
 
     } catch (error) {
       console.error('Error sending message:', error);
-      toast.error('Error al enviar el mensaje. Por favor, intenta de nuevo.');
+      toast.error((error as Error).message || 'Error al enviar el mensaje. Por favor, intenta de nuevo.');
       setIsLoading(false);
       setIsContextLoading(false);
-      // If a temporary streaming message was added, remove it on error
       if (tempAssistantMessageId) {
         setMessages(prev => prev.filter(msg => msg.id !== tempAssistantMessageId));
       }
@@ -401,8 +375,8 @@ export function ChatInterface({
           </div>
         </CardHeader>
 
-        <CardContent className="flex-1 flex flex-col p-0 min-h-0">
-          <ScrollArea className="flex-1 p-4 overflow-y-auto min-h-0" ref={scrollAreaRef}>
+        <CardContent className="flex-1 p-0 min-h-0">
+          <ScrollArea className="h-full p-4" ref={scrollAreaRef}>
             <div className="space-y-4">
               {messages.length === 0 && !isLoading ? (
                 <div className="text-center text-muted-foreground py-8">
@@ -471,31 +445,31 @@ export function ChatInterface({
               )}
             </div>
           </ScrollArea>
-
-          <div className="border-t p-4 flex-shrink-0">
-            <div className="flex gap-2">
-              <Input
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Escribe tu mensaje aquí..."
-                disabled={isLoading || !userId}
-                className="flex-1"
-              />
-              <Button
-                onClick={sendMessage}
-                disabled={isLoading || !inputMessage.trim() || !userId}
-                size="icon"
-              >
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-          </div>
         </CardContent>
+
+        <div className="border-t p-4 flex-shrink-0">
+          <div className="flex gap-2">
+            <Input
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Escribe tu mensaje aquí..."
+              disabled={isLoading || !userId}
+              className="flex-1"
+            />
+            <Button
+              onClick={sendMessage}
+              disabled={isLoading || !inputMessage.trim() || !userId}
+              size="icon"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        </div>
       </Card>
     </div>
   );
