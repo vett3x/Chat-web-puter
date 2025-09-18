@@ -298,7 +298,7 @@ export function ChatInterface({
                   setIsLoading(false);
               });
           }
-      }, 20);
+      }, 10);
 
     } catch (error) {
       console.error('Error sending message:', error);
