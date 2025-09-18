@@ -205,10 +205,9 @@ export function ChatInterface({
 
     let currentConvId = conversationId;
     let shouldFetchContextFromDB = false;
+    let tempAssistantMessageId: string | null = null; // Declare outside try block
 
     if (!currentConvId) {
-      // This is the very first message, so a new conversation will be created.
-      // We need to fetch context from DB for this new conversation.
       shouldFetchContextFromDB = true;
       currentConvId = await createNewConversationInDB(userMessage.content);
       if (!currentConvId) {
@@ -220,19 +219,16 @@ export function ChatInterface({
     const savedUserMessage = await saveMessageToDB(currentConvId, userMessage);
     if (!savedUserMessage) {
       setIsLoading(false);
-      // Optionally remove the temporary message if saving failed
       setMessages(prev => prev.filter(msg => msg.id !== tempUserMessageId));
       return;
     }
-    // Replace temporary user message with the one from DB (with actual ID and timestamp)
     setMessages(prev => prev.map(msg => msg.id === tempUserMessageId ? savedUserMessage : msg));
-
 
     try {
       let puterMessages: PuterMessage[] = [];
 
       if (!isContextInitialized || shouldFetchContextFromDB) {
-        setIsContextLoading(true); // Show context loading indicator
+        setIsContextLoading(true);
         const { data: historyData, error: historyError } = await supabase
           .from('messages')
           .select('content, role')
@@ -251,15 +247,12 @@ export function ChatInterface({
           role: msg.role as 'user' | 'assistant',
           content: msg.content
         }));
-        setIsContextInitialized(true); // Context is now initialized for this conversation
+        setIsContextInitialized(true);
       } else {
-        // Context is already initialized, use current in-memory messages
         puterMessages = messages.map(msg => ({
           role: msg.role,
           content: msg.content
         }));
-        // The latest user message (savedUserMessage) is already included in `messages`
-        // when `isContextInitialized` is true, so no explicit check/push is needed here.
       }
 
       console.log('Sending messages to Puter (with context):', puterMessages);
@@ -267,7 +260,7 @@ export function ChatInterface({
       const response = await window.puter.ai.chat(puterMessages, {
         model: selectedModel
       });
-      setIsContextLoading(false); // Ensure it's turned off after AI call
+      setIsContextLoading(false);
 
       console.log('Puter response:', response);
 
@@ -282,25 +275,65 @@ export function ChatInterface({
         messageContent = 'Error: Formato de respuesta no reconocido';
       }
 
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(), // Temporary ID for immediate UI update
-        content: messageContent,
-        role: 'assistant',
-        model: selectedModel,
-        timestamp: new Date(),
+      // Create a temporary assistant message for streaming
+      tempAssistantMessageId = (Date.now() + 1).toString();
+      const streamingAssistantMessage: Message = {
+          id: tempAssistantMessageId, // Start with empty content
+          content: '',
+          role: 'assistant',
+          model: selectedModel,
+          timestamp: new Date(),
       };
+      setMessages(prev => [...prev, streamingAssistantMessage]);
 
-      const savedAssistantMessage = await saveMessageToDB(currentConvId, assistantMessage);
-      if (savedAssistantMessage) {
-        setMessages(prev => [...prev, savedAssistantMessage]);
-      }
+      // Start streaming simulation
+      let currentStreamedContent = '';
+      let charIndex = 0;
+      const fullMessageContent = messageContent;
+
+      const typingInterval = setInterval(() => {
+          if (charIndex < fullMessageContent.length) {
+              currentStreamedContent += fullMessageContent[charIndex];
+              setMessages(prev =>
+                  prev.map(msg =>
+                      msg.id === tempAssistantMessageId
+                          ? { ...msg, content: currentStreamedContent }
+                          : msg
+                  )
+              );
+              charIndex++;
+          } else {
+              clearInterval(typingInterval);
+              // Streaming finished, now save the final message to DB
+              const finalAssistantMessage: Message = {
+                  id: tempAssistantMessageId!, // Use the same temp ID, assert non-null
+                  content: fullMessageContent,
+                  role: 'assistant',
+                  model: selectedModel,
+                  timestamp: new Date(),
+              };
+              saveMessageToDB(currentConvId, finalAssistantMessage).then(savedMsg => {
+                  if (savedMsg) {
+                      setMessages(prev =>
+                          prev.map(msg =>
+                              msg.id === tempAssistantMessageId ? savedMsg : msg
+                          )
+                      );
+                  }
+                  setIsLoading(false); // Only set isLoading to false after streaming and saving
+              });
+          }
+      }, 20); // Velocidad de escritura: 20ms por carácter
 
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error('Error al enviar el mensaje. Por favor, intenta de nuevo.');
-    } finally {
       setIsLoading(false);
-      setIsContextLoading(false); // Ensure it's turned off
+      setIsContextLoading(false);
+      // If a temporary streaming message was added, remove it on error
+      if (tempAssistantMessageId) {
+        setMessages(prev => prev.filter(msg => msg.id !== tempAssistantMessageId));
+      }
     }
   };
 
@@ -313,8 +346,8 @@ export function ChatInterface({
 
   const startNewChat = () => {
     setMessages([]);
-    onNewConversationCreated(null as any); // Indicate no conversation selected, will create new on next message
-    setIsContextInitialized(false); // Reset context state for new chat
+    onNewConversationCreated(null as any);
+    setIsContextInitialized(false);
     toast.success('Nuevo chat iniciado');
   };
 
@@ -419,24 +452,7 @@ export function ChatInterface({
                   </div>
                 ))
               )}
-              {isLoading && !isContextLoading && ( // Show "Escribiendo..." when AI is generating response
-                <div className="flex gap-3 justify-start">
-                  <div className="flex gap-3 max-w-[80%]">
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center">
-                        <Bot className="h-4 w-4 text-secondary-foreground" />
-                      </div>
-                    </div>
-                    <div className="bg-muted rounded-lg p-3">
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="text-sm">Escribiendo...</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {isContextLoading && ( // Show "Cargando Contexto..." when fetching history for AI
+              {isContextLoading && (
                 <div className="flex gap-3 justify-start">
                   <div className="flex gap-3 max-w-[80%]">
                     <div className="flex-shrink-0">
