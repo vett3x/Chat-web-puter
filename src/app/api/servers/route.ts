@@ -3,20 +3,7 @@ import { z } from 'zod';
 import { Client } from 'ssh2';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-
-// Almacenamiento temporal de servidores (¡solo para desarrollo, no para producción persistente!)
-// Las credenciales SSH se almacenan aquí en memoria. Se perderán al reiniciar el servidor.
-interface ServerConfig {
-  id: string;
-  name?: string;
-  ip_address: string;
-  ssh_username: string;
-  ssh_password?: string; // Optional if using keys, but required for password auth
-  ssh_port?: number; // Added SSH port
-}
-
-const registeredServers: ServerConfig[] = [];
-let serverIdCounter = 1;
+import CryptoJS from 'crypto-js'; // Import crypto-js
 
 // Define SuperUser emails (for server-side check)
 const SUPERUSER_EMAILS = ['martinpensa1@gmail.com']; // ¡Asegúrate de que este sea tu correo electrónico!
@@ -26,13 +13,13 @@ const serverSchema = z.object({
   ip_address: z.string().ip({ message: 'Dirección IP inválida.' }),
   ssh_username: z.string().min(1, { message: 'El usuario SSH es requerido.' }),
   ssh_password: z.string().min(1, { message: 'La contraseña SSH es requerida.' }),
-  ssh_port: z.coerce.number().int().min(1).max(65535).default(22).optional(), // Added SSH port
+  ssh_port: z.coerce.number().int().min(1).max(65535).default(22).optional(),
   name: z.string().optional(),
 });
 
 // Helper function to create Supabase client for API routes
-async function getSupabaseServerClient() { // Made async
-  const cookieStore = cookies(); // cookies() is synchronous, but awaiting it helps type inference
+async function getSupabaseServerClient() {
+  const cookieStore = cookies();
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -51,9 +38,21 @@ async function getSupabaseServerClient() { // Made async
   );
 }
 
+// Encryption/Decryption functions
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'super-secret-key-please-change-me'; // Fallback for dev, MUST be set in production
+
+function encrypt(text: string): string {
+  return CryptoJS.AES.encrypt(text, ENCRYPTION_KEY).toString();
+}
+
+function decrypt(ciphertext: string): string {
+  const bytes = CryptoJS.AES.decrypt(ciphertext, ENCRYPTION_KEY);
+  return bytes.toString(CryptoJS.enc.Utf8);
+}
+
 // Add a middleware-like check for SuperUser
 async function authorizeSuperUser() {
-  const supabase = await getSupabaseServerClient(); // Await the call
+  const supabase = await getSupabaseServerClient();
   const { data: { session } } = await supabase.auth.getSession();
 
   if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
@@ -67,9 +66,24 @@ export async function GET(req: Request) {
   const authError = await authorizeSuperUser();
   if (authError) return authError;
 
-  // Include ssh_port in the safeServers response
-  const safeServers = registeredServers.map(({ id, name, ip_address, ssh_port }) => ({ id, name, ip_address, ssh_port }));
-  return NextResponse.json(safeServers);
+  const supabase = await getSupabaseServerClient();
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (!session) {
+    return NextResponse.json({ message: 'No autenticado.' }, { status: 401 });
+  }
+
+  const { data: servers, error } = await supabase
+    .from('user_servers')
+    .select('id, name, ip_address, ssh_port, ssh_username') // Do NOT select encrypted_ssh_password
+    .eq('user_id', session.user.id);
+
+  if (error) {
+    console.error('Error fetching servers from Supabase:', error);
+    return NextResponse.json({ message: 'Error al cargar los servidores.' }, { status: 500 });
+  }
+
+  return NextResponse.json(servers);
 }
 
 // POST /api/servers - Añadir un nuevo servidor
@@ -77,9 +91,20 @@ export async function POST(req: Request) {
   const authError = await authorizeSuperUser();
   if (authError) return authError;
 
+  const supabase = await getSupabaseServerClient();
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (!session) {
+    return NextResponse.json({ message: 'No autenticado.' }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
     const newServerData = serverSchema.parse(body);
+
+    // Encrypt sensitive data
+    const encryptedPassword = encrypt(newServerData.ssh_password);
+    // No need to encrypt port, it's not as sensitive and often public
 
     // Simulate SSH connection test (optional, but good practice)
     const conn = new Client();
@@ -97,9 +122,9 @@ export async function POST(req: Request) {
         resolve();
       }).connect({
         host: newServerData.ip_address,
-        port: newServerData.ssh_port || 22, // Use provided port or default to 22
+        port: newServerData.ssh_port || 22,
         username: newServerData.ssh_username,
-        password: newServerData.ssh_password,
+        password: decrypt(encryptedPassword), // Decrypt for connection test
         readyTimeout: 5000, // 5 seconds timeout
       });
     });
@@ -111,15 +136,27 @@ export async function POST(req: Request) {
       );
     }
 
-    const newServer: ServerConfig = {
-      id: `srv-${serverIdCounter++}`,
-      ...newServerData,
-    };
-    registeredServers.push(newServer);
-    console.log('Servidor añadido (en memoria):', newServer.name || newServer.ip_address);
+    // Save to Supabase
+    const { data, error } = await supabase
+      .from('user_servers')
+      .insert({
+        user_id: session.user.id,
+        name: newServerData.name,
+        ip_address: newServerData.ip_address,
+        ssh_port: newServerData.ssh_port || 22,
+        ssh_username: newServerData.ssh_username,
+        encrypted_ssh_password: encryptedPassword,
+      })
+      .select('id, name, ip_address, ssh_port') // Select non-sensitive data to return
+      .single();
+
+    if (error) {
+      console.error('Error inserting server into Supabase:', error);
+      return NextResponse.json({ message: 'Error al guardar el servidor.' }, { status: 500 });
+    }
 
     return NextResponse.json(
-      { message: 'Servidor añadido y conexión SSH verificada correctamente.', server: { id: newServer.id, name: newServer.name, ip_address: newServer.ip_address, ssh_port: newServer.ssh_port } },
+      { message: 'Servidor añadido y conexión SSH verificada correctamente.', server: data },
       { status: 201 }
     );
   } catch (error: any) {
@@ -136,6 +173,13 @@ export async function DELETE(req: Request) {
   const authError = await authorizeSuperUser();
   if (authError) return authError;
 
+  const supabase = await getSupabaseServerClient();
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (!session) {
+    return NextResponse.json({ message: 'No autenticado.' }, { status: 401 });
+  }
+
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
 
@@ -143,21 +187,18 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ message: 'ID de servidor no proporcionado.' }, { status: 400 });
   }
 
-  const initialLength = registeredServers.length;
-  const serverIndex = registeredServers.findIndex(s => s.id === id);
+  const { error } = await supabase
+    .from('user_servers')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', session.user.id);
 
-  if (serverIndex === -1) {
-    return NextResponse.json({ message: 'Servidor no encontrado.' }, { status: 404 });
-  }
-
-  registeredServers.splice(serverIndex, 1);
-
-  if (registeredServers.length < initialLength) {
-    console.log('Servidor eliminado (en memoria):', id);
-    return NextResponse.json({ message: 'Servidor eliminado correctamente.' }, { status: 200 });
-  } else {
+  if (error) {
+    console.error('Error deleting server from Supabase:', error);
     return NextResponse.json({ message: 'Error al eliminar el servidor.' }, { status: 500 });
   }
+
+  return NextResponse.json({ message: 'Servidor eliminado correctamente.' }, { status: 200 });
 }
 
 // Las siguientes funciones deben ser movidas a sus propios archivos de ruta en Next.js App Router.
