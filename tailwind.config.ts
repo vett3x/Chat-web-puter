@@ -90,11 +90,17 @@ export default {
   				to: {
   					height: '0'
   				}
-  			}
+  			},
+        'pulse-glow': {
+          '0%': { boxShadow: '0 0 0 0 theme(colors.green.500 / 0.7)' },
+          '70%': { boxShadow: '0 0 0 10px theme(colors.green.500 / 0)' },
+          '100%': { boxShadow: '0 0 0 0 theme(colors.green.500 / 0)' },
+        },
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out'
+  			'accordion-up': 'accordion-up 0.2s ease-out',
+        'pulse-glow': 'pulse-glow 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
   		}
   	}
   },
