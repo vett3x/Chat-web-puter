@@ -179,11 +179,10 @@ function ServerListItem({ server, onDeleteServer, onSelectServerForDetails }: { 
             customStyle={{ 
               margin: 0, 
               background: '#1E1E1E', 
-              maxHeight: '300px', 
-              overflowY: 'auto',
-              overflowX: 'auto', // Added for horizontal scrolling
-              whiteSpace: 'pre-wrap', // Added for word wrapping
-              wordBreak: 'break-all', // Ensures long words break
+              maxHeight: '400px', // Increased height
+              overflow: 'auto', // Combined overflow for both X and Y
+              whiteSpace: 'pre-wrap', // Ensures text wraps
+              wordBreak: 'break-word', // Breaks long words
             }} 
             codeTagProps={{ style: { fontFamily: 'var(--font-geist-mono)' } }}
           >
