@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader2, Save, KeyRound, Trash2, Gauge } from 'lucide-react';
+import { Loader2, Save, KeyRound, Trash2, Gauge, Server } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -42,6 +42,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import Link from 'next/link'; // Import Link
 
 // Schemas para los formularios
 const changePasswordSchema = z.object({
@@ -58,7 +59,7 @@ interface AppSettingsDialogProps {
 }
 
 export function AppSettingsDialog({ open, onOpenChange, aiResponseSpeed, onAiResponseSpeedChange }: AppSettingsDialogProps) {
-  const { session, isLoading: isSessionLoading } = useSession();
+  const { session, isLoading: isSessionLoading, isSuperUser } = useSession(); // Get isSuperUser
   const router = useRouter();
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -197,6 +198,26 @@ export function AppSettingsDialog({ open, onOpenChange, aiResponseSpeed, onAiRes
           </div>
 
           <Separator />
+
+          {/* Server Management Section (Visible only to SuperUsers) */}
+          {isSuperUser && (
+            <>
+              <div>
+                <h3 className="text-lg font-semibold flex items-center gap-2 mb-3">
+                  <Server className="h-5 w-5 text-muted-foreground" /> Gestión de Servidores
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Configura y administra los servidores para DeepCoder.
+                </p>
+                <Link href="/dashboard/servers" passHref>
+                  <Button variant="outline" onClick={() => onOpenChange(false)}>
+                    <Server className="mr-2 h-4 w-4" /> Ir a Gestión de Servidores
+                  </Button>
+                </Link>
+              </div>
+              <Separator />
+            </>
+          )}
 
           {/* Other Customization (Placeholder) */}
           <div>
