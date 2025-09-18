@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,31 @@ interface CodeBlockProps {
 export function CodeBlock({ language, code, filename }: CodeBlockProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [isOpen, setIsOpen] = useState(true);
+  const [displayedCode, setDisplayedCode] = useState('');
+
+  useEffect(() => {
+    setDisplayedCode('');
+    let timeoutId: NodeJS.Timeout;
+
+    if (code) {
+      let i = 0;
+      const typeCharacter = () => {
+        if (i < code.length) {
+          setDisplayedCode((prev) => prev + code.charAt(i));
+          i++;
+          const delay = Math.random() * 15 + 5; // Velocidad de escritura aleatoria para un efecto más natural
+          timeoutId = setTimeout(typeCharacter, delay);
+        }
+      };
+      typeCharacter();
+    }
+
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [code]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(code).then(() => {
@@ -79,7 +104,7 @@ export function CodeBlock({ language, code, filename }: CodeBlockProps) {
           customStyle={{ margin: 0, borderRadius: '0 0 0.5rem 0.5rem', background: '#1E1E1E' }}
           codeTagProps={{ style: { fontFamily: 'var(--font-geist-mono)' } }}
         >
-          {code}
+          {displayedCode}
         </SyntaxHighlighter>
       </CollapsibleContent>
     </Collapsible>
