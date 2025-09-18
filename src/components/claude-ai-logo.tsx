@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import Image from 'next/image'; // Usar next/image para optimización
+// Eliminamos la importación de Image de next/image
 
 interface ClaudeAILogoProps {
   className?: string;
@@ -9,13 +9,12 @@ interface ClaudeAILogoProps {
 
 const ClaudeAILogo: React.FC<ClaudeAILogoProps> = ({ className }) => {
   return (
-    <Image
-      src="/claude_aI_logo.svg" 
+    <img
+      src="/claude_aI_logo.svg" // Usamos la ruta directa al SVG
       alt="Claude AI Logo"
-      width={16} 
-      height={16} 
+      width={16} // Mantenemos el ancho para consistencia
+      height={16} // Mantenemos el alto para consistencia
       className={className}
-      unoptimized={true} // Deshabilitar la optimización para este SVG
     />
   );
 };
