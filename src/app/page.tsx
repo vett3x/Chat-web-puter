@@ -6,7 +6,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { ConversationSidebar } from "@/components/conversation-sidebar";
 import { useSession } from "@/components/session-context-provider";
 import { useState, useEffect } from "react";
-import { MadeWithDyad } from "@/components/made-with-dyad";
+
 
 export default function Home() {
   const { session, isLoading: isSessionLoading } = useSession();
@@ -48,7 +48,6 @@ export default function Home() {
           />
         </ResizablePanel>
       </ResizablePanelGroup>
-      <MadeWithDyad />
       <Toaster />
     </div>
   );
