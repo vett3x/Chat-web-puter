@@ -12,13 +12,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
-import { Moon, Sun, Settings, LogOut, User as UserIcon } from 'lucide-react';
+import { Moon, Sun, Settings, LogOut, User as UserIcon, Server } from 'lucide-react'; // Import Server icon
 import { useTheme } from 'next-themes';
 import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-// No longer importing Link as we're using a dialog
 
 interface Profile {
   first_name: string | null;
@@ -27,11 +26,13 @@ interface Profile {
 }
 
 interface ProfileDropdownProps {
-  onOpenProfileSettings: () => void; // Prop para abrir el diálogo de perfil
-  onOpenAppSettings: () => void; // Nueva prop para abrir el diálogo de configuración de la app
+  onOpenProfileSettings: () => void;
+  onOpenAppSettings: () => void;
+  onOpenServerManagement: () => void; // New prop
+  isSuperUser: boolean; // New prop
 }
 
-export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings }: ProfileDropdownProps) {
+export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOpenServerManagement, isSuperUser }: ProfileDropdownProps) {
   const { session } = useSession();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -121,7 +122,7 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings }: Pr
             <span>Perfil</span>
           </div>
         </DropdownMenuItem>
-        <DropdownMenuItem 
+        <DropdownMenuItem
           className="flex items-center justify-between cursor-pointer"
           onSelect={(e: Event) => e.preventDefault()} // Prevenir que el menú se cierre al interactuar con el switch
         >
@@ -143,6 +144,14 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings }: Pr
             <span>Configuración</span>
           </div>
         </DropdownMenuItem>
+        {isSuperUser && ( // Conditionally render for SuperUsers
+          <DropdownMenuItem onClick={onOpenServerManagement} className="flex items-center cursor-pointer">
+            <div className="flex items-center">
+              <Server className="mr-2 h-4 w-4" />
+              <span>Gestión de Servidores</span>
+            </div>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive" onClick={handleSignOut}>
           <div className="flex items-center">
             <LogOut className="mr-2 h-4 w-4" />

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { Client } from 'ssh2'; // Import the Client from ssh2
+import { Client } from 'ssh2';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { cookies, ReadonlyRequestCookies } from 'next/headers'; // Import ReadonlyRequestCookies
 
 // Almacenamiento temporal de servidores (¡solo para desarrollo, no para producción persistente!)
 // Las credenciales SSH se almacenan aquí en memoria. Se perderán al reiniciar el servidor.
@@ -15,6 +17,9 @@ interface ServerConfig {
 const registeredServers: ServerConfig[] = [];
 let serverIdCounter = 1;
 
+// Define SuperUser emails (for server-side check)
+const SUPERUSER_EMAILS = ['martinpensa1@gmail.com']; // ¡Asegúrate de que este sea tu correo electrónico!
+
 // Esquema de validación para añadir un servidor
 const serverSchema = z.object({
   ip_address: z.string().ip({ message: 'Dirección IP inválida.' }),
@@ -23,14 +28,55 @@ const serverSchema = z.object({
   name: z.string().optional(),
 });
 
+// Helper function to create Supabase client for API routes
+function getSupabaseServerClient() {
+  // Explicitly cast the result of cookies() to ReadonlyRequestCookies
+  const cookieStore: ReadonlyRequestCookies = cookies();
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get: (name: string) => cookieStore.get(name)?.value,
+        set: (name: string, value: string, options: CookieOptions) => {
+          // Use the direct `set` method signature from `next/headers`
+          cookieStore.set(name, value, options);
+        },
+        remove: (name: string, options: CookieOptions) => {
+          // For `remove`, `next/headers` has a `delete` method.
+          cookieStore.delete(name);
+        },
+      },
+    }
+  );
+}
+
+// Add a middleware-like check for SuperUser
+async function authorizeSuperUser() {
+  const supabase = getSupabaseServerClient();
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
+    return NextResponse.json({ message: 'Acceso denegado. Se requiere ser SuperUsuario.' }, { status: 403 });
+  }
+  return null; // Authorized
+}
+
 // GET /api/servers - Obtener la lista de servidores registrados (sin credenciales sensibles)
-export async function GET() {
+export async function GET(req: Request) {
+  const authError = await authorizeSuperUser();
+  if (authError) return authError;
+
   const safeServers = registeredServers.map(({ id, name, ip_address }) => ({ id, name, ip_address }));
   return NextResponse.json(safeServers);
 }
 
 // POST /api/servers - Añadir un nuevo servidor
 export async function POST(req: Request) {
+  const authError = await authorizeSuperUser();
+  if (authError) return authError;
+
   try {
     const body = await req.json();
     const newServerData = serverSchema.parse(body);
@@ -87,6 +133,9 @@ export async function POST(req: Request) {
 
 // DELETE /api/servers/[id] - Eliminar un servidor
 export async function DELETE(req: Request) {
+  const authError = await authorizeSuperUser();
+  if (authError) return authError;
+
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
 

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, MessageSquare, Loader2, Folder, ChevronRight, ChevronDown, Server } from 'lucide-react'; // Import Server icon
+import { Plus, MessageSquare, Loader2, Folder, ChevronRight, ChevronDown, Server } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,7 +21,7 @@ interface Conversation {
   title: string;
   created_at: string;
   folder_id: string | null;
-  order_index: number; // Added for reordering
+  order_index: number;
 }
 
 interface Folder {
@@ -37,7 +37,7 @@ interface ConversationSidebarProps {
   onSelectConversation: (conversationId: string | null) => void;
   onOpenProfileSettings: () => void;
   onOpenAppSettings: () => void;
-  onOpenServerManagement: () => void; // New prop for opening server management dialog
+  onOpenServerManagement: () => void;
 }
 
 export function ConversationSidebar({
@@ -45,9 +45,9 @@ export function ConversationSidebar({
   onSelectConversation,
   onOpenProfileSettings,
   onOpenAppSettings,
-  onOpenServerManagement, // Destructure new prop
+  onOpenServerManagement,
 }: ConversationSidebarProps) {
-  const { session, isLoading: isSessionLoading, isSuperUser } = useSession(); // Get isSuperUser
+  const { session, isLoading: isSessionLoading, isSuperUser } = useSession();
   const userId = session?.user?.id;
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -117,7 +117,6 @@ export function ConversationSidebar({
     if (!userId || isCreatingConversation) return;
 
     setIsCreatingConversation(true);
-    // Determine the highest order_index for conversations in 'General'
     const generalConvs = conversations.filter(c => c.folder_id === null);
     const maxOrderIndex = generalConvs.length > 0
       ? Math.max(...generalConvs.map(c => c.order_index))
@@ -134,10 +133,10 @@ export function ConversationSidebar({
       console.error('Error creating new conversation:', error);
       toast.error('Error al crear una nueva conversación.');
     } else if (data) {
-      setConversations(prev => [data, ...prev]); // Add to the beginning for immediate visibility
+      setConversations(prev => [data, ...prev]);
       onSelectConversation(data.id);
       toast.success('Nueva conversación creada.');
-      setIsGeneralExpanded(true); // Ensure General is expanded for new conversation
+      setIsGeneralExpanded(true);
     }
     setIsCreatingConversation(false);
   };
@@ -169,7 +168,6 @@ export function ConversationSidebar({
       return;
     }
 
-    // When moving, assign a new order_index at the end of the target folder/general
     const targetConversations = conversations.filter(c => c.folder_id === targetFolderId);
     const maxOrderIndex = targetConversations.length > 0
       ? Math.max(...targetConversations.map(c => c.order_index))
@@ -187,9 +185,9 @@ export function ConversationSidebar({
       toast.error('Error al mover la conversación.');
     } else {
       toast.success('Conversación movida.');
-      fetchConversationsAndFolders(); // Re-fetch to update both lists and order
+      fetchConversationsAndFolders();
       if (selectedConversationId === conversationId) {
-        onSelectConversation(null); // Deselect if the moved conversation was selected
+        onSelectConversation(null);
       }
     }
   };
@@ -201,8 +199,6 @@ export function ConversationSidebar({
     const targetConv = conversations.find(c => c.id === targetId);
 
     if (!draggedConv || !targetConv || draggedConv.folder_id !== targetConv.folder_id) {
-      // If folders are different, it's a move, not a reorder.
-      // This case should ideally be handled by handleDrop on folder, but as a fallback:
       if (draggedConv && targetConv) {
         handleConversationMoved(draggedId, targetConv.folder_id);
       }
@@ -218,15 +214,12 @@ export function ConversationSidebar({
 
     if (targetIndex === -1 || draggedIndex === -1) return;
 
-    // Remove dragged item from its current position
     const [removed] = siblingConversations.splice(draggedIndex, 1);
-    // Insert it at the new position
     const newTargetIndex = position === 'before' ? targetIndex : targetIndex + 1;
     siblingConversations.splice(newTargetIndex > siblingConversations.length ? siblingConversations.length : newTargetIndex, 0, removed);
 
-    // Recalculate order_index for affected items
     const updates = siblingConversations.map((conv, index) => {
-      const newOrderIndex = (index + 1) * 100; // Simple re-indexing
+      const newOrderIndex = (index + 1) * 100;
       return { id: conv.id, order_index: newOrderIndex };
     });
 
@@ -239,7 +232,7 @@ export function ConversationSidebar({
       toast.error('Error al reordenar las conversaciones.');
     } else {
       toast.success('Conversación reordenada.');
-      fetchConversationsAndFolders(); // Re-fetch to update UI
+      fetchConversationsAndFolders();
     }
   };
 
@@ -261,7 +254,7 @@ export function ConversationSidebar({
       toast.error('Error al mover la carpeta.');
     } else {
       toast.success('Carpeta movida.');
-      fetchConversationsAndFolders(); // Re-fetch to update both lists
+      fetchConversationsAndFolders();
     }
   };
 
@@ -281,7 +274,7 @@ export function ConversationSidebar({
 
   const handleDrop = (e: React.DragEvent, targetFolderId: string | null) => {
     e.preventDefault();
-    setDraggingOverFolderId(null); // Reset drag over state
+    setDraggingOverFolderId(null);
     setDraggedOverConversationId(null);
     setDropPosition(null);
 
@@ -294,12 +287,10 @@ export function ConversationSidebar({
       if (type === 'conversation') {
         handleConversationMoved(id, targetFolderId);
       } else if (type === 'folder') {
-        // Prevent dropping a folder into itself or its direct child
         if (id === targetFolderId) {
           toast.error('No puedes mover una carpeta a sí misma.');
           return;
         }
-        // Check if targetFolderId is a descendant of id
         let currentParentId = targetFolderId;
         while (currentParentId) {
           if (currentParentId === id) {
@@ -366,6 +357,8 @@ export function ConversationSidebar({
         <ProfileDropdown
           onOpenProfileSettings={onOpenProfileSettings}
           onOpenAppSettings={onOpenAppSettings}
+          onOpenServerManagement={onOpenServerManagement} // Pass the new prop
+          isSuperUser={isSuperUser} // Pass isSuperUser prop
         />
       </div>
 
@@ -400,7 +393,7 @@ export function ConversationSidebar({
               <Folder className="h-4 w-4" />
             )}
           </Button>
-          {isSuperUser && ( // Only show for SuperUsers
+          {isSuperUser && (
             <Button
               variant="outline"
               size="icon"
@@ -430,12 +423,12 @@ export function ConversationSidebar({
                 className={cn(
                   "cursor-pointer hover:bg-sidebar-accent transition-colors group relative",
                   selectedConversationId === null && isGeneralExpanded && "bg-sidebar-primary",
-                  selectedConversationId === null && isGeneralExpanded && "text-sidebar-primary-foreground", // Simplificado
-                  draggingOverFolderId === null && draggedItemType === 'conversation' && "border-2 border-blue-500 bg-blue-500/10" // Visual feedback for drag over General
+                  selectedConversationId === null && isGeneralExpanded && "text-sidebar-primary-foreground",
+                  draggingOverFolderId === null && draggedItemType === 'conversation' && "border-2 border-blue-500 bg-blue-500/10"
                 )}
                 onClick={() => setIsGeneralExpanded(!isGeneralExpanded)}
                 onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => handleDrop(e, null)} // Drop target for 'General' (null folder_id)
+                onDrop={(e) => handleDrop(e, null)}
                 onDragEnter={(e) => handleDragEnter(e, null)}
                 onDragLeave={(e) => handleDragLeave(e, null)}
               >
