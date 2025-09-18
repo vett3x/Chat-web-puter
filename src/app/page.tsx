@@ -5,14 +5,16 @@ import { ConversationSidebar } from "@/components/conversation-sidebar";
 import { useSession } from "@/components/session-context-provider";
 import { useState, useEffect } from "react";
 import { ProfileSettingsDialog } from "@/components/profile-settings-dialog";
-import { AppSettingsDialog } from "@/components/app-settings-dialog"; // Import the new dialog component
+import { AppSettingsDialog } from "@/components/app-settings-dialog";
+import { ServerManagementDialog } from "@/components/server-management-dialog"; // Import the new dialog
 
 export default function Home() {
-  const { session, isLoading: isSessionLoading } = useSession();
+  const { session, isLoading: isSessionLoading, isSuperUser } = useSession(); // Get isSuperUser
   const userId = session?.user?.id;
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [isProfileSettingsOpen, setIsProfileSettingsOpen] = useState(false);
-  const [isAppSettingsOpen, setIsAppSettingsOpen] = useState(false); // State for AppSettingsDialog visibility
+  const [isAppSettingsOpen, setIsAppSettingsOpen] = useState(false);
+  const [isServerManagementOpen, setIsServerManagementOpen] = useState(false); // State for ServerManagementDialog visibility
   const [aiResponseSpeed, setAiResponseSpeed] = useState<'slow' | 'normal' | 'fast'>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('aiResponseSpeed') as 'slow' | 'normal' | 'fast') || 'normal';
@@ -46,6 +48,10 @@ export default function Home() {
     setIsAppSettingsOpen(true);
   };
 
+  const handleOpenServerManagement = () => {
+    setIsServerManagementOpen(true);
+  };
+
   const handleAiResponseSpeedChange = (speed: 'slow' | 'normal' | 'fast') => {
     setAiResponseSpeed(speed);
     // Optionally, close the dialog after changing speed
@@ -59,7 +65,8 @@ export default function Home() {
           selectedConversationId={selectedConversationId}
           onSelectConversation={setSelectedConversationId}
           onOpenProfileSettings={handleOpenProfileSettings}
-          onOpenAppSettings={handleOpenAppSettings} // Pass the function to open AppSettingsDialog
+          onOpenAppSettings={handleOpenAppSettings}
+          onOpenServerManagement={handleOpenServerManagement} // Pass the new function
         />
       </aside>
       <main className="flex-1 flex flex-col min-w-0">
@@ -71,7 +78,7 @@ export default function Home() {
             // This prop will be used to update the title in the sidebar if the chat interface changes it
             // For now, the sidebar manages its own titles.
           }}
-          aiResponseSpeed={aiResponseSpeed} // Pass AI response speed to ChatInterface
+          aiResponseSpeed={aiResponseSpeed}
         />
         <ProfileSettingsDialog
           open={isProfileSettingsOpen}
@@ -83,6 +90,12 @@ export default function Home() {
           aiResponseSpeed={aiResponseSpeed}
           onAiResponseSpeedChange={handleAiResponseSpeedChange}
         />
+        {isSuperUser && ( // Only render if user is a SuperUser
+          <ServerManagementDialog
+            open={isServerManagementOpen}
+            onOpenChange={setIsServerManagementOpen}
+          />
+        )}
       </main>
     </div>
   );

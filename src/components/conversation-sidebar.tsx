@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, MessageSquare, Loader2, Folder, ChevronRight, ChevronDown } from 'lucide-react';
+import { Plus, MessageSquare, Loader2, Folder, ChevronRight, ChevronDown, Server } from 'lucide-react'; // Import Server icon
 import { Separator } from '@/components/ui/separator';
 import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,7 +14,7 @@ import { ProfileDropdown } from './profile-dropdown';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DraggableFolderItem } from './draggable-folder-item';
 import { DraggableConversationCard } from './draggable-conversation-card';
-import { useTheme } from 'next-themes'; // Importar useTheme
+import { useTheme } from 'next-themes';
 
 interface Conversation {
   id: string;
@@ -35,17 +35,19 @@ interface Folder {
 interface ConversationSidebarProps {
   selectedConversationId: string | null;
   onSelectConversation: (conversationId: string | null) => void;
-  onOpenProfileSettings: () => void; // Prop para abrir el diálogo de perfil
-  onOpenAppSettings: () => void; // Nueva prop para abrir el diálogo de configuración de la app
+  onOpenProfileSettings: () => void;
+  onOpenAppSettings: () => void;
+  onOpenServerManagement: () => void; // New prop for opening server management dialog
 }
 
 export function ConversationSidebar({
   selectedConversationId,
   onSelectConversation,
   onOpenProfileSettings,
-  onOpenAppSettings, // Destructure new prop
+  onOpenAppSettings,
+  onOpenServerManagement, // Destructure new prop
 }: ConversationSidebarProps) {
-  const { session, isLoading: isSessionLoading } = useSession();
+  const { session, isLoading: isSessionLoading, isSuperUser } = useSession(); // Get isSuperUser
   const userId = session?.user?.id;
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -53,7 +55,7 @@ export function ConversationSidebar({
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [isGeneralExpanded, setIsGeneralExpanded] = useState(true);
-  const { theme } = useTheme(); // Obtener el tema actual
+  const { theme } = useTheme();
 
   // Drag and Drop State
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
@@ -74,10 +76,10 @@ export function ConversationSidebar({
     setIsLoadingConversations(true);
     const { data: convData, error: convError } = await supabase
       .from('conversations')
-      .select('id, title, created_at, folder_id, order_index') // Select order_index
+      .select('id, title, created_at, folder_id, order_index')
       .eq('user_id', userId)
-      .order('order_index', { ascending: true }) // Order by order_index
-      .order('created_at', { ascending: false }); // Fallback order
+      .order('order_index', { ascending: true })
+      .order('created_at', { ascending: false });
 
     const { data: folderData, error: folderError } = await supabase
       .from('folders')
@@ -363,7 +365,7 @@ export function ConversationSidebar({
       <div className="mb-4">
         <ProfileDropdown
           onOpenProfileSettings={onOpenProfileSettings}
-          onOpenAppSettings={onOpenAppSettings} // Pass the new prop
+          onOpenAppSettings={onOpenAppSettings}
         />
       </div>
 
@@ -398,6 +400,17 @@ export function ConversationSidebar({
               <Folder className="h-4 w-4" />
             )}
           </Button>
+          {isSuperUser && ( // Only show for SuperUsers
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onOpenServerManagement}
+              className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full"
+              title="Gestión de Servidores"
+            >
+              <Server className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
 
@@ -426,17 +439,17 @@ export function ConversationSidebar({
                 onDragEnter={(e) => handleDragEnter(e, null)}
                 onDragLeave={(e) => handleDragLeave(e, null)}
               >
-                <CardContent className="py-1.5 px-2 flex items-center justify-between gap-1"> {/* Adjusted padding and gap */}
+                <CardContent className="py-1.5 px-2 flex items-center justify-between gap-1">
                   <div className="flex items-center flex-1 overflow-hidden">
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 flex-shrink-0" // Adjusted button size
+                      className="h-6 w-6 flex-shrink-0"
                       onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsGeneralExpanded(!isGeneralExpanded); }}
                     >
-                      {isGeneralExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />} {/* Adjusted icon size */}
+                      {isGeneralExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                     </Button>
-                    <MessageSquare className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" /> {/* Adjusted icon size and margin */}
+                    <MessageSquare className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
                     <span className="text-sm font-medium truncate flex-1">General</span>
                   </div>
                 </CardContent>
@@ -460,7 +473,7 @@ export function ConversationSidebar({
                         onConversationMoved={handleConversationMoved}
                         onConversationReordered={handleConversationReordered}
                         allFolders={folders}
-                        level={1} // Indent for conversations in General
+                        level={1}
                         onDragStart={handleDragStart}
                         isDraggingOver={draggedOverConversationId === conversation.id && draggedItemType === 'conversation'}
                         dropPosition={draggedOverConversationId === conversation.id ? dropPosition : null}
@@ -485,7 +498,7 @@ export function ConversationSidebar({
                     level={0}
                     selectedConversationId={selectedConversationId}
                     onSelectConversation={onSelectConversation}
-                    onSelectFolder={() => onSelectConversation(null)} // Deselect conversation when selecting folder
+                    onSelectFolder={() => onSelectConversation(null)}
                     conversations={conversations}
                     subfolders={folders}
                     onFolderUpdated={fetchConversationsAndFolders}
@@ -499,7 +512,7 @@ export function ConversationSidebar({
                     isDraggingOver={draggingOverFolderId === folder.id}
                     onDragEnter={handleDragEnter}
                     onDragLeave={handleDragLeave}
-                    onConversationReordered={handleConversationReordered} // Pass to folder item
+                    onConversationReordered={handleConversationReordered}
                     draggedOverConversationId={draggedOverConversationId}
                     dropPosition={dropPosition}
                     draggedItemType={draggedItemType}
