@@ -109,8 +109,11 @@ export function ProfileDropdown() {
           <span>Mi Cuenta</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator className="bg-border" />
-        <DropdownMenuItem className="flex items-center justify-between cursor-pointer">
-          <div className="flex items-center"> {/* Agrupando icono y texto */}
+        <DropdownMenuItem 
+          className="flex items-center justify-between cursor-pointer"
+          onSelect={(e) => e.preventDefault()} // Prevenir que el menú se cierre al interactuar con el switch
+        >
+          <div className="flex items-center">
             {isMounted && theme === 'dark' ? <Moon className="mr-2 h-4 w-4" /> : <Sun className="mr-2 h-4 w-4" />}
             <span>Modo Oscuro</span>
           </div>
@@ -118,18 +121,18 @@ export function ProfileDropdown() {
             <Switch
               checked={theme === 'dark'}
               onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()} // Asegurar que el clic del switch no propague
             />
           )}
         </DropdownMenuItem>
         <DropdownMenuItem className="cursor-pointer" onClick={() => toast.info('Funcionalidad de configuración no implementada.')}>
-          <div className="flex items-center"> {/* Agrupando icono y texto para consistencia */}
+          <div className="flex items-center">
             <Settings className="mr-2 h-4 w-4" />
             <span>Configuración</span>
           </div>
         </DropdownMenuItem>
         <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive" onClick={handleSignOut}>
-          <div className="flex items-center"> {/* Agrupando icono y texto para consistencia */}
+          <div className="flex items-center">
             <LogOut className="mr-2 h-4 w-4" />
             <span>Cerrar Sesión</span>
           </div>
