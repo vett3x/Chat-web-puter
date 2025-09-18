@@ -340,7 +340,7 @@ export function ChatInterface({
     <div className="flex flex-col h-full bg-background">
       <div className="flex-1 min-h-0 relative">
         <ScrollArea className="h-full" ref={scrollAreaRef}>
-          <div className="p-4 space-y-4 pb-32">
+          <div className="p-4 space-y-4 pb-48"> {/* Aumentado el padding-bottom a pb-48 */}
             {messages.length === 0 && !isLoading ? (
               <div className="text-center text-muted-foreground py-8">
                 <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
