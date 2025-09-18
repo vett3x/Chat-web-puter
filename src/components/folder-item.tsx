@@ -161,7 +161,7 @@ export function FolderItem({
               variant="ghost"
               size="icon"
               className="h-7 w-7 flex-shrink-0"
-              onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
+              onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
             >
               {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </Button>
@@ -188,10 +188,10 @@ export function FolderItem({
           <div className="flex-shrink-0 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             {isEditing ? (
               <>
-                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleSaveEdit(); }} className="h-7 w-7">
+                <Button variant="ghost" size="icon" onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleSaveEdit(); }} className="h-7 w-7">
                   <Save className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setIsEditing(false); setEditingName(folder.name); }} className="h-7 w-7">
+                <Button variant="ghost" size="icon" onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsEditing(false); setEditingName(folder.name); }} className="h-7 w-7">
                   <X className="h-4 w-4" />
                 </Button>
               </>
@@ -203,16 +203,16 @@ export function FolderItem({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48 bg-popover text-popover-foreground border-border">
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCreateSubfolder(folder.id); }}>
+                  <DropdownMenuItem onClick={(e: React.MouseEvent) => { e.stopPropagation(); onCreateSubfolder(folder.id); }}>
                     <Plus className="mr-2 h-4 w-4" /> Crear Subcarpeta
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}>
+                  <DropdownMenuItem onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsEditing(true); }}>
                     <Edit className="mr-2 h-4 w-4" /> Renombrar
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <AlertDialog open={isDeleting} onOpenChange={setIsDeleting}>
                     <AlertDialogTrigger asChild>
-                      <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                      <DropdownMenuItem onSelect={(e: Event) => e.preventDefault()} className="text-destructive focus:text-destructive">
                         <Trash2 className="mr-2 h-4 w-4" /> Eliminar
                       </DropdownMenuItem>
                     </AlertDialogTrigger>
@@ -226,7 +226,7 @@ export function FolderItem({
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={(e) => { e.stopPropagation(); handleDeleteFolder(); }}>
+                        <AlertDialogAction onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleDeleteFolder(); }}>
                           Eliminar
                         </AlertDialogAction>
                       </AlertDialogFooter>
@@ -280,12 +280,12 @@ export function FolderItem({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48 bg-popover text-popover-foreground border-border">
-                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelectConversation(conversation.id); }}>
+                    <DropdownMenuItem onClick={(e: React.MouseEvent) => { e.stopPropagation(); onSelectConversation(conversation.id); }}>
                       <MessageSquare className="mr-2 h-4 w-4" /> Abrir
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuTrigger asChild>
-                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                      <DropdownMenuItem onSelect={(e: Event) => e.preventDefault()}>
                         <MoveRight className="mr-2 h-4 w-4" /> Mover a
                       </DropdownMenuItem>
                     </DropdownMenuTrigger>

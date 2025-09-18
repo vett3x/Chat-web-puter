@@ -383,7 +383,7 @@ export function ConversationSidebar({
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={(e) => {
+                                onClick={(e: React.MouseEvent) => {
                                   e.stopPropagation();
                                   handleSaveConversationEdit(conversation.id);
                                 }}
@@ -394,7 +394,7 @@ export function ConversationSidebar({
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={(e) => {
+                                onClick={(e: React.MouseEvent) => {
                                   e.stopPropagation();
                                   handleCancelConversationEdit();
                                 }}
@@ -408,7 +408,7 @@ export function ConversationSidebar({
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={(e) => {
+                                onClick={(e: React.MouseEvent) => {
                                   e.stopPropagation();
                                   handleEditConversationClick(conversation);
                                 }}
@@ -426,12 +426,12 @@ export function ConversationSidebar({
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-48 bg-popover text-popover-foreground border-border">
-                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelectConversation(conversation.id); }}>
+                                  <DropdownMenuItem onClick={(e: React.MouseEvent) => { e.stopPropagation(); onSelectConversation(conversation.id); }}>
                                     <MessageSquare className="mr-2 h-4 w-4" /> Abrir
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuTrigger asChild>
-                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                    <DropdownMenuItem onSelect={(e: Event) => e.preventDefault()}>
                                       <MoveRight className="mr-2 h-4 w-4" /> Mover a
                                     </DropdownMenuItem>
                                   </DropdownMenuTrigger>
@@ -453,7 +453,7 @@ export function ConversationSidebar({
                                       <Button
                                         variant="ghost"
                                         size="icon"
-                                        onClick={(e) => {
+                                        onClick={(e: React.MouseEvent) => {
                                           e.stopPropagation();
                                           setDeletingConversationId(conversation.id);
                                         }}

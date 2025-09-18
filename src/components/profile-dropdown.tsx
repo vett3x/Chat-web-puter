@@ -111,7 +111,7 @@ export function ProfileDropdown() {
         <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem 
           className="flex items-center justify-between cursor-pointer"
-          onSelect={(e) => e.preventDefault()} // Prevenir que el menú se cierre al interactuar con el switch
+          onSelect={(e: Event) => e.preventDefault()} // Prevenir que el menú se cierre al interactuar con el switch
         >
           <div className="flex items-center">
             {isMounted && theme === 'dark' ? <Moon className="mr-2 h-4 w-4" /> : <Sun className="mr-2 h-4 w-4" />}
