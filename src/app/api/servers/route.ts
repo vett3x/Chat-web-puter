@@ -47,6 +47,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
   }
 
+  // Check for SUPABASE_SERVICE_ROLE_KEY
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('SUPABASE_SERVICE_ROLE_KEY is not set in environment variables.');
+    return NextResponse.json({ message: 'Error de configuración del servidor: Clave de servicio de Supabase no encontrada.' }, { status: 500 });
+  }
+
   // Use admin client to bypass RLS, relying on the superuser check for security
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -76,6 +82,12 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const newServerData = serverSchema.parse(body);
+
+    // Check for SUPABASE_SERVICE_ROLE_KEY
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('SUPABASE_SERVICE_ROLE_KEY is not set in environment variables.');
+      return NextResponse.json({ message: 'Error de configuración del servidor: Clave de servicio de Supabase no encontrada.' }, { status: 500 });
+    }
 
     // Use admin client to bypass RLS
     const supabaseAdmin = createClient(
@@ -130,6 +142,12 @@ export async function DELETE(req: NextRequest) {
 
   if (!id) {
     return NextResponse.json({ message: 'ID de servidor no proporcionado.' }, { status: 400 });
+  }
+
+  // Check for SUPABASE_SERVICE_ROLE_KEY
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('SUPABASE_SERVICE_ROLE_KEY is not set in environment variables.');
+    return NextResponse.json({ message: 'Error de configuración del servidor: Clave de servicio de Supabase no encontrada.' }, { status: 500 });
   }
 
   // Use admin client to bypass RLS
