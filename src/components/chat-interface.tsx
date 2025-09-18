@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send, Bot, User, Loader2, MessageSquarePlus } from 'lucide-react';
@@ -377,8 +377,8 @@ export function ChatInterface({
         </div>
       </CardHeader>
 
-      <div className="flex-1 relative min-h-0">
-        <ScrollArea className="absolute inset-0" ref={scrollAreaRef}>
+      <div className="flex-1 min-h-0">
+        <ScrollArea className="h-full" ref={scrollAreaRef}>
           <div className="p-4 space-y-4">
             {messages.length === 0 && !isLoading ? (
               <div className="text-center text-muted-foreground py-8">
