@@ -279,26 +279,62 @@ export function ChatInterface({
     return { id: data.id, timestamp: new Date(data.created_at) };
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files) {
-      const filesArray = Array.from(event.target.files);
-      const newImages: { file: File; preview: string }[] = [];
+  const processFiles = (files: FileList | null) => {
+    if (!files) return;
 
-      filesArray.forEach(file => {
-        if (file.type.startsWith('image/') && file.size <= 5 * 1024 * 1024) { // 5MB limit
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            newImages.push({ file, preview: reader.result as string });
-            if (newImages.length === filesArray.length) {
-              setSelectedImages(prev => [...prev, ...newImages].slice(0, 4)); // Limit to 4 images
+    const filesArray = Array.from(files);
+    const newImages: { file: File; preview: string }[] = [];
+
+    filesArray.forEach(file => {
+      if (file.type.startsWith('image/') && file.size <= 5 * 1024 * 1024) { // 5MB limit
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          newImages.push({ file, preview: reader.result as string });
+          if (newImages.length === filesArray.length) {
+            setSelectedImages(prev => [...prev, ...newImages].slice(0, 4)); // Limit to 4 images
+          }
+        };
+        reader.readAsDataURL(file);
+      } else {
+        toast.error('Solo se permiten imágenes de hasta 5MB.');
+      }
+    });
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    processFiles(event.target.files);
+    event.target.value = ''; // Clear the input so the same file can be selected again
+  };
+
+  const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = event.clipboardData?.items;
+    if (items) {
+      let hasImage = false;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const file = items[i].getAsFile();
+          if (file) {
+            // Directly process the pasted file
+            if (file.type.startsWith('image/') && file.size <= 5 * 1024 * 1024) { // 5MB limit
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                setSelectedImages(prev => {
+                  const newImages = [...prev, { file, preview: reader.result as string }];
+                  return newImages.slice(0, 4); // Limit to 4 images
+                });
+              };
+              reader.readAsDataURL(file);
+              hasImage = true;
+              event.preventDefault(); // Prevent default paste behavior if an image is found
+            } else {
+              toast.error('Solo se permiten imágenes de hasta 5MB.');
             }
-          };
-          reader.readAsDataURL(file);
-        } else {
-          toast.error('Solo se permiten imágenes de hasta 5MB.');
+          }
         }
-      });
-      event.target.value = ''; // Clear the input so the same file can be selected again
+      }
+      if (hasImage) {
+        toast.info('Imagen pegada desde el portapapeles.');
+      }
     }
   };
 
@@ -591,6 +627,7 @@ export function ChatInterface({
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
+                onPaste={handlePaste} // Added onPaste handler
                 placeholder="Pregunta a Claude AI..."
                 disabled={isLoading || !userId}
                 className="flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none max-h-[200px] overflow-y-auto bg-transparent"
