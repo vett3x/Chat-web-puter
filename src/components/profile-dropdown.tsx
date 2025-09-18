@@ -132,11 +132,11 @@ export function ProfileDropdown() {
             />
           )}
         </DropdownMenuItem>
-        <DropdownMenuItem className="cursor-pointer" onClick={() => toast.info('Funcionalidad de configuración no implementada.')}>
-          <div className="flex items-center">
+        <DropdownMenuItem asChild> {/* Changed to asChild and added Link */}
+          <Link href="/settings/profile" className="flex items-center cursor-pointer">
             <Settings className="mr-2 h-4 w-4" />
             <span>Configuración</span>
-          </div>
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive" onClick={handleSignOut}>
           <div className="flex items-center">
