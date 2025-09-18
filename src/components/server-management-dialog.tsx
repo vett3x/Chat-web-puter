@@ -22,7 +22,7 @@ interface ServerManagementDialogProps {
 export function ServerManagementDialog({ open, onOpenChange }: ServerManagementDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[900px] p-6 h-[90vh] flex flex-col"> {/* Increased max-width and added flex-col for layout */}
+      <DialogContent className="sm:max-w-[1200px] p-6 h-[95vh] flex flex-col"> {/* Increased max-width and height */}
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Server className="h-6 w-6" /> Gestión de Servidores
@@ -32,7 +32,7 @@ export function ServerManagementDialog({ open, onOpenChange }: ServerManagementD
             Recuerda que las credenciales SSH se enviarán a tu backend de orquestación para su gestión segura.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex-1 py-4 overflow-hidden"> {/* Added flex-1 and overflow-hidden */}
+        <div className="flex-1 py-4 overflow-hidden">
           <ServerManagementTabs />
         </div>
         <DialogFooter>
