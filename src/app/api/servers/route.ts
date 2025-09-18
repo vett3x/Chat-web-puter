@@ -1,8 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { cookies, ReadonlyRequestCookies } from 'next/headers'; // Importamos ReadonlyRequestCookies
-// Eliminamos la importación de CryptoJS
+import { cookies } from 'next/headers'; // Eliminamos ReadonlyRequestCookies de aquí
 
 // Define SuperUser emails (for server-side check)
 const SUPERUSER_EMAILS = ['martinpensa1@gmail.com']; // ¡Asegúrate de que este sea tu correo electrónico!
@@ -16,21 +15,14 @@ const serverSchema = z.object({
   name: z.string().optional(),
 });
 
-// Eliminamos las funciones de cifrado/descifrado
-// const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'super-secret-key-please-change-me';
-// function encrypt(text: string): string { /* ... */ }
-// function decrypt(ciphertext: string): string { /* ... */ }
-
 // Helper function to create Supabase client for API routes
 function getSupabaseServerClient(res: NextResponse) {
-  const cookieStore = cookies() as ReadonlyRequestCookies; // Type assertion aquí
-
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: (name: string) => cookieStore.get(name)?.value, // Usamos la variable cookieStore
+        get: (name: string) => cookies().get(name)?.value, // Acceso directo a cookies().get()
         set: (name: string, value: string, options: CookieOptions) => {
           res.cookies.set({ name, value, ...options });
         },
@@ -68,7 +60,7 @@ export async function GET(req: NextRequest) {
 
   const { data: servers, error } = await supabase
     .from('user_servers')
-    .select('id, name, ip_address, ssh_port, ssh_username') // No seleccionamos la contraseña por seguridad
+    .select('id, name, ip_address, ssh_port, ssh_username') // No seleccionamos ssh_password
     .eq('user_id', session.user.id);
 
   if (error) {
@@ -96,7 +88,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const newServerData = serverSchema.parse(body);
 
-    // Eliminamos el cifrado, la contraseña se guarda en texto plano
     const { data, error } = await supabase
       .from('user_servers')
       .insert({
@@ -107,7 +98,7 @@ export async function POST(req: NextRequest) {
         ssh_username: newServerData.ssh_username,
         ssh_password: newServerData.ssh_password, // Almacenando la contraseña en texto plano
       })
-      .select('id, name, ip_address, ssh_port')
+      .select('id, name, ip_address, ssh_port') // Seleccionamos solo datos no sensibles para la respuesta
       .single();
 
     if (error) {
