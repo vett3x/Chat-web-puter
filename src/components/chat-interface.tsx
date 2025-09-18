@@ -318,7 +318,7 @@ export function ChatInterface({
 
       <div className="flex-1 min-h-0 relative">
         <ScrollArea className="h-full" ref={scrollAreaRef}>
-          <div className="p-4 space-y-4 pb-24"> {/* Añadido padding-bottom para el cuadro flotante */}
+          <div className="p-4 space-y-4 pb-28"> {/* Aumentado padding-bottom para el cuadro flotante */}
             {messages.length === 0 && !isLoading ? (
               <div className="text-center text-muted-foreground py-8">
                 <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -378,15 +378,16 @@ export function ChatInterface({
         </ScrollArea>
 
         {/* Cuadro de entrada flotante */}
-        <div className="absolute bottom-4 left-0 right-0 flex justify-center px-4">
-          <div className="w-full max-w-3xl bg-card rounded-xl shadow-lg p-2 flex items-end gap-2 focus-within:ring-2 focus-within:ring-green-500 focus-within:ring-offset-2 focus-within:ring-offset-background transition-all duration-200">
+        <div className="absolute bottom-8 left-0 right-0 flex justify-center px-4"> {/* Mover más arriba */}
+          <div className="w-full max-w-3xl bg-card rounded-xl border border-input shadow-2xl p-2 flex items-end gap-2 focus-within:ring-2 focus-within:ring-green-500 focus-within:ring-offset-2 focus-within:ring-offset-background transition-all duration-200">
             <Textarea
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Pregunta a Claude AI..."
               disabled={isLoading || !userId}
-              className="flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none min-h-[40px] max-h-[200px] overflow-y-auto bg-transparent"
+              // Aumentar min-h
+              className="flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none min-h-[50px] max-h-[200px] overflow-y-auto bg-transparent"
               rows={1}
             />
             <Select value={selectedModel} onValueChange={setSelectedModel}>
