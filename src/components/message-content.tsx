@@ -1,0 +1,63 @@
+"use client";
+
+import React from 'react';
+import { CodeBlock } from './code-block';
+
+interface MessageContentProps {
+  content: string;
+}
+
+const codeBlockRegex = /```(\w+)(?::([\w./-]+))?\n([\s\S]*?)\n```/g;
+
+export function MessageContent({ content }: MessageContentProps) {
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = codeBlockRegex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({
+        type: 'text',
+        value: content.substring(lastIndex, match.index),
+      });
+    }
+
+    parts.push({
+      type: 'code',
+      language: match[1],
+      filename: match[2],
+      code: match[3].trim(),
+    });
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < content.length) {
+    parts.push({
+      type: 'text',
+      value: content.substring(lastIndex),
+    });
+  }
+
+  if (parts.length === 0) {
+    parts.push({ type: 'text', value: content });
+  }
+
+  return (
+    <>
+      {parts.map((part, index) => {
+        if (part.type === 'code') {
+          return (
+            <CodeBlock
+              key={index}
+              language={part.language || ''}
+              filename={part.filename}
+              code={part.code}
+            />
+          );
+        }
+        return <span key={index} className="whitespace-pre-wrap">{part.value}</span>;
+      })}
+    </>
+  );
+}

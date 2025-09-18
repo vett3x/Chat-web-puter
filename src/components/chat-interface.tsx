@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input';
 import { CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot, User, Loader2, MessageSquarePlus, Square } from 'lucide-react';
+import { Send, Bot, User, Loader2, MessageSquarePlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/components/session-context-provider';
+import { MessageContent } from './message-content';
 
 interface Message {
   id: string;
@@ -78,7 +79,6 @@ export function ChatInterface({
   const [isContextLoading, setIsContextLoading] = useState(false);
   const [isContextInitialized, setIsContextInitialized] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     const checkPuter = () => {
@@ -204,7 +204,6 @@ export function ChatInterface({
 
     let currentConvId = conversationId;
     let shouldFetchContextFromDB = false;
-    let tempAssistantMessageId: string | null = null;
 
     if (!currentConvId) {
       shouldFetchContextFromDB = true;
@@ -256,101 +255,38 @@ export function ChatInterface({
       });
       setIsContextLoading(false);
 
-      let messageContent = response?.message?.content?.[0]?.text || 'Sin contenido';
+      const messageContent = response?.message?.content?.[0]?.text || 'Sin contenido';
 
-      tempAssistantMessageId = (Date.now() + 1).toString();
-      const streamingAssistantMessage: Message = {
-          id: tempAssistantMessageId,
-          content: '',
-          role: 'assistant',
-          model: selectedModel,
-          timestamp: new Date(),
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: messageContent,
+        role: 'assistant',
+        model: selectedModel,
+        timestamp: new Date(),
       };
-      setMessages(prev => [...prev, streamingAssistantMessage]);
 
-      let charIndex = 0;
-      const typingInterval = setInterval(() => {
-          if (charIndex < messageContent.length) {
-              setMessages(prev =>
-                  prev.map(msg =>
-                      msg.id === tempAssistantMessageId
-                          ? { ...msg, content: messageContent.substring(0, charIndex + 1) }
-                          : msg
-                  )
-              );
-              charIndex++;
-          } else {
-              clearInterval(typingInterval);
-              intervalRef.current = null;
-              const finalAssistantMessage: Message = {
-                  id: tempAssistantMessageId!,
-                  content: messageContent,
-                  role: 'assistant',
-                  model: selectedModel,
-                  timestamp: new Date(),
-              };
-              saveMessageToDB(currentConvId!, finalAssistantMessage).then(savedMsg => {
-                  if (savedMsg) {
-                      setMessages(prev =>
-                          prev.map(msg =>
-                              msg.id === tempAssistantMessageId ? savedMsg : msg
-                          )
-                      );
-                  }
-                  setIsLoading(false);
-              });
-          }
-      }, 5);
-      intervalRef.current = typingInterval;
+      setMessages(prev => [...prev, assistantMessage]);
+      setIsLoading(false);
+
+      const savedAssistantMessage = await saveMessageToDB(currentConvId, assistantMessage);
+      if (savedAssistantMessage) {
+        setMessages(prev =>
+          prev.map(msg =>
+            msg.id === assistantMessage.id ? savedAssistantMessage : msg
+          )
+        );
+      } else {
+        setMessages(prev => prev.filter(msg => msg.id !== assistantMessage.id));
+        toast.error('Error al guardar la respuesta del asistente.');
+      }
 
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error((error as Error).message || 'Error al enviar el mensaje. Por favor, intenta de nuevo.');
       setIsLoading(false);
       setIsContextLoading(false);
-      if (tempAssistantMessageId) {
-        setMessages(prev => prev.filter(msg => msg.id !== tempAssistantMessageId));
-      }
     }
   };
-
-  const handleStopGeneration = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-      setIsLoading(false);
-
-      const currentConvId = conversationId;
-      if (!currentConvId) {
-        console.error("Cannot stop generation without a conversation ID.");
-        return;
-      }
-
-      setMessages(prevMessages => {
-        const lastMessage = prevMessages[prevMessages.length - 1];
-
-        if (lastMessage && lastMessage.role === 'assistant' && lastMessage.content.trim() === '') {
-          return prevMessages.slice(0, -1);
-        }
-
-        if (lastMessage && lastMessage.role === 'assistant') {
-          saveMessageToDB(currentConvId, lastMessage).then(savedMsg => {
-            if (savedMsg) {
-              setMessages(currentMsgs =>
-                currentMsgs.map(msg =>
-                  msg.id === lastMessage.id ? savedMsg : msg
-                )
-              );
-            }
-          });
-        }
-        
-        return prevMessages;
-      });
-      
-      toast.info('Generación detenida.');
-    }
-  }, [conversationId]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -360,18 +296,11 @@ export function ChatInterface({
   };
 
   const startNewChat = () => {
-    if (intervalRef.current) {
-      handleStopGeneration();
-    }
     setMessages([]);
     onNewConversationCreated(null as any);
     setIsContextInitialized(false);
     toast.success('Nuevo chat iniciado');
   };
-
-  const lastMessage = messages[messages.length - 1];
-  const isAIThinking = isLoading && lastMessage?.role === 'user';
-  const isStreaming = isLoading && !isAIThinking;
 
   if (!isPuterReady) {
     return (
@@ -462,7 +391,7 @@ export function ChatInterface({
                           : 'bg-muted'
                       }`}
                     >
-                      <div className="whitespace-pre-wrap">{message.content}</div>
+                      <MessageContent content={message.content} />
                       {message.model && (
                         <div className="text-xs opacity-70 mt-2">
                           {AVAILABLE_MODELS.find(m => m.value === message.model)?.label}
@@ -473,7 +402,7 @@ export function ChatInterface({
                 </div>
               ))
             )}
-            {isAIThinking && (
+            {isLoading && messages[messages.length - 1]?.role === 'user' && (
               <div className="flex gap-3 justify-start">
                 <div className="flex gap-3 max-w-[80%]">
                   <div className="flex-shrink-0">
@@ -521,23 +450,17 @@ export function ChatInterface({
             disabled={isLoading || !userId}
             className="flex-1"
           />
-          {isStreaming ? (
-            <Button onClick={handleStopGeneration} variant="destructive" size="icon">
-              <Square className="h-4 w-4" />
-            </Button>
-          ) : (
-            <Button
-              onClick={sendMessage}
-              disabled={isLoading || !inputMessage.trim() || !userId}
-              size="icon"
-            >
-              {isAIThinking ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
-          )}
+          <Button
+            onClick={sendMessage}
+            disabled={isLoading || !inputMessage.trim() || !userId}
+            size="icon"
+          >
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+          </Button>
         </div>
       </div>
     </div>
