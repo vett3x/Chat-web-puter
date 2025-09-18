@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { Client } from 'ssh2';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import CryptoJS from 'crypto-js'; // Import crypto-js
+import CryptoJS from 'crypto-js';
 
 // Define SuperUser emails (for server-side check)
 const SUPERUSER_EMAILS = ['martinpensa1@gmail.com']; // ¡Asegúrate de que este sea tu correo electrónico!
@@ -17,30 +17,6 @@ const serverSchema = z.object({
   name: z.string().optional(),
 });
 
-// Helper function to create Supabase client for API routes
-// Se hace async y se await cookies() para ayudar a TypeScript con la inferencia de tipos.
-async function getSupabaseServerClient() {
-  const cookieStore = cookies(); // cookies() es síncrona, pero la inferencia de tipos puede mejorar con await.
-
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get: (name: string) => cookieStore.get(name)?.value,
-        set: (name: string, value: string, options: CookieOptions) => {
-          // Para Route Handlers, `cookieStore.set` se usa para modificar las cookies de la respuesta.
-          cookieStore.set({ name, value, ...options });
-        },
-        remove: (name: string, options: CookieOptions) => {
-          // Para eliminar una cookie, se usa `cookieStore.set` con un valor vacío.
-          cookieStore.set({ name, value: '', ...options });
-        },
-      },
-    }
-  );
-}
-
 // Encryption/Decryption functions
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'super-secret-key-please-change-me'; // Fallback for dev, MUST be set in production
 
@@ -53,9 +29,31 @@ function decrypt(ciphertext: string): string {
   return bytes.toString(CryptoJS.enc.Utf8);
 }
 
+// Helper function to create Supabase client for API routes
+// Esta función ahora toma un objeto NextResponse para modificar sus cookies y es SÍNCRONA.
+function getSupabaseServerClient(res: NextResponse) {
+  const cookieStore = cookies();
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get: (name: string) => cookieStore.get(name)?.value,
+        set: (name: string, value: string, options: CookieOptions) => {
+          res.cookies.set({ name, value, ...options });
+        },
+        remove: (name: string, options: CookieOptions) => {
+          res.cookies.set({ name, value: '', ...options });
+        },
+      },
+    }
+  );
+}
+
 // Add a middleware-like check for SuperUser
-async function authorizeSuperUser() {
-  const supabase = await getSupabaseServerClient(); // Ahora se await la llamada
+async function authorizeSuperUser(res: NextResponse) {
+  const supabase = getSupabaseServerClient(res); // Ya no se necesita 'await' aquí
   const { data: { session } } = await supabase.auth.getSession();
 
   if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
@@ -65,11 +63,12 @@ async function authorizeSuperUser() {
 }
 
 // GET /api/servers - Obtener la lista de servidores registrados (sin credenciales sensibles)
-export async function GET(req: Request) {
-  const authError = await authorizeSuperUser();
+export async function GET(req: NextRequest) {
+  const res = NextResponse.json({});
+  const authError = await authorizeSuperUser(res);
   if (authError) return authError;
 
-  const supabase = await getSupabaseServerClient(); // Ahora se await la llamada
+  const supabase = getSupabaseServerClient(res); // Ya no se necesita 'await' aquí
   const { data: { session } } = await supabase.auth.getSession();
 
   if (!session) {
@@ -78,23 +77,24 @@ export async function GET(req: Request) {
 
   const { data: servers, error } = await supabase
     .from('user_servers')
-    .select('id, name, ip_address, ssh_port, ssh_username') // Do NOT select encrypted_ssh_password
+    .select('id, name, ip_address, ssh_port, ssh_username')
     .eq('user_id', session.user.id);
 
   if (error) {
-    console.error('Error fetching servers from Supabase:', error);
+    console.error('Error fetching servers from Supabase:', JSON.stringify(error, null, 2));
     return NextResponse.json({ message: 'Error al cargar los servidores.' }, { status: 500 });
   }
 
-  return NextResponse.json(servers);
+  return NextResponse.json(servers, { status: 200, headers: res.headers });
 }
 
 // POST /api/servers - Añadir un nuevo servidor
-export async function POST(req: Request) {
-  const authError = await authorizeSuperUser();
+export async function POST(req: NextRequest) {
+  const res = NextResponse.json({});
+  const authError = await authorizeSuperUser(res);
   if (authError) return authError;
 
-  const supabase = await getSupabaseServerClient(); // Ahora se await la llamada
+  const supabase = getSupabaseServerClient(res); // Ya no se necesita 'await' aquí
   const { data: { session } } = await supabase.auth.getSession();
 
   if (!session) {
@@ -105,11 +105,8 @@ export async function POST(req: Request) {
     const body = await req.json();
     const newServerData = serverSchema.parse(body);
 
-    // Encrypt sensitive data
     const encryptedPassword = encrypt(newServerData.ssh_password);
-    // No need to encrypt port, it's not as sensitive and often public
 
-    // Simulate SSH connection test (optional, but good practice)
     const conn = new Client();
     let connectionSuccessful = false;
     let connectionError: string | null = null;
@@ -127,8 +124,8 @@ export async function POST(req: Request) {
         host: newServerData.ip_address,
         port: newServerData.ssh_port || 22,
         username: newServerData.ssh_username,
-        password: decrypt(encryptedPassword), // Decrypt for connection test
-        readyTimeout: 5000, // 5 seconds timeout
+        password: decrypt(encryptedPassword),
+        readyTimeout: 5000,
       });
     });
 
@@ -139,7 +136,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Save to Supabase
     const { data, error } = await supabase
       .from('user_servers')
       .insert({
@@ -150,7 +146,7 @@ export async function POST(req: Request) {
         ssh_username: newServerData.ssh_username,
         encrypted_ssh_password: encryptedPassword,
       })
-      .select('id, name, ip_address, ssh_port') // Select non-sensitive data to return
+      .select('id, name, ip_address, ssh_port')
       .single();
 
     if (error) {
@@ -160,7 +156,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(
       { message: 'Servidor añadido y conexión SSH verificada correctamente.', server: data },
-      { status: 201 }
+      { status: 201, headers: res.headers }
     );
   } catch (error: any) {
     if (error instanceof z.ZodError) {
@@ -172,11 +168,12 @@ export async function POST(req: Request) {
 }
 
 // DELETE /api/servers/[id] - Eliminar un servidor
-export async function DELETE(req: Request) {
-  const authError = await authorizeSuperUser();
+export async function DELETE(req: NextRequest) {
+  const res = NextResponse.json({});
+  const authError = await authorizeSuperUser(res);
   if (authError) return authError;
 
-  const supabase = await getSupabaseServerClient(); // Ahora se await la llamada
+  const supabase = getSupabaseServerClient(res); // Ya no se necesita 'await' aquí
   const { data: { session } } = await supabase.auth.getSession();
 
   if (!session) {
@@ -201,132 +198,5 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ message: 'Error al eliminar el servidor.' }, { status: 500 });
   }
 
-  return NextResponse.json({ message: 'Servidor eliminado correctamente.' }, { status: 200 });
+  return NextResponse.json({ message: 'Servidor eliminado correctamente.' }, { status: 200, headers: res.headers });
 }
-
-// Las siguientes funciones deben ser movidas a sus propios archivos de ruta en Next.js App Router.
-// Por ejemplo, GET_SERVER_DETAILS debería estar en src/app/api/servers/[id]/details/route.ts como una función 'GET'.
-/*
-export async function GET_SERVER_DETAILS(req: Request) {
-  const authError = await authorizeSuperUser();
-  if (authError) return authError;
-
-  const { searchParams } = new URL(req.url);
-  const id = searchParams.get('id');
-
-  if (!id) {
-    return NextResponse.json({ message: 'ID de servidor no proporcionado.' }, { status: 400 });
-  }
-
-  const server = registeredServers.find(s => s.id === id);
-
-  if (!server) {
-    return NextResponse.json({ message: 'Servidor no encontrado.' }, { status: 404 });
-  }
-
-  // Placeholder for actual server details. In a real app, this would involve SSH commands.
-  const details = {
-    id: server.id,
-    name: server.name,
-    ip_address: server.ip_address,
-    status: 'Online',
-    cpu_usage: '25%',
-    ram_usage: '4GB / 16GB',
-    disk_usage: '100GB / 500GB',
-    running_dockers: 3,
-    web_links: [
-      { name: 'App Demo', url: `http://${server.ip_address}:3000`, status: 'Running' },
-      { name: 'Admin Panel', url: `http://${server.ip_address}:8080`, status: 'Offline' },
-    ],
-    last_updated: new Date().toISOString(),
-  };
-
-  return NextResponse.json(details);
-}
-
-export async function GET_SERVER_DOCKER(req: Request) {
-  const authError = await authorizeSuperUser();
-  if (authError) return authError;
-
-  const { searchParams } = new URL(req.url);
-  const id = searchParams.get('id');
-
-  if (!id) {
-    return NextResponse.json({ message: 'ID de servidor no proporcionado.' }, { status: 400 });
-  }
-
-  const server = registeredServers.find(s => s.id === id);
-
-  if (!server) {
-    return NextResponse.json({ message: 'Servidor no encontrado.' }, { status: 404 });
-  }
-
-  // Placeholder for actual Docker command execution via SSH
-  const dockerContainers = [
-    { id: 'c1', name: 'web-app', image: 'nginx:latest', status: 'running', ports: '80:80', cpu: '5%', mem: '100MB' },
-    { id: 'c2', name: 'database', image: 'postgres:14', status: 'running', ports: '5432:5432', cpu: '10%', mem: '250MB' },
-    { id: 'c3', name: 'redis', image: 'redis:latest', status: 'exited', ports: '6379:6379', cpu: '0%', mem: '0MB' },
-  ];
-
-  return NextResponse.json(dockerContainers);
-}
-
-export async function GET_SERVER_USAGE(req: Request) {
-  const authError = await authorizeSuperUser();
-  if (authError) return authError;
-
-  const { searchParams } = new URL(req.url);
-  const id = searchParams.get('id');
-
-  if (!id) {
-    return NextResponse.json({ message: 'ID de servidor no proporcionado.' }, { status: 400 });
-  }
-
-  const server = registeredServers.find(s => s.id === id);
-
-  if (!server) {
-    return NextResponse.json({ message: 'Servidor no encontrado.' }, { status: 404 });
-  }
-
-  // Placeholder for actual usage history data
-  const usageHistory = [
-    { timestamp: new Date(Date.now() - 3600000).toISOString(), cpu: 20, ram: 300, disk: 50 },
-    { timestamp: new Date(Date.now() - 1800000).toISOString(), cpu: 25, ram: 320, disk: 51 },
-    { timestamp: new Date().toISOString(), cpu: 22, ram: 310, disk: 50 },
-  ];
-
-  return NextResponse.json(usageHistory);
-}
-
-export async function POST_CLOUDFLARE_TUNNEL(req: Request) {
-  const authError = await authorizeSuperUser();
-  if (authError) return authError;
-
-  const { searchParams } = new URL(req.url);
-  const id = searchParams.get('id');
-
-  if (!id) {
-    return NextResponse.json({ message: 'ID de servidor no proporcionado.' }, { status: 400 });
-  }
-
-  const server = registeredServers.find(s => s.id === id);
-
-  if (!server) {
-    return NextResponse.json({ message: 'Servidor no encontrado.' }, { status: 404 });
-  }
-
-  const { action, tunnelId, secret } = await req.json(); // Example payload
-
-  // Placeholder for actual Cloudflare Tunnel management via SSH
-  let message = `Acción '${action}' para Cloudflare Tunnel en ${server.name || server.ip_address} (ID: ${id}).`;
-  if (action === 'create') {
-    message += ' Tunnel creado con éxito.';
-  } else if (action === 'delete') {
-    message += ' Tunnel eliminado con éxito.';
-  } else if (action === 'status') {
-    message += ' Estado del Tunnel: Activo.';
-  }
-
-  return NextResponse.json({ message, status: 'success' });
-}
-*/
