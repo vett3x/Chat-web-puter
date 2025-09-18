@@ -184,7 +184,7 @@ export function DraggableConversationCard({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <CardContent className="p-1.5 flex items-center justify-between gap-2"> {/* Reduced padding */}
+      <CardContent className="py-1 px-1.5 flex items-center justify-between gap-1"> {/* Reduced vertical padding, adjusted horizontal */}
         {isEditing ? (
           <Input
             value={editingTitle}
@@ -196,29 +196,29 @@ export function DraggableConversationCard({
               }
             }}
             onBlur={handleSaveEdit}
-            className="flex-1 bg-sidebar-background text-sidebar-foreground h-7 text-xs" // Reduced height and font size
+            className="flex-1 bg-sidebar-background text-sidebar-foreground h-6 text-xs" // Reduced height
           />
         ) : (
-          <div className="flex items-center gap-2 flex-1 overflow-hidden">
-            <MessageSquare className="h-3.5 w-3.5 flex-shrink-0" /> {/* Smaller icon */}
+          <div className="flex items-center gap-1 flex-1 overflow-hidden"> {/* Reduced gap */}
+            <MessageSquare className="h-3 w-3 flex-shrink-0" /> {/* Smaller icon */}
             <span className="text-xs truncate">{conversation.title}</span> {/* Smaller font size */}
           </div>
         )}
-        <div className="flex-shrink-0 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex-shrink-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"> {/* Reduced gap */}
           {isEditing ? (
             <>
-              <Button variant="ghost" size="icon" onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleSaveEdit(); }} className="h-6 w-6"> {/* Smaller buttons */}
-                <Save className="h-3.5 w-3.5" /> {/* Smaller icon */}
+              <Button variant="ghost" size="icon" onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleSaveEdit(); }} className="h-5 w-5"> {/* Smaller buttons */}
+                <Save className="h-3 w-3" /> {/* Smaller icon */}
               </Button>
-              <Button variant="ghost" size="icon" onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsEditing(false); setEditingTitle(conversation.title); }} className="h-6 w-6"> {/* Smaller buttons */}
-                <X className="h-3.5 w-3.5" /> {/* Smaller icon */}
+              <Button variant="ghost" size="icon" onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsEditing(false); setEditingTitle(conversation.title); }} className="h-5 w-5"> {/* Smaller buttons */}
+                <X className="h-3 w-3" /> {/* Smaller icon */}
               </Button>
             </>
           ) : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-6 w-6"> {/* Smaller button */}
-                  <MoreVertical className="h-3.5 w-3.5" /> {/* Smaller icon */}
+                <Button variant="ghost" size="icon" className="h-5 w-5"> {/* Smaller button */}
+                  <MoreVertical className="h-3 w-3" /> {/* Smaller icon */}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48 bg-popover text-popover-foreground border-border">
