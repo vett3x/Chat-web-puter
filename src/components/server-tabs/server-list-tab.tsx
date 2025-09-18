@@ -172,7 +172,7 @@ function ServerListItem({ server, onDeleteServer, onSelectServerForDetails }: { 
         </div>
       </div>
       <CollapsibleContent>
-        <div className="mt-2 rounded-md"> {/* Removed overflow-hidden here */}
+        <div className="mt-2 rounded-md">
           <SyntaxHighlighter 
             language="bash" 
             style={vscDarkPlus} 
@@ -180,11 +180,17 @@ function ServerListItem({ server, onDeleteServer, onSelectServerForDetails }: { 
               margin: 0, 
               background: '#1E1E1E', 
               maxHeight: '400px', 
-              overflow: 'auto', 
+              overflowY: 'auto', // Explicitly vertical scroll
+              overflowX: 'auto', // Explicitly horizontal scroll
               whiteSpace: 'pre-wrap', 
               wordBreak: 'break-all', 
             }} 
-            codeTagProps={{ style: { fontFamily: 'var(--font-geist-mono)' } }}
+            codeTagProps={{ 
+              style: { 
+                fontFamily: 'var(--font-geist-mono)',
+                wordBreak: 'break-all', // Apply word-break here too
+              } 
+            }}
           >
             {server.provisioning_log || 'No hay logs disponibles.'}
           </SyntaxHighlighter>
