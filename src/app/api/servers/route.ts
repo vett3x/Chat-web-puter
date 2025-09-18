@@ -12,6 +12,7 @@ interface ServerConfig {
   ip_address: string;
   ssh_username: string;
   ssh_password?: string; // Optional if using keys, but required for password auth
+  ssh_port?: number; // Added SSH port
 }
 
 const registeredServers: ServerConfig[] = [];
@@ -25,12 +26,13 @@ const serverSchema = z.object({
   ip_address: z.string().ip({ message: 'Dirección IP inválida.' }),
   ssh_username: z.string().min(1, { message: 'El usuario SSH es requerido.' }),
   ssh_password: z.string().min(1, { message: 'La contraseña SSH es requerida.' }),
+  ssh_port: z.coerce.number().int().min(1).max(65535).default(22).optional(), // Added SSH port
   name: z.string().optional(),
 });
 
 // Helper function to create Supabase client for API routes
 async function getSupabaseServerClient() { // Made async
-  const cookieStore = cookies(); // This is synchronous, but the async context helps type inference
+  const cookieStore = cookies(); // cookies() is synchronous, but awaiting it helps type inference
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -65,7 +67,8 @@ export async function GET(req: Request) {
   const authError = await authorizeSuperUser();
   if (authError) return authError;
 
-  const safeServers = registeredServers.map(({ id, name, ip_address }) => ({ id, name, ip_address }));
+  // Include ssh_port in the safeServers response
+  const safeServers = registeredServers.map(({ id, name, ip_address, ssh_port }) => ({ id, name, ip_address, ssh_port }));
   return NextResponse.json(safeServers);
 }
 
@@ -94,7 +97,7 @@ export async function POST(req: Request) {
         resolve();
       }).connect({
         host: newServerData.ip_address,
-        port: 22,
+        port: newServerData.ssh_port || 22, // Use provided port or default to 22
         username: newServerData.ssh_username,
         password: newServerData.ssh_password,
         readyTimeout: 5000, // 5 seconds timeout
@@ -116,7 +119,7 @@ export async function POST(req: Request) {
     console.log('Servidor añadido (en memoria):', newServer.name || newServer.ip_address);
 
     return NextResponse.json(
-      { message: 'Servidor añadido y conexión SSH verificada correctamente.', server: { id: newServer.id, name: newServer.name, ip_address: newServer.ip_address } },
+      { message: 'Servidor añadido y conexión SSH verificada correctamente.', server: { id: newServer.id, name: newServer.name, ip_address: newServer.ip_address, ssh_port: newServer.ssh_port } },
       { status: 201 }
     );
   } catch (error: any) {

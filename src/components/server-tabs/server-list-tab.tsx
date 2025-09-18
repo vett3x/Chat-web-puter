@@ -35,6 +35,7 @@ const serverFormSchema = z.object({
   ip_address: z.string().ip({ message: 'Dirección IP inválida.' }),
   ssh_username: z.string().min(1, { message: 'El usuario SSH es requerido.' }),
   ssh_password: z.string().min(1, { message: 'La contraseña SSH es requerida.' }),
+  ssh_port: z.coerce.number().int().min(1).max(65535).default(22).optional(), // Added SSH port
   name: z.string().optional(),
 });
 
@@ -44,6 +45,7 @@ interface RegisteredServer {
   id: string;
   name?: string;
   ip_address: string;
+  ssh_port?: number; // Added SSH port to interface
 }
 
 // La URL de la API ahora es interna al mismo origen
@@ -59,6 +61,7 @@ function AddServerForm({ onServerAdded }: { onServerAdded: () => void }) {
       ip_address: '',
       ssh_username: '',
       ssh_password: '',
+      ssh_port: 22, // Default SSH port
       name: '',
     },
   });
@@ -81,7 +84,7 @@ function AddServerForm({ onServerAdded }: { onServerAdded: () => void }) {
       }
 
       toast.success(result.message || 'Servidor añadido correctamente.');
-      form.reset();
+      form.reset({ ssh_port: 22 }); // Reset form, keep default port
       onServerAdded(); // Callback to refresh the list
     } catch (error: any) {
       console.error('Error adding server:', error);
@@ -153,6 +156,19 @@ function AddServerForm({ onServerAdded }: { onServerAdded: () => void }) {
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="ssh_port"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Puerto SSH</FormLabel>
+                  <FormControl>
+                    <Input type="number" placeholder="22" {...field} disabled={isAddingServer} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <Button type="submit" disabled={isAddingServer}>
               {isAddingServer ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -196,7 +212,7 @@ function RegisteredServersList({ servers, isLoadingServers, onDeleteServer, onSe
               <div key={server.id} className="border p-4 rounded-md bg-muted/50 flex items-center justify-between">
                 <div>
                   <h4 className="font-semibold">{server.name || 'Servidor sin nombre'}</h4>
-                  <p className="text-sm text-muted-foreground">IP: {server.ip_address}</p>
+                  <p className="text-sm text-muted-foreground">IP: {server.ip_address}{server.ssh_port ? `:${server.ssh_port}` : ''}</p>
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="icon" onClick={() => onSelectServerForDetails(server)} title="Ver detalles">
