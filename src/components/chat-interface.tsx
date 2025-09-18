@@ -425,10 +425,12 @@ export function ChatInterface({
       console.log('Puter AI response:', response);
 
       if (!response || (typeof response === 'object' && Object.keys(response).length === 0)) {
+        console.error('Puter AI returned an empty or malformed response:', response); // Added logging
         throw new Error('La respuesta de la IA está vacía o tuvo un formato inesperado. Si es tu primera interacción en una nueva sesión, podría ser necesario completar una verificación de seguridad (ej. CAPTCHA) en el popup de Puter AI.');
       }
       if (response && response.error) {
         const apiErrorMessage = typeof response.error === 'string' ? response.error : (response.error.message || JSON.stringify(response.error));
+        console.error('Puter AI API error:', response.error); // Added logging
         throw new Error(`Error de la IA: ${apiErrorMessage}`);
       }
 
@@ -472,7 +474,13 @@ export function ChatInterface({
       });
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Ocurrió un error desconocido.';
+      console.error('Error sending message to Puter AI:', error); // Log the full error object
+      let errorMessage = 'Ocurrió un error desconocido.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null && 'message' in error) {
+        errorMessage = (error as { message: string }).message;
+      }
       toast.error(errorMessage);
       setMessages(prev => prev.map(msg => msg.id === tempAssistantId ? { ...msg, content: `Error: ${errorMessage}`, isTyping: false, isNew: true } : msg));
     } finally {
