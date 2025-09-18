@@ -436,7 +436,7 @@ export function ChatInterface({
                 <Button
                   variant="default"
                   size="icon"
-                  className="rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-200"
+                  className="rounded-full bg-info text-info-foreground shadow-avatar-user hover:shadow-avatar-user-hover transition-all duration-200"
                   aria-label="Seleccionar modelo de IA"
                 >
                   <Bot className="h-5 w-5" />

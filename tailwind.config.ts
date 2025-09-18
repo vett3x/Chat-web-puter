@@ -106,6 +106,7 @@ export default {
   		},
       boxShadow: {
         'avatar-user': '0 0 8px 2px hsl(var(--user-avatar-shadow) / 0.5)',
+        'avatar-user-hover': '0 0 12px 4px hsl(var(--user-avatar-shadow) / 0.7)', // Nueva sombra para hover
         'avatar-ai': '0 0 8px 2px hsl(var(--ai-avatar-shadow) / 0.5)',
       },
   	}
