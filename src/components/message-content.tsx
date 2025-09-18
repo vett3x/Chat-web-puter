@@ -9,7 +9,7 @@ interface MessageContentProps {
   isNew?: boolean;
 }
 
-const codeBlockRegex = /```(\w+)(?::([\w./-]+))?\n(?:\[(.*?)\]\n)?([\s\S]*?)\n```/g;
+const codeBlockRegex = /```(\w+)(?::([\w./-]+))?\n([\s\S]*?)\n```/g;
 
 export function MessageContent({ content, isNew }: MessageContentProps) {
   const parts = [];
@@ -28,8 +28,7 @@ export function MessageContent({ content, isNew }: MessageContentProps) {
       type: 'code' as const,
       language: match[1],
       filename: match[2],
-      summary: match[3],
-      code: (match[4] || '').trim(),
+      code: (match[3] || '').trim(),
     });
 
     lastIndex = match.index + match[0].length;
@@ -55,7 +54,6 @@ export function MessageContent({ content, isNew }: MessageContentProps) {
               key={index}
               language={part.language || ''}
               filename={part.filename}
-              summary={part.summary}
               code={part.code}
               isNew={isNew}
             />
