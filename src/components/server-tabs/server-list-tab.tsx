@@ -180,15 +180,13 @@ function ServerListItem({ server, onDeleteServer, onSelectServerForDetails }: { 
               margin: 0, 
               background: '#1E1E1E', 
               maxHeight: '400px', 
-              overflowY: 'auto', // Explicitly vertical scroll
-              overflowX: 'auto', // Explicitly horizontal scroll
-              whiteSpace: 'pre-wrap', 
-              wordBreak: 'break-all', 
+              overflowY: 'auto',
+              overflowX: 'auto',
+              whiteSpace: 'pre', // Changed from 'pre-wrap' to 'pre'
             }} 
             codeTagProps={{ 
               style: { 
                 fontFamily: 'var(--font-geist-mono)',
-                wordBreak: 'break-all', // Apply word-break here too
               } 
             }}
           >
