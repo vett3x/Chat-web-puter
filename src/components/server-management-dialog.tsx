@@ -22,7 +22,7 @@ interface ServerManagementDialogProps {
 export function ServerManagementDialog({ open, onOpenChange }: ServerManagementDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[1200px] p-6 h-[95vh] flex flex-col"> {/* Increased max-width and height */}
+      <DialogContent className="sm:max-w-[95vw] p-6 h-[95vh] flex flex-col"> {/* Increased max-width to 95vw */}
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Server className="h-6 w-6" /> Gestión de Servidores
