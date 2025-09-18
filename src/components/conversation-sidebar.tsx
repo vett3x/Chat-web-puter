@@ -34,11 +34,13 @@ interface Folder {
 interface ConversationSidebarProps {
   selectedConversationId: string | null;
   onSelectConversation: (conversationId: string | null) => void;
+  onOpenProfileSettings: () => void; // New prop
 }
 
 export function ConversationSidebar({
   selectedConversationId,
   onSelectConversation,
+  onOpenProfileSettings, // Destructure new prop
 }: ConversationSidebarProps) {
   const { session, isLoading: isSessionLoading } = useSession();
   const userId = session?.user?.id;
@@ -355,7 +357,7 @@ export function ConversationSidebar({
   return (
     <div className="flex flex-col h-full p-4 border-r bg-sidebar text-sidebar-foreground">
       <div className="mb-4">
-        <ProfileDropdown />
+        <ProfileDropdown onOpenProfileSettings={onOpenProfileSettings} /> {/* Pass the new prop */}
       </div>
 
       <div className="flex items-center justify-between mb-4">

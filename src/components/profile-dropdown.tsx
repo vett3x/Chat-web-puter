@@ -18,7 +18,7 @@ import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link'; // Import Link for navigation
+// No longer importing Link as we're using a dialog
 
 interface Profile {
   first_name: string | null;
@@ -26,7 +26,11 @@ interface Profile {
   avatar_url: string | null;
 }
 
-export function ProfileDropdown() {
+interface ProfileDropdownProps {
+  onOpenProfileSettings: () => void; // New prop to open the dialog
+}
+
+export function ProfileDropdown({ onOpenProfileSettings }: ProfileDropdownProps) {
   const { session } = useSession();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -110,13 +114,11 @@ export function ProfileDropdown() {
           <span>Mi Cuenta</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator className="bg-border" />
-        <DropdownMenuItem asChild>
-          <Link href="/settings/profile" className="flex items-center cursor-pointer">
-            <div className="flex items-center"> {/* Envuelto en un div */}
-              <UserIcon className="mr-2 h-4 w-4" />
-              <span>Perfil</span>
-            </div>
-          </Link>
+        <DropdownMenuItem onClick={onOpenProfileSettings} className="flex items-center cursor-pointer">
+          <div className="flex items-center">
+            <UserIcon className="mr-2 h-4 w-4" />
+            <span>Perfil</span>
+          </div>
         </DropdownMenuItem>
         <DropdownMenuItem 
           className="flex items-center justify-between cursor-pointer"
@@ -134,13 +136,11 @@ export function ProfileDropdown() {
             />
           )}
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/settings/profile" className="flex items-center cursor-pointer">
-            <div className="flex items-center"> {/* Envuelto en un div */}
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Configuración</span>
-            </div>
-          </Link>
+        <DropdownMenuItem onClick={onOpenProfileSettings} className="flex items-center cursor-pointer">
+          <div className="flex items-center">
+            <Settings className="mr-2 h-4 w-4" />
+            <span>Configuración</span>
+          </div>
         </DropdownMenuItem>
         <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive" onClick={handleSignOut}>
           <div className="flex items-center">

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -18,10 +18,18 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2, User as UserIcon, Upload, XCircle, Save } from 'lucide-react';
 import Image from 'next/image';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
 
 const profileFormSchema = z.object({
   first_name: z.string().max(50, { message: 'El nombre no puede exceder los 50 caracteres.' }).optional(),
@@ -31,7 +39,12 @@ const profileFormSchema = z.object({
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
 
-export default function ProfileSettingsPage() {
+interface ProfileSettingsDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function ProfileSettingsDialog({ open, onOpenChange }: ProfileSettingsDialogProps) {
   const { session, isLoading: isSessionLoading } = useSession();
   const router = useRouter();
   const [profile, setProfile] = useState<{ first_name: string | null; last_name: string | null; avatar_url: string | null } | null>(null);
@@ -47,37 +60,41 @@ export default function ProfileSettingsPage() {
     },
   });
 
+  // Redirect if not authenticated and dialog is open
   useEffect(() => {
-    if (!isSessionLoading && !session) {
+    if (open && !isSessionLoading && !session) {
+      onOpenChange(false); // Close dialog
       router.push('/login');
     }
-  }, [session, isSessionLoading, router]);
+  }, [session, isSessionLoading, router, open, onOpenChange]);
+
+  const fetchProfile = useCallback(async () => {
+    if (session?.user?.id) {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, avatar_url')
+        .eq('id', session.user.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching profile:', error);
+        toast.error('Error al cargar el perfil del usuario.');
+      } else {
+        setProfile(data);
+        form.reset({
+          first_name: data?.first_name || '',
+          last_name: data?.last_name || '',
+        });
+        setAvatarPreview(data?.avatar_url || null);
+      }
+    }
+  }, [session, form]);
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      if (session?.user?.id) {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('first_name, last_name, avatar_url')
-          .eq('id', session.user.id)
-          .single();
-
-        if (error) {
-          console.error('Error fetching profile:', error);
-          toast.error('Error al cargar el perfil del usuario.');
-        } else {
-          setProfile(data);
-          form.reset({
-            first_name: data?.first_name || '',
-            last_name: data?.last_name || '',
-          });
-          setAvatarPreview(data?.avatar_url || null);
-        }
-      }
-    };
-
-    fetchProfile();
-  }, [session, form]);
+    if (open && session?.user?.id) {
+      fetchProfile();
+    }
+  }, [open, session, fetchProfile]);
 
   const getInitials = (firstName: string | null | undefined, lastName: string | null | undefined) => {
     const first = firstName ? firstName.charAt(0) : '';
@@ -185,6 +202,7 @@ export default function ProfileSettingsPage() {
       }));
       setAvatarFile(null); // Clear file input after successful upload
       toast.success('Perfil actualizado correctamente.');
+      onOpenChange(false); // Close dialog on successful save
     } catch (error: any) {
       console.error('Error updating profile:', error.message);
       toast.error(`Error al actualizar el perfil: ${error.message}`);
@@ -194,22 +212,17 @@ export default function ProfileSettingsPage() {
   };
 
   if (isSessionLoading || !session) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="ml-2 text-muted-foreground">Cargando perfil...</p>
-      </div>
-    );
+    return null; // Don't render dialog content if session is loading or not present
   }
 
   return (
-    <div className="flex justify-center items-start min-h-screen bg-background p-4">
-      <Card className="w-full max-w-2xl">
-        <CardHeader>
-          <CardTitle>Configuración de Perfil</CardTitle>
-          <CardDescription>Actualiza tu información personal y avatar.</CardDescription>
-        </CardHeader>
-        <CardContent>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[500px] p-6">
+        <DialogHeader>
+          <DialogTitle>Configuración de Perfil</DialogTitle>
+          <DialogDescription>Actualiza tu información personal y avatar.</DialogDescription>
+        </DialogHeader>
+        <div className="py-4">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <div className="flex flex-col items-center gap-4 mb-6">
@@ -281,18 +294,23 @@ export default function ProfileSettingsPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" disabled={isUploading}>
-                {isUploading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="mr-2 h-4 w-4" />
-                )}
-                Guardar Cambios
-              </Button>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button variant="outline" disabled={isUploading}>Cancelar</Button>
+                </DialogClose>
+                <Button type="submit" disabled={isUploading}>
+                  {isUploading ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="mr-2 h-4 w-4" />
+                  )}
+                  Guardar Cambios
+                </Button>
+              </DialogFooter>
             </form>
           </Form>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
