@@ -368,8 +368,8 @@ export function ChatInterface({
           </div>
         </CardHeader>
 
-        <CardContent className="flex-1 flex flex-col p-0 min-h-0 overflow-hidden">
-          <ScrollArea className="flex-1 p-4 h-0 max-h-full" ref={scrollAreaRef}> {/* Añadido max-h-full */}
+        <CardContent className="flex-1 flex flex-col p-0 min-h-0">
+          <ScrollArea className="flex-1 p-4 overflow-y-auto" ref={scrollAreaRef}>
             <div className="space-y-4">
               {messages.length === 0 && !isLoading ? (
                 <div className="text-center text-muted-foreground py-8">
@@ -456,7 +456,7 @@ export function ChatInterface({
             </div>
           </ScrollArea>
 
-          <div className="border-t p-4">
+          <div className="border-t p-4 flex-shrink-0">
             <div className="flex gap-2">
               <Input
                 value={inputMessage}
