@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot, User, Loader2, Check, Paperclip, X } from 'lucide-react';
+import { Send, Bot, User, Loader2, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/components/session-context-provider';
@@ -18,30 +18,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import Image from 'next/image';
-import { v4 as uuidv4 } from 'uuid';
 
-// Interfaces para el contenido multimodal
-interface PuterMessageContentBlock {
-  type: 'text' | 'image';
-  text?: string;
-  source?: {
-    type: 'base64';
-    media_type: string;
-    data: string;
-  };
-}
-
-interface PuterMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: PuterMessageContentBlock[]; // Siempre un array para multimodal
-}
-
-// Interfaz para el estado interno y DB
 interface Message {
   id: string;
   conversation_id?: string;
-  content: PuterMessageContentBlock[]; // Stored as JSONB in DB
+  content: string;
   role: 'user' | 'assistant';
   model?: string;
   timestamp: Date;
@@ -65,6 +46,11 @@ const AI_PROVIDERS = [
 const ALL_MODEL_VALUES = AI_PROVIDERS.flatMap(provider => provider.models.map(model => model.value));
 const DEFAULT_AI_MODEL = ALL_MODEL_VALUES[0]; // Define un modelo por defecto
 
+interface PuterMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
 declare global {
   interface Window {
     puter: {
@@ -80,14 +66,6 @@ interface ChatInterfaceProps {
   conversationId: string | null;
   onNewConversationCreated: (conversationId: string) => void;
   onConversationTitleUpdate: (conversationId: string, newTitle: string) => void;
-}
-
-interface AttachedFile {
-  id: string;
-  file: File;
-  previewUrl: string;
-  base64Data: string;
-  mediaType: string;
 }
 
 export function ChatInterface({
@@ -107,9 +85,7 @@ export function ChatInterface({
   const [isLoading, setIsLoading] = useState(false);
   const [isPuterReady, setIsPuterReady] = useState(false);
   const [isSendingFirstMessageOfNewConversation, setIsSendingFirstMessageOfNewConversation] = useState(false);
-  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]); // Nuevo estado para archivos adjuntos
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null); // Referencia para el input de archivo
 
   useEffect(() => {
     const checkPuter = () => {
@@ -160,7 +136,7 @@ export function ChatInterface({
     return data.map((msg) => ({
       id: msg.id,
       conversation_id: msg.conversation_id,
-      content: msg.content as PuterMessageContentBlock[], // Asumimos que ya es JSONB
+      content: msg.content,
       role: msg.role as 'user' | 'assistant',
       model: msg.model || undefined,
       timestamp: new Date(msg.created_at),
@@ -175,6 +151,7 @@ export function ChatInterface({
         if (conversationDetails && conversationDetails.model) {
           setSelectedModel(conversationDetails.model);
         } else {
+          // If conversation has no model, default to user's last selected or global default
           setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL);
         }
 
@@ -185,7 +162,7 @@ export function ChatInterface({
         setIsLoading(false);
       } else if (!conversationId) {
         setMessages([]);
-        setAttachedFiles([]); // Limpiar archivos adjuntos al iniciar un nuevo chat
+        // When no conversation is selected, reset model to user's default
         setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL);
       }
     };
@@ -199,7 +176,7 @@ export function ChatInterface({
         scrollElement.scrollTop = scrollElement.scrollHeight;
       }
     }
-  }, [messages, isLoading, attachedFiles]); // Incluir attachedFiles para scroll al añadir/quitar
+  }, [messages, isLoading]);
 
   const createNewConversationInDB = async () => {
     if (!userId) {
@@ -223,7 +200,7 @@ export function ChatInterface({
 
     const { data, error } = await supabase
       .from('conversations')
-      .insert({ user_id: userId, title: newTitle, model: selectedModel })
+      .insert({ user_id: userId, title: newTitle, model: selectedModel }) // Guardar el modelo seleccionado
       .select('id, title')
       .single();
 
@@ -269,7 +246,7 @@ export function ChatInterface({
       conversation_id: convId,
       user_id: userId,
       role: msg.role,
-      content: msg.content, // JSONB se maneja directamente
+      content: msg.content,
       model: msg.model,
     }).select('id, created_at').single();
 
@@ -281,50 +258,12 @@ export function ChatInterface({
     return { id: data.id, timestamp: new Date(data.created_at) };
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    if (files.length === 0) return;
-
-    const newAttachedFiles: AttachedFile[] = [];
-    files.forEach(file => {
-      if (!file.type.startsWith('image/')) {
-        toast.error(`El archivo ${file.name} no es una imagen. Solo se admiten imágenes.`);
-        return;
-      }
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        toast.error(`La imagen ${file.name} es demasiado grande (máx. 5MB).`);
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64Data = (e.target?.result as string).split(',')[1]; // Get base64 part
-        newAttachedFiles.push({
-          id: uuidv4(),
-          file,
-          previewUrl: URL.createObjectURL(file),
-          base64Data,
-          mediaType: file.type,
-        });
-        setAttachedFiles(prev => [...prev, ...newAttachedFiles]);
-      };
-      reader.readAsDataURL(file);
-    });
-    event.target.value = ''; // Clear input to allow re-selecting same file
-  };
-
-  const removeAttachedFile = (id: string) => {
-    setAttachedFiles(prev => prev.filter(file => file.id !== id));
-  };
-
   const sendMessage = async () => {
-    if ((!inputMessage.trim() && attachedFiles.length === 0) || isLoading || !isPuterReady || !userId) return;
+    if (!inputMessage.trim() || isLoading || !isPuterReady || !userId) return;
 
     setIsLoading(true);
     const messageToSend = inputMessage;
     setInputMessage('');
-    const filesToAttach = [...attachedFiles]; // Copiar para usar en este envío
-    setAttachedFiles([]); // Limpiar adjuntos después de copiar
 
     let currentConvId = conversationId;
     let isNewConversation = false;
@@ -337,33 +276,17 @@ export function ChatInterface({
         setIsLoading(false);
         setIsSendingFirstMessageOfNewConversation(false);
         setInputMessage(messageToSend);
-        setAttachedFiles(filesToAttach); // Restaurar si falla la creación de conversación
         return;
       }
     }
 
     const finalConvId = currentConvId;
 
-    const userContentBlocks: PuterMessageContentBlock[] = [];
-    if (messageToSend.trim()) {
-      userContentBlocks.push({ type: 'text', text: messageToSend });
-    }
-    filesToAttach.forEach(file => {
-      userContentBlocks.push({
-        type: 'image',
-        source: {
-          type: 'base64',
-          media_type: file.mediaType,
-          data: file.base64Data,
-        },
-      });
-    });
-
     const tempUserMessageId = `user-${Date.now()}`;
     const userMessage: Message = {
       id: tempUserMessageId,
       conversation_id: finalConvId,
-      content: userContentBlocks,
+      content: messageToSend,
       role: 'user',
       timestamp: new Date(),
     };
@@ -374,7 +297,7 @@ export function ChatInterface({
     const placeholderMessage: Message = {
       id: tempAssistantId,
       conversation_id: finalConvId,
-      content: [{ type: 'text', text: '' }], // Contenido vacío para el placeholder
+      content: '',
       role: 'assistant',
       model: selectedModel,
       timestamp: new Date(),
@@ -394,17 +317,15 @@ export function ChatInterface({
 
       const puterMessages: PuterMessage[] = historyData.map(msg => ({
         role: msg.role as 'user' | 'assistant',
-        content: msg.content as PuterMessageContentBlock[] // Asumimos que ya es JSONB
+        content: msg.content
       }));
 
       const systemMessage: PuterMessage = {
-        role: 'system', // Aseguramos que el rol sea el literal 'system'
-        content: [{ type: 'text', text: "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante." }]
+        role: 'system',
+        content: "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante."
       };
 
-      const messagesForAI = [...puterMessages, { role: 'user', content: userContentBlocks }];
-
-      const response = await window.puter.ai.chat([systemMessage, ...messagesForAI], { model: selectedModel });
+      const response = await window.puter.ai.chat([systemMessage, ...puterMessages, { role: 'user', content: messageToSend }], { model: selectedModel });
       console.log('Puter AI response:', response);
 
       if (!response || (typeof response === 'object' && Object.keys(response).length === 0)) {
@@ -415,11 +336,11 @@ export function ChatInterface({
         throw new Error(`Error de la IA: ${apiErrorMessage}`);
       }
 
-      let messageContent: PuterMessageContentBlock[] = [{ type: 'text', text: 'Sin contenido' }];
+      let messageContent = 'Sin contenido';
       if (response?.message?.content?.[0]?.text) {
-        messageContent = [{ type: 'text', text: response.message.content[0].text }];
+        messageContent = response.message.content[0].text;
       } else if (typeof response?.content === 'string') {
-        messageContent = [{ type: 'text', text: response.content }];
+        messageContent = response.content;
       } else {
         console.error('Unexpected AI response format:', response);
         throw new Error('La respuesta de la IA tuvo un formato inesperado.');
@@ -443,7 +364,7 @@ export function ChatInterface({
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Ocurrió un error desconocido.';
       toast.error(errorMessage);
-      setMessages(prev => prev.map(msg => msg.id === tempAssistantId ? { ...msg, content: [{ type: 'text', text: `Error: ${errorMessage}` }], isTyping: false, isNew: true } : msg));
+      setMessages(prev => prev.map(msg => msg.id === tempAssistantId ? { ...msg, content: `Error: ${errorMessage}`, isTyping: false, isNew: true } : msg));
     } finally {
       setIsLoading(false);
       if (isNewConversation) {
@@ -543,51 +464,10 @@ export function ChatInterface({
           </div>
         </ScrollArea>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 bg-background border-t">
-          {attachedFiles.length > 0 && (
-            <div className="mb-4 flex flex-wrap gap-2 p-2 border rounded-lg bg-secondary/20">
-              {attachedFiles.map(file => (
-                <div key={file.id} className="relative w-24 h-24 rounded-md overflow-hidden border">
-                  <Image
-                    src={file.previewUrl}
-                    alt={file.file.name}
-                    layout="fill"
-                    objectFit="cover"
-                    className="rounded-md"
-                  />
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    className="absolute top-1 right-1 h-6 w-6 rounded-full p-0.5 bg-red-500/80 hover:bg-red-600"
-                    onClick={() => removeAttachedFile(file.id)}
-                  >
-                    <X className="h-3 w-3 text-white" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="w-full max-w-3xl mx-auto bg-card rounded-xl border border-input shadow-lg p-2 flex items-center gap-2 
+        <div className="absolute bottom-16 left-0 right-0 flex justify-center px-4">
+          <div className="w-full max-w-3xl bg-card rounded-xl border border-input shadow-lg p-2 flex items-center gap-2 
                         focus-within:ring-2 focus-within:ring-green-500 focus-within:ring-offset-2 focus-within:ring-offset-background 
                         focus-within:shadow-[0_0_20px_5px_rgb(34_197_94_/_0.4)] transition-all duration-200">
-            <input
-              type="file"
-              ref={fileInputRef}
-              multiple
-              accept="image/*" // Solo imágenes por ahora
-              onChange={handleFileChange}
-              className="hidden"
-              disabled={isLoading || !userId}
-            />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isLoading || !userId}
-              className="flex-shrink-0 text-muted-foreground hover:text-foreground"
-            >
-              <Paperclip className="h-5 w-5" />
-            </Button>
             <Textarea
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
@@ -640,7 +520,7 @@ export function ChatInterface({
 
             <Button
               onClick={sendMessage}
-              disabled={isLoading || (!inputMessage.trim() && attachedFiles.length === 0) || !userId}
+              disabled={isLoading || !inputMessage.trim() || !userId}
               size="icon"
               className="flex-shrink-0"
             >
