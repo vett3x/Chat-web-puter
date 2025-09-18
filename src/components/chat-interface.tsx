@@ -134,15 +134,30 @@ export function ChatInterface({
     }
   }, [messages, isLoading]);
 
-  const createNewConversationInDB = async (initialMessageContent: string) => {
+  const createNewConversationInDB = async () => { // Eliminado initialMessageContent del parámetro
     if (!userId) {
       toast.error('Usuario no autenticado.');
       return null;
     }
 
+    // Obtener el número de conversaciones existentes para el usuario
+    const { count, error: countError } = await supabase
+      .from('conversations')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    if (countError) {
+      console.error('Error fetching conversation count:', countError);
+      toast.error('Error al obtener el número de conversaciones.');
+      return null;
+    }
+
+    const newChatNumber = (count || 0) + 1;
+    const newTitle = `Chat #${newChatNumber}`;
+
     const { data, error } = await supabase
       .from('conversations')
-      .insert({ user_id: userId, title: initialMessageContent.substring(0, 50) + '...' })
+      .insert({ user_id: userId, title: newTitle }) // Usar el título generado
       .select('id, title')
       .single();
 
@@ -190,7 +205,7 @@ export function ChatInterface({
     if (!currentConvId) {
       isNewConversation = true;
       setIsSendingFirstMessageOfNewConversation(true); // Establecer la bandera
-      currentConvId = await createNewConversationInDB(messageToSend);
+      currentConvId = await createNewConversationInDB(); // Llamar sin el mensaje inicial
       if (!currentConvId) {
         setIsLoading(false);
         setIsSendingFirstMessageOfNewConversation(false); // Limpiar la bandera en caso de fallo
