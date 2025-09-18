@@ -4,9 +4,12 @@ import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import React, { useState } from 'react';
 
 export default function LoginPage() {
+  const [currentLang, setCurrentLang] = useState('es'); // Estado para el idioma actual
+
   const spanishLocalization = {
     variables: {
       sign_in: {
@@ -48,14 +51,72 @@ export default function LoginPage() {
     },
   };
 
+  const englishLocalization = {
+    variables: {
+      sign_in: {
+        email_label: 'Email',
+        password_label: 'Password',
+        email_input_placeholder: 'Your email address',
+        password_input_placeholder: 'Your password',
+        button_label: 'Sign In',
+        social_auth_typography: 'Or continue with',
+        link_text: 'Already have an account? Sign In',
+        forgotten_password_text: 'Forgot your password?',
+        no_account_text: 'Don\'t have an account? Sign Up',
+      },
+      sign_up: {
+        email_label: 'Email',
+        password_label: 'Password',
+        email_input_placeholder: 'Your email address',
+        password_input_placeholder: 'Create a password',
+        button_label: 'Sign Up',
+        social_auth_typography: 'Or continue with',
+        link_text: 'Already have an account? Sign In',
+      },
+      forgotten_password: {
+        email_label: 'Email',
+        email_input_placeholder: 'Your email address',
+        button_label: 'Send recovery instructions',
+        link_text: 'Remembered your password? Sign In',
+      },
+      update_password: {
+        password_label: 'New Password',
+        password_input_placeholder: 'Your new password',
+        button_label: 'Update Password',
+      },
+      magic_link: {
+        email_input_placeholder: 'Your email address',
+        button_label: 'Send magic link',
+        link_text: 'Send a magic link by email',
+      },
+    },
+  };
+
+  const currentLocalization = currentLang === 'es' ? spanishLocalization : englishLocalization;
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Bienvenido</CardTitle>
-          <CardDescription>Inicia sesión o regístrate para continuar</CardDescription>
+          <CardTitle className="text-2xl">
+            {currentLang === 'es' ? 'Bienvenido' : 'Welcome'}
+          </CardTitle>
+          <CardDescription>
+            {currentLang === 'es' ? 'Inicia sesión o regístrate para continuar' : 'Sign in or sign up to continue'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 flex justify-end">
+            <Select value={currentLang} onValueChange={setCurrentLang}>
+              <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder="Idioma" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="es">Español</SelectItem>
+                <SelectItem value="en">English</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <Auth
             supabaseClient={supabase}
             providers={[]}
@@ -72,9 +133,9 @@ export default function LoginPage() {
             }}
             theme="dark"
             redirectTo={typeof window !== 'undefined' ? `${window.location.origin}/` : undefined}
-            lang="es"
+            lang={currentLang} {/* 'lang' como prop directa */}
             localization={{
-              variables: spanishLocalization.variables,
+              variables: currentLocalization.variables,
             }}
           />
         </CardContent>
