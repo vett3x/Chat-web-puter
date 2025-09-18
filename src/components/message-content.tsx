@@ -38,14 +38,15 @@ interface MessageContentProps {
 }
 
 // Adjusted regex to be more flexible with whitespace and newlines,
-// specifically expecting a newline after the header and before the closing backticks.
-const codeBlockRegex = /```(\w+)(?::([\w./-]+))?\s*\n([\s\S]*?)\n\s*```/g;
+// specifically expecting one or more newline characters after the header and before the closing backticks.
+const codeBlockRegex = /```(\w+)(?::([\w./-]+))?\s*[\r\n]+([\s\S]*?)[\r\n]+\s*```/g;
 
 export function MessageContent({ content, isNew, aiResponseSpeed }: MessageContentProps) {
   const [animatedPartsCount, setAnimatedPartsCount] = useState(0);
 
   // Parse content into a flat array of renderable parts
   const renderableParts = React.useMemo(() => {
+    console.log("MessageContent: Type of content received:", typeof content);
     if (typeof content === 'string') {
       const parsedParts: Array<{ type: 'text' | 'code'; value?: string; language?: string; filename?: string; code?: string; }> = [];
       let lastIndex = 0;
@@ -54,6 +55,7 @@ export function MessageContent({ content, isNew, aiResponseSpeed }: MessageConte
       codeBlockRegex.lastIndex = 0; // Reset regex for each text part
 
       while ((match = codeBlockRegex.exec(content)) !== null) {
+        console.log("MessageContent: Regex match found:", match);
         if (match.index > lastIndex) {
           parsedParts.push({
             type: 'text' as const,
@@ -92,6 +94,7 @@ export function MessageContent({ content, isNew, aiResponseSpeed }: MessageConte
         } as CodeBlockPart;
       });
     } else if (Array.isArray(content)) {
+      console.log("MessageContent: Content is an array, not parsing for code blocks within string.");
       // If content is already an array of PuterContentPart, ensure it's mapped to RenderablePart
       return content.map(part => {
         if (part.type === 'text') return part as PuterTextContentPart;
