@@ -75,11 +75,11 @@
     --sidebar-ring: 217.2 91.2% 59.8%}
   .dark {
 
-    --background: 220 10% 5%; /* Very dark gray, almost black */
+    --background: 220 10% 7%; /* Slightly lighter dark gray for chat area */
 
     --foreground: 0 0% 98%; /* White text */
 
-    --card: 220 10% 7%; /* Slightly lighter dark gray for cards */
+    --card: 220 10% 7%; /* Same as background for consistency */
 
     --card-foreground: 0 0% 98%;
 
@@ -126,7 +126,7 @@
 
     /* Sidebar specific colors */
 
-    --sidebar-background: 220 10% 7%; /* Dark gray for sidebar background */
+    --sidebar-background: 220 10% 5%; /* Very dark gray, almost black for sidebar */
 
     --sidebar-foreground: 0 0% 98%; /* White text */
 
