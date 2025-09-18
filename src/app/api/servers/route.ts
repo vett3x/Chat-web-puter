@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
-// import { Client } from 'ssh2'; // Eliminamos la importación de ssh2 por ahora
+// import { Client } from 'ssh2'; // Eliminamos la importación de ssh2 ya que no se usa
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { cookies } from 'next/headers'; // Eliminado ReadonlyRequestCookies de aquí
+import { cookies, ReadonlyRequestCookies } from 'next/headers'; // Importamos ReadonlyRequestCookies
 import CryptoJS from 'crypto-js';
 
 // Define SuperUser emails (for server-side check)
@@ -33,14 +33,14 @@ function decrypt(ciphertext: string): string {
 
 // Helper function to create Supabase client for API routes
 function getSupabaseServerClient(res: NextResponse) {
-  // No necesitamos una variable cookieStore aquí, ya que cookies() se llamará directamente en el 'get'.
+  const cookieStore = cookies() as ReadonlyRequestCookies; // Type assertion aquí
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: (name: string) => cookies().get(name)?.value, // Llamada directa a cookies().get()
+        get: (name: string) => cookieStore.get(name)?.value, // Usamos la variable cookieStore
         set: (name: string, value: string, options: CookieOptions) => {
           res.cookies.set({ name, value, ...options });
         },
