@@ -1,8 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
-// import { Client } from 'ssh2'; // Eliminamos la importación de ssh2 ya que no se usa
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { cookies, ReadonlyRequestCookies } from 'next/headers'; // Importamos ReadonlyRequestCookies
+import { cookies } from 'next/headers';
 import CryptoJS from 'crypto-js';
 
 // Define SuperUser emails (for server-side check)
@@ -33,14 +32,12 @@ function decrypt(ciphertext: string): string {
 
 // Helper function to create Supabase client for API routes
 function getSupabaseServerClient(res: NextResponse) {
-  const cookieStore = cookies() as ReadonlyRequestCookies; // Type assertion aquí
-
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: (name: string) => cookieStore.get(name)?.value, // Usamos la variable cookieStore
+        get: (name: string) => cookies().get(name)?.value, // Llamada directa a cookies().get()
         set: (name: string, value: string, options: CookieOptions) => {
           res.cookies.set({ name, value, ...options });
         },
@@ -107,10 +104,6 @@ export async function POST(req: NextRequest) {
     const newServerData = serverSchema.parse(body);
 
     const encryptedPassword = encrypt(newServerData.ssh_password);
-
-    // Eliminamos la verificación de conexión SSH inmediata para simplificar el proceso
-    // y evitar errores de runtime relacionados con la conectividad o credenciales.
-    // La conexión SSH se probará cuando se intente desplegar un entorno.
 
     const { data, error } = await supabase
       .from('user_servers')

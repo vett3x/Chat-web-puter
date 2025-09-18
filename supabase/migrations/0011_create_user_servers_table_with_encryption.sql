@@ -1,46 +1,40 @@
 -- Crear la tabla user_servers
-CREATE TABLE public.user_servers (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  name TEXT,
-  ip_address TEXT NOT NULL,
-  ssh_port INT NOT NULL DEFAULT 22,
-  ssh_username TEXT NOT NULL,
-  encrypted_ssh_password TEXT NOT NULL, -- Contraseña cifrada
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+create table public.user_servers (
+  id uuid not null default gen_random_uuid(),
+  user_id uuid not null,
+  name text,
+  ip_address text not null,
+  ssh_port integer not null default 22,
+  ssh_username text not null,
+  encrypted_ssh_password text not null,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone,
+
+  constraint user_servers_pkey primary key (id),
+  constraint user_servers_user_id_fkey foreign key (user_id) references auth.users (id) on delete cascade
 );
 
--- Habilitar RLS en la tabla user_servers
-ALTER TABLE public.user_servers ENABLE ROW LEVEL SECURITY;
+-- Habilitar Row Level Security (RLS)
+alter table public.user_servers enable row level security;
 
--- Política para que los usuarios puedan ver sus propios servidores
-CREATE POLICY "Users can view their own servers." ON public.user_servers
-  FOR SELECT USING (auth.uid() = user_id);
+-- Políticas de RLS para la tabla user_servers
+-- Permitir a los usuarios ver sus propios servidores
+create policy "Users can view their own servers."
+on public.user_servers for select
+using (auth.uid() = user_id);
 
--- Política para que los usuarios puedan insertar sus propios servidores
-CREATE POLICY "Users can insert their own servers." ON public.user_servers
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
+-- Permitir a los usuarios insertar sus propios servidores
+create policy "Users can insert their own servers."
+on public.user_servers for insert
+with check (auth.uid() = user_id);
 
--- Política para que los usuarios puedan actualizar sus propios servidores
-CREATE POLICY "Users can update their own servers." ON public.user_servers
-  FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+-- Permitir a los usuarios actualizar sus propios servidores
+create policy "Users can update their own servers."
+on public.user_servers for update
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
 
--- Política para que los usuarios puedan eliminar sus propios servidores
-CREATE POLICY "Users can delete their own servers." ON public.user_servers
-  FOR DELETE USING (auth.uid() = user_id);
-
--- Crear una función para actualizar 'updated_at' automáticamente
-CREATE OR REPLACE FUNCTION public.update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Crear un trigger para la función 'update_updated_at_column' en 'user_servers'
-CREATE TRIGGER update_user_servers_updated_at
-BEFORE UPDATE ON public.user_servers
-FOR EACH ROW
-EXECUTE FUNCTION public.update_updated_at_column();
+-- Permitir a los usuarios eliminar sus propios servidores
+create policy "Users can delete their own servers."
+on public.user_servers for delete
+using (auth.uid() = user_id);
