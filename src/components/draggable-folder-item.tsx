@@ -23,12 +23,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Folder, ChevronRight, ChevronDown, Edit, Save, X, Trash2, Plus, MessageSquare, MoreVertical } from 'lucide-react'; // Eliminado MoveRight
+import { Folder, ChevronRight, ChevronDown, Edit, Save, X, Trash2, Plus, MessageSquare, MoreVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from './session-context-provider';
-import { DraggableConversationCard } from './draggable-conversation-card'; // Import the new component
+import { DraggableConversationCard } from './draggable-conversation-card';
 
 interface Folder {
   id: string;
@@ -43,6 +43,7 @@ interface Conversation {
   title: string;
   created_at: string;
   folder_id: string | null;
+  order_index: number; // Added for reordering
 }
 
 interface DraggableFolderItemProps {
@@ -64,6 +65,10 @@ interface DraggableFolderItemProps {
   isDraggingOver: boolean;
   onDragEnter: (e: React.DragEvent, folderId: string | null) => void;
   onDragLeave: (e: React.DragEvent, folderId: string | null) => void;
+  onConversationReordered: (draggedId: string, targetId: string, position: 'before' | 'after') => void; // New prop
+  draggedOverConversationId: string | null; // New prop
+  dropPosition: 'before' | 'after' | null; // New prop
+  draggedItemType: 'conversation' | 'folder' | null; // New prop
 }
 
 export function DraggableFolderItem({
@@ -77,7 +82,7 @@ export function DraggableFolderItem({
   onFolderUpdated,
   onFolderDeleted,
   onConversationMoved,
-  onFolderMoved, // New prop
+  onFolderMoved,
   onCreateSubfolder,
   allFolders,
   onDragStart,
@@ -85,6 +90,10 @@ export function DraggableFolderItem({
   isDraggingOver,
   onDragEnter,
   onDragLeave,
+  onConversationReordered, // Destructure new prop
+  draggedOverConversationId,
+  dropPosition,
+  draggedItemType,
 }: DraggableFolderItemProps) {
   const { session } = useSession();
   const userId = session?.user?.id;
@@ -93,7 +102,10 @@ export function DraggableFolderItem({
   const [editingName, setEditingName] = useState(folder.name);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const filteredConversations = conversations.filter(conv => conv.folder_id === folder.id);
+  const filteredConversations = conversations
+    .filter(conv => conv.folder_id === folder.id)
+    .sort((a, b) => a.order_index - b.order_index); // Sort by order_index
+
   const filteredSubfolders = subfolders.filter(sub => sub.parent_id === folder.id);
 
   const handleSaveEdit = async () => {
@@ -165,7 +177,7 @@ export function DraggableFolderItem({
         className={cn(
           "cursor-pointer hover:bg-sidebar-accent transition-colors group relative",
           selectedConversationId === null && isExpanded && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary",
-          isDraggingOver && "border-2 border-blue-500 bg-blue-500/10" // Visual feedback for drag over
+          isDraggingOver && draggedItemType === 'folder' && "border-2 border-blue-500 bg-blue-500/10" // Visual feedback for drag over
         )}
         style={{ paddingLeft: paddingLeft }}
         draggable="true"
@@ -230,7 +242,6 @@ export function DraggableFolderItem({
                     <Edit className="mr-2 h-4 w-4" /> Renombrar
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  {/* Se eliminó la opción "Mover a" */}
                   <AlertDialog open={isDeleting} onOpenChange={setIsDeleting}>
                     <AlertDialogTrigger asChild>
                       <DropdownMenuItem onSelect={(e: Event) => e.preventDefault()} className="text-destructive focus:text-destructive">
@@ -283,6 +294,10 @@ export function DraggableFolderItem({
               isDraggingOver={false} // Pass false for nested items
               onDragEnter={onDragEnter}
               onDragLeave={onDragLeave}
+              onConversationReordered={onConversationReordered} // Pass to nested folder item
+              draggedOverConversationId={draggedOverConversationId}
+              dropPosition={dropPosition}
+              draggedItemType={draggedItemType}
             />
           ))}
           {filteredConversations.map((conversation) => (
@@ -294,9 +309,12 @@ export function DraggableFolderItem({
               onConversationUpdated={onFolderUpdated} // Re-fetch all on update
               onConversationDeleted={onFolderUpdated} // Re-fetch all on delete
               onConversationMoved={onConversationMoved}
+              onConversationReordered={onConversationReordered} // Pass to conversation card
               allFolders={allFolders}
               level={level + 1}
               onDragStart={onDragStart}
+              isDraggingOver={draggedOverConversationId === conversation.id && draggedItemType === 'conversation'}
+              dropPosition={draggedOverConversationId === conversation.id ? dropPosition : null}
             />
           ))}
         </div>

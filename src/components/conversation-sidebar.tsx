@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
 import { Plus, MessageSquare, Loader2, Folder, ChevronRight, ChevronDown } from 'lucide-react';
-import { Separator } from '@/components/ui/separator'; // Corrected import
+import { Separator } from '@/components/ui/separator';
 import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -20,6 +20,7 @@ interface Conversation {
   title: string;
   created_at: string;
   folder_id: string | null;
+  order_index: number; // Added for reordering
 }
 
 interface Folder {
@@ -52,6 +53,9 @@ export function ConversationSidebar({
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [draggedItemType, setDraggedItemType] = useState<'conversation' | 'folder' | null>(null);
   const [draggingOverFolderId, setDraggingOverFolderId] = useState<string | null>(null);
+  const [draggedOverConversationId, setDraggedOverConversationId] = useState<string | null>(null);
+  const [dropPosition, setDropPosition] = useState<'before' | 'after' | null>(null);
+
 
   const fetchConversationsAndFolders = useCallback(async () => {
     if (!userId) {
@@ -64,9 +68,10 @@ export function ConversationSidebar({
     setIsLoadingConversations(true);
     const { data: convData, error: convError } = await supabase
       .from('conversations')
-      .select('id, title, created_at, folder_id')
+      .select('id, title, created_at, folder_id, order_index') // Select order_index
       .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+      .order('order_index', { ascending: true }) // Order by order_index
+      .order('created_at', { ascending: false }); // Fallback order
 
     const { data: folderData, error: folderError } = await supabase
       .from('folders')
@@ -104,17 +109,24 @@ export function ConversationSidebar({
     if (!userId || isCreatingConversation) return;
 
     setIsCreatingConversation(true);
+    // Determine the highest order_index for conversations in 'General'
+    const generalConvs = conversations.filter(c => c.folder_id === null);
+    const maxOrderIndex = generalConvs.length > 0
+      ? Math.max(...generalConvs.map(c => c.order_index))
+      : 0;
+    const newOrderIndex = maxOrderIndex + 1;
+
     const { data, error } = await supabase
       .from('conversations')
-      .insert({ user_id: userId, title: 'Nueva conversación', folder_id: null })
-      .select('id, title, created_at, folder_id')
+      .insert({ user_id: userId, title: 'Nueva conversación', folder_id: null, order_index: newOrderIndex })
+      .select('id, title, created_at, folder_id, order_index')
       .single();
 
     if (error) {
       console.error('Error creating new conversation:', error);
       toast.error('Error al crear una nueva conversación.');
     } else if (data) {
-      setConversations(prev => [data, ...prev]);
+      setConversations(prev => [data, ...prev]); // Add to the beginning for immediate visibility
       onSelectConversation(data.id);
       toast.success('Nueva conversación creada.');
       setIsGeneralExpanded(true); // Ensure General is expanded for new conversation
@@ -149,9 +161,16 @@ export function ConversationSidebar({
       return;
     }
 
+    // When moving, assign a new order_index at the end of the target folder/general
+    const targetConversations = conversations.filter(c => c.folder_id === targetFolderId);
+    const maxOrderIndex = targetConversations.length > 0
+      ? Math.max(...targetConversations.map(c => c.order_index))
+      : 0;
+    const newOrderIndex = maxOrderIndex + 1;
+
     const { error } = await supabase
       .from('conversations')
-      .update({ folder_id: targetFolderId })
+      .update({ folder_id: targetFolderId, order_index: newOrderIndex })
       .eq('id', conversationId)
       .eq('user_id', userId);
 
@@ -160,12 +179,62 @@ export function ConversationSidebar({
       toast.error('Error al mover la conversación.');
     } else {
       toast.success('Conversación movida.');
-      fetchConversationsAndFolders(); // Re-fetch to update both lists
+      fetchConversationsAndFolders(); // Re-fetch to update both lists and order
       if (selectedConversationId === conversationId) {
         onSelectConversation(null); // Deselect if the moved conversation was selected
       }
     }
   };
+
+  const handleConversationReordered = async (draggedId: string, targetId: string, position: 'before' | 'after') => {
+    if (!userId || draggedId === targetId) return;
+
+    const draggedConv = conversations.find(c => c.id === draggedId);
+    const targetConv = conversations.find(c => c.id === targetId);
+
+    if (!draggedConv || !targetConv || draggedConv.folder_id !== targetConv.folder_id) {
+      // If folders are different, it's a move, not a reorder.
+      // This case should ideally be handled by handleDrop on folder, but as a fallback:
+      if (draggedConv && targetConv) {
+        handleConversationMoved(draggedId, targetConv.folder_id);
+      }
+      return;
+    }
+
+    const siblingConversations = conversations
+      .filter(c => c.folder_id === draggedConv.folder_id)
+      .sort((a, b) => a.order_index - b.order_index);
+
+    const targetIndex = siblingConversations.findIndex(c => c.id === targetId);
+    const draggedIndex = siblingConversations.findIndex(c => c.id === draggedId);
+
+    if (targetIndex === -1 || draggedIndex === -1) return;
+
+    // Remove dragged item from its current position
+    const [removed] = siblingConversations.splice(draggedIndex, 1);
+    // Insert it at the new position
+    const newTargetIndex = position === 'before' ? targetIndex : targetIndex + 1;
+    siblingConversations.splice(newTargetIndex > siblingConversations.length ? siblingConversations.length : newTargetIndex, 0, removed);
+
+    // Recalculate order_index for affected items
+    const updates = siblingConversations.map((conv, index) => {
+      const newOrderIndex = (index + 1) * 100; // Simple re-indexing
+      return { id: conv.id, order_index: newOrderIndex };
+    });
+
+    const { error } = await supabase
+      .from('conversations')
+      .upsert(updates, { onConflict: 'id' });
+
+    if (error) {
+      console.error('Error reordering conversations:', error);
+      toast.error('Error al reordenar las conversaciones.');
+    } else {
+      toast.success('Conversación reordenada.');
+      fetchConversationsAndFolders(); // Re-fetch to update UI
+    }
+  };
+
 
   const handleFolderMoved = async (folderId: string, targetParentId: string | null) => {
     if (!userId) {
@@ -198,11 +267,15 @@ export function ConversationSidebar({
     setDraggedItemId(null);
     setDraggedItemType(null);
     setDraggingOverFolderId(null);
+    setDraggedOverConversationId(null);
+    setDropPosition(null);
   };
 
   const handleDrop = (e: React.DragEvent, targetFolderId: string | null) => {
     e.preventDefault();
     setDraggingOverFolderId(null); // Reset drag over state
+    setDraggedOverConversationId(null);
+    setDropPosition(null);
 
     const data = e.dataTransfer.getData('text/plain');
     if (!data) return;
@@ -247,6 +320,25 @@ export function ConversationSidebar({
       setDraggingOverFolderId(null);
     }
   };
+
+  const handleConversationDragOver = (e: React.DragEvent, convId: string) => {
+    e.preventDefault();
+    setDraggedOverConversationId(convId);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    if (y < rect.height / 2) {
+      setDropPosition('before');
+    } else {
+      setDropPosition('after');
+    }
+  };
+
+  const handleConversationDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDraggedOverConversationId(null);
+    setDropPosition(null);
+  };
+
 
   const rootFolders = folders.filter(f => f.parent_id === null);
   const generalConversations = conversations.filter(conv => conv.folder_id === null);
@@ -352,9 +444,12 @@ export function ConversationSidebar({
                         onConversationUpdated={fetchConversationsAndFolders}
                         onConversationDeleted={fetchConversationsAndFolders}
                         onConversationMoved={handleConversationMoved}
+                        onConversationReordered={handleConversationReordered}
                         allFolders={folders}
                         level={1} // Indent for conversations in General
                         onDragStart={handleDragStart}
+                        isDraggingOver={draggedOverConversationId === conversation.id && draggedItemType === 'conversation'}
+                        dropPosition={draggedOverConversationId === conversation.id ? dropPosition : null}
                       />
                     ))
                   )}
@@ -390,6 +485,10 @@ export function ConversationSidebar({
                     isDraggingOver={draggingOverFolderId === folder.id}
                     onDragEnter={handleDragEnter}
                     onDragLeave={handleDragLeave}
+                    onConversationReordered={handleConversationReordered} // Pass to folder item
+                    draggedOverConversationId={draggedOverConversationId}
+                    dropPosition={dropPosition}
+                    draggedItemType={draggedItemType}
                   />
                 ))
               )}

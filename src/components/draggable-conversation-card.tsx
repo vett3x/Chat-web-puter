@@ -23,7 +23,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { MessageSquare, Edit, Save, X, Trash2, MoreVertical } from 'lucide-react'; // Eliminado MoveRight
+import { MessageSquare, Edit, Save, X, Trash2, MoreVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,6 +34,7 @@ interface Conversation {
   title: string;
   created_at: string;
   folder_id: string | null;
+  order_index: number; // Added for reordering
 }
 
 interface Folder {
@@ -51,9 +52,12 @@ interface DraggableConversationCardProps {
   onConversationUpdated: () => void;
   onConversationDeleted: () => void;
   onConversationMoved: (conversationId: string, targetFolderId: string | null) => void;
+  onConversationReordered: (draggedId: string, targetId: string, position: 'before' | 'after') => void; // New prop for reordering
   allFolders: Folder[];
   level: number; // For indentation
   onDragStart: (e: React.DragEvent, conversationId: string, type: 'conversation' | 'folder') => void;
+  isDraggingOver: boolean; // New prop for visual feedback during reorder
+  dropPosition: 'before' | 'after' | null; // New prop for visual feedback during reorder
 }
 
 export function DraggableConversationCard({
@@ -63,9 +67,12 @@ export function DraggableConversationCard({
   onConversationUpdated,
   onConversationDeleted,
   onConversationMoved,
+  onConversationReordered,
   allFolders,
   level,
   onDragStart,
+  isDraggingOver,
+  dropPosition,
 }: DraggableConversationCardProps) {
   const { session } = useSession();
   const userId = session?.user?.id;
@@ -126,18 +133,58 @@ export function DraggableConversationCard({
 
   const paddingLeft = `${level * 1.25 + 0.5}rem`; // Indent based on level
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    if (y < rect.height / 2) {
+      e.currentTarget.setAttribute('data-drop-position', 'before');
+    } else {
+      e.currentTarget.setAttribute('data-drop-position', 'after');
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.currentTarget.removeAttribute('data-drop-position');
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.currentTarget.removeAttribute('data-drop-position');
+    const data = e.dataTransfer.getData('text/plain');
+    if (!data) return;
+
+    try {
+      const { id: draggedId, type: draggedType } = JSON.parse(data);
+      if (draggedType === 'conversation' && draggedId !== conversation.id) {
+        const dropPosition = e.currentTarget.getAttribute('data-drop-position') as 'before' | 'after';
+        if (dropPosition) {
+          onConversationReordered(draggedId, conversation.id, dropPosition);
+        }
+      }
+    } catch (error) {
+      console.error('Error parsing drag data:', error);
+      toast.error('Error al procesar el arrastre.');
+    }
+  };
+
   return (
     <Card
       className={cn(
         "cursor-pointer hover:bg-sidebar-accent transition-colors group relative",
-        selectedConversationId === conversation.id && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary"
+        selectedConversationId === conversation.id && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary",
+        isDraggingOver && dropPosition === 'before' && "border-t-2 border-blue-500",
+        isDraggingOver && dropPosition === 'after' && "border-b-2 border-blue-500"
       )}
       onClick={() => onSelectConversation(conversation.id)}
       style={{ paddingLeft: paddingLeft }}
       draggable="true"
       onDragStart={(e) => onDragStart(e, conversation.id, 'conversation')}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
-      <CardContent className="p-2 flex items-center justify-between gap-2">
+      <CardContent className="p-1.5 flex items-center justify-between gap-2"> {/* Reduced padding */}
         {isEditing ? (
           <Input
             value={editingTitle}
@@ -149,29 +196,29 @@ export function DraggableConversationCard({
               }
             }}
             onBlur={handleSaveEdit}
-            className="flex-1 bg-sidebar-background text-sidebar-foreground h-8"
+            className="flex-1 bg-sidebar-background text-sidebar-foreground h-7 text-xs" // Reduced height and font size
           />
         ) : (
           <div className="flex items-center gap-2 flex-1 overflow-hidden">
-            <MessageSquare className="h-4 w-4 flex-shrink-0" />
-            <span className="text-sm truncate">{conversation.title}</span>
+            <MessageSquare className="h-3.5 w-3.5 flex-shrink-0" /> {/* Smaller icon */}
+            <span className="text-xs truncate">{conversation.title}</span> {/* Smaller font size */}
           </div>
         )}
         <div className="flex-shrink-0 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           {isEditing ? (
             <>
-              <Button variant="ghost" size="icon" onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleSaveEdit(); }} className="h-7 w-7">
-                <Save className="h-4 w-4" />
+              <Button variant="ghost" size="icon" onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleSaveEdit(); }} className="h-6 w-6"> {/* Smaller buttons */}
+                <Save className="h-3.5 w-3.5" /> {/* Smaller icon */}
               </Button>
-              <Button variant="ghost" size="icon" onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsEditing(false); setEditingTitle(conversation.title); }} className="h-7 w-7">
-                <X className="h-4 w-4" />
+              <Button variant="ghost" size="icon" onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsEditing(false); setEditingTitle(conversation.title); }} className="h-6 w-6"> {/* Smaller buttons */}
+                <X className="h-3.5 w-3.5" /> {/* Smaller icon */}
               </Button>
             </>
           ) : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7">
-                  <MoreVertical className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="h-6 w-6"> {/* Smaller button */}
+                  <MoreVertical className="h-3.5 w-3.5" /> {/* Smaller icon */}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48 bg-popover text-popover-foreground border-border">
@@ -182,7 +229,6 @@ export function DraggableConversationCard({
                   <Edit className="mr-2 h-4 w-4" /> Renombrar
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                {/* Se eliminó la opción "Mover a" */}
                 <AlertDialog open={isDeleting} onOpenChange={setIsDeleting}>
                   <AlertDialogTrigger asChild>
                     <DropdownMenuItem onSelect={(e: Event) => e.preventDefault()} className="text-destructive focus:text-destructive">
