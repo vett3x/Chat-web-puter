@@ -5,14 +5,20 @@ import { useState, useEffect, useRef } from 'react';
 interface TextAnimatorProps {
   text: string;
   className?: string;
+  isNew?: boolean;
+  onAnimationComplete?: () => void;
 }
 
-export function TextAnimator({ text, className }: TextAnimatorProps) {
-  const [displayedText, setDisplayedText] = useState('');
+export function TextAnimator({ text, className, isNew, onAnimationComplete }: TextAnimatorProps) {
+  const [displayedText, setDisplayedText] = useState(isNew ? '' : text);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Limpiar siempre cualquier animación anterior para evitar superposiciones
+    if (!isNew) {
+      setDisplayedText(text);
+      return;
+    }
+
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
     }
@@ -22,13 +28,17 @@ export function TextAnimator({ text, className }: TextAnimatorProps) {
       let i = 0;
       intervalRef.current = setInterval(() => {
         if (i < text.length) {
-          // Usar substring es más seguro aquí, ya que no depende del estado anterior
           setDisplayedText(text.substring(0, i + 1));
           i++;
-        } else if (intervalRef.current) {
-          clearInterval(intervalRef.current);
+        } else {
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+          }
+          onAnimationComplete?.();
         }
       }, 25);
+    } else {
+      onAnimationComplete?.();
     }
 
     return () => {
@@ -36,7 +46,7 @@ export function TextAnimator({ text, className }: TextAnimatorProps) {
         clearInterval(intervalRef.current);
       }
     };
-  }, [text]);
+  }, [text, isNew, onAnimationComplete]);
 
   return <span className={className}>{displayedText}</span>;
 }

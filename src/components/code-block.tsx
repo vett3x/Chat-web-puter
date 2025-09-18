@@ -14,9 +14,10 @@ interface CodeBlockProps {
   code: string;
   filename?: string;
   isNew?: boolean;
+  onAnimationComplete?: () => void;
 }
 
-export function CodeBlock({ language, code, filename, isNew }: CodeBlockProps) {
+export function CodeBlock({ language, code, filename, isNew, onAnimationComplete }: CodeBlockProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [isOpen, setIsOpen] = useState(true);
   const [displayedCode, setDisplayedCode] = useState(isNew ? '' : code);
@@ -38,11 +39,11 @@ export function CodeBlock({ language, code, filename, isNew }: CodeBlockProps) {
     setDisplayedCode('');
     
     if (code) {
-      // --- Nueva lógica de animación adaptativa y gradual ---
+      // --- Lógica de animación adaptativa y gradual ---
       const TARGET_CHARS_PER_SECOND = 1000;
       const CHUNK_SIZE = 15;
       const MIN_DELAY = 1;
-      const MAX_DURATION = 6000; // 6 segundos como máximo para la animación
+      const MAX_DURATION = 6000;
 
       const totalDuration = Math.min(
         (code.length / TARGET_CHARS_PER_SECOND) * 1000,
@@ -61,12 +62,13 @@ export function CodeBlock({ language, code, filename, isNew }: CodeBlockProps) {
           timeoutRef.current = setTimeout(typeChunk, delayPerChunk);
         } else {
           setIsTyping(false);
+          onAnimationComplete?.(); // Animation finished
         }
       };
       typeChunk();
-      // --- Fin de la nueva lógica ---
     } else {
       setIsTyping(false);
+      onAnimationComplete?.(); // No code to animate
     }
 
     return () => {
@@ -74,7 +76,7 @@ export function CodeBlock({ language, code, filename, isNew }: CodeBlockProps) {
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [code, isNew]);
+  }, [code, isNew, onAnimationComplete]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(code).then(() => {
