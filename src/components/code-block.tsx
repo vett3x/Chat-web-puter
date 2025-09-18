@@ -38,23 +38,39 @@ export function CodeBlock({ language, code, filename, isNew }: CodeBlockProps) {
     setDisplayedCode('');
     
     if (code) {
-      let i = 0;
-      const typeChunk = () => {
-        if (i < code.length) {
-          // Animar en fragmentos para un mejor rendimiento en bloques de código grandes
-          const chunkSize = code.length > 500 ? 25 : 10;
-          const delay = 10;
-          
-          const nextI = Math.min(i + chunkSize, code.length);
-          setDisplayedCode(code.substring(0, nextI));
-          i = nextI;
-          
-          timeoutRef.current = setTimeout(typeChunk, delay);
-        } else {
-          setIsTyping(false);
-        }
-      };
-      typeChunk();
+      const CODE_LENGTH_THRESHOLD = 300; // Umbral para cambiar de animación
+      const CHAR_ANIMATION_DELAY = 8;    // ms para animación por caracter
+      const CHUNK_ANIMATION_DELAY = 1;   // ms para animación por fragmento
+      const CHUNK_SIZE = 20;             // caracteres por fragmento
+
+      if (code.length < CODE_LENGTH_THRESHOLD) {
+        // Animación por carácter para código corto
+        let i = 0;
+        const typeCharacter = () => {
+          if (i < code.length) {
+            setDisplayedCode(code.substring(0, i + 1));
+            i++;
+            timeoutRef.current = setTimeout(typeCharacter, CHAR_ANIMATION_DELAY);
+          } else {
+            setIsTyping(false);
+          }
+        };
+        typeCharacter();
+      } else {
+        // Animación por fragmentos (chunks) para código largo
+        let i = 0;
+        const typeChunk = () => {
+          if (i < code.length) {
+            const nextI = Math.min(i + CHUNK_SIZE, code.length);
+            setDisplayedCode(code.substring(0, nextI));
+            i = nextI;
+            timeoutRef.current = setTimeout(typeChunk, CHUNK_ANIMATION_DELAY);
+          } else {
+            setIsTyping(false);
+          }
+        };
+        typeChunk();
+      }
     } else {
       setIsTyping(false);
     }
