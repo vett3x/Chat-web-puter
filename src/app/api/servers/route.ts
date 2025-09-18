@@ -17,14 +17,14 @@ const serverSchema = z.object({
 
 // Helper function to create Supabase client for API routes
 async function getSupabaseServerClient(res: NextResponse) { // Hacemos la función async
-  const cookieStore = cookies(); // Llama a cookies() aquí
+  const cookieStore = await cookies(); // Await la llamada a cookies()
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: (name: string) => cookieStore.get(name)?.value, // Usa la variable cookieStore
+        get: (name: string) => cookieStore.get(name)?.value, // Ahora cookieStore no es una promesa
         set: (name: string, value: string, options: CookieOptions) => {
           res.cookies.set({ name, value, ...options });
         },
