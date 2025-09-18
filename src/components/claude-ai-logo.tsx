@@ -10,11 +10,12 @@ interface ClaudeAILogoProps {
 const ClaudeAILogo: React.FC<ClaudeAILogoProps> = ({ className }) => {
   return (
     <Image
-      src="/claude_aI_logo.svg" // ¡Corregido a 'aI' para coincidir con tu nombre de archivo!
+      src="/claude_aI_logo.svg" 
       alt="Claude AI Logo"
-      width={16} // Ajusta el tamaño según sea necesario
-      height={16} // Ajusta el tamaño según sea necesario
+      width={16} 
+      height={16} 
       className={className}
+      unoptimized={true} // Deshabilitar la optimización para este SVG
     />
   );
 };
