@@ -378,8 +378,10 @@ export function ChatInterface({
         </ScrollArea>
 
         {/* Cuadro de entrada flotante */}
-        <div className="absolute bottom-16 left-0 right-0 flex justify-center px-4"> {/* Mover más arriba */}
-          <div className="w-full max-w-3xl bg-card rounded-xl border border-input shadow-2xl p-2 flex items-end gap-2 focus-within:ring-2 focus-within:ring-green-500 focus-within:ring-offset-2 focus-within:ring-offset-background transition-all duration-200">
+        <div className="absolute bottom-16 left-0 right-0 flex justify-center px-4">
+          <div className="w-full max-w-3xl bg-card rounded-xl border border-input shadow-lg p-2 flex items-end gap-2 
+                        focus-within:ring-2 focus-within:ring-green-500 focus-within:ring-offset-2 focus-within:ring-offset-background 
+                        focus-within:shadow-[0_0_20px_5px_rgb(34_197_94_/_0.4)] transition-all duration-200">
             <Textarea
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
