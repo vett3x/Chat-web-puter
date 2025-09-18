@@ -410,7 +410,7 @@ export function ChatInterface({
               rows={1}
             />
             <Select value={selectedModel} onValueChange={setSelectedModel}>
-              <SelectTrigger className="w-[200px] flex-shrink-0"> {/* Ancho ajustado aquí */}
+              <SelectTrigger className="w-[320px] flex-shrink-0"> {/* Ancho ajustado a 320px */}
                 <SelectValue placeholder="Modelo" />
               </SelectTrigger>
               <SelectContent>
