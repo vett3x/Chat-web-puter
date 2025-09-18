@@ -445,7 +445,7 @@ export function ChatInterface({
               <DropdownMenuContent 
                 side="top" 
                 align="end" 
-                className="w-64 bg-popover text-popover-foreground border-border rounded-none"
+                className="w-64 bg-popover text-popover-foreground border-border rounded-lg"
               >
                 <DropdownMenuLabel className="text-sm font-semibold">Seleccionar Modelo de IA</DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-border" />
