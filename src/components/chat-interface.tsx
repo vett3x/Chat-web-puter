@@ -239,6 +239,13 @@ export function ChatInterface({
       });
       setIsContextLoading(false);
 
+      if (response && response.error) {
+        const apiErrorMessage = typeof response.error === 'string' 
+          ? response.error 
+          : (response.error.message || JSON.stringify(response.error));
+        throw new Error(`Error de la IA: ${apiErrorMessage}`);
+      }
+
       let messageContent = 'Sin contenido';
       if (response && response.message && Array.isArray(response.message.content) && response.message.content.length > 0 && response.message.content[0].text) {
         messageContent = response.message.content[0].text;
@@ -274,7 +281,20 @@ export function ChatInterface({
 
     } catch (error) {
       console.error('Error sending message:', error);
-      toast.error((error as Error).message || 'Error al enviar el mensaje. Por favor, intenta de nuevo.');
+      
+      let errorMessage = 'Error al enviar el mensaje. Por favor, intenta de nuevo.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null) {
+        const errorString = JSON.stringify(error);
+        if (errorString !== '{}') {
+          errorMessage = `La API devolvió un error: ${errorString}`;
+        }
+      } else if (typeof error === 'string' && error) {
+        errorMessage = error;
+      }
+
+      toast.error(errorMessage);
       setIsLoading(false);
       setIsContextLoading(false);
     }
