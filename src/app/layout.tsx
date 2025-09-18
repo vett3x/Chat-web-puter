@@ -44,7 +44,7 @@ export default function RootLayout({
           <SessionContextProvider>
             {children}
           </SessionContextProvider>
-          <Toaster />
+          <Toaster position="bottom-center" />
         </ThemeProvider>
       </body>
     </html>

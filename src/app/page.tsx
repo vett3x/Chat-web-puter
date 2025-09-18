@@ -1,7 +1,6 @@
 "use client";
 
 import { ChatInterface } from "@/components/chat-interface";
-import { Toaster } from "@/components/ui/sonner";
 import { ConversationSidebar } from "@/components/conversation-sidebar";
 import { useSession } from "@/components/session-context-provider";
 import { useState, useEffect } from "react";
@@ -43,7 +42,6 @@ export default function Home() {
           }}
         />
       </main>
-      <Toaster />
     </div>
   );
 }
