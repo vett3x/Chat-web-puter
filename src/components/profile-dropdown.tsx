@@ -68,7 +68,6 @@ export function ProfileDropdown() {
     }
   };
 
-  // Actualizada la firma de la función para aceptar undefined
   const getInitials = (firstName: string | null | undefined, lastName: string | null | undefined) => {
     const first = firstName ? firstName.charAt(0) : '';
     const last = lastName ? lastName.charAt(0) : '';
@@ -108,11 +107,10 @@ export function ProfileDropdown() {
       <DropdownMenuContent className="w-56 bg-popover text-popover-foreground border-border">
         <DropdownMenuLabel className="flex items-center justify-between">
           <span>Mi Cuenta</span>
-          {/* Puedes añadir un indicador de plan aquí si lo deseas */}
         </DropdownMenuLabel>
         <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem className="flex items-center justify-between cursor-pointer">
-          <div className="flex items-center">
+          <div className="flex items-center"> {/* Agrupando icono y texto */}
             {isMounted && theme === 'dark' ? <Moon className="mr-2 h-4 w-4" /> : <Sun className="mr-2 h-4 w-4" />}
             <span>Modo Oscuro</span>
           </div>
@@ -120,18 +118,21 @@ export function ProfileDropdown() {
             <Switch
               checked={theme === 'dark'}
               onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
-              onClick={(e) => e.stopPropagation()} // Prevent dropdown from closing
+              onClick={(e) => e.stopPropagation()}
             />
           )}
         </DropdownMenuItem>
         <DropdownMenuItem className="cursor-pointer" onClick={() => toast.info('Funcionalidad de configuración no implementada.')}>
-          <Settings className="mr-2 h-4 w-4" />
-          <span>Configuración</span>
+          <div className="flex items-center"> {/* Agrupando icono y texto para consistencia */}
+            <Settings className="mr-2 h-4 w-4" />
+            <span>Configuración</span>
+          </div>
         </DropdownMenuItem>
-        <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive" onClick={handleSignOut}>
-          <LogOut className="mr-2 h-4 w-4" />
-          <span>Cerrar Sesión</span>
+          <div className="flex items-center"> {/* Agrupando icono y texto para consistencia */}
+            <LogOut className="mr-2 h-4 w-4" />
+            <span>Cerrar Sesión</span>
+          </div>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
