@@ -172,7 +172,7 @@ function ServerListItem({ server, onDeleteServer, onSelectServerForDetails }: { 
         </div>
       </div>
       <CollapsibleContent>
-        <div className="mt-2 rounded-md overflow-hidden">
+        <div className="mt-2 rounded-md"> {/* Removed overflow-hidden here */}
           <SyntaxHighlighter 
             language="bash" 
             style={vscDarkPlus} 
@@ -182,7 +182,7 @@ function ServerListItem({ server, onDeleteServer, onSelectServerForDetails }: { 
               maxHeight: '400px', 
               overflow: 'auto', 
               whiteSpace: 'pre-wrap', 
-              wordBreak: 'break-all', // Changed from 'break-word' to 'break-all'
+              wordBreak: 'break-all', 
             }} 
             codeTagProps={{ style: { fontFamily: 'var(--font-geist-mono)' } }}
           >
