@@ -70,7 +70,7 @@ const DropdownMenuContent = React.forwardRef<
         {...props}
       >
         {children}
-        <DropdownMenuPrimitive.Arrow className="fill-popover h-4 w-4 stroke-foreground stroke-1" />
+        <DropdownMenuPrimitive.Arrow className="fill-popover h-4 w-4" /> {/* Eliminado stroke-foreground stroke-1 */}
       </DropdownMenuPrimitive.Content>
     </DropdownMenuPrimitive.Portal>
   );
