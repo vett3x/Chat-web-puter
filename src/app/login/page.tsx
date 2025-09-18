@@ -5,10 +5,19 @@ import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Moon, Sun } from 'lucide-react';
+import { useTheme } from 'next-themes';
 
 export default function LoginPage() {
   const [currentLang, setCurrentLang] = useState('es'); // Estado para el idioma actual
+  const { theme, setTheme } = useTheme();
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const spanishVariables = {
     sign_in: {
@@ -94,7 +103,22 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4 relative">
+      {isMounted && (
+        <Button
+          variant="outline"
+          size="icon"
+          className="absolute top-4 right-4 h-12 w-12 rounded-full text-foreground"
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          aria-label="Toggle theme"
+        >
+          {theme === 'dark' ? (
+            <Sun className="h-6 w-6" />
+          ) : (
+            <Moon className="h-6 w-6" />
+          )}
+        </Button>
+      )}
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">
