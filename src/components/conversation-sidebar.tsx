@@ -104,7 +104,6 @@ export function ConversationSidebar({
     } else if (data) {
       setConversations(prev => [data, ...prev]);
       onSelectConversation(data.id);
-      // onNewConversationCreated(data.id); // Esta llamada ya no es necesaria aquí
       toast.success('Nueva conversación creada.');
     }
     setIsCreatingConversation(false);
@@ -160,11 +159,18 @@ export function ConversationSidebar({
       console.error('Error deleting conversation:', error);
       toast.error('Error al eliminar la conversación.');
     } else {
+      // Remove the conversation from the local state
       setConversations(prev => prev.filter(conv => conv.id !== conversationId));
+      
+      // If the deleted conversation was the selected one, deselect it
       if (selectedConversationId === conversationId) {
-        onSelectConversation(null); // Deselect if the current conversation is deleted
-        // onNewConversationCreated(null as any); // Esta llamada es incorrecta y se elimina
+        onSelectConversation(null); 
       }
+      
+      // Re-fetch conversations to ensure the list is up-to-date and loading state is reset
+      // This is crucial if the list becomes empty or if there are other conversations to select.
+      await fetchConversations(); 
+      
       toast.success('Conversación eliminada.');
     }
     setDeletingConversationId(null); // Reset deleting state
