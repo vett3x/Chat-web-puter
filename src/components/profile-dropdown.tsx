@@ -18,6 +18,7 @@ import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link'; // Import Link for navigation
 
 interface Profile {
   first_name: string | null;
@@ -109,6 +110,12 @@ export function ProfileDropdown() {
           <span>Mi Cuenta</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator className="bg-border" />
+        <DropdownMenuItem asChild>
+          <Link href="/settings/profile" className="flex items-center cursor-pointer">
+            <UserIcon className="mr-2 h-4 w-4" />
+            <span>Perfil</span>
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem 
           className="flex items-center justify-between cursor-pointer"
           onSelect={(e: Event) => e.preventDefault()} // Prevenir que el menú se cierre al interactuar con el switch

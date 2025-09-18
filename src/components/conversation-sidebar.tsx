@@ -354,6 +354,10 @@ export function ConversationSidebar({
 
   return (
     <div className="flex flex-col h-full p-4 border-r bg-sidebar text-sidebar-foreground">
+      <div className="mb-4">
+        <ProfileDropdown />
+      </div>
+
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold">Navegación</h2>
         <div className="flex gap-2">
@@ -496,9 +500,6 @@ export function ConversationSidebar({
           )}
         </div>
       </ScrollArea>
-      <div className="mt-auto pt-4 border-t border-sidebar-border">
-        <ProfileDropdown />
-      </div>
     </div>
   );
 }
