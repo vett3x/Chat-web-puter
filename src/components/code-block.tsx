@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Button } from '@/components/ui/button';
@@ -21,8 +21,14 @@ export function CodeBlock({ language, code, filename, isNew }: CodeBlockProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [displayedCode, setDisplayedCode] = useState(isNew ? '' : code);
   const [isTyping, setIsTyping] = useState(!!isNew);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    // Limpiar siempre la animación anterior al ejecutar el efecto
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
     if (!isNew) {
       setDisplayedCode(code);
       setIsTyping(false);
@@ -31,16 +37,15 @@ export function CodeBlock({ language, code, filename, isNew }: CodeBlockProps) {
 
     setIsTyping(true);
     setDisplayedCode('');
-    let timeoutId: NodeJS.Timeout;
-
+    
     if (code) {
       let i = 0;
       const typeCharacter = () => {
         if (i < code.length) {
-          setDisplayedCode((prev) => prev + code.charAt(i));
+          setDisplayedCode(code.substring(0, i + 1));
           i++;
-          const delay = 8; // Escritura de código más lenta para una mejor sensación de "generación"
-          timeoutId = setTimeout(typeCharacter, delay);
+          const delay = 8;
+          timeoutRef.current = setTimeout(typeCharacter, delay);
         } else {
           setIsTyping(false);
         }
@@ -51,8 +56,8 @@ export function CodeBlock({ language, code, filename, isNew }: CodeBlockProps) {
     }
 
     return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
     };
   }, [code, isNew]);
