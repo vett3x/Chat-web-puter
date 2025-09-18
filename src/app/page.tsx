@@ -36,7 +36,7 @@ export default function Home() {
           />
         </ResizablePanel>
         <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={75} className="h-full"> {/* Añadido h-full aquí */}
+        <ResizablePanel defaultSize={75}>
           <ChatInterface
             userId={userId}
             conversationId={selectedConversationId}
