@@ -4,12 +4,13 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
+import { Send, Bot, User, Loader2 } from 'lucide-react'; // Eliminado Sparkles
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/components/session-context-provider';
 import { MessageContent } from './message-content';
 import { Textarea } from '@/components/ui/textarea';
+import ClaudeAILogo from './claude-ai-logo'; // Importar el nuevo componente del logo
 
 interface Message {
   id: string;
@@ -25,7 +26,7 @@ interface Message {
 const AI_PROVIDERS = [
   {
     company: 'Anthropic',
-    logo: Sparkles,
+    logo: ClaudeAILogo, // Usar el nuevo componente del logo
     models: [
       { value: 'claude-sonnet-4', label: 'Claude Sonnet 4' },
       { value: 'claude-opus-4', label: 'Claude Opus 4' },
@@ -340,7 +341,7 @@ export function ChatInterface({
     <div className="flex flex-col h-full bg-background">
       <div className="flex-1 min-h-0 relative">
         <ScrollArea className="h-full" ref={scrollAreaRef}>
-          <div className="p-4 space-y-4 pb-48"> {/* Aumentado el padding-bottom a pb-48 */}
+          <div className="p-4 space-y-4 pb-48">
             {messages.length === 0 && !isLoading ? (
               <div className="text-center text-muted-foreground py-8">
                 <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -420,8 +421,8 @@ export function ChatInterface({
                 {AI_PROVIDERS.map((provider, providerIndex) => (
                   <SelectGroup key={provider.company}>
                     <SelectLabel className="flex items-center gap-2 font-bold text-foreground">
-                      <provider.logo className="h-4 w-4" />
-                      {provider.company}
+                      <span>{provider.company}</span> {/* Nombre del proveedor */}
+                      <provider.logo className="h-4 w-4" /> {/* Logo después del nombre */}
                     </SelectLabel>
                     {provider.models.map((model) => (
                       <SelectItem key={model.value} value={model.value} className="pl-8">
