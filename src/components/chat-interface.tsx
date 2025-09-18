@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot, User, Loader2, MessageSquarePlus } from 'lucide-react';
+import { Send, Bot, User, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/components/session-context-provider';
@@ -273,12 +273,6 @@ export function ChatInterface({
     }
   };
 
-  const startNewChat = () => {
-    setMessages([]);
-    onNewConversationCreated(null as any);
-    toast.success('Nuevo chat iniciado');
-  };
-
   if (!isPuterReady) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -321,9 +315,6 @@ export function ChatInterface({
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" size="sm" onClick={startNewChat}>
-              <MessageSquarePlus className="h-4 w-4 mr-2" /> Nuevo Chat
-            </Button>
           </div>
         </div>
       </CardHeader>
