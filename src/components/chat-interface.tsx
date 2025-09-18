@@ -318,7 +318,7 @@ export function ChatInterface({
 
       <div className="flex-1 min-h-0 relative">
         <ScrollArea className="h-full" ref={scrollAreaRef}>
-          <div className="p-4 space-y-4 pb-28"> {/* Aumentado padding-bottom para el cuadro flotante */}
+          <div className="p-4 space-y-4 pb-32"> {/* Aumentado padding-bottom para el cuadro flotante */}
             {messages.length === 0 && !isLoading ? (
               <div className="text-center text-muted-foreground py-8">
                 <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -378,7 +378,7 @@ export function ChatInterface({
         </ScrollArea>
 
         {/* Cuadro de entrada flotante */}
-        <div className="absolute bottom-8 left-0 right-0 flex justify-center px-4"> {/* Mover más arriba */}
+        <div className="absolute bottom-16 left-0 right-0 flex justify-center px-4"> {/* Mover más arriba */}
           <div className="w-full max-w-3xl bg-card rounded-xl border border-input shadow-2xl p-2 flex items-end gap-2 focus-within:ring-2 focus-within:ring-green-500 focus-within:ring-offset-2 focus-within:ring-offset-background transition-all duration-200">
             <Textarea
               value={inputMessage}
@@ -386,7 +386,6 @@ export function ChatInterface({
               onKeyPress={handleKeyPress}
               placeholder="Pregunta a Claude AI..."
               disabled={isLoading || !userId}
-              // Aumentar min-h
               className="flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none min-h-[50px] max-h-[200px] overflow-y-auto bg-transparent"
               rows={1}
             />
@@ -396,7 +395,7 @@ export function ChatInterface({
               </SelectTrigger>
               <SelectContent>
                 {AI_PROVIDERS.map((provider, providerIndex) => (
-                  <SelectGroup key={provider.company}> {/* Envuelto en SelectGroup */}
+                  <SelectGroup key={provider.company}>
                     <SelectLabel className="flex items-center gap-2 font-bold text-foreground">
                       <provider.logo className="h-4 w-4" />
                       {provider.company}
