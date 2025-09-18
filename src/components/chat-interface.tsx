@@ -2,15 +2,15 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input'; // Mantener Input si se usa en otro lugar, pero usaremos Textarea para el chat
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot, User, Loader2 } from 'lucide-react';
+import { Send, Bot, User, Loader2, Sparkles } from 'lucide-react'; // Importar Sparkles para el logo de Anthropic
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/components/session-context-provider';
 import { MessageContent } from './message-content';
+import { Textarea } from '@/components/ui/textarea'; // Importar Textarea
 
 interface Message {
   id: string;
@@ -22,12 +22,30 @@ interface Message {
   isTyping?: boolean; // Para el indicador de carga en línea
 }
 
-const AVAILABLE_MODELS = [
-  { value: 'claude-sonnet-4', label: 'Claude Sonnet 4' },
-  { value: 'claude-opus-4', label: 'Claude Opus 4' },
-  { value: 'claude-3-7-sonnet', label: 'Claude 3.7 Sonnet' },
-  { value: 'claude-3-7-opus', label: 'Claude 3.7 Opus' },
+// Reestructuración de los modelos para incluir información de la empresa y logos
+const AI_PROVIDERS = [
+  {
+    company: 'Anthropic',
+    logo: Sparkles, // Usamos Sparkles como logo placeholder
+    models: [
+      { value: 'claude-sonnet-4', label: 'Claude Sonnet 4' },
+      { value: 'claude-opus-4', label: 'Claude Opus 4' },
+      { value: 'claude-3-7-sonnet', label: 'Claude 3.7 Sonnet' },
+      { value: 'claude-3-7-opus', label: 'Claude 3.7 Opus' },
+    ],
+  },
+  // Puedes añadir más proveedores aquí si es necesario
+  // {
+  //   company: 'Google',
+  //   logo: Bot, // Otro icono de ejemplo
+  //   models: [
+  //     { value: 'gemini-pro', label: 'Gemini Pro' },
+  //   ],
+  // },
 ];
+
+// Extraer todos los valores de los modelos para el estado inicial
+const ALL_MODEL_VALUES = AI_PROVIDERS.flatMap(provider => provider.models.map(model => model.value));
 
 interface PuterMessage {
   role: 'user' | 'assistant' | 'system';
@@ -59,8 +77,8 @@ export function ChatInterface({
 }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
-  const [selectedModel, setSelectedModel] = useState('claude-sonnet-4');
-  const [isLoading, setIsLoading] = useState(false); // Ahora solo para deshabilitar el input/botón
+  const [selectedModel, setSelectedModel] = useState(ALL_MODEL_VALUES[0]); // Seleccionar el primer modelo por defecto
+  const [isLoading, setIsLoading] = useState(false);
   const [isPuterReady, setIsPuterReady] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
@@ -296,32 +314,11 @@ export function ChatInterface({
 
   return (
     <div className="flex flex-col h-full bg-background">
-      <CardHeader className="flex-shrink-0 border-b">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Bot className="h-6 w-6" />
-            Chat con Claude AI
-          </CardTitle>
-          <div className="flex items-center gap-2">
-            <Select value={selectedModel} onValueChange={setSelectedModel}>
-              <SelectTrigger className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {AVAILABLE_MODELS.map((model) => (
-                  <SelectItem key={model.value} value={model.value}>
-                    {model.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </CardHeader>
+      {/* La cabecera con el título y el selector de modelo se ha eliminado */}
 
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 relative">
         <ScrollArea className="h-full" ref={scrollAreaRef}>
-          <div className="p-4 space-y-4">
+          <div className="p-4 space-y-4 pb-24"> {/* Añadido padding-bottom para el cuadro flotante */}
             {messages.length === 0 && !isLoading ? (
               <div className="text-center text-muted-foreground py-8">
                 <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -369,7 +366,7 @@ export function ChatInterface({
                       )}
                       {message.model && !message.isTyping && (
                         <div className="text-xs opacity-70 mt-2">
-                          {AVAILABLE_MODELS.find(m => m.value === message.model)?.label}
+                          {AI_PROVIDERS.flatMap(p => p.models).find(m => m.value === message.model)?.label}
                         </div>
                       )}
                     </div>
@@ -379,29 +376,53 @@ export function ChatInterface({
             )}
           </div>
         </ScrollArea>
-      </div>
 
-      <div className="border-t p-4 flex-shrink-0 bg-muted/40">
-        <div className="flex gap-2">
-          <Input
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Escribe tu mensaje aquí..."
-            disabled={isLoading || !userId}
-            className="flex-1"
-          />
-          <Button
-            onClick={sendMessage}
-            disabled={isLoading || !inputMessage.trim() || !userId}
-            size="icon"
-          >
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
+        {/* Cuadro de entrada flotante */}
+        <div className="absolute bottom-4 left-0 right-0 flex justify-center px-4">
+          <div className="w-full max-w-3xl bg-card rounded-xl shadow-lg p-2 flex items-end gap-2 focus-within:ring-2 focus-within:ring-green-500 focus-within:ring-offset-2 focus-within:ring-offset-background transition-all duration-200">
+            <Textarea
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Pregunta a Claude AI..."
+              disabled={isLoading || !userId}
+              className="flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none min-h-[40px] max-h-[200px] overflow-y-auto bg-transparent"
+              rows={1}
+            />
+            <Select value={selectedModel} onValueChange={setSelectedModel}>
+              <SelectTrigger className="w-[160px] flex-shrink-0">
+                <SelectValue placeholder="Modelo" />
+              </SelectTrigger>
+              <SelectContent>
+                {AI_PROVIDERS.map((provider, providerIndex) => (
+                  <React.Fragment key={provider.company}>
+                    <SelectLabel className="flex items-center gap-2 font-bold text-foreground">
+                      <provider.logo className="h-4 w-4" />
+                      {provider.company}
+                    </SelectLabel>
+                    {provider.models.map((model) => (
+                      <SelectItem key={model.value} value={model.value} className="pl-8">
+                        {model.label}
+                      </SelectItem>
+                    ))}
+                    {providerIndex < AI_PROVIDERS.length - 1 && <SelectSeparator />}
+                  </React.Fragment>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              onClick={sendMessage}
+              disabled={isLoading || !inputMessage.trim() || !userId}
+              size="icon"
+              className="flex-shrink-0"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
