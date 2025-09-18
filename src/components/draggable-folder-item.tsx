@@ -170,6 +170,7 @@ export function DraggableFolderItem({
   };
 
   const paddingLeft = `${level * 1.25 + 0.5}rem`; // Indent based on level
+  const MAX_FOLDER_NESTING_LEVEL = 2; // Root is level 0, so 0, 1, 2 are allowed for folders to contain subfolders
 
   return (
     <div className="space-y-1">
@@ -235,7 +236,11 @@ export function DraggableFolderItem({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48 bg-popover text-popover-foreground border-border">
-                  <DropdownMenuItem onClick={(e: React.MouseEvent) => { e.stopPropagation(); onCreateSubfolder(folder.id); }}>
+                  <DropdownMenuItem 
+                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); onCreateSubfolder(folder.id); }}
+                    disabled={level >= MAX_FOLDER_NESTING_LEVEL} // Disable if max level reached
+                    className={level >= MAX_FOLDER_NESTING_LEVEL ? "opacity-50 cursor-not-allowed" : ""}
+                  >
                     <Plus className="mr-2 h-4 w-4" /> Crear Subcarpeta
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsEditing(true); }}>
