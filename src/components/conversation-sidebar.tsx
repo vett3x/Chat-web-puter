@@ -4,34 +4,16 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, MessageSquare, Loader2, Edit, Save, X, Trash2, Folder, List, Archive, MoreVertical, MoveRight } from 'lucide-react';
+import { Plus, MessageSquare, Loader2, Folder, ChevronRight, ChevronDown } from 'lucide-react';
+import { Separator } from '@/components/ui/separator'; // Corrected import
 import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
-} from '@/components/ui/dropdown-menu';
 import { ProfileDropdown } from './profile-dropdown';
 import { Skeleton } from '@/components/ui/skeleton';
-import { FolderItem } from './folder-item';
+import { DraggableFolderItem } from './draggable-folder-item';
+import { DraggableConversationCard } from './draggable-conversation-card';
 
 interface Conversation {
   id: string;
@@ -53,8 +35,6 @@ interface ConversationSidebarProps {
   onSelectConversation: (conversationId: string | null) => void;
 }
 
-type ViewMode = 'all' | 'unarchived' | 'folder';
-
 export function ConversationSidebar({
   selectedConversationId,
   onSelectConversation,
@@ -66,11 +46,12 @@ export function ConversationSidebar({
   const [isLoadingConversations, setIsLoadingConversations] = useState(true);
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
-  const [editingConversationId, setEditingConversationId] = useState<string | null>(null);
-  const [editingTitle, setEditingTitle] = useState('');
-  const [deletingConversationId, setDeletingConversationId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>('unarchived'); // Default view mode
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null); // Track selected folder for view mode
+  const [isGeneralExpanded, setIsGeneralExpanded] = useState(true);
+
+  // Drag and Drop State
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+  const [draggedItemType, setDraggedItemType] = useState<'conversation' | 'folder' | null>(null);
+  const [draggingOverFolderId, setDraggingOverFolderId] = useState<string | null>(null);
 
   const fetchConversationsAndFolders = useCallback(async () => {
     if (!userId) {
@@ -119,25 +100,13 @@ export function ConversationSidebar({
     }
   }, [userId, isSessionLoading, fetchConversationsAndFolders]);
 
-  // Re-fetch when a new conversation is created externally or moved
-  useEffect(() => {
-    if (userId && selectedConversationId && !isLoadingConversations) {
-      const isSelectedConversationInList = conversations.some(
-        (conv) => conv.id === selectedConversationId
-      );
-      if (!isSelectedConversationInList) {
-        fetchConversationsAndFolders();
-      }
-    }
-  }, [selectedConversationId, userId, isLoadingConversations, conversations, fetchConversationsAndFolders]);
-
   const createNewConversation = async () => {
     if (!userId || isCreatingConversation) return;
 
     setIsCreatingConversation(true);
     const { data, error } = await supabase
       .from('conversations')
-      .insert({ user_id: userId, title: 'Nueva conversación', folder_id: null }) // New conversations are unarchived by default
+      .insert({ user_id: userId, title: 'Nueva conversación', folder_id: null })
       .select('id, title, created_at, folder_id')
       .single();
 
@@ -148,8 +117,7 @@ export function ConversationSidebar({
       setConversations(prev => [data, ...prev]);
       onSelectConversation(data.id);
       toast.success('Nueva conversación creada.');
-      setViewMode('unarchived'); // Switch to unarchived view
-      setSelectedFolderId(null);
+      setIsGeneralExpanded(true); // Ensure General is expanded for new conversation
     }
     setIsCreatingConversation(false);
   };
@@ -171,72 +139,11 @@ export function ConversationSidebar({
     } else if (data) {
       setFolders(prev => [data, ...prev]);
       toast.success(`${newFolderName} creada.`);
-      setViewMode('folder'); // Switch to folder view
-      setSelectedFolderId(data.id); // Select the newly created folder
     }
     setIsCreatingFolder(false);
   };
 
-  const handleEditConversationClick = (conversation: Conversation) => {
-    setEditingConversationId(conversation.id);
-    setEditingTitle(conversation.title);
-  };
-
-  const handleSaveConversationEdit = async (conversationId: string) => {
-    if (!editingTitle.trim()) {
-      toast.error('El título no puede estar vacío.');
-      return;
-    }
-    const { error } = await supabase
-      .from('conversations')
-      .update({ title: editingTitle })
-      .eq('id', conversationId)
-      .eq('user_id', userId);
-
-    if (error) {
-      console.error('Error updating conversation title:', error);
-      toast.error('Error al actualizar el título de la conversación.');
-    } else {
-      setConversations(prev =>
-        prev.map(conv => (conv.id === conversationId ? { ...conv, title: editingTitle } : conv))
-      );
-      setEditingConversationId(null);
-      setEditingTitle('');
-      toast.success('Título de conversación actualizado.');
-    }
-  };
-
-  const handleCancelConversationEdit = () => {
-    setEditingConversationId(null);
-    setEditingTitle('');
-  };
-
-  const handleDeleteConversation = async (conversationId: string) => {
-    if (!userId) {
-      toast.error('Usuario no autenticado.');
-      return;
-    }
-
-    const { error } = await supabase
-      .from('conversations')
-      .delete()
-      .eq('id', conversationId)
-      .eq('user_id', userId);
-
-    if (error) {
-      console.error('Error deleting conversation:', error);
-      toast.error('Error al eliminar la conversación.');
-    } else {
-      setConversations(prev => prev.filter(conv => conv.id !== conversationId));
-      if (selectedConversationId === conversationId) {
-        onSelectConversation(null);
-      }
-      toast.success('Conversación eliminada.');
-    }
-    setDeletingConversationId(null);
-  };
-
-  const handleMoveConversation = async (conversationId: string, targetFolderId: string | null) => {
+  const handleConversationMoved = async (conversationId: string, targetFolderId: string | null) => {
     if (!userId) {
       toast.error('Usuario no autenticado.');
       return;
@@ -260,16 +167,90 @@ export function ConversationSidebar({
     }
   };
 
-  const handleSelectFolder = (folderId: string | null) => {
-    setSelectedFolderId(folderId);
-    setViewMode('folder');
-    onSelectConversation(null); // Deselect any conversation when selecting a folder
+  const handleFolderMoved = async (folderId: string, targetParentId: string | null) => {
+    if (!userId) {
+      toast.error('Usuario no autenticado.');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('folders')
+      .update({ parent_id: targetParentId })
+      .eq('id', folderId)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error moving folder:', error);
+      toast.error('Error al mover la carpeta.');
+    } else {
+      toast.success('Carpeta movida.');
+      fetchConversationsAndFolders(); // Re-fetch to update both lists
+    }
+  };
+
+  const handleDragStart = (e: React.DragEvent, id: string, type: 'conversation' | 'folder') => {
+    e.dataTransfer.setData('text/plain', JSON.stringify({ id, type }));
+    setDraggedItemId(id);
+    setDraggedItemType(type);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItemId(null);
+    setDraggedItemType(null);
+    setDraggingOverFolderId(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetFolderId: string | null) => {
+    e.preventDefault();
+    setDraggingOverFolderId(null); // Reset drag over state
+
+    const data = e.dataTransfer.getData('text/plain');
+    if (!data) return;
+
+    try {
+      const { id, type } = JSON.parse(data);
+
+      if (type === 'conversation') {
+        handleConversationMoved(id, targetFolderId);
+      } else if (type === 'folder') {
+        // Prevent dropping a folder into itself or its direct child
+        if (id === targetFolderId) {
+          toast.error('No puedes mover una carpeta a sí misma.');
+          return;
+        }
+        // Check if targetFolderId is a descendant of id
+        let currentParentId = targetFolderId;
+        while (currentParentId) {
+          if (currentParentId === id) {
+            toast.error('No puedes mover una carpeta a una de sus subcarpetas.');
+            return;
+          }
+          const parentFolder = folders.find(f => f.id === currentParentId);
+          currentParentId = parentFolder ? parentFolder.parent_id : null;
+        }
+        handleFolderMoved(id, targetFolderId);
+      }
+    } catch (error) {
+      console.error('Error parsing drag data:', error);
+      toast.error('Error al procesar el arrastre.');
+    }
+  };
+
+  const handleDragEnter = (e: React.DragEvent, folderId: string | null) => {
+    e.preventDefault();
+    setDraggingOverFolderId(folderId);
+  };
+
+  const handleDragLeave = (e: React.DragEvent, folderId: string | null) => {
+    e.preventDefault();
+    if (draggingOverFolderId === folderId) {
+      setDraggingOverFolderId(null);
+    }
   };
 
   const rootFolders = folders.filter(f => f.parent_id === null);
-  const unarchivedConversations = conversations.filter(conv => conv.folder_id === null);
+  const generalConversations = conversations.filter(conv => conv.folder_id === null);
 
-  // Si la sesión está cargando, no mostramos nada aún o un indicador global si lo hubiera
   if (isSessionLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-4">
@@ -315,23 +296,6 @@ export function ConversationSidebar({
         </div>
       </div>
 
-      <div className="flex gap-2 mb-4">
-        <Button
-          variant={viewMode === 'unarchived' ? 'secondary' : 'ghost'}
-          className="flex-1 justify-start"
-          onClick={() => { setViewMode('unarchived'); setSelectedFolderId(null); onSelectConversation(null); }}
-        >
-          <MessageSquare className="mr-2 h-4 w-4" /> Conversaciones
-        </Button>
-        <Button
-          variant={viewMode === 'folder' ? 'secondary' : 'ghost'}
-          className="flex-1 justify-start"
-          onClick={() => { setViewMode('folder'); onSelectConversation(null); }}
-        >
-          <Folder className="mr-2 h-4 w-4" /> Carpetas
-        </Button>
-      </div>
-
       <ScrollArea className="flex-1">
         <div className="space-y-2">
           {isLoadingConversations && conversations.length === 0 && folders.length === 0 ? (
@@ -343,178 +307,91 @@ export function ConversationSidebar({
             ))
           ) : (
             <>
-              {viewMode === 'unarchived' && (
-                unarchivedConversations.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    No hay conversaciones sin archivar.
-                  </p>
-                ) : (
-                  unarchivedConversations.map((conversation) => (
-                    <Card
-                      key={conversation.id}
-                      className={cn(
-                        "cursor-pointer hover:bg-sidebar-accent transition-colors group",
-                        selectedConversationId === conversation.id && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary"
-                      )}
-                      onClick={() => onSelectConversation(conversation.id)}
+              {/* General Conversations Section */}
+              <Card
+                className={cn(
+                  "cursor-pointer hover:bg-sidebar-accent transition-colors group relative",
+                  selectedConversationId === null && isGeneralExpanded && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary",
+                  draggingOverFolderId === null && draggedItemType === 'conversation' && "border-2 border-blue-500 bg-blue-500/10" // Visual feedback for drag over General
+                )}
+                onClick={() => setIsGeneralExpanded(!isGeneralExpanded)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => handleDrop(e, null)} // Drop target for 'General' (null folder_id)
+                onDragEnter={(e) => handleDragEnter(e, null)}
+                onDragLeave={(e) => handleDragLeave(e, null)}
+              >
+                <CardContent className="p-2 flex items-center justify-between gap-2">
+                  <div className="flex items-center flex-1 overflow-hidden">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 flex-shrink-0"
+                      onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsGeneralExpanded(!isGeneralExpanded); }}
                     >
-                      <CardContent className="p-3 flex items-center justify-between gap-2">
-                        {editingConversationId === conversation.id ? (
-                          <Input
-                            value={editingTitle}
-                            onChange={(e) => setEditingTitle(e.target.value)}
-                            onClick={(e) => e.stopPropagation()}
-                            onKeyPress={(e) => {
-                              if (e.key === 'Enter') {
-                                handleSaveConversationEdit(conversation.id);
-                              }
-                            }}
-                            className="flex-1 bg-sidebar-background text-sidebar-foreground"
-                          />
-                        ) : (
-                          <div className="flex items-center gap-2 flex-1 overflow-hidden">
-                            <MessageSquare className="h-4 w-4 flex-shrink-0" />
-                            <span className="text-sm truncate">{conversation.title}</span>
-                          </div>
-                        )}
-                        <div className="flex-shrink-0 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {editingConversationId === conversation.id ? (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={(e: React.MouseEvent) => {
-                                  e.stopPropagation();
-                                  handleSaveConversationEdit(conversation.id);
-                                }}
-                                className="h-7 w-7 text-sidebar-primary-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                              >
-                                <Save className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={(e: React.MouseEvent) => {
-                                  e.stopPropagation();
-                                  handleCancelConversationEdit();
-                                }}
-                                className="h-7 w-7 text-sidebar-primary-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </>
-                          ) : (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={(e: React.MouseEvent) => {
-                                  e.stopPropagation();
-                                  handleEditConversationClick(conversation);
-                                }}
-                                className={cn(
-                                  "h-7 w-7",
-                                  selectedConversationId === conversation.id ? "text-sidebar-primary-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                                )}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48 bg-popover text-popover-foreground border-border">
-                                  <DropdownMenuItem onClick={(e: React.MouseEvent) => { e.stopPropagation(); onSelectConversation(conversation.id); }}>
-                                    <MessageSquare className="mr-2 h-4 w-4" /> Abrir
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuTrigger asChild>
-                                    <DropdownMenuItem onSelect={(e: Event) => e.preventDefault()}>
-                                      <MoveRight className="mr-2 h-4 w-4" /> Mover a
-                                    </DropdownMenuItem>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent side="right" align="start" className="w-48 bg-popover text-popover-foreground border-border">
-                                    <DropdownMenuLabel>Mover a Carpeta</DropdownMenuLabel>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => handleMoveConversation(conversation.id, null)}>
-                                      (Sin carpeta)
-                                    </DropdownMenuItem>
-                                    {folders.map(f => (
-                                      <DropdownMenuItem key={f.id} onClick={() => handleMoveConversation(conversation.id, f.id)}>
-                                        {f.name}
-                                      </DropdownMenuItem>
-                                    ))}
-                                  </DropdownMenuContent>
-                                  <DropdownMenuSeparator />
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={(e: React.MouseEvent) => {
-                                          e.stopPropagation();
-                                          setDeletingConversationId(conversation.id);
-                                        }}
-                                        className={cn(
-                                          "h-7 w-7 text-destructive hover:bg-destructive/10",
-                                          selectedConversationId === conversation.id ? "text-sidebar-primary-foreground hover:bg-sidebar-accent hover:text-destructive" : "text-destructive hover:bg-destructive/10"
-                                        )}
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Esta acción no se puede deshacer. Esto eliminará permanentemente tu conversación y todos sus mensajes.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel onClick={() => setDeletingConversationId(null)}>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDeleteConversation(conversation.id)}>
-                                          Eliminar
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                )
+                      {isGeneralExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </Button>
+                    <MessageSquare className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <span className="text-sm font-medium truncate flex-1">General</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {isGeneralExpanded && (
+                <div className="pl-4 space-y-1">
+                  {generalConversations.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-2">
+                      No hay conversaciones en General.
+                    </p>
+                  ) : (
+                    generalConversations.map((conversation) => (
+                      <DraggableConversationCard
+                        key={conversation.id}
+                        conversation={conversation}
+                        selectedConversationId={selectedConversationId}
+                        onSelectConversation={onSelectConversation}
+                        onConversationUpdated={fetchConversationsAndFolders}
+                        onConversationDeleted={fetchConversationsAndFolders}
+                        onConversationMoved={handleConversationMoved}
+                        allFolders={folders}
+                        level={1} // Indent for conversations in General
+                        onDragStart={handleDragStart}
+                      />
+                    ))
+                  )}
+                </div>
               )}
 
-              {viewMode === 'folder' && (
-                rootFolders.length === 0 && folders.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    No hay carpetas. ¡Crea una nueva!
-                  </p>
-                ) : (
-                  rootFolders.map((folder) => (
-                    <FolderItem
-                      key={folder.id}
-                      folder={folder}
-                      level={0}
-                      selectedConversationId={selectedConversationId}
-                      onSelectConversation={onSelectConversation}
-                      onSelectFolder={handleSelectFolder}
-                      conversations={conversations}
-                      subfolders={folders}
-                      onFolderUpdated={fetchConversationsAndFolders}
-                      onFolderDeleted={fetchConversationsAndFolders}
-                      onConversationMoved={handleMoveConversation}
-                      onCreateSubfolder={createNewFolder}
-                      allFolders={folders}
-                    />
-                  ))
-                )
+              <Separator className="my-4 bg-sidebar-border" />
+
+              {/* Folders Section */}
+              {rootFolders.length === 0 && generalConversations.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No hay carpetas. ¡Crea una nueva!
+                </p>
+              ) : (
+                rootFolders.map((folder) => (
+                  <DraggableFolderItem
+                    key={folder.id}
+                    folder={folder}
+                    level={0}
+                    selectedConversationId={selectedConversationId}
+                    onSelectConversation={onSelectConversation}
+                    onSelectFolder={() => onSelectConversation(null)} // Deselect conversation when selecting folder
+                    conversations={conversations}
+                    subfolders={folders}
+                    onFolderUpdated={fetchConversationsAndFolders}
+                    onFolderDeleted={fetchConversationsAndFolders}
+                    onConversationMoved={handleConversationMoved}
+                    onFolderMoved={handleFolderMoved}
+                    onCreateSubfolder={createNewFolder}
+                    allFolders={folders}
+                    onDragStart={handleDragStart}
+                    onDrop={handleDrop}
+                    isDraggingOver={draggingOverFolderId === folder.id}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                  />
+                ))
               )}
             </>
           )}

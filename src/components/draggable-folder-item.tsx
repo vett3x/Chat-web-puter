@@ -28,6 +28,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from './session-context-provider';
+import { DraggableConversationCard } from './draggable-conversation-card'; // Import the new component
 
 interface Folder {
   id: string;
@@ -44,7 +45,7 @@ interface Conversation {
   folder_id: string | null;
 }
 
-interface FolderItemProps {
+interface DraggableFolderItemProps {
   folder: Folder;
   level: number;
   selectedConversationId: string | null;
@@ -55,11 +56,17 @@ interface FolderItemProps {
   onFolderUpdated: () => void; // Callback to refresh parent list
   onFolderDeleted: () => void; // Callback to refresh parent list
   onConversationMoved: (conversationId: string, targetFolderId: string | null) => void; // Centralized callback
+  onFolderMoved: (folderId: string, targetParentId: string | null) => void; // New callback for folder moves
   onCreateSubfolder: (parentId: string) => void;
   allFolders: Folder[]; // For "move to folder" dropdown
+  onDragStart: (e: React.DragEvent, id: string, type: 'conversation' | 'folder') => void;
+  onDrop: (e: React.DragEvent, targetFolderId: string | null) => void;
+  isDraggingOver: boolean;
+  onDragEnter: (e: React.DragEvent, folderId: string | null) => void;
+  onDragLeave: (e: React.DragEvent, folderId: string | null) => void;
 }
 
-export function FolderItem({
+export function DraggableFolderItem({
   folder,
   level,
   selectedConversationId,
@@ -69,10 +76,16 @@ export function FolderItem({
   subfolders,
   onFolderUpdated,
   onFolderDeleted,
-  onConversationMoved, // Use the centralized function
+  onConversationMoved,
+  onFolderMoved, // New prop
   onCreateSubfolder,
   allFolders,
-}: FolderItemProps) {
+  onDragStart,
+  onDrop,
+  isDraggingOver,
+  onDragEnter,
+  onDragLeave,
+}: DraggableFolderItemProps) {
   const { session } = useSession();
   const userId = session?.user?.id;
   const [isExpanded, setIsExpanded] = useState(false);
@@ -150,10 +163,17 @@ export function FolderItem({
     <div className="space-y-1">
       <Card
         className={cn(
-          "cursor-pointer hover:bg-sidebar-accent transition-colors group",
-          selectedConversationId === null && isExpanded && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary"
+          "cursor-pointer hover:bg-sidebar-accent transition-colors group relative",
+          selectedConversationId === null && isExpanded && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary",
+          isDraggingOver && "border-2 border-blue-500 bg-blue-500/10" // Visual feedback for drag over
         )}
         style={{ paddingLeft: paddingLeft }}
+        draggable="true"
+        onDragStart={(e) => onDragStart(e, folder.id, 'folder')}
+        onDragOver={(e) => e.preventDefault()} // Allow drop
+        onDrop={(e) => onDrop(e, folder.id)}
+        onDragEnter={(e) => onDragEnter(e, folder.id)}
+        onDragLeave={(e) => onDragLeave(e, folder.id)}
       >
         <CardContent className="p-2 flex items-center justify-between gap-2">
           <div className="flex items-center flex-1 overflow-hidden" onClick={() => setIsExpanded(!isExpanded)}>
@@ -210,6 +230,24 @@ export function FolderItem({
                     <Edit className="mr-2 h-4 w-4" /> Renombrar
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  <DropdownMenuTrigger asChild>
+                    <DropdownMenuItem onSelect={(e: Event) => e.preventDefault()}>
+                      <MoveRight className="mr-2 h-4 w-4" /> Mover a
+                    </DropdownMenuItem>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent side="right" align="start" className="w-48 bg-popover text-popover-foreground border-border">
+                    <DropdownMenuLabel>Mover a Carpeta</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => onFolderMoved(folder.id, null)}>
+                      (Raíz)
+                    </DropdownMenuItem>
+                    {allFolders.filter(f => f.id !== folder.id && f.id !== folder.parent_id).map(f => (
+                      <DropdownMenuItem key={f.id} onClick={() => onFolderMoved(folder.id, f.id)}>
+                        {f.name}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                  <DropdownMenuSeparator />
                   <AlertDialog open={isDeleting} onOpenChange={setIsDeleting}>
                     <AlertDialogTrigger asChild>
                       <DropdownMenuItem onSelect={(e: Event) => e.preventDefault()} className="text-destructive focus:text-destructive">
@@ -240,9 +278,9 @@ export function FolderItem({
       </Card>
 
       {isExpanded && (
-        <div className="pl-4 space-y-1">
+        <div className="space-y-1">
           {filteredSubfolders.map((subfolder) => (
-            <FolderItem
+            <DraggableFolderItem
               key={subfolder.id}
               folder={subfolder}
               level={level + 1}
@@ -254,57 +292,29 @@ export function FolderItem({
               onFolderUpdated={onFolderUpdated}
               onFolderDeleted={onFolderDeleted}
               onConversationMoved={onConversationMoved}
+              onFolderMoved={onFolderMoved}
               onCreateSubfolder={onCreateSubfolder}
               allFolders={allFolders}
+              onDragStart={onDragStart}
+              onDrop={onDrop}
+              isDraggingOver={false} // Pass false for nested items
+              onDragEnter={onDragEnter}
+              onDragLeave={onDragLeave}
             />
           ))}
           {filteredConversations.map((conversation) => (
-            <Card
+            <DraggableConversationCard
               key={conversation.id}
-              className={cn(
-                "cursor-pointer hover:bg-sidebar-accent transition-colors group",
-                selectedConversationId === conversation.id && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary"
-              )}
-              onClick={() => onSelectConversation(conversation.id)}
-              style={{ paddingLeft: `${(level + 1) * 1.25 + 0.5}rem` }} // Indent conversations inside folders
-            >
-              <CardContent className="p-2 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 flex-1 overflow-hidden">
-                  <MessageSquare className="h-4 w-4 flex-shrink-0" />
-                  <span className="text-sm truncate">{conversation.title}</span>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48 bg-popover text-popover-foreground border-border">
-                    <DropdownMenuItem onClick={(e: React.MouseEvent) => { e.stopPropagation(); onSelectConversation(conversation.id); }}>
-                      <MessageSquare className="mr-2 h-4 w-4" /> Abrir
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuTrigger asChild>
-                      <DropdownMenuItem onSelect={(e: Event) => e.preventDefault()}>
-                        <MoveRight className="mr-2 h-4 w-4" /> Mover a
-                      </DropdownMenuItem>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent side="right" align="start" className="w-48 bg-popover text-popover-foreground border-border">
-                      <DropdownMenuLabel>Mover a Carpeta</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => onConversationMoved(conversation.id, null)}>
-                        (Sin carpeta)
-                      </DropdownMenuItem>
-                      {allFolders.filter(f => f.id !== folder.id).map(f => (
-                        <DropdownMenuItem key={f.id} onClick={() => onConversationMoved(conversation.id, f.id)}>
-                          {f.name}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </CardContent>
-            </Card>
+              conversation={conversation}
+              selectedConversationId={selectedConversationId}
+              onSelectConversation={onSelectConversation}
+              onConversationUpdated={onFolderUpdated} // Re-fetch all on update
+              onConversationDeleted={onFolderUpdated} // Re-fetch all on delete
+              onConversationMoved={onConversationMoved}
+              allFolders={allFolders}
+              level={level + 1}
+              onDragStart={onDragStart}
+            />
           ))}
         </div>
       )}
