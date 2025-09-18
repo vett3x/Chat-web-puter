@@ -16,10 +16,10 @@ const serverSchema = z.object({
   name: z.string().optional(),
 });
 
-// Helper function to create a Supabase client for Route Handlers
-function createSupabaseClient() {
-  const cookieStore = cookies();
-  return createServerClient(
+// GET /api/servers - Obtener la lista de servidores registrados
+export async function GET(req: NextRequest) {
+  const cookieStore = cookies() as any;
+  const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -36,11 +36,6 @@ function createSupabaseClient() {
       },
     }
   );
-}
-
-// GET /api/servers - Obtener la lista de servidores registrados
-export async function GET(req: NextRequest) {
-  const supabase = createSupabaseClient();
 
   const { data: { session } } = await supabase.auth.getSession();
   if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
@@ -62,7 +57,24 @@ export async function GET(req: NextRequest) {
 
 // POST /api/servers - Añadir un nuevo servidor y empezar el aprovisionamiento
 export async function POST(req: NextRequest) {
-  const supabase = createSupabaseClient();
+  const cookieStore = cookies() as any;
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          // In a Route Handler, the cookie store is read-only.
+        },
+        remove(name: string, options: CookieOptions) {
+          // In a Route Handler, the cookie store is read-only.
+        },
+      },
+    }
+  );
 
   const { data: { session } } = await supabase.auth.getSession();
   if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
@@ -110,7 +122,24 @@ export async function POST(req: NextRequest) {
 
 // DELETE /api/servers - Eliminar un servidor
 export async function DELETE(req: NextRequest) {
-  const supabase = createSupabaseClient();
+  const cookieStore = cookies() as any;
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          // In a Route Handler, the cookie store is read-only.
+        },
+        remove(name: string, options: CookieOptions) {
+          // In a Route Handler, the cookie store is read-only.
+        },
+      },
+    }
+  );
 
   const { data: { session } } = await supabase.auth.getSession();
   if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
