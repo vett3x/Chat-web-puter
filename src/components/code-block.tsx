@@ -13,10 +13,11 @@ interface CodeBlockProps {
   language: string;
   code: string;
   filename?: string;
+  summary?: string;
   isNew?: boolean;
 }
 
-export function CodeBlock({ language, code, filename, isNew }: CodeBlockProps) {
+export function CodeBlock({ language, code, filename, summary, isNew }: CodeBlockProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [isOpen, setIsOpen] = useState(true);
   const [displayedCode, setDisplayedCode] = useState(isNew ? '' : code);
@@ -117,29 +118,36 @@ export function CodeBlock({ language, code, filename, isNew }: CodeBlockProps) {
         isTyping && "border-warning shadow-[0_0_10px_1px_hsl(var(--warning))]"
       )}
     >
-      <div className="flex items-center justify-between p-2 pl-4 bg-muted/80 rounded-t-lg">
-        <div className="flex items-center gap-2 overflow-hidden">
-          {isTyping ? (
-            <Loader2 className="h-4 w-4 animate-spin text-warning flex-shrink-0" />
-          ) : (
-            <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
-          )}
-          <span className="text-sm font-mono truncate">{filename || `${language} code`}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={handleDownload} className="h-7 w-7">
-            <Download className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={handleCopy} className="h-7 w-7">
-            {isCopied ? <Check className="h-4 w-4 text-green-500" /> : <Clipboard className="h-4 w-4" />}
-          </Button>
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-7 w-7">
-              <ChevronsUpDown className="h-4 w-4" />
-              <span className="sr-only">Toggle</span>
+      <div className="bg-muted/80 rounded-t-lg">
+        <div className="flex items-center justify-between p-2 pl-4">
+          <div className="flex items-center gap-2 overflow-hidden">
+            {isTyping ? (
+              <Loader2 className="h-4 w-4 animate-spin text-warning flex-shrink-0" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+            )}
+            <span className="text-sm font-mono truncate">{filename || `${language} code`}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={handleDownload} className="h-7 w-7">
+              <Download className="h-4 w-4" />
             </Button>
-          </CollapsibleTrigger>
+            <Button variant="ghost" size="icon" onClick={handleCopy} className="h-7 w-7">
+              {isCopied ? <Check className="h-4 w-4 text-green-500" /> : <Clipboard className="h-4 w-4" />}
+            </Button>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7">
+                <ChevronsUpDown className="h-4 w-4" />
+                <span className="sr-only">Toggle</span>
+              </Button>
+            </CollapsibleTrigger>
+          </div>
         </div>
+        {summary && (
+          <div className="px-4 pb-2 text-xs text-muted-foreground border-t pt-2">
+            {summary}
+          </div>
+        )}
       </div>
       <CollapsibleContent>
         <SyntaxHighlighter
