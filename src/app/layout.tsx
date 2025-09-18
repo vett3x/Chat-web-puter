@@ -4,7 +4,7 @@ import "./globals.css";
 import Script from "next/script";
 import { SessionContextProvider } from "@/components/session-context-provider";
 import { Toaster } from "@/components/ui/sonner";
-
+import { ThemeProvider } from "@/components/theme-provider"; // Importar ThemeProvider
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning> {/* suppressHydrationWarning para next-themes */}
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
@@ -35,10 +35,17 @@ export default function RootLayout({
           src="https://js.puter.com/v2/" 
           strategy="beforeInteractive"
         />
-        <SessionContextProvider>
-          {children}
-        </SessionContextProvider>
-        <Toaster />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <SessionContextProvider>
+            {children}
+          </SessionContextProvider>
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   );

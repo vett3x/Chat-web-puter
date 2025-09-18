@@ -21,6 +21,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { ProfileDropdown } from './profile-dropdown'; // Importar el nuevo componente
 
 interface Conversation {
   id: string;
@@ -301,6 +302,9 @@ export function ConversationSidebar({
           )}
         </div>
       </ScrollArea>
+      <div className="mt-auto pt-4 border-t border-sidebar-border">
+        <ProfileDropdown />
+      </div>
     </div>
   );
 }
