@@ -4,17 +4,17 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot, User, Loader2 } from 'lucide-react'; // Eliminado Sparkles
+import { Send, Bot, User, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/components/session-context-provider';
 import { MessageContent } from './message-content';
 import { Textarea } from '@/components/ui/textarea';
-import ClaudeAILogo from './claude-ai-logo'; // Importar el nuevo componente del logo
+import ClaudeAILogo from './claude-ai-logo';
 
 interface Message {
   id: string;
-  conversation_id?: string; // Añadido para rastrear a qué conversación pertenece el mensaje
+  conversation_id?: string;
   content: string;
   role: 'user' | 'assistant';
   model?: string;
@@ -26,7 +26,7 @@ interface Message {
 const AI_PROVIDERS = [
   {
     company: 'Anthropic',
-    logo: ClaudeAILogo, // Usar el nuevo componente del logo
+    logo: ClaudeAILogo,
     models: [
       { value: 'claude-sonnet-4', label: 'Claude Sonnet 4' },
       { value: 'claude-opus-4', label: 'Claude Opus 4' },
@@ -113,8 +113,6 @@ export function ChatInterface({
       if (conversationId && userId) {
         setIsLoading(true);
         const fetchedMsgs = await getMessagesFromDB(conversationId);
-        // Solo actualiza los mensajes si no estamos en medio de enviar el primer mensaje de una nueva conversación
-        // O si los mensajes obtenidos de la DB no están vacíos (es una conversación existente con historial)
         if (!isSendingFirstMessageOfNewConversation || fetchedMsgs.length > 0) {
           setMessages(fetchedMsgs);
         }
@@ -135,13 +133,12 @@ export function ChatInterface({
     }
   }, [messages, isLoading]);
 
-  const createNewConversationInDB = async () => { // Eliminado initialMessageContent del parámetro
+  const createNewConversationInDB = async () => {
     if (!userId) {
       toast.error('Usuario no autenticado.');
       return null;
     }
 
-    // Obtener el número de conversaciones existentes para el usuario
     const { count, error: countError } = await supabase
       .from('conversations')
       .select('*', { count: 'exact', head: true })
@@ -158,7 +155,7 @@ export function ChatInterface({
 
     const { data, error } = await supabase
       .from('conversations')
-      .insert({ user_id: userId, title: newTitle }) // Usar el título generado
+      .insert({ user_id: userId, title: newTitle })
       .select('id, title')
       .single();
 
@@ -205,12 +202,12 @@ export function ChatInterface({
 
     if (!currentConvId) {
       isNewConversation = true;
-      setIsSendingFirstMessageOfNewConversation(true); // Establecer la bandera
-      currentConvId = await createNewConversationInDB(); // Llamar sin el mensaje inicial
+      setIsSendingFirstMessageOfNewConversation(true);
+      currentConvId = await createNewConversationInDB();
       if (!currentConvId) {
         setIsLoading(false);
-        setIsSendingFirstMessageOfNewConversation(false); // Limpiar la bandera en caso de fallo
-        setInputMessage(messageToSend); // Restaurar el mensaje en el input
+        setIsSendingFirstMessageOfNewConversation(false);
+        setInputMessage(messageToSend);
         return;
       }
     }
@@ -261,7 +258,7 @@ export function ChatInterface({
       };
 
       const response = await window.puter.ai.chat([systemMessage, ...puterMessages, { role: 'user', content: messageToSend }], { model: selectedModel });
-      console.log('Puter AI response:', response); // Para depuración
+      console.log('Puter AI response:', response);
 
       if (!response || (typeof response === 'object' && Object.keys(response).length === 0)) {
         throw new Error('La respuesta de la IA está vacía o tuvo un formato inesperado. Si es tu primera interacción en una nueva sesión, podría ser necesario completar una verificación de seguridad (ej. CAPTCHA) en el popup de Puter AI.');
@@ -289,8 +286,7 @@ export function ChatInterface({
 
       setMessages(prev => prev.map(msg => msg.id === tempAssistantId ? { ...msg, ...assistantMessageData, isTyping: false, isNew: true } : msg));
 
-      // Guardar el mensaje del usuario y del asistente en la DB
-      await saveMessageToDB(finalConvId, userMessage); // Guardar el mensaje del usuario
+      await saveMessageToDB(finalConvId, userMessage);
       saveMessageToDB(finalConvId, assistantMessageData).then(savedData => {
         if (savedData) {
           setMessages(prev => prev.map(msg => msg.id === tempAssistantId ? { ...msg, id: savedData.id, timestamp: savedData.timestamp } : msg));
@@ -304,7 +300,7 @@ export function ChatInterface({
     } finally {
       setIsLoading(false);
       if (isNewConversation) {
-        setIsSendingFirstMessageOfNewConversation(false); // Limpiar la bandera
+        setIsSendingFirstMessageOfNewConversation(false);
       }
     }
   };
@@ -414,15 +410,15 @@ export function ChatInterface({
               rows={1}
             />
             <Select value={selectedModel} onValueChange={setSelectedModel}>
-              <SelectTrigger className="w-[160px] flex-shrink-0">
+              <SelectTrigger className="w-[200px] flex-shrink-0"> {/* Ancho ajustado aquí */}
                 <SelectValue placeholder="Modelo" />
               </SelectTrigger>
               <SelectContent>
                 {AI_PROVIDERS.map((provider, providerIndex) => (
                   <SelectGroup key={provider.company}>
                     <SelectLabel className="flex items-center gap-2 font-bold text-foreground">
-                      <span>{provider.company}</span> {/* Nombre del proveedor */}
-                      <provider.logo className="h-4 w-4" /> {/* Logo después del nombre */}
+                      <span>{provider.company}</span>
+                      <provider.logo className="h-4 w-4" />
                     </SelectLabel>
                     {provider.models.map((model) => (
                       <SelectItem key={model.value} value={model.value} className="pl-8">
