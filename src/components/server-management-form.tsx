@@ -45,7 +45,8 @@ interface RegisteredServer {
   ip_address: string;
 }
 
-const DEEPCODER_API_URL = process.env.NEXT_PUBLIC_DEEPCODER_API_URL;
+// La URL de la API ahora es interna al mismo origen
+const DEEPCODER_API_BASE_PATH = '/api/servers';
 
 export function ServerManagementForm() {
   const [isAddingServer, setIsAddingServer] = useState(false);
@@ -63,15 +64,9 @@ export function ServerManagementForm() {
   });
 
   const fetchServers = useCallback(async () => {
-    if (!DEEPCODER_API_URL) {
-      console.error('NEXT_PUBLIC_DEEPCODER_API_URL no está configurada.');
-      toast.error('Error de configuración: URL del backend no definida.');
-      setIsLoadingServers(false);
-      return;
-    }
     setIsLoadingServers(true);
     try {
-      const response = await fetch(`${DEEPCODER_API_URL}/servers`);
+      const response = await fetch(DEEPCODER_API_BASE_PATH);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -90,13 +85,9 @@ export function ServerManagementForm() {
   }, [fetchServers]);
 
   const onSubmit = async (values: ServerFormValues) => {
-    if (!DEEPCODER_API_URL) {
-      toast.error('Error de configuración: URL del backend no definida.');
-      return;
-    }
     setIsAddingServer(true);
     try {
-      const response = await fetch(`${DEEPCODER_API_URL}/servers`, {
+      const response = await fetch(DEEPCODER_API_BASE_PATH, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -104,12 +95,12 @@ export function ServerManagementForm() {
         body: JSON.stringify(values),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        throw new Error(result.message || `HTTP error! status: ${response.status}`);
       }
 
-      const result = await response.json();
       toast.success(result.message || 'Servidor añadido correctamente.');
       form.reset();
       fetchServers(); // Refresh the list of servers
@@ -122,15 +113,23 @@ export function ServerManagementForm() {
   };
 
   const handleDeleteServer = async (serverId: string) => {
-    if (!DEEPCODER_API_URL) {
-      toast.error('Error de configuración: URL del backend no definida.');
-      return;
+    try {
+      const response = await fetch(`${DEEPCODER_API_BASE_PATH}?id=${serverId}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || `HTTP error! status: ${response.status}`);
+      }
+
+      toast.success(result.message || 'Servidor eliminado correctamente.');
+      fetchServers(); // Refresh the list of servers
+    } catch (error: any) {
+      console.error('Error deleting server:', error);
+      toast.error(`Error al eliminar el servidor: ${error.message}`);
     }
-    // In a real scenario, you'd send a DELETE request to your backend
-    // For now, we'll simulate deletion from the frontend list
-    toast.info('Simulando la eliminación del servidor. Esto debería ser manejado por el backend.');
-    setServers(prev => prev.filter(server => server.id !== serverId));
-    toast.success('Servidor eliminado (simulado) correctamente.');
   };
 
   return (
@@ -244,7 +243,6 @@ export function ServerManagementForm() {
                         <AlertDialogTitle>¿Estás seguro de eliminar este servidor?</AlertDialogTitle>
                         <AlertDialogDescription>
                           Esta acción eliminará el servidor "{server.name || server.ip_address}" de la lista.
-                          (Actualmente es una eliminación simulada en el frontend).
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
