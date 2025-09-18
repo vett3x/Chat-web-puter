@@ -21,7 +21,7 @@ export function TextAnimator({ text, className }: TextAnimatorProps) {
         } else {
           clearInterval(intervalId);
         }
-      }, 15); // Velocidad de escritura ajustada para ser rápida y fluida
+      }, 25); // Velocidad de escritura más lenta y notable
 
       return () => clearInterval(intervalId);
     }

@@ -39,7 +39,7 @@ export function CodeBlock({ language, code, filename, isNew }: CodeBlockProps) {
         if (i < code.length) {
           setDisplayedCode((prev) => prev + code.charAt(i));
           i++;
-          const delay = 1; // Velocidad de escritura muy rápida
+          const delay = 8; // Escritura de código más lenta para una mejor sensación de "generación"
           timeoutId = setTimeout(typeCharacter, delay);
         } else {
           setIsTyping(false);
