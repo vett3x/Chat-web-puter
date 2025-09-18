@@ -57,7 +57,7 @@ DropdownMenuSubContent.displayName = DropdownMenuPrimitive.SubContent.displayNam
 const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
->(({ className, children, sideOffset = 15, ...props }, ref) => { // Aumentado sideOffset a 15
+>(({ className, children, sideOffset = 20, ...props }, ref) => { // Aumentado sideOffset a 20
   return (
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.Content
@@ -70,7 +70,7 @@ const DropdownMenuContent = React.forwardRef<
         {...props}
       >
         {children}
-        <DropdownMenuPrimitive.Arrow className="fill-popover" />
+        <DropdownMenuPrimitive.Arrow className="fill-popover h-4 w-4 stroke-border stroke-1" /> {/* Añadido h-4 w-4 stroke-border stroke-1 */}
       </DropdownMenuPrimitive.Content>
     </DropdownMenuPrimitive.Portal>
   );
