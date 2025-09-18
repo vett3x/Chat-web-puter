@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot, User, Loader2, Check } from 'lucide-react';
+import { Send, Bot, User, Loader2, Check, Paperclip, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/components/session-context-provider';
@@ -18,16 +18,48 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import Image from 'next/image'; // Importar el componente Image de Next.js
+
+// New types for multimodal content
+interface PuterTextContentPart {
+  type: 'text';
+  text: string;
+}
+
+interface PuterImageContentPart {
+  type: 'image_url';
+  image_url: {
+    url: string; // Can be data URL (base64) or public URL
+  };
+}
+
+type PuterContentPart = PuterTextContentPart | PuterImageContentPart;
+
+interface PuterMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string | PuterContentPart[]; // Updated to allow array of parts
+}
+
+declare global {
+  interface Window {
+    puter: {
+      ai: {
+        chat: (messages: PuterMessage[], options: { model: string }) => Promise<any>;
+      };
+    };
+  }
+}
 
 interface Message {
   id: string;
   conversation_id?: string;
-  content: string;
+  content: string | PuterContentPart[]; // Updated
   role: 'user' | 'assistant';
   model?: string;
   timestamp: Date;
   isNew?: boolean;
   isTyping?: boolean;
+  type?: 'text' | 'multimodal'; // Added type for easier rendering/storage
 }
 
 const AI_PROVIDERS = [
@@ -45,21 +77,6 @@ const AI_PROVIDERS = [
 
 const ALL_MODEL_VALUES = AI_PROVIDERS.flatMap(provider => provider.models.map(model => model.value));
 const DEFAULT_AI_MODEL = ALL_MODEL_VALUES[0]; // Define un modelo por defecto
-
-interface PuterMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-}
-
-declare global {
-  interface Window {
-    puter: {
-      ai: {
-        chat: (messages: PuterMessage[], options: { model: string }) => Promise<any>;
-      };
-    };
-  }
-}
 
 interface ChatInterfaceProps {
   userId: string | undefined;
@@ -85,6 +102,8 @@ export function ChatInterface({
   const [isLoading, setIsLoading] = useState(false);
   const [isPuterReady, setIsPuterReady] = useState(false);
   const [isSendingFirstMessageOfNewConversation, setIsSendingFirstMessageOfNewConversation] = useState(false);
+  const [selectedImages, setSelectedImages] = useState<{ file: File; preview: string }[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -123,7 +142,7 @@ export function ChatInterface({
   const getMessagesFromDB = useCallback(async (convId: string) => {
     const { data, error } = await supabase
       .from('messages')
-      .select('id, content, role, model, created_at, conversation_id')
+      .select('id, content, role, model, created_at, conversation_id, type')
       .eq('conversation_id', convId)
       .eq('user_id', userId)
       .order('created_at', { ascending: true });
@@ -136,10 +155,11 @@ export function ChatInterface({
     return data.map((msg) => ({
       id: msg.id,
       conversation_id: msg.conversation_id,
-      content: msg.content,
+      content: msg.content, // content is already jsonb, so it will be parsed correctly
       role: msg.role as 'user' | 'assistant',
       model: msg.model || undefined,
       timestamp: new Date(msg.created_at),
+      type: msg.type as 'text' | 'multimodal',
     }));
   }, [userId]);
 
@@ -176,7 +196,7 @@ export function ChatInterface({
         scrollElement.scrollTop = scrollElement.scrollHeight;
       }
     }
-  }, [messages, isLoading]);
+  }, [messages, isLoading, selectedImages]); // Added selectedImages to dependencies
 
   const createNewConversationInDB = async () => {
     if (!userId) {
@@ -246,8 +266,9 @@ export function ChatInterface({
       conversation_id: convId,
       user_id: userId,
       role: msg.role,
-      content: msg.content,
+      content: msg.content, // content is now jsonb, so it will be stored as JSON
       model: msg.model,
+      type: msg.type,
     }).select('id, created_at').single();
 
     if (error) {
@@ -258,12 +279,41 @@ export function ChatInterface({
     return { id: data.id, timestamp: new Date(data.created_at) };
   };
 
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files) {
+      const filesArray = Array.from(event.target.files);
+      const newImages: { file: File; preview: string }[] = [];
+
+      filesArray.forEach(file => {
+        if (file.type.startsWith('image/') && file.size <= 5 * 1024 * 1024) { // 5MB limit
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            newImages.push({ file, preview: reader.result as string });
+            if (newImages.length === filesArray.length) {
+              setSelectedImages(prev => [...prev, ...newImages].slice(0, 4)); // Limit to 4 images
+            }
+          };
+          reader.readAsDataURL(file);
+        } else {
+          toast.error('Solo se permiten imágenes de hasta 5MB.');
+        }
+      });
+      event.target.value = ''; // Clear the input so the same file can be selected again
+    }
+  };
+
+  const removeImage = (indexToRemove: number) => {
+    setSelectedImages(prev => prev.filter((_, index) => index !== indexToRemove));
+  };
+
   const sendMessage = async () => {
-    if (!inputMessage.trim() || isLoading || !isPuterReady || !userId) return;
+    if ((!inputMessage.trim() && selectedImages.length === 0) || isLoading || !isPuterReady || !userId) return;
 
     setIsLoading(true);
     const messageToSend = inputMessage;
+    const imagesToSend = selectedImages;
     setInputMessage('');
+    setSelectedImages([]);
 
     let currentConvId = conversationId;
     let isNewConversation = false;
@@ -276,19 +326,28 @@ export function ChatInterface({
         setIsLoading(false);
         setIsSendingFirstMessageOfNewConversation(false);
         setInputMessage(messageToSend);
+        setSelectedImages(imagesToSend); // Restore images if conversation creation failed
         return;
       }
     }
 
     const finalConvId = currentConvId;
 
-    const tempUserMessageId = `user-${Date.now()}`;
+    const userContent: PuterContentPart[] = [];
+    if (messageToSend.trim()) {
+      userContent.push({ type: 'text', text: messageToSend });
+    }
+    imagesToSend.forEach(img => {
+      userContent.push({ type: 'image_url', image_url: { url: img.preview } });
+    });
+
     const userMessage: Message = {
-      id: tempUserMessageId,
+      id: `user-${Date.now()}`,
       conversation_id: finalConvId,
-      content: messageToSend,
+      content: userContent.length > 1 || imagesToSend.length > 0 ? userContent : messageToSend,
       role: 'user',
       timestamp: new Date(),
+      type: imagesToSend.length > 0 ? 'multimodal' : 'text',
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -302,13 +361,14 @@ export function ChatInterface({
       model: selectedModel,
       timestamp: new Date(),
       isTyping: true,
+      type: 'text', // Placeholder type
     };
     setMessages(prev => [...prev, placeholderMessage]);
 
     try {
       const { data: historyData, error: historyError } = await supabase
         .from('messages')
-        .select('content, role')
+        .select('content, role, type')
         .eq('conversation_id', finalConvId)
         .eq('user_id', userId)
         .order('created_at', { ascending: true });
@@ -317,7 +377,7 @@ export function ChatInterface({
 
       const puterMessages: PuterMessage[] = historyData.map(msg => ({
         role: msg.role as 'user' | 'assistant',
-        content: msg.content
+        content: msg.content as string | PuterContentPart[] // Ensure content type matches PuterMessage
       }));
 
       const systemMessage: PuterMessage = {
@@ -325,7 +385,7 @@ export function ChatInterface({
         content: "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante."
       };
 
-      const response = await window.puter.ai.chat([systemMessage, ...puterMessages, { role: 'user', content: messageToSend }], { model: selectedModel });
+      const response = await window.puter.ai.chat([systemMessage, ...puterMessages, { role: 'user', content: userContent }], { model: selectedModel });
       console.log('Puter AI response:', response);
 
       if (!response || (typeof response === 'object' && Object.keys(response).length === 0)) {
@@ -336,20 +396,34 @@ export function ChatInterface({
         throw new Error(`Error de la IA: ${apiErrorMessage}`);
       }
 
-      let messageContent = 'Sin contenido';
-      if (response?.message?.content?.[0]?.text) {
-        messageContent = response.message.content[0].text;
+      let assistantMessageContent: string | PuterContentPart[] = 'Sin contenido';
+      let assistantMessageType: 'text' | 'multimodal' = 'text';
+
+      if (response?.message?.content) {
+        if (Array.isArray(response.message.content)) {
+          assistantMessageContent = response.message.content.map((part: any) => {
+            if (part.type === 'text') return { type: 'text', text: part.text };
+            if (part.type === 'image_url') return { type: 'image_url', image_url: { url: part.image_url.url } };
+            return { type: 'text', text: JSON.stringify(part) }; // Fallback for unknown parts
+          });
+          assistantMessageType = (assistantMessageContent as PuterContentPart[]).some((part: PuterContentPart) => part.type === 'image_url') ? 'multimodal' : 'text';
+        } else if (typeof response.message.content === 'string') {
+          assistantMessageContent = response.message.content;
+          assistantMessageType = 'text';
+        }
       } else if (typeof response?.content === 'string') {
-        messageContent = response.content;
+        assistantMessageContent = response.content;
+        assistantMessageType = 'text';
       } else {
         console.error('Unexpected AI response format:', response);
         throw new Error('La respuesta de la IA tuvo un formato inesperado.');
       }
 
       const assistantMessageData = {
-        content: messageContent,
+        content: assistantMessageContent,
         role: 'assistant' as const,
         model: selectedModel,
+        type: assistantMessageType,
       };
 
       setMessages(prev => prev.map(msg => msg.id === tempAssistantId ? { ...msg, ...assistantMessageData, isTyping: false, isNew: true } : msg));
@@ -464,72 +538,118 @@ export function ChatInterface({
           </div>
         </ScrollArea>
 
-        <div className="absolute bottom-16 left-0 right-0 flex justify-center px-4">
-          <div className="w-full max-w-3xl bg-card rounded-xl border border-input shadow-lg p-2 flex items-center gap-2 
+        <div className="absolute bottom-0 left-0 right-0 flex justify-center px-4 pb-4 pt-2">
+          <div className="w-full max-w-3xl bg-card rounded-xl border border-input shadow-lg p-2 flex flex-col gap-2 
                         focus-within:ring-2 focus-within:ring-green-500 focus-within:ring-offset-2 focus-within:ring-offset-background 
                         focus-within:shadow-[0_0_20px_5px_rgb(34_197_94_/_0.4)] transition-all duration-200">
-            <Textarea
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Pregunta a Claude AI..."
-              disabled={isLoading || !userId}
-              className="flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none max-h-[200px] overflow-y-auto bg-transparent"
-              rows={1}
-            />
             
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="default"
-                  size="icon"
-                  className="rounded-full bg-info text-info-foreground shadow-avatar-user hover:shadow-avatar-user-hover transition-all duration-200"
-                  aria-label="Seleccionar modelo de IA"
-                >
-                  <Bot className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent 
-                side="top" 
-                align="end" 
-                className="w-64 bg-popover text-popover-foreground border-border rounded-lg"
-              >
-                <DropdownMenuLabel className="text-sm font-semibold">Seleccionar Modelo de IA</DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-border" />
-                {AI_PROVIDERS.map((provider, providerIndex) => (
-                  <React.Fragment key={provider.company}>
-                    <DropdownMenuLabel className="flex items-center gap-2 font-bold text-foreground px-2 py-1.5">
-                      <span>{provider.company}</span>
-                      <provider.logo className="h-4 w-4" />
-                    </DropdownMenuLabel>
-                    {provider.models.map((model) => (
-                      <DropdownMenuItem
-                        key={model.value}
-                        onClick={() => handleModelChange(model.value)}
-                        className="flex items-center justify-between cursor-pointer pl-8"
-                      >
-                        <span>{model.label}</span>
-                        {selectedModel === model.value && <Check className="h-4 w-4 text-primary" />}
-                      </DropdownMenuItem>
-                    ))}
-                    {providerIndex < AI_PROVIDERS.length - 1 && <DropdownMenuSeparator className="bg-border" />}
-                  </React.Fragment>
+            {selectedImages.length > 0 && (
+              <div className="flex flex-wrap gap-2 p-2 border-b border-input">
+                {selectedImages.map((img, index) => (
+                  <div key={index} className="relative w-24 h-24 rounded-md overflow-hidden">
+                    <Image
+                      src={img.preview}
+                      alt={`Preview ${index}`}
+                      layout="fill"
+                      objectFit="cover"
+                      className="rounded-md"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-0 right-0 h-6 w-6 rounded-full bg-background/70 hover:bg-background text-destructive hover:text-destructive-foreground"
+                      onClick={() => removeImage(index)}
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </Button>
+                  </div>
                 ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+              </div>
+            )}
 
-            <Button
-              onClick={sendMessage}
-              disabled={isLoading || !inputMessage.trim() || !userId}
-              size="icon"
-              className="flex-shrink-0"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
+            <div className="flex items-center gap-2">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="image/*"
+                multiple
+                className="hidden"
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading || selectedImages.length >= 4}
+                className="flex-shrink-0 text-muted-foreground hover:text-foreground"
+                aria-label="Adjuntar archivo"
+              >
+                <Paperclip className="h-5 w-5" />
+              </Button>
+
+              <Textarea
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Pregunta a Claude AI..."
+                disabled={isLoading || !userId}
+                className="flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none max-h-[200px] overflow-y-auto bg-transparent"
+                rows={1}
+              />
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="default"
+                    size="icon"
+                    className="rounded-full bg-info text-info-foreground shadow-avatar-user hover:shadow-avatar-user-hover transition-all duration-200"
+                    aria-label="Seleccionar modelo de IA"
+                  >
+                    <Bot className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent 
+                  side="top" 
+                  align="end" 
+                  className="w-64 bg-popover text-popover-foreground border-border rounded-lg"
+                >
+                  <DropdownMenuLabel className="text-sm font-semibold">Seleccionar Modelo de IA</DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-border" />
+                  {AI_PROVIDERS.map((provider, providerIndex) => (
+                    <React.Fragment key={provider.company}>
+                      <DropdownMenuLabel className="flex items-center gap-2 font-bold text-foreground px-2 py-1.5">
+                        <span>{provider.company}</span>
+                        <provider.logo className="h-4 w-4" />
+                      </DropdownMenuLabel>
+                      {provider.models.map((model) => (
+                        <DropdownMenuItem
+                          key={model.value}
+                          onClick={() => handleModelChange(model.value)}
+                          className="flex items-center justify-between cursor-pointer pl-8"
+                        >
+                          <span>{model.label}</span>
+                          {selectedModel === model.value && <Check className="h-4 w-4 text-primary" />}
+                        </DropdownMenuItem>
+                      ))}
+                      {providerIndex < AI_PROVIDERS.length - 1 && <DropdownMenuSeparator className="bg-border" />}
+                    </React.Fragment>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Button
+                onClick={sendMessage}
+                disabled={isLoading || (!inputMessage.trim() && selectedImages.length === 0) || !userId}
+                size="icon"
+                className="flex-shrink-0"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
