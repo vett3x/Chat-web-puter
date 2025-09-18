@@ -246,6 +246,10 @@ export function ChatInterface({
 
       const response = await window.puter.ai.chat([systemMessage, ...puterMessages], { model: selectedModel });
 
+      // Enhanced check for empty or unexpected AI response, potentially due to a security challenge
+      if (!response || (typeof response === 'object' && Object.keys(response).length === 0)) {
+        throw new Error('La respuesta de la IA está vacía o tuvo un formato inesperado. Si es tu primera interacción en una nueva sesión, podría ser necesario completar una verificación de seguridad (ej. CAPTCHA) en el popup de Puter AI.');
+      }
       if (response && response.error) {
         const apiErrorMessage = typeof response.error === 'string' ? response.error : (response.error.message || JSON.stringify(response.error));
         throw new Error(`Error de la IA: ${apiErrorMessage}`);

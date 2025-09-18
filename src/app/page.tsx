@@ -28,7 +28,6 @@ export default function Home() {
         <ConversationSidebar
           selectedConversationId={selectedConversationId}
           onSelectConversation={setSelectedConversationId}
-          onNewConversationCreated={handleNewConversationCreated}
         />
       </aside>
       <main className="flex-1 flex flex-col min-w-0">

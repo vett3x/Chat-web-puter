@@ -32,13 +32,12 @@ interface Conversation {
 interface ConversationSidebarProps {
   selectedConversationId: string | null;
   onSelectConversation: (conversationId: string | null) => void;
-  onNewConversationCreated: (conversationId: string) => void;
+  // onNewConversationCreated ya no es una prop de este componente
 }
 
 export function ConversationSidebar({
   selectedConversationId,
   onSelectConversation,
-  onNewConversationCreated,
 }: ConversationSidebarProps) {
   const { session, isLoading: isSessionLoading } = useSession();
   const userId = session?.user?.id;
@@ -57,6 +56,20 @@ export function ConversationSidebar({
       setIsLoadingConversations(false);
     }
   }, [userId, isSessionLoading]);
+
+  // Nuevo useEffect para reaccionar a la creación de conversaciones externas (desde ChatInterface)
+  useEffect(() => {
+    if (userId && selectedConversationId && !isLoadingConversations) {
+      // Verifica si la conversación seleccionada no está en la lista actual
+      const isSelectedConversationInList = conversations.some(
+        (conv) => conv.id === selectedConversationId
+      );
+      if (!isSelectedConversationInList) {
+        // Si es un nuevo ID no presente en la lista, vuelve a cargar las conversaciones
+        fetchConversations();
+      }
+    }
+  }, [selectedConversationId, userId, isLoadingConversations, conversations]); // Añadido 'conversations' a las dependencias
 
   const fetchConversations = async () => {
     setIsLoadingConversations(true);
@@ -91,7 +104,7 @@ export function ConversationSidebar({
     } else if (data) {
       setConversations(prev => [data, ...prev]);
       onSelectConversation(data.id);
-      onNewConversationCreated(data.id);
+      // onNewConversationCreated(data.id); // Esta llamada ya no es necesaria aquí
       toast.success('Nueva conversación creada.');
     }
     setIsCreatingConversation(false);
@@ -150,7 +163,7 @@ export function ConversationSidebar({
       setConversations(prev => prev.filter(conv => conv.id !== conversationId));
       if (selectedConversationId === conversationId) {
         onSelectConversation(null); // Deselect if the current conversation is deleted
-        onNewConversationCreated(null as any); // Indicate a new chat state
+        // onNewConversationCreated(null as any); // Esta llamada es incorrecta y se elimina
       }
       toast.success('Conversación eliminada.');
     }
