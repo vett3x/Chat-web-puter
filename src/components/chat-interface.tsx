@@ -129,14 +129,24 @@ export function ChatInterface({
       .select('id, title, model')
       .eq('id', convId)
       .eq('user_id', userId)
-      .single();
+      .limit(1); // Cambiado de .single() a .limit(1)
 
     if (error) {
       console.error('Error fetching conversation details:', error.message || error.details || error);
       toast.error('Error al cargar los detalles de la conversación.');
       return null;
     }
-    return data;
+
+    // Si data es un array, toma el primer elemento. Si está vacío, devuelve null.
+    if (Array.isArray(data) && data.length > 0) {
+      if (data.length > 1) {
+        console.warn(`Múltiples conversaciones encontradas para el ID ${convId} y el usuario ${userId}. Se devolverá la primera.`);
+      }
+      return data[0];
+    } else if (data && !Array.isArray(data)) { // Supabase podría devolver un solo objeto si se usa limit(1) y solo hay un resultado
+      return data;
+    }
+    return null; // No se encontraron datos
   }, [userId]);
 
   const getMessagesFromDB = useCallback(async (convId: string) => {
