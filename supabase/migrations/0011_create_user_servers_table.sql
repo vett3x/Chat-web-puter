@@ -1,4 +1,6 @@
 -- Crear la tabla user_servers
+-- ADVERTENCIA DE SEGURIDAD: ssh_password se almacena en texto plano.
+-- En un entorno de producción, se recomienda encarecidamente cifrar esta columna.
 create table public.user_servers (
   id uuid not null default gen_random_uuid(),
   user_id uuid not null,
@@ -6,7 +8,7 @@ create table public.user_servers (
   ip_address text not null,
   ssh_port integer not null default 22,
   ssh_username text not null,
-  encrypted_ssh_password text not null,
+  ssh_password text not null, -- Cambiado de encrypted_ssh_password a ssh_password (texto plano)
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone,
 

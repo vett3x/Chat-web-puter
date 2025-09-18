@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { cookies } from 'next/headers';
-import CryptoJS from 'crypto-js';
+import { cookies, ReadonlyRequestCookies } from 'next/headers'; // Importamos ReadonlyRequestCookies
+// Eliminamos la importación de CryptoJS
 
 // Define SuperUser emails (for server-side check)
 const SUPERUSER_EMAILS = ['martinpensa1@gmail.com']; // ¡Asegúrate de que este sea tu correo electrónico!
@@ -11,33 +11,26 @@ const SUPERUSER_EMAILS = ['martinpensa1@gmail.com']; // ¡Asegúrate de que este
 const serverSchema = z.object({
   ip_address: z.string().ip({ message: 'Dirección IP inválida.' }),
   ssh_username: z.string().min(1, { message: 'El usuario SSH es requerido.' }),
-  ssh_password: z.string().min(1, { message: 'La contraseña SSH es requerida.' }),
+  ssh_password: z.string().min(1, { message: 'La contraseña SSH es requerida.' }), // Ahora se almacenará en texto plano
   ssh_port: z.coerce.number().int().min(1).max(65535).default(22).optional(),
   name: z.string().optional(),
 });
 
-// Encryption/Decryption functions
-// IMPORTANTE: En producción, DEBES establecer la variable de entorno ENCRYPTION_KEY.
-// No uses la clave por defecto 'super-secret-key-please-change-me' en un entorno real.
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'super-secret-key-please-change-me';
-
-function encrypt(text: string): string {
-  return CryptoJS.AES.encrypt(text, ENCRYPTION_KEY).toString();
-}
-
-function decrypt(ciphertext: string): string {
-  const bytes = CryptoJS.AES.decrypt(ciphertext, ENCRYPTION_KEY);
-  return bytes.toString(CryptoJS.enc.Utf8);
-}
+// Eliminamos las funciones de cifrado/descifrado
+// const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'super-secret-key-please-change-me';
+// function encrypt(text: string): string { /* ... */ }
+// function decrypt(ciphertext: string): string { /* ... */ }
 
 // Helper function to create Supabase client for API routes
 function getSupabaseServerClient(res: NextResponse) {
+  const cookieStore = cookies() as ReadonlyRequestCookies; // Type assertion aquí
+
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: (name: string) => cookies().get(name)?.value, // Llamada directa a cookies().get()
+        get: (name: string) => cookieStore.get(name)?.value, // Usamos la variable cookieStore
         set: (name: string, value: string, options: CookieOptions) => {
           res.cookies.set({ name, value, ...options });
         },
@@ -75,7 +68,7 @@ export async function GET(req: NextRequest) {
 
   const { data: servers, error } = await supabase
     .from('user_servers')
-    .select('id, name, ip_address, ssh_port, ssh_username')
+    .select('id, name, ip_address, ssh_port, ssh_username') // No seleccionamos la contraseña por seguridad
     .eq('user_id', session.user.id);
 
   if (error) {
@@ -103,8 +96,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const newServerData = serverSchema.parse(body);
 
-    const encryptedPassword = encrypt(newServerData.ssh_password);
-
+    // Eliminamos el cifrado, la contraseña se guarda en texto plano
     const { data, error } = await supabase
       .from('user_servers')
       .insert({
@@ -113,7 +105,7 @@ export async function POST(req: NextRequest) {
         ip_address: newServerData.ip_address,
         ssh_port: newServerData.ssh_port || 22,
         ssh_username: newServerData.ssh_username,
-        encrypted_ssh_password: encryptedPassword,
+        ssh_password: newServerData.ssh_password, // Almacenando la contraseña en texto plano
       })
       .select('id, name, ip_address, ssh_port')
       .single();
