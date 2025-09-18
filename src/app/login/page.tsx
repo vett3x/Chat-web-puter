@@ -29,7 +29,7 @@ export default function LoginPage() {
                 },
               },
             }}
-            theme="light" // O "dark" si tu app usa tema oscuro por defecto
+            theme="dark" // Cambiado a tema oscuro
             redirectTo={typeof window !== 'undefined' ? `${window.location.origin}/` : undefined}
           />
         </CardContent>

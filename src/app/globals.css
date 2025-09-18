@@ -75,43 +75,43 @@
     --sidebar-ring: 217.2 91.2% 59.8%}
   .dark {
 
-    --background: 0 0% 3.9%;
+    --background: 220 10% 5%; /* Very dark gray, almost black */
 
-    --foreground: 0 0% 98%;
+    --foreground: 0 0% 98%; /* White text */
 
-    --card: 0 0% 3.9%;
+    --card: 220 10% 7%; /* Slightly lighter dark gray for cards */
 
     --card-foreground: 0 0% 98%;
 
-    --popover: 0 0% 3.9%;
+    --popover: 220 10% 7%;
 
     --popover-foreground: 0 0% 98%;
 
-    --primary: 0 0% 98%;
+    --primary: 220 10% 15%; /* Darker gray for primary buttons */
 
-    --primary-foreground: 0 0% 9%;
+    --primary-foreground: 0 0% 98%; /* White text on primary */
 
-    --secondary: 0 0% 14.9%;
+    --secondary: 220 10% 10%; /* Dark gray for secondary elements */
 
     --secondary-foreground: 0 0% 98%;
 
-    --muted: 0 0% 14.9%;
+    --muted: 220 10% 10%; /* Dark gray for muted backgrounds */
 
-    --muted-foreground: 0 0% 63.9%;
+    --muted-foreground: 220 10% 60%; /* Lighter gray for muted text */
 
-    --accent: 0 0% 14.9%;
+    --accent: 220 10% 10%; /* Dark gray for accent backgrounds */
 
     --accent-foreground: 0 0% 98%;
 
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 62.8% 30.6%; /* Keep destructive as is for now */
 
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 14.9%;
+    --border: 220 10% 15%; /* Darker gray for borders */
 
-    --input: 0 0% 14.9%;
+    --input: 220 10% 10%; /* Dark gray for input fields */
 
-    --ring: 0 0% 83.1%;
+    --ring: 220 10% 30%; /* Slightly lighter ring for focus */
 
     --chart-1: 220 70% 50%;
 
@@ -124,21 +124,23 @@
     --chart-5: 340 75% 55%
   ;
 
-    --sidebar-background: 240 5.9% 10%;
+    /* Sidebar specific colors */
 
-    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-background: 220 10% 7%; /* Dark gray for sidebar background */
 
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-foreground: 0 0% 98%; /* White text */
 
-    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-primary: 220 10% 15%; /* Darker gray for selected conversation */
 
-    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-primary-foreground: 0 0% 98%; /* White text on selected conversation */
 
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-accent: 220 10% 10%; /* Hover/active state in sidebar */
 
-    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 0 0% 98%;
 
-    --sidebar-ring: 217.2 91.2% 59.8%}
+    --sidebar-border: 220 10% 15%;
+
+    --sidebar-ring: 220 10% 30%;}
 }
 
 
