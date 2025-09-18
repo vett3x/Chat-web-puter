@@ -4,12 +4,23 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, MessageSquare, Loader2, Edit, Save, X } from 'lucide-react';
+import { Plus, MessageSquare, Loader2, Edit, Save, X, Trash2 } from 'lucide-react';
 import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface Conversation {
   id: string;
@@ -35,6 +46,7 @@ export function ConversationSidebar({
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [editingConversationId, setEditingConversationId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
+  const [deletingConversationId, setDeletingConversationId] = useState<string | null>(null);
 
   useEffect(() => {
     if (userId) {
@@ -116,6 +128,32 @@ export function ConversationSidebar({
   const handleCancelEdit = () => {
     setEditingConversationId(null);
     setEditingTitle('');
+  };
+
+  const handleDeleteConversation = async (conversationId: string) => {
+    if (!userId) {
+      toast.error('Usuario no autenticado.');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('conversations')
+      .delete()
+      .eq('id', conversationId)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error deleting conversation:', error);
+      toast.error('Error al eliminar la conversación.');
+    } else {
+      setConversations(prev => prev.filter(conv => conv.id !== conversationId));
+      if (selectedConversationId === conversationId) {
+        onSelectConversation(null); // Deselect if the current conversation is deleted
+        onNewConversationCreated(null as any); // Indicate a new chat state
+      }
+      toast.success('Conversación eliminada.');
+    }
+    setDeletingConversationId(null); // Reset deleting state
   };
 
   if (isSessionLoading || isLoadingConversations) {
@@ -207,20 +245,54 @@ export function ConversationSidebar({
                         </Button>
                       </>
                     ) : (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditClick(conversation);
-                        }}
-                        className={cn(
-                          "h-7 w-7",
-                          selectedConversationId === conversation.id ? "text-sidebar-primary-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                        )}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditClick(conversation);
+                          }}
+                          className={cn(
+                            "h-7 w-7",
+                            selectedConversationId === conversation.id ? "text-sidebar-primary-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                          )}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeletingConversationId(conversation.id);
+                              }}
+                              className={cn(
+                                "h-7 w-7 text-destructive hover:bg-destructive/10",
+                                selectedConversationId === conversation.id ? "text-sidebar-primary-foreground hover:bg-sidebar-accent hover:text-destructive" : "text-destructive hover:bg-destructive/10"
+                              )}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta acción no se puede deshacer. Esto eliminará permanentemente tu conversación y todos sus mensajes.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel onClick={() => setDeletingConversationId(null)}>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeleteConversation(conversation.id)}>
+                                Eliminar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </>
                     )}
                   </div>
                 </CardContent>
