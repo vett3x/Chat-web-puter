@@ -1,7 +1,6 @@
 "use client";
 
 import React from 'react';
-// Eliminamos la importación de Image de next/image
 
 interface ClaudeAILogoProps {
   className?: string;
@@ -10,10 +9,10 @@ interface ClaudeAILogoProps {
 const ClaudeAILogo: React.FC<ClaudeAILogoProps> = ({ className }) => {
   return (
     <img
-      src="/claude_aI_logo.svg" // Usamos la ruta directa al SVG
+      src="/claude_aI_logo.svg.png" // Ruta corregida para el archivo PNG
       alt="Claude AI Logo"
-      width={16} // Mantenemos el ancho para consistencia
-      height={16} // Mantenemos el alto para consistencia
+      width={16}
+      height={16}
       className={className}
     />
   );
