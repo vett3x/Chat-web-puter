@@ -78,7 +78,7 @@ export function ChatInterface({
   const [isContextLoading, setIsContextLoading] = useState(false);
   const [isContextInitialized, setIsContextInitialized] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     const checkPuter = () => {
