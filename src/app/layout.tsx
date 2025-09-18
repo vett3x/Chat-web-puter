@@ -45,7 +45,7 @@ export default function RootLayout({
             {children}
           </SessionContextProvider>
           <Toaster
-            position="bottom-center"
+            position="top-right" // Cambiado a top-right
             toastOptions={{
               classNames: {
                 info: "bg-info text-info-foreground border-blue-500",
