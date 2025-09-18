@@ -37,8 +37,9 @@ interface MessageContentProps {
   aiResponseSpeed: 'slow' | 'normal' | 'fast'; // New prop for AI response speed
 }
 
-// Adjusted regex to be more flexible with whitespace and newlines
-const codeBlockRegex = /```(\w+)(?::([\w./-]+))?\s*([\s\S]*?)\s*```/g;
+// Adjusted regex to be more flexible with whitespace and newlines,
+// specifically expecting a newline after the header and before the closing backticks.
+const codeBlockRegex = /```(\w+)(?::([\w./-]+))?\s*\n([\s\S]*?)\n\s*```/g;
 
 export function MessageContent({ content, isNew, aiResponseSpeed }: MessageContentProps) {
   const [animatedPartsCount, setAnimatedPartsCount] = useState(0);
