@@ -37,33 +37,28 @@ interface MessageContentProps {
   aiResponseSpeed: 'slow' | 'normal' | 'fast'; // New prop for AI response speed
 }
 
-// Adjusted regex to be more flexible with whitespace and newlines,
-// specifically expecting one or more newline characters after the header and before the closing backticks.
-const codeBlockRegex = /```(\w+)(?::([\w./-]+))?\s*[\r\n]+([\s\S]*?)[\r\n]+\s*```/g;
+const codeBlockRegex = /```(\w+)(?::([\w./-]+))?\n([\s\S]*?)\n```/g;
 
 export function MessageContent({ content, isNew, aiResponseSpeed }: MessageContentProps) {
   const [animatedPartsCount, setAnimatedPartsCount] = useState(0);
 
-  // Parse content into a flat array of renderable parts
-  const renderableParts = React.useMemo(() => {
-    console.log("MessageContent: Type of content received:", typeof content);
-    if (typeof content === 'string') {
-      const parsedParts: RenderablePart[] = [];
+  // Helper to render a single part
+  const renderPart = (part: RenderablePart, index: number, isAnimating: boolean, onComplete?: () => void) => {
+    if (part.type === 'text') {
+      const textValue = part.text;
+      
+      // Check for code blocks within text parts
+      const textParts = [];
       let lastIndex = 0;
       let match;
-      
       codeBlockRegex.lastIndex = 0; // Reset regex for each text part
 
-      while ((match = codeBlockRegex.exec(content)) !== null) {
-        console.log("MessageContent: Regex match found:", match);
+      while ((match = codeBlockRegex.exec(textValue)) !== null) {
         if (match.index > lastIndex) {
-          parsedParts.push({
-            type: 'text',
-            text: content.substring(lastIndex, match.index),
-          });
+          textParts.push({ type: 'text_segment', value: textValue.substring(lastIndex, match.index) });
         }
-        parsedParts.push({
-          type: 'code',
+        textParts.push({
+          type: 'code_block',
           language: match[1],
           filename: match[2],
           code: (match[3] || '').trim(),
@@ -71,37 +66,43 @@ export function MessageContent({ content, isNew, aiResponseSpeed }: MessageConte
         lastIndex = match.index + match[0].length;
       }
 
-      if (lastIndex < content.length) {
-        parsedParts.push({
-          type: 'text',
-          text: content.substring(lastIndex),
+      if (lastIndex < textValue.length) {
+        textParts.push({ type: 'text_segment', value: textValue.substring(lastIndex) });
+      }
+
+      if (textParts.length > 0) {
+        return textParts.map((segment, segIndex) => {
+          if (segment.type === 'code_block') {
+            return (
+              <CodeBlock
+                key={`${index}-${segIndex}`}
+                language={segment.language || ''}
+                filename={segment.filename}
+                code={segment.code || ''}
+                isNew={isAnimating}
+                onAnimationComplete={onComplete}
+                animationSpeed={aiResponseSpeed} // Pass speed
+              />
+            );
+          }
+          return (
+            <TextAnimator
+              key={`${index}-${segIndex}`}
+              text={segment.value || ''}
+              className="whitespace-pre-wrap"
+              isNew={isAnimating}
+              onAnimationComplete={onComplete}
+              animationSpeed={aiResponseSpeed} // Pass speed
+            />
+          );
         });
       }
-
-      if (parsedParts.length === 0 && content) {
-        parsedParts.push({ type: 'text', text: content });
-      }
-      return parsedParts;
-    } else if (Array.isArray(content)) {
-      console.log("MessageContent: Content is an array, not parsing for code blocks within string.");
-      // If content is already an array of PuterContentPart, ensure it's mapped to RenderablePart
-      return content.map(part => {
-        if (part.type === 'text') return part as PuterTextContentPart;
-        if (part.type === 'image_url') return part as PuterImageContentPart;
-        // Fallback for unknown parts, should not happen if PuterContentPart is well-defined
-        return { type: 'text', text: JSON.stringify(part) } as PuterTextContentPart; 
-      });
-    }
-    return [];
-  }, [content]);
-
-  // Helper to render a single part
-  const renderPart = (part: RenderablePart, index: number, isAnimating: boolean, onComplete?: () => void) => {
-    if (part.type === 'text') {
+      
+      // If no code blocks, treat as a single text segment
       return (
         <TextAnimator
           key={index}
-          text={part.text || ''}
+          text={textValue || ''}
           className="whitespace-pre-wrap"
           isNew={isAnimating}
           onAnimationComplete={onComplete}
@@ -136,6 +137,59 @@ export function MessageContent({ content, isNew, aiResponseSpeed }: MessageConte
     }
     return null;
   };
+
+  // Parse content into a flat array of renderable parts
+  const renderableParts = React.useMemo(() => {
+    if (typeof content === 'string') {
+      const parsedParts: Array<{ type: 'text' | 'code'; value?: string; language?: string; filename?: string; code?: string; }> = [];
+      let lastIndex = 0;
+      let match;
+      
+      codeBlockRegex.lastIndex = 0;
+
+      while ((match = codeBlockRegex.exec(content)) !== null) {
+        if (match.index > lastIndex) {
+          parsedParts.push({
+            type: 'text' as const,
+            value: content.substring(lastIndex, match.index),
+          });
+        }
+        parsedParts.push({
+          type: 'code' as const,
+          language: match[1],
+          filename: match[2],
+          code: (match[3] || '').trim(),
+        });
+        lastIndex = match.index + match[0].length;
+      }
+
+      if (lastIndex < content.length) {
+        parsedParts.push({
+          type: 'text' as const,
+          value: content.substring(lastIndex),
+        });
+      }
+
+      if (parsedParts.length === 0 && content) {
+        parsedParts.push({ type: 'text' as const, value: content });
+      }
+      // Map to the RenderablePart union type
+      return parsedParts.map(p => {
+        if (p.type === 'text') {
+          return { type: 'text', text: p.value || '' } as PuterTextContentPart;
+        }
+        return {
+          type: 'code',
+          language: p.language,
+          filename: p.filename,
+          code: p.code || '',
+        } as CodeBlockPart;
+      });
+    } else if (Array.isArray(content)) {
+      return content;
+    }
+    return [];
+  }, [content]);
 
   useEffect(() => {
     if (isNew) {
