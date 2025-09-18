@@ -92,9 +92,9 @@ export default {
   				}
   			},
         'pulse-glow': {
-          '0%': { boxShadow: '0 0 0 0 theme(colors.green.500 / 0.7)' },
-          '70%': { boxShadow: '0 0 0 10px theme(colors.green.500 / 0)' },
-          '100%': { boxShadow: '0 0 0 0 theme(colors.green.500 / 0)' },
+          '0%': { boxShadow: '0 0 0 0px rgba(34, 197, 94, 0.5)' }, /* Empieza con un brillo sutil */
+          '50%': { boxShadow: '0 0 15px 7px rgba(34, 197, 94, 0.7)' }, /* Pico del brillo, más intenso */
+          '100%': { boxShadow: '0 0 0 0px rgba(34, 197, 94, 0)' }, /* Se desvanece completamente */
         },
   		},
   		animation: {
