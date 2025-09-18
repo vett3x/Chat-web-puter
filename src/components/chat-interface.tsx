@@ -421,6 +421,11 @@ export function ChatInterface({
         content: "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante."
       };
 
+      console.info('Attempting to call Puter AI chat with:', {
+        messages: [...puterMessages, { role: 'user', content: userContent }],
+        model: selectedModel
+      });
+
       const response = await window.puter.ai.chat([systemMessage, ...puterMessages, { role: 'user', content: userContent }], { model: selectedModel });
       console.log('Puter AI response:', response);
 
@@ -476,10 +481,16 @@ export function ChatInterface({
     } catch (error) {
       console.error('Error sending message to Puter AI:', error); // Log the full error object
       let errorMessage = 'Ocurrió un error desconocido.';
+      
       if (error instanceof Error) {
         errorMessage = error.message;
-      } else if (typeof error === 'object' && error !== null && 'message' in error) {
-        errorMessage = (error as { message: string }).message;
+      } else if (typeof error === 'object' && error !== null) {
+        const errorString = JSON.stringify(error);
+        if (errorString === '{}') {
+          errorMessage = 'La API de Puter AI devolvió un error vacío o inesperado. Esto podría indicar un problema de conexión, autenticación o que se requiere una acción en el popup de Puter AI (ej. CAPTCHA).';
+        } else {
+          errorMessage = (error as any).message || (error as any).error || errorString;
+        }
       }
       toast.error(errorMessage);
       setMessages(prev => prev.map(msg => msg.id === tempAssistantId ? { ...msg, content: `Error: ${errorMessage}`, isTyping: false, isNew: true } : msg));
