@@ -2,15 +2,22 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot, User, Loader2 } from 'lucide-react';
+import { Send, Bot, User, Loader2, Check } from 'lucide-react'; // Añadido 'Check' para el indicador de selección
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/components/session-context-provider';
 import { MessageContent } from './message-content';
 import { Textarea } from '@/components/ui/textarea';
 import ClaudeAILogo from './claude-ai-logo';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'; // Importados componentes de DropdownMenu
 
 interface Message {
   id: string;
@@ -68,7 +75,13 @@ export function ChatInterface({
 }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
-  const [selectedModel, setSelectedModel] = useState(ALL_MODEL_VALUES[0]);
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
+    // Inicializar desde localStorage o usar el primer modelo por defecto
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('selected_ai_model') || ALL_MODEL_VALUES[0];
+    }
+    return ALL_MODEL_VALUES[0];
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [isPuterReady, setIsPuterReady] = useState(false);
   const [isSendingFirstMessageOfNewConversation, setIsSendingFirstMessageOfNewConversation] = useState(false);
@@ -84,6 +97,13 @@ export function ChatInterface({
     };
     checkPuter();
   }, []);
+
+  // Efecto para guardar el modelo seleccionado en localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('selected_ai_model', selectedModel);
+    }
+  }, [selectedModel]);
 
   const getMessagesFromDB = useCallback(async (convId: string) => {
     const { data, error } = await supabase
@@ -409,27 +429,44 @@ export function ChatInterface({
               className="flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none max-h-[200px] overflow-y-auto bg-transparent"
               rows={1}
             />
-            <Select value={selectedModel} onValueChange={setSelectedModel}>
-              <SelectTrigger className="w-[320px] flex-shrink-0"> {/* Ancho ajustado a 320px */}
-                <SelectValue placeholder="Modelo" />
-              </SelectTrigger>
-              <SelectContent>
+            
+            {/* Nuevo botón redondo para la selección de IA */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="default"
+                  size="icon"
+                  className="rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-200"
+                  aria-label="Seleccionar modelo de IA"
+                >
+                  <Bot className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-64 bg-popover text-popover-foreground border-border">
+                <DropdownMenuLabel className="text-sm font-semibold">Seleccionar Modelo de IA</DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-border" />
                 {AI_PROVIDERS.map((provider, providerIndex) => (
-                  <SelectGroup key={provider.company}>
-                    <SelectLabel className="flex items-center gap-2 font-bold text-foreground">
+                  <React.Fragment key={provider.company}>
+                    <DropdownMenuLabel className="flex items-center gap-2 font-bold text-foreground px-2 py-1.5">
                       <span>{provider.company}</span>
                       <provider.logo className="h-4 w-4" />
-                    </SelectLabel>
+                    </DropdownMenuLabel>
                     {provider.models.map((model) => (
-                      <SelectItem key={model.value} value={model.value} className="pl-8">
-                        {model.label}
-                      </SelectItem>
+                      <DropdownMenuItem
+                        key={model.value}
+                        onClick={() => setSelectedModel(model.value)}
+                        className="flex items-center justify-between cursor-pointer pl-8"
+                      >
+                        <span>{model.label}</span>
+                        {selectedModel === model.value && <Check className="h-4 w-4 text-primary" />}
+                      </DropdownMenuItem>
                     ))}
-                    {providerIndex < AI_PROVIDERS.length - 1 && <SelectSeparator />}
-                  </SelectGroup>
+                    {providerIndex < AI_PROVIDERS.length - 1 && <DropdownMenuSeparator className="bg-border" />}
+                  </React.Fragment>
                 ))}
-              </SelectContent>
-            </Select>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <Button
               onClick={sendMessage}
               disabled={isLoading || !inputMessage.trim() || !userId}
