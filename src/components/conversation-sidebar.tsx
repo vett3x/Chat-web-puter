@@ -216,7 +216,7 @@ export function ConversationSidebar({
                   ) : (
                     <div className="flex items-center gap-2 flex-1 overflow-hidden">
                       <MessageSquare className="h-4 w-4 flex-shrink-0" />
-                      <span className="text-sm truncate">{conversation.title}</span>
+                      <span className="text-sm">{conversation.title}</span>
                     </div>
                   )}
                   <div className="flex-shrink-0 flex gap-1">
