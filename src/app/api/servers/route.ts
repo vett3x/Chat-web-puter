@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { cookies } from 'next/headers'; // Eliminamos ReadonlyRequestCookies de aquí
+import { cookies, ReadonlyRequestCookies } from 'next/headers'; // Importamos ReadonlyRequestCookies
 
 // Define SuperUser emails (for server-side check)
 const SUPERUSER_EMAILS = ['martinpensa1@gmail.com']; // ¡Asegúrate de que este sea tu correo electrónico!
@@ -17,12 +17,14 @@ const serverSchema = z.object({
 
 // Helper function to create Supabase client for API routes
 function getSupabaseServerClient(res: NextResponse) {
+  const cookieStore: ReadonlyRequestCookies = cookies(); // Tipado explícito aquí
+
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: (name: string) => cookies().get(name)?.value, // Acceso directo a cookies().get()
+        get: (name: string) => cookieStore.get(name)?.value, // Usa la variable cookieStore
         set: (name: string, value: string, options: CookieOptions) => {
           res.cookies.set({ name, value, ...options });
         },
