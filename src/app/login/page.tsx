@@ -7,6 +7,47 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 
 export default function LoginPage() {
+  const spanishLocalization = {
+    variables: {
+      sign_in: {
+        email_label: 'Correo electrónico',
+        password_label: 'Contraseña',
+        email_input_placeholder: 'Tu correo electrónico',
+        password_input_placeholder: 'Tu contraseña',
+        button_label: 'Iniciar sesión',
+        social_auth_typography: 'O continuar con',
+        link_text: '¿Ya tienes una cuenta? Inicia sesión',
+        forgotten_password_text: '¿Olvidaste tu contraseña?',
+        no_account_text: '¿No tienes una cuenta? Regístrate',
+      },
+      sign_up: {
+        email_label: 'Correo electrónico',
+        password_label: 'Contraseña',
+        email_input_placeholder: 'Tu correo electrónico',
+        password_input_placeholder: 'Crea una contraseña',
+        button_label: 'Registrarse',
+        social_auth_typography: 'O continuar con',
+        link_text: '¿Ya tienes una cuenta? Inicia sesión',
+      },
+      forgotten_password: {
+        email_label: 'Correo electrónico',
+        email_input_placeholder: 'Tu correo electrónico',
+        button_label: 'Enviar instrucciones de recuperación',
+        link_text: '¿Recordaste tu contraseña? Inicia sesión',
+      },
+      update_password: {
+        password_label: 'Nueva contraseña',
+        password_input_placeholder: 'Tu nueva contraseña',
+        button_label: 'Actualizar contraseña',
+      },
+      magic_link: {
+        email_input_placeholder: 'Tu correo electrónico',
+        button_label: 'Enviar enlace mágico',
+        link_text: 'Enviar un enlace mágico por correo electrónico',
+      },
+    },
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
       <Card className="w-full max-w-md">
@@ -17,7 +58,7 @@ export default function LoginPage() {
         <CardContent>
           <Auth
             supabaseClient={supabase}
-            providers={[]} // Puedes añadir 'google', 'github', etc. aquí si lo deseas
+            providers={[]}
             appearance={{
               theme: ThemeSupa,
               variables: {
@@ -29,8 +70,12 @@ export default function LoginPage() {
                 },
               },
             }}
-            theme="dark" // Cambiado a tema oscuro
+            theme="dark"
             redirectTo={typeof window !== 'undefined' ? `${window.location.origin}/` : undefined}
+            lang="es"
+            localization={{
+              variables: spanishLocalization.variables,
+            }}
           />
         </CardContent>
       </Card>
