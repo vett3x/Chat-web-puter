@@ -23,7 +23,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { MessageSquare, Edit, Save, X, Trash2, MoreVertical, MoveRight } from 'lucide-react';
+import { MessageSquare, Edit, Save, X, Trash2, MoreVertical } from 'lucide-react'; // Eliminado MoveRight
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -182,24 +182,7 @@ export function DraggableConversationCard({
                   <Edit className="mr-2 h-4 w-4" /> Renombrar
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuTrigger asChild>
-                  <DropdownMenuItem onSelect={(e: Event) => e.preventDefault()}>
-                    <MoveRight className="mr-2 h-4 w-4" /> Mover a
-                  </DropdownMenuItem>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent side="right" align="start" className="w-48 bg-popover text-popover-foreground border-border">
-                  <DropdownMenuLabel>Mover a Carpeta</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onConversationMoved(conversation.id, null)}>
-                    (General)
-                  </DropdownMenuItem>
-                  {allFolders.filter(f => f.id !== conversation.folder_id).map(f => (
-                    <DropdownMenuItem key={f.id} onClick={() => onConversationMoved(conversation.id, f.id)}>
-                      {f.name}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-                <DropdownMenuSeparator />
+                {/* Se eliminó la opción "Mover a" */}
                 <AlertDialog open={isDeleting} onOpenChange={setIsDeleting}>
                   <AlertDialogTrigger asChild>
                     <DropdownMenuItem onSelect={(e: Event) => e.preventDefault()} className="text-destructive focus:text-destructive">
