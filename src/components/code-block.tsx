@@ -24,7 +24,6 @@ export function CodeBlock({ language, code, filename, isNew }: CodeBlockProps) {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Limpiar siempre la animación anterior al ejecutar el efecto
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
@@ -40,17 +39,22 @@ export function CodeBlock({ language, code, filename, isNew }: CodeBlockProps) {
     
     if (code) {
       let i = 0;
-      const typeCharacter = () => {
+      const typeChunk = () => {
         if (i < code.length) {
-          setDisplayedCode(code.substring(0, i + 1));
-          i++;
-          const delay = 8;
-          timeoutRef.current = setTimeout(typeCharacter, delay);
+          // Animar en fragmentos para un mejor rendimiento en bloques de código grandes
+          const chunkSize = code.length > 500 ? 25 : 10;
+          const delay = 10;
+          
+          const nextI = Math.min(i + chunkSize, code.length);
+          setDisplayedCode(code.substring(0, nextI));
+          i = nextI;
+          
+          timeoutRef.current = setTimeout(typeChunk, delay);
         } else {
           setIsTyping(false);
         }
       };
-      typeCharacter();
+      typeChunk();
     } else {
       setIsTyping(false);
     }
