@@ -22,6 +22,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ProfileDropdown } from './profile-dropdown'; // Importar el nuevo componente
+import { Skeleton } from '@/components/ui/skeleton'; // Importar Skeleton
 
 interface Conversation {
   id: string;
@@ -176,11 +177,12 @@ export function ConversationSidebar({
     setDeletingConversationId(null); // Reset deleting state
   };
 
-  if (isSessionLoading || isLoadingConversations) {
+  // Si la sesión está cargando, no mostramos nada aún o un indicador global si lo hubiera
+  if (isSessionLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="mt-2 text-muted-foreground">Cargando conversaciones...</p>
+        <p className="mt-2 text-muted-foreground">Cargando sesión...</p>
       </div>
     );
   }
@@ -205,7 +207,15 @@ export function ConversationSidebar({
       </div>
       <ScrollArea className="flex-1">
         <div className="space-y-2">
-          {conversations.length === 0 ? (
+          {isLoadingConversations && conversations.length === 0 ? (
+            // Esqueleto de carga cuando no hay conversaciones y se están cargando
+            Array.from({ length: 5 }).map((_, i) => (
+              <Card key={i} className="p-3 flex items-center gap-2 bg-sidebar-accent">
+                <Skeleton className="h-4 w-4 rounded-full" />
+                <Skeleton className="h-4 w-3/4" />
+              </Card>
+            ))
+          ) : conversations.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">
               No hay conversaciones. ¡Crea una nueva!
             </p>
