@@ -112,8 +112,10 @@ export function ProfileDropdown() {
         <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem asChild>
           <Link href="/settings/profile" className="flex items-center cursor-pointer">
-            <UserIcon className="mr-2 h-4 w-4" />
-            <span>Perfil</span>
+            <div className="flex items-center"> {/* Envuelto en un div */}
+              <UserIcon className="mr-2 h-4 w-4" />
+              <span>Perfil</span>
+            </div>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem 
@@ -132,10 +134,12 @@ export function ProfileDropdown() {
             />
           )}
         </DropdownMenuItem>
-        <DropdownMenuItem asChild> {/* Changed to asChild and added Link */}
+        <DropdownMenuItem asChild>
           <Link href="/settings/profile" className="flex items-center cursor-pointer">
-            <Settings className="mr-2 h-4 w-4" />
-            <span>Configuración</span>
+            <div className="flex items-center"> {/* Envuelto en un div */}
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Configuración</span>
+            </div>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive" onClick={handleSignOut}>
