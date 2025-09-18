@@ -32,14 +32,14 @@ function decrypt(ciphertext: string): string {
 // Helper function to create Supabase client for API routes
 // Esta función ahora toma un objeto NextResponse para modificar sus cookies y es SÍNCRONA.
 function getSupabaseServerClient(res: NextResponse) {
-  const cookieStore = cookies();
+  // No necesitamos una variable cookieStore aquí, ya que cookies() se llamará directamente en el 'get'.
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: (name: string) => cookieStore.get(name)?.value,
+        get: (name: string) => cookies().get(name)?.value, // Llamada directa a cookies().get()
         set: (name: string, value: string, options: CookieOptions) => {
           res.cookies.set({ name, value, ...options });
         },
@@ -53,7 +53,7 @@ function getSupabaseServerClient(res: NextResponse) {
 
 // Add a middleware-like check for SuperUser
 async function authorizeSuperUser(res: NextResponse) {
-  const supabase = getSupabaseServerClient(res); // Ya no se necesita 'await' aquí
+  const supabase = getSupabaseServerClient(res);
   const { data: { session } } = await supabase.auth.getSession();
 
   if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
   const authError = await authorizeSuperUser(res);
   if (authError) return authError;
 
-  const supabase = getSupabaseServerClient(res); // Ya no se necesita 'await' aquí
+  const supabase = getSupabaseServerClient(res);
   const { data: { session } } = await supabase.auth.getSession();
 
   if (!session) {
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
   const authError = await authorizeSuperUser(res);
   if (authError) return authError;
 
-  const supabase = getSupabaseServerClient(res); // Ya no se necesita 'await' aquí
+  const supabase = getSupabaseServerClient(res);
   const { data: { session } } = await supabase.auth.getSession();
 
   if (!session) {
@@ -173,7 +173,7 @@ export async function DELETE(req: NextRequest) {
   const authError = await authorizeSuperUser(res);
   if (authError) return authError;
 
-  const supabase = getSupabaseServerClient(res); // Ya no se necesita 'await' aquí
+  const supabase = getSupabaseServerClient(res);
   const { data: { session } } = await supabase.auth.getSession();
 
   if (!session) {
