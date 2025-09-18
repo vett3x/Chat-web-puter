@@ -350,147 +350,145 @@ export function ChatInterface({
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <Card className="flex-1 flex flex-col border-none shadow-none">
-        <CardHeader className="flex-shrink-0 border-b">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Bot className="h-6 w-6" />
-              Chat con Claude AI
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              <Select value={selectedModel} onValueChange={setSelectedModel}>
-                <SelectTrigger className="w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {AVAILABLE_MODELS.map((model) => (
-                    <SelectItem key={model.value} value={model.value}>
-                      {model.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button variant="outline" size="sm" onClick={startNewChat}>
-                <MessageSquarePlus className="h-4 w-4 mr-2" /> Nuevo Chat
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-
-        <CardContent className="flex-1 p-0 min-h-0">
-          <ScrollArea className="h-full" ref={scrollAreaRef}>
-            <div className="space-y-4 p-4">
-              {messages.length === 0 && !isLoading ? (
-                <div className="text-center text-muted-foreground py-8">
-                  <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>¡Hola! Soy Claude AI. ¿En qué puedo ayudarte hoy?</p>
-                  <p className="text-sm mt-2">Selecciona un modelo y comienza a chatear.</p>
-                </div>
-              ) : (
-                messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex gap-3 ${
-                      message.role === 'user' ? 'justify-end' : 'justify-start'
-                    }`}
-                  >
-                    <div
-                      className={`flex gap-3 max-w-[80%] ${
-                        message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
-                      }`}
-                    >
-                      <div className="flex-shrink-0">
-                        {message.role === 'user' ? (
-                          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                            <User className="h-4 w-4 text-primary-foreground" />
-                          </div>
-                        ) : (
-                          <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center">
-                            <Bot className="h-4 w-4 text-secondary-foreground" />
-                          </div>
-                        )}
-                      </div>
-                      <div
-                        className={`rounded-lg p-3 ${
-                          message.role === 'user'
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted'
-                        }`}
-                      >
-                        <div className="whitespace-pre-wrap">{message.content}</div>
-                        {message.model && (
-                          <div className="text-xs opacity-70 mt-2">
-                            {AVAILABLE_MODELS.find(m => m.value === message.model)?.label}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-              {isAIThinking && (
-                <div className="flex gap-3 justify-start">
-                  <div className="flex gap-3 max-w-[80%]">
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center">
-                        <Bot className="h-4 w-4 text-secondary-foreground" />
-                      </div>
-                    </div>
-                    <div className="bg-muted rounded-lg p-3">
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="text-sm">Pensando...</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {isContextLoading && (
-                <div className="flex gap-3 justify-start">
-                  <div className="flex gap-3 max-w-[80%]">
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center">
-                        <Bot className="h-4 w-4 text-secondary-foreground" />
-                      </div>
-                    </div>
-                    <div className="bg-muted rounded-lg p-3">
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="text-sm">Cargando contexto...</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-        </CardContent>
-
-        <div className="border-t p-4 flex-shrink-0">
-          <div className="flex gap-2">
-            <Input
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Escribe tu mensaje aquí..."
-              disabled={isLoading || !userId}
-              className="flex-1"
-            />
-            <Button
-              onClick={sendMessage}
-              disabled={isLoading || !inputMessage.trim() || !userId}
-              size="icon"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
+    <div className="flex flex-col h-full bg-background">
+      <CardHeader className="flex-shrink-0 border-b">
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Bot className="h-6 w-6" />
+            Chat con Claude AI
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <Select value={selectedModel} onValueChange={setSelectedModel}>
+              <SelectTrigger className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {AVAILABLE_MODELS.map((model) => (
+                  <SelectItem key={model.value} value={model.value}>
+                    {model.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" onClick={startNewChat}>
+              <MessageSquarePlus className="h-4 w-4 mr-2" /> Nuevo Chat
             </Button>
           </div>
         </div>
-      </Card>
+      </CardHeader>
+
+      <div className="flex-1 relative min-h-0">
+        <ScrollArea className="absolute inset-0" ref={scrollAreaRef}>
+          <div className="p-4 space-y-4">
+            {messages.length === 0 && !isLoading ? (
+              <div className="text-center text-muted-foreground py-8">
+                <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>¡Hola! Soy Claude AI. ¿En qué puedo ayudarte hoy?</p>
+                <p className="text-sm mt-2">Selecciona un modelo y comienza a chatear.</p>
+              </div>
+            ) : (
+              messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex gap-3 ${
+                    message.role === 'user' ? 'justify-end' : 'justify-start'
+                  }`}
+                >
+                  <div
+                    className={`flex gap-3 max-w-[80%] ${
+                      message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
+                    }`}
+                  >
+                    <div className="flex-shrink-0">
+                      {message.role === 'user' ? (
+                        <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                          <User className="h-4 w-4 text-primary-foreground" />
+                        </div>
+                      ) : (
+                        <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center">
+                          <Bot className="h-4 w-4 text-secondary-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <div
+                      className={`rounded-lg p-3 ${
+                        message.role === 'user'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted'
+                      }`}
+                    >
+                      <div className="whitespace-pre-wrap">{message.content}</div>
+                      {message.model && (
+                        <div className="text-xs opacity-70 mt-2">
+                          {AVAILABLE_MODELS.find(m => m.value === message.model)?.label}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+            {isAIThinking && (
+              <div className="flex gap-3 justify-start">
+                <div className="flex gap-3 max-w-[80%]">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center">
+                      <Bot className="h-4 w-4 text-secondary-foreground" />
+                    </div>
+                  </div>
+                  <div className="bg-muted rounded-lg p-3">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm">Pensando...</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            {isContextLoading && (
+              <div className="flex gap-3 justify-start">
+                <div className="flex gap-3 max-w-[80%]">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center">
+                      <Bot className="h-4 w-4 text-secondary-foreground" />
+                    </div>
+                  </div>
+                  <div className="bg-muted rounded-lg p-3">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm">Cargando contexto...</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+
+      <div className="border-t p-4 flex-shrink-0 bg-muted/40">
+        <div className="flex gap-2">
+          <Input
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="Escribe tu mensaje aquí..."
+            disabled={isLoading || !userId}
+            className="flex-1"
+          />
+          <Button
+            onClick={sendMessage}
+            disabled={isLoading || !inputMessage.trim() || !userId}
+            size="icon"
+          >
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
