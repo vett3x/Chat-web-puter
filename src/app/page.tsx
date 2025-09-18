@@ -2,11 +2,9 @@
 
 import { ChatInterface } from "@/components/chat-interface";
 import { Toaster } from "@/components/ui/sonner";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ConversationSidebar } from "@/components/conversation-sidebar";
 import { useSession } from "@/components/session-context-provider";
 import { useState, useEffect } from "react";
-
 
 export default function Home() {
   const { session, isLoading: isSessionLoading } = useSession();
@@ -26,28 +24,25 @@ export default function Home() {
   };
 
   return (
-    <div className="flex flex-col h-screen">
-      <ResizablePanelGroup direction="horizontal" className="flex-1">
-        <ResizablePanel defaultSize={25} minSize={20} maxSize={30}>
-          <ConversationSidebar
-            selectedConversationId={selectedConversationId}
-            onSelectConversation={setSelectedConversationId}
-            onNewConversationCreated={handleNewConversationCreated}
-          />
-        </ResizablePanel>
-        <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={75}>
-          <ChatInterface
-            userId={userId}
-            conversationId={selectedConversationId}
-            onNewConversationCreated={handleNewConversationCreated}
-            onConversationTitleUpdate={(id, newTitle) => {
-              // This prop will be used to update the title in the sidebar if the chat interface changes it
-              // For now, the sidebar manages its own titles.
-            }}
-          />
-        </ResizablePanel>
-      </ResizablePanelGroup>
+    <div className="flex h-screen bg-background">
+      <aside className="w-[300px] flex-shrink-0">
+        <ConversationSidebar
+          selectedConversationId={selectedConversationId}
+          onSelectConversation={setSelectedConversationId}
+          onNewConversationCreated={handleNewConversationCreated}
+        />
+      </aside>
+      <main className="flex-1 flex flex-col min-w-0">
+        <ChatInterface
+          userId={userId}
+          conversationId={selectedConversationId}
+          onNewConversationCreated={handleNewConversationCreated}
+          onConversationTitleUpdate={(id, newTitle) => {
+            // This prop will be used to update the title in the sidebar if the chat interface changes it
+            // For now, the sidebar manages its own titles.
+          }}
+        />
+      </main>
       <Toaster />
     </div>
   );
