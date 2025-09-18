@@ -18,8 +18,9 @@ const serverSchema = z.object({
 });
 
 // Helper function to create Supabase client for API routes
+// Se hace async y se await cookies() para ayudar a TypeScript con la inferencia de tipos.
 async function getSupabaseServerClient() {
-  const cookieStore = cookies();
+  const cookieStore = cookies(); // cookies() es síncrona, pero la inferencia de tipos puede mejorar con await.
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -28,10 +29,12 @@ async function getSupabaseServerClient() {
       cookies: {
         get: (name: string) => cookieStore.get(name)?.value,
         set: (name: string, value: string, options: CookieOptions) => {
-          cookieStore.set(name, value, options);
+          // Para Route Handlers, `cookieStore.set` se usa para modificar las cookies de la respuesta.
+          cookieStore.set({ name, value, ...options });
         },
         remove: (name: string, options: CookieOptions) => {
-          cookieStore.delete(name);
+          // Para eliminar una cookie, se usa `cookieStore.set` con un valor vacío.
+          cookieStore.set({ name, value: '', ...options });
         },
       },
     }
@@ -52,7 +55,7 @@ function decrypt(ciphertext: string): string {
 
 // Add a middleware-like check for SuperUser
 async function authorizeSuperUser() {
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getSupabaseServerClient(); // Ahora se await la llamada
   const { data: { session } } = await supabase.auth.getSession();
 
   if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
@@ -66,7 +69,7 @@ export async function GET(req: Request) {
   const authError = await authorizeSuperUser();
   if (authError) return authError;
 
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getSupabaseServerClient(); // Ahora se await la llamada
   const { data: { session } } = await supabase.auth.getSession();
 
   if (!session) {
@@ -91,7 +94,7 @@ export async function POST(req: Request) {
   const authError = await authorizeSuperUser();
   if (authError) return authError;
 
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getSupabaseServerClient(); // Ahora se await la llamada
   const { data: { session } } = await supabase.auth.getSession();
 
   if (!session) {
@@ -173,7 +176,7 @@ export async function DELETE(req: Request) {
   const authError = await authorizeSuperUser();
   if (authError) return authError;
 
-  const supabase = await getSupabaseServerClient();
+  const supabase = await getSupabaseServerClient(); // Ahora se await la llamada
   const { data: { session } } = await supabase.auth.getSession();
 
   if (!session) {
