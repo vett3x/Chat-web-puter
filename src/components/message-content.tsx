@@ -37,7 +37,7 @@ interface MessageContentProps {
   aiResponseSpeed: 'slow' | 'normal' | 'fast'; // New prop for AI response speed
 }
 
-const codeBlockRegex = /```(\w+)(?::([\w./-]+))?\n([\s\S]*?)\n```/g;
+const codeBlockRegex = /```(\w+)(?::([\w./-]+))?\s*\n([\s\S]*?)\n```/g;
 
 export function MessageContent({ content, isNew, aiResponseSpeed }: MessageContentProps) {
   const [animatedPartsCount, setAnimatedPartsCount] = useState(0);
