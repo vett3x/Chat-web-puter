@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot, User, Loader2, Check } from 'lucide-react'; // Añadido 'Check' para el indicador de selección
+import { Send, Bot, User, Loader2, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/components/session-context-provider';
@@ -17,7 +17,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'; // Importados componentes de DropdownMenu
+} from '@/components/ui/dropdown-menu';
 
 interface Message {
   id: string;
@@ -44,6 +44,7 @@ const AI_PROVIDERS = [
 ];
 
 const ALL_MODEL_VALUES = AI_PROVIDERS.flatMap(provider => provider.models.map(model => model.value));
+const DEFAULT_AI_MODEL = ALL_MODEL_VALUES[0]; // Define un modelo por defecto
 
 interface PuterMessage {
   role: 'user' | 'assistant' | 'system';
@@ -76,11 +77,10 @@ export function ChatInterface({
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [selectedModel, setSelectedModel] = useState<string>(() => {
-    // Inicializar desde localStorage o usar el primer modelo por defecto
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('selected_ai_model') || ALL_MODEL_VALUES[0];
+      return localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL;
     }
-    return ALL_MODEL_VALUES[0];
+    return DEFAULT_AI_MODEL;
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isPuterReady, setIsPuterReady] = useState(false);
@@ -98,12 +98,27 @@ export function ChatInterface({
     checkPuter();
   }, []);
 
-  // Efecto para guardar el modelo seleccionado en localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('selected_ai_model', selectedModel);
     }
   }, [selectedModel]);
+
+  const getConversationDetails = useCallback(async (convId: string) => {
+    const { data, error } = await supabase
+      .from('conversations')
+      .select('id, title, model')
+      .eq('id', convId)
+      .eq('user_id', userId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching conversation details:', error.message || error.details || error);
+      toast.error('Error al cargar los detalles de la conversación.');
+      return null;
+    }
+    return data;
+  }, [userId]);
 
   const getMessagesFromDB = useCallback(async (convId: string) => {
     const { data, error } = await supabase
@@ -129,9 +144,17 @@ export function ChatInterface({
   }, [userId]);
 
   useEffect(() => {
-    const loadMessages = async () => {
+    const loadConversationData = async () => {
       if (conversationId && userId) {
         setIsLoading(true);
+        const conversationDetails = await getConversationDetails(conversationId);
+        if (conversationDetails && conversationDetails.model) {
+          setSelectedModel(conversationDetails.model);
+        } else {
+          // If conversation has no model, default to user's last selected or global default
+          setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL);
+        }
+
         const fetchedMsgs = await getMessagesFromDB(conversationId);
         if (!isSendingFirstMessageOfNewConversation || fetchedMsgs.length > 0) {
           setMessages(fetchedMsgs);
@@ -139,10 +162,12 @@ export function ChatInterface({
         setIsLoading(false);
       } else if (!conversationId) {
         setMessages([]);
+        // When no conversation is selected, reset model to user's default
+        setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL);
       }
     };
-    loadMessages();
-  }, [conversationId, userId, getMessagesFromDB, isSendingFirstMessageOfNewConversation]);
+    loadConversationData();
+  }, [conversationId, userId, getMessagesFromDB, getConversationDetails, isSendingFirstMessageOfNewConversation]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -175,7 +200,7 @@ export function ChatInterface({
 
     const { data, error } = await supabase
       .from('conversations')
-      .insert({ user_id: userId, title: newTitle })
+      .insert({ user_id: userId, title: newTitle, model: selectedModel }) // Guardar el modelo seleccionado
       .select('id, title')
       .single();
 
@@ -187,6 +212,29 @@ export function ChatInterface({
     onNewConversationCreated(data.id);
     onConversationTitleUpdate(data.id, data.title);
     return data.id;
+  };
+
+  const updateConversationModelInDB = async (convId: string, model: string) => {
+    if (!userId) return;
+    const { error } = await supabase
+      .from('conversations')
+      .update({ model: model })
+      .eq('id', convId)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error updating conversation model:', error.message || error.details || error);
+      toast.error('Error al actualizar el modelo de la conversación.');
+    } else {
+      toast.success('Modelo de IA actualizado para esta conversación.');
+    }
+  };
+
+  const handleModelChange = (modelValue: string) => {
+    setSelectedModel(modelValue);
+    if (conversationId) {
+      updateConversationModelInDB(conversationId, modelValue);
+    }
   };
 
   const saveMessageToDB = async (convId: string, msg: Omit<Message, 'timestamp' | 'id'>) => {
@@ -430,7 +478,6 @@ export function ChatInterface({
               rows={1}
             />
             
-            {/* Botón redondo para la selección de IA */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -458,7 +505,7 @@ export function ChatInterface({
                     {provider.models.map((model) => (
                       <DropdownMenuItem
                         key={model.value}
-                        onClick={() => setSelectedModel(model.value)}
+                        onClick={() => handleModelChange(model.value)}
                         className="flex items-center justify-between cursor-pointer pl-8"
                       >
                         <span>{model.label}</span>
