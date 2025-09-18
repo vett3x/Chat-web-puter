@@ -171,11 +171,11 @@ export function ConversationSidebar({
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold">Conversaciones</h2>
         <Button
-          variant="default" // Cambiado a default
+          variant="default"
           size="icon"
           onClick={createNewConversation}
           disabled={isCreatingConversation}
-          className="bg-green-500 hover:bg-green-600 text-white animate-pulse-glow" // Estilo y animación
+          className="bg-green-500 hover:bg-green-600 text-white animate-pulse-glow rounded-full" // Añadido rounded-full
         >
           {isCreatingConversation ? (
             <Loader2 className="h-4 w-4 animate-spin" />
