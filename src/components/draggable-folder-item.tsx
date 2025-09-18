@@ -140,9 +140,25 @@ export function DraggableFolderItem({
       return;
     }
 
-    // Check if folder contains subfolders or conversations
-    if (filteredSubfolders.length > 0 || filteredConversations.length > 0) {
-      toast.error('No se puede eliminar una carpeta que contiene elementos. Vacíala primero.');
+    // First, move all conversations from this folder to 'General' (folder_id = null)
+    if (filteredConversations.length > 0) {
+      const { error: updateError } = await supabase
+        .from('conversations')
+        .update({ folder_id: null })
+        .eq('folder_id', folder.id)
+        .eq('user_id', userId);
+
+      if (updateError) {
+        console.error('Error moving conversations from folder:', updateError);
+        toast.error('Error al mover las conversaciones de la carpeta.');
+        setIsDeleting(false);
+        return;
+      }
+    }
+
+    // Check if folder still contains subfolders
+    if (filteredSubfolders.length > 0) {
+      toast.error('No se puede eliminar una carpeta que contiene subcarpetas. Vacíalas primero.');
       setIsDeleting(false);
       return;
     }
@@ -157,8 +173,8 @@ export function DraggableFolderItem({
       console.error('Error deleting folder:', error);
       toast.error('Error al eliminar la carpeta.');
     } else {
-      toast.success('Carpeta eliminada.');
-      onFolderDeleted();
+      toast.success('Carpeta eliminada y conversaciones movidas a General.');
+      onFolderDeleted(); // This will trigger a re-fetch of conversations and folders
       // If the selected conversation was in this folder, deselect it
       if (selectedConversationId && filteredConversations.some(conv => conv.id === selectedConversationId)) {
         onSelectConversation(null);
@@ -257,8 +273,7 @@ export function DraggableFolderItem({
                       <AlertDialogHeader>
                         <AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Esta acción no se puede deshacer. Esto eliminará permanentemente la carpeta.
-                          Asegúrate de que no contiene subcarpetas ni conversaciones.
+                          Esta acción no se puede deshacer. Si la carpeta contiene conversaciones, se moverán a "General". Si contiene subcarpetas, deberás vaciarlas primero.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>

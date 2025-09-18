@@ -14,6 +14,7 @@ import { ProfileDropdown } from './profile-dropdown';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DraggableFolderItem } from './draggable-folder-item';
 import { DraggableConversationCard } from './draggable-conversation-card';
+import { useTheme } from 'next-themes'; // Importar useTheme
 
 interface Conversation {
   id: string;
@@ -52,6 +53,7 @@ export function ConversationSidebar({
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [isGeneralExpanded, setIsGeneralExpanded] = useState(true);
+  const { theme } = useTheme(); // Obtener el tema actual
 
   // Drag and Drop State
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
@@ -414,7 +416,8 @@ export function ConversationSidebar({
               <Card
                 className={cn(
                   "cursor-pointer hover:bg-sidebar-accent transition-colors group relative",
-                  selectedConversationId === null && isGeneralExpanded && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary",
+                  selectedConversationId === null && isGeneralExpanded && "bg-sidebar-primary",
+                  selectedConversationId === null && isGeneralExpanded && (theme === 'light' ? "text-black" : "text-sidebar-primary-foreground"), // Condición para el color del texto
                   draggingOverFolderId === null && draggedItemType === 'conversation' && "border-2 border-blue-500 bg-blue-500/10" // Visual feedback for drag over General
                 )}
                 onClick={() => setIsGeneralExpanded(!isGeneralExpanded)}
