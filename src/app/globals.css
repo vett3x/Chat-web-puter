@@ -80,7 +80,11 @@
 
     --sidebar-border: 220 13% 91%;
 
-    --sidebar-ring: 217.2 91.2% 59.8%}
+    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    --user-avatar-shadow: 210 90% 50%; /* Blue for user avatar shadow */
+    --ai-avatar-shadow: 30 90% 50%;   /* Orange for AI avatar shadow */
+  }
   .dark {
 
     --background: 220 10% 7%; /* Slightly lighter dark gray for chat area */
@@ -156,7 +160,11 @@
 
     --sidebar-border: 220 10% 15%;
 
-    --sidebar-ring: 220 10% 30%;}
+    --sidebar-ring: 220 10% 30%;
+
+    --user-avatar-shadow: 210 90% 50%; /* Blue for user avatar shadow */
+    --ai-avatar-shadow: 30 90% 50%;   /* Orange for AI avatar shadow */
+  }
 }
 
 

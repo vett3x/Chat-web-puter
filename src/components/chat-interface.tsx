@@ -347,11 +347,11 @@ export function ChatInterface({
                   >
                     <div className="flex-shrink-0">
                       {message.role === 'user' ? (
-                        <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                        <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center shadow-lg shadow-user-avatar-shadow/50">
                           <User className="h-4 w-4 text-primary-foreground" />
                         </div>
                       ) : (
-                        <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center">
+                        <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center shadow-lg shadow-ai-avatar-shadow/50">
                           <Bot className="h-4 w-4 text-secondary-foreground" />
                         </div>
                       )}
