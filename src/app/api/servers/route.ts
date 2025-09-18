@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { provisionServer } from '@/lib/server-provisioning';
 
@@ -16,8 +17,8 @@ const serverSchema = z.object({
   name: z.string().optional(),
 });
 
-// GET /api/servers - Obtener la lista de servidores registrados
-export async function GET(req: NextRequest) {
+// Helper function to get the session
+async function getSession() {
   const cookieStore = cookies() as any;
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -36,19 +37,29 @@ export async function GET(req: NextRequest) {
       },
     }
   );
+  return supabase.auth.getSession();
+}
 
-  const { data: { session } } = await supabase.auth.getSession();
+// GET /api/servers - Obtener la lista de servidores registrados
+export async function GET(req: NextRequest) {
+  const { data: { session } } = await getSession();
   if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
   }
 
-  const { data: servers, error } = await supabase
+  // Use admin client to bypass RLS, relying on the superuser check for security
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const { data: servers, error } = await supabaseAdmin
     .from('user_servers')
     .select('id, name, ip_address, ssh_port, ssh_username, status, provisioning_log')
-    .eq('user_id', session!.user.id);
+    .eq('user_id', session.user.id);
 
   if (error) {
-    console.error('Error fetching servers from Supabase:', JSON.stringify(error, null, 2));
+    console.error('Error fetching servers from Supabase (admin):', JSON.stringify(error, null, 2));
     return NextResponse.json({ message: 'Error al cargar los servidores.' }, { status: 500 });
   }
 
@@ -57,26 +68,7 @@ export async function GET(req: NextRequest) {
 
 // POST /api/servers - Añadir un nuevo servidor y empezar el aprovisionamiento
 export async function POST(req: NextRequest) {
-  const cookieStore = cookies() as any;
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          // In a Route Handler, the cookie store is read-only.
-        },
-        remove(name: string, options: CookieOptions) {
-          // In a Route Handler, the cookie store is read-only.
-        },
-      },
-    }
-  );
-
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await getSession();
   if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
   }
@@ -85,10 +77,16 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const newServerData = serverSchema.parse(body);
 
-    const { data: newServer, error } = await supabase
+    // Use admin client to bypass RLS
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { data: newServer, error } = await supabaseAdmin
       .from('user_servers')
       .insert({
-        user_id: session!.user.id,
+        user_id: session.user.id,
         name: newServerData.name,
         ip_address: newServerData.ip_address,
         ssh_port: newServerData.ssh_port || 22,
@@ -100,7 +98,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) {
-      console.error('Error inserting server into Supabase:', error);
+      console.error('Error inserting server into Supabase (admin):', error);
       return NextResponse.json({ message: 'Error al guardar el servidor.' }, { status: 500 });
     }
 
@@ -122,26 +120,7 @@ export async function POST(req: NextRequest) {
 
 // DELETE /api/servers - Eliminar un servidor
 export async function DELETE(req: NextRequest) {
-  const cookieStore = cookies() as any;
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          // In a Route Handler, the cookie store is read-only.
-        },
-        remove(name: string, options: CookieOptions) {
-          // In a Route Handler, the cookie store is read-only.
-        },
-      },
-    }
-  );
-
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await getSession();
   if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
   }
@@ -153,14 +132,20 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ message: 'ID de servidor no proporcionado.' }, { status: 400 });
   }
 
-  const { error } = await supabase
+  // Use admin client to bypass RLS
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const { error } = await supabaseAdmin
     .from('user_servers')
     .delete()
     .eq('id', id)
-    .eq('user_id', session!.user.id);
+    .eq('user_id', session.user.id); // Still check user_id for safety
 
   if (error) {
-    console.error('Error deleting server from Supabase:', error);
+    console.error('Error deleting server from Supabase (admin):', error);
     return NextResponse.json({ message: 'Error al eliminar el servidor.' }, { status: 500 });
   }
 
