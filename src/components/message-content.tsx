@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { CodeBlock } from './code-block';
+import { TextAnimator } from './text-animator';
 
 interface MessageContentProps {
   content: string;
@@ -58,7 +59,11 @@ export function MessageContent({ content, isNew }: MessageContentProps) {
             />
           );
         }
-        return <span key={index} className="whitespace-pre-wrap">{part.value}</span>;
+        return isNew ? (
+          <TextAnimator key={index} text={part.value} className="whitespace-pre-wrap" />
+        ) : (
+          <span key={index} className="whitespace-pre-wrap">{part.value}</span>
+        );
       })}
     </>
   );
