@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot, User, Loader2, MessageSquarePlus } from 'lucide-react';
+import { Send, Bot, User, Loader2, MessageSquarePlus, Square } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/components/session-context-provider';
@@ -78,6 +78,7 @@ export function ChatInterface({
   const [isContextLoading, setIsContextLoading] = useState(false);
   const [isContextInitialized, setIsContextInitialized] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const checkPuter = () => {
@@ -280,6 +281,7 @@ export function ChatInterface({
               charIndex++;
           } else {
               clearInterval(typingInterval);
+              intervalRef.current = null;
               const finalAssistantMessage: Message = {
                   id: tempAssistantMessageId!,
                   content: messageContent,
@@ -299,6 +301,7 @@ export function ChatInterface({
               });
           }
       }, 5);
+      intervalRef.current = typingInterval;
 
     } catch (error) {
       console.error('Error sending message:', error);
@@ -311,6 +314,44 @@ export function ChatInterface({
     }
   };
 
+  const handleStopGeneration = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+      setIsLoading(false);
+
+      const currentConvId = conversationId;
+      if (!currentConvId) {
+        console.error("Cannot stop generation without a conversation ID.");
+        return;
+      }
+
+      setMessages(prevMessages => {
+        const lastMessage = prevMessages[prevMessages.length - 1];
+
+        if (lastMessage && lastMessage.role === 'assistant' && lastMessage.content.trim() === '') {
+          return prevMessages.slice(0, -1);
+        }
+
+        if (lastMessage && lastMessage.role === 'assistant') {
+          saveMessageToDB(currentConvId, lastMessage).then(savedMsg => {
+            if (savedMsg) {
+              setMessages(currentMsgs =>
+                currentMsgs.map(msg =>
+                  msg.id === lastMessage.id ? savedMsg : msg
+                )
+              );
+            }
+          });
+        }
+        
+        return prevMessages;
+      });
+      
+      toast.info('Generación detenida.');
+    }
+  }, [conversationId]);
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -319,6 +360,9 @@ export function ChatInterface({
   };
 
   const startNewChat = () => {
+    if (intervalRef.current) {
+      handleStopGeneration();
+    }
     setMessages([]);
     onNewConversationCreated(null as any);
     setIsContextInitialized(false);
@@ -327,6 +371,7 @@ export function ChatInterface({
 
   const lastMessage = messages[messages.length - 1];
   const isAIThinking = isLoading && lastMessage?.role === 'user';
+  const isStreaming = isLoading && !isAIThinking;
 
   if (!isPuterReady) {
     return (
@@ -476,17 +521,23 @@ export function ChatInterface({
             disabled={isLoading || !userId}
             className="flex-1"
           />
-          <Button
-            onClick={sendMessage}
-            disabled={isLoading || !inputMessage.trim() || !userId}
-            size="icon"
-          >
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
+          {isStreaming ? (
+            <Button onClick={handleStopGeneration} variant="destructive" size="icon">
+              <Square className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button
+              onClick={sendMessage}
+              disabled={isLoading || !inputMessage.trim() || !userId}
+              size="icon"
+            >
+              {isAIThinking ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          )}
         </div>
       </div>
     </div>
