@@ -417,7 +417,7 @@ export function ConversationSidebar({
                 className={cn(
                   "cursor-pointer hover:bg-sidebar-accent transition-colors group relative",
                   selectedConversationId === null && isGeneralExpanded && "bg-sidebar-primary",
-                  selectedConversationId === null && isGeneralExpanded && (theme === 'light' ? "text-black" : "text-sidebar-primary-foreground"), // Condición para el color del texto
+                  selectedConversationId === null && isGeneralExpanded && "text-sidebar-primary-foreground", // Simplificado
                   draggingOverFolderId === null && draggedItemType === 'conversation' && "border-2 border-blue-500 bg-blue-500/10" // Visual feedback for drag over General
                 )}
                 onClick={() => setIsGeneralExpanded(!isGeneralExpanded)}

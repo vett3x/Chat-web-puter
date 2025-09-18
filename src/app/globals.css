@@ -70,9 +70,9 @@
 
     --sidebar-foreground: 240 5.3% 26.1%;
 
-    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary: 210 90% 50%; /* Cambiado a azul para el tema claro */
 
-    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-primary-foreground: 0 0% 9%; /* Cambiado a oscuro para contraste en azul */
 
     --sidebar-accent: 240 4.8% 95.9%;
 
