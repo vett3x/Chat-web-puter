@@ -172,17 +172,12 @@ function ServerListItem({ server, onDeleteServer, onSelectServerForDetails }: { 
         </div>
       </div>
       <CollapsibleContent>
-        <div className="mt-2 rounded-md">
+        <div className="mt-2 rounded-md max-h-[400px] overflow-auto">
           <SyntaxHighlighter 
             language="bash" 
             style={vscDarkPlus} 
             customStyle={{ 
-              margin: 0, 
-              background: '#1E1E1E', 
-              maxHeight: '400px', 
-              overflowY: 'auto',
-              overflowX: 'auto',
-              whiteSpace: 'pre', // Changed from 'pre-wrap' to 'pre'
+              margin: 0,
             }} 
             codeTagProps={{ 
               style: { 
