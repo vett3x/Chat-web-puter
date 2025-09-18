@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -14,10 +14,21 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Server } from 'lucide-react';
+import { Loader2, PlusCircle, Server, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const serverFormSchema = z.object({
   ip_address: z.string().ip({ message: 'Dirección IP inválida.' }),
@@ -28,9 +39,18 @@ const serverFormSchema = z.object({
 
 type ServerFormValues = z.infer<typeof serverFormSchema>;
 
+interface RegisteredServer {
+  id: string;
+  name?: string;
+  ip_address: string;
+}
+
+const DEEPCODER_API_URL = process.env.NEXT_PUBLIC_DEEPCODER_API_URL;
+
 export function ServerManagementForm() {
   const [isAddingServer, setIsAddingServer] = useState(false);
-  const [servers, setServers] = useState<ServerFormValues[]>([]); // Placeholder for server list
+  const [servers, setServers] = useState<RegisteredServer[]>([]);
+  const [isLoadingServers, setIsLoadingServers] = useState(true);
 
   const form = useForm<ServerFormValues>({
     resolver: zodResolver(serverFormSchema),
@@ -42,26 +62,75 @@ export function ServerManagementForm() {
     },
   });
 
+  const fetchServers = useCallback(async () => {
+    if (!DEEPCODER_API_URL) {
+      console.error('NEXT_PUBLIC_DEEPCODER_API_URL no está configurada.');
+      toast.error('Error de configuración: URL del backend no definida.');
+      setIsLoadingServers(false);
+      return;
+    }
+    setIsLoadingServers(true);
+    try {
+      const response = await fetch(`${DEEPCODER_API_URL}/servers`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data: RegisteredServer[] = await response.json();
+      setServers(data);
+    } catch (error: any) {
+      console.error('Error fetching servers:', error);
+      toast.error(`Error al cargar los servidores: ${error.message}`);
+    } finally {
+      setIsLoadingServers(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchServers();
+  }, [fetchServers]);
+
   const onSubmit = async (values: ServerFormValues) => {
+    if (!DEEPCODER_API_URL) {
+      toast.error('Error de configuración: URL del backend no definida.');
+      return;
+    }
     setIsAddingServer(true);
     try {
-      // In a real application, you would send these details to your separate backend
-      // The backend would then establish SSH connection, verify, and store securely.
-      console.log('Attempting to add server:', values);
-      toast.info('Simulando la adición del servidor. Los datos se enviarán a tu backend de orquestación.');
+      const response = await fetch(`${DEEPCODER_API_URL}/servers`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(values),
+      });
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
 
-      setServers(prev => [...prev, values]);
+      const result = await response.json();
+      toast.success(result.message || 'Servidor añadido correctamente.');
       form.reset();
-      toast.success('Servidor añadido (simulado) correctamente.');
+      fetchServers(); // Refresh the list of servers
     } catch (error: any) {
-      console.error('Error adding server:', error.message);
+      console.error('Error adding server:', error);
       toast.error(`Error al añadir el servidor: ${error.message}`);
     } finally {
       setIsAddingServer(false);
     }
+  };
+
+  const handleDeleteServer = async (serverId: string) => {
+    if (!DEEPCODER_API_URL) {
+      toast.error('Error de configuración: URL del backend no definida.');
+      return;
+    }
+    // In a real scenario, you'd send a DELETE request to your backend
+    // For now, we'll simulate deletion from the frontend list
+    toast.info('Simulando la eliminación del servidor. Esto debería ser manejado por el backend.');
+    setServers(prev => prev.filter(server => server.id !== serverId));
+    toast.success('Servidor eliminado (simulado) correctamente.');
   };
 
   return (
@@ -149,16 +218,43 @@ export function ServerManagementForm() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {servers.length === 0 ? (
+          {isLoadingServers ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <p className="ml-2 text-muted-foreground">Cargando servidores...</p>
+            </div>
+          ) : servers.length === 0 ? (
             <p className="text-muted-foreground">No hay servidores registrados aún.</p>
           ) : (
             <div className="space-y-4">
-              {servers.map((server, index) => (
-                <div key={index} className="border p-4 rounded-md bg-muted/50">
-                  <h4 className="font-semibold">{server.name || 'Servidor sin nombre'}</h4>
-                  <p className="text-sm text-muted-foreground">IP: {server.ip_address}</p>
-                  <p className="text-sm text-muted-foreground">Usuario SSH: {server.ssh_username}</p>
-                  {/* Do NOT display SSH password */}
+              {servers.map((server) => (
+                <div key={server.id} className="border p-4 rounded-md bg-muted/50 flex items-center justify-between">
+                  <div>
+                    <h4 className="font-semibold">{server.name || 'Servidor sin nombre'}</h4>
+                    <p className="text-sm text-muted-foreground">IP: {server.ip_address}</p>
+                  </div>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="icon" className="h-8 w-8">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>¿Estás seguro de eliminar este servidor?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Esta acción eliminará el servidor "{server.name || server.ip_address}" de la lista.
+                          (Actualmente es una eliminación simulada en el frontend).
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDeleteServer(server.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                          Eliminar
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               ))}
             </div>
