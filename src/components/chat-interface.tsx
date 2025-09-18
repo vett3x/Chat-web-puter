@@ -19,6 +19,7 @@ interface Message {
   model?: string;
   timestamp: Date;
   isNew?: boolean;
+  isTyping?: boolean; // Para el indicador de carga en línea
 }
 
 const AVAILABLE_MODELS = [
@@ -59,10 +60,8 @@ export function ChatInterface({
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [selectedModel, setSelectedModel] = useState('claude-sonnet-4');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // Ahora solo para deshabilitar el input/botón
   const [isPuterReady, setIsPuterReady] = useState(false);
-  const [isContextLoading, setIsContextLoading] = useState(false);
-  const [isContextInitialized, setIsContextInitialized] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -78,7 +77,6 @@ export function ChatInterface({
 
   const fetchMessages = useCallback(async (convId: string) => {
     setIsLoading(true);
-    setIsContextInitialized(false);
     const { data, error } = await supabase
       .from('messages')
       .select('id, content, role, model, created_at')
@@ -100,7 +98,6 @@ export function ChatInterface({
           timestamp: new Date(msg.created_at),
         }))
       );
-      setIsContextInitialized(true);
     }
     setIsLoading(false);
   }, [userId]);
@@ -110,7 +107,6 @@ export function ChatInterface({
       fetchMessages(conversationId);
     } else {
       setMessages([]);
-      setIsContextInitialized(false);
     }
   }, [conversationId, userId, fetchMessages]);
 
@@ -121,7 +117,7 @@ export function ChatInterface({
         scrollElement.scrollTop = scrollElement.scrollHeight;
       }
     }
-  }, [messages, isLoading, isContextLoading]);
+  }, [messages, isLoading]);
 
   const createNewConversationInDB = async (initialMessageContent: string) => {
     if (!userId) {
@@ -145,7 +141,7 @@ export function ChatInterface({
     return data.id;
   };
 
-  const saveMessageToDB = async (convId: string, msg: Message) => {
+  const saveMessageToDB = async (convId: string, msg: Omit<Message, 'timestamp' | 'id'>) => {
     if (!userId) {
       toast.error('Usuario no autenticado.');
       return null;
@@ -156,26 +152,22 @@ export function ChatInterface({
       role: msg.role,
       content: msg.content,
       model: msg.model,
-    }).select('id, content, role, model, created_at').single();
+    }).select('id, created_at').single();
 
     if (error) {
       console.error('Error saving message:', error.message || error.details || error);
       toast.error('Error al guardar el mensaje en la base de datos.');
       return null;
     }
-    return {
-      id: data.id,
-      content: data.content,
-      role: data.role as 'user' | 'assistant',
-      model: data.model || undefined,
-      timestamp: new Date(data.created_at),
-    };
+    return { id: data.id, timestamp: new Date(data.created_at) };
   };
 
   const sendMessage = async () => {
     if (!inputMessage.trim() || isLoading || !isPuterReady || !userId) return;
 
-    const tempUserMessageId = Date.now().toString();
+    setIsLoading(true); // Deshabilita el botón de enviar
+
+    const tempUserMessageId = `user-${Date.now()}`;
     const userMessage: Message = {
       id: tempUserMessageId,
       content: inputMessage,
@@ -185,125 +177,92 @@ export function ChatInterface({
 
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
-    setIsLoading(true);
 
     let currentConvId = conversationId;
-    let shouldFetchContextFromDB = false;
-
     if (!currentConvId) {
-      shouldFetchContextFromDB = true;
       currentConvId = await createNewConversationInDB(userMessage.content);
       if (!currentConvId) {
         setIsLoading(false);
+        setMessages(prev => prev.filter(msg => msg.id !== tempUserMessageId)); // Eliminar mensaje de usuario si falla la creación
         return;
       }
     }
 
-    const savedUserMessage = await saveMessageToDB(currentConvId, userMessage);
-    if (!savedUserMessage) {
-      setIsLoading(false);
-      setMessages(prev => prev.filter(msg => msg.id !== tempUserMessageId));
-      return;
-    }
-    setMessages(prev => prev.map(msg => msg.id === tempUserMessageId ? savedUserMessage : msg));
+    const finalConvId = currentConvId;
+    saveMessageToDB(finalConvId, userMessage).then(savedData => {
+      if (savedData) {
+        setMessages(prev => prev.map(msg => msg.id === tempUserMessageId ? { ...msg, id: savedData.id, timestamp: savedData.timestamp } : msg));
+      }
+    });
+
+    const tempAssistantId = `assistant-${Date.now()}`;
+    const placeholderMessage: Message = {
+      id: tempAssistantId,
+      content: '',
+      role: 'assistant',
+      model: selectedModel,
+      timestamp: new Date(),
+      isTyping: true,
+    };
+    setMessages(prev => [...prev, placeholderMessage]);
 
     try {
-      let puterMessages: PuterMessage[] = [];
-      const currentMessages = [...messages, savedUserMessage];
+      const { data: historyData, error: historyError } = await supabase
+        .from('messages')
+        .select('content, role')
+        .eq('conversation_id', finalConvId)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true });
 
-      if (!isContextInitialized || shouldFetchContextFromDB) {
-        setIsContextLoading(true);
-        const { data: historyData, error: historyError } = await supabase
-          .from('messages')
-          .select('content, role')
-          .eq('conversation_id', currentConvId)
-          .eq('user_id', userId)
-          .order('created_at', { ascending: true });
+      if (historyError) throw new Error('Error al cargar el historial para el contexto de la IA.');
 
-        if (historyError) {
-          throw new Error('Error al cargar el historial para el contexto de la IA.');
-        }
-        puterMessages = historyData.map(msg => ({
-          role: msg.role as 'user' | 'assistant',
-          content: msg.content
-        }));
-        setIsContextInitialized(true);
-      } else {
-        puterMessages = currentMessages.map(msg => ({
-          role: msg.role,
-          content: msg.content
-        }));
-      }
+      const puterMessages: PuterMessage[] = historyData.map(msg => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content
+      }));
 
       const systemMessage: PuterMessage = {
         role: 'system',
         content: "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante."
       };
 
-      const response = await window.puter.ai.chat([systemMessage, ...puterMessages], {
-        model: selectedModel
-      });
-      setIsContextLoading(false);
+      const response = await window.puter.ai.chat([systemMessage, ...puterMessages], { model: selectedModel });
 
       if (response && response.error) {
-        const apiErrorMessage = typeof response.error === 'string' 
-          ? response.error 
-          : (response.error.message || JSON.stringify(response.error));
+        const apiErrorMessage = typeof response.error === 'string' ? response.error : (response.error.message || JSON.stringify(response.error));
         throw new Error(`Error de la IA: ${apiErrorMessage}`);
       }
 
       let messageContent = 'Sin contenido';
-      if (response && response.message && Array.isArray(response.message.content) && response.message.content.length > 0 && response.message.content[0].text) {
+      if (response?.message?.content?.[0]?.text) {
         messageContent = response.message.content[0].text;
-      } else if (response && typeof response.content === 'string') {
+      } else if (typeof response?.content === 'string') {
         messageContent = response.content;
       } else {
         console.error('Unexpected AI response format:', response);
         throw new Error('La respuesta de la IA tuvo un formato inesperado.');
       }
 
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
+      const assistantMessageData = {
         content: messageContent,
-        role: 'assistant',
+        role: 'assistant' as const,
         model: selectedModel,
-        timestamp: new Date(),
-        isNew: true,
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
-      setIsLoading(false);
+      setMessages(prev => prev.map(msg => msg.id === tempAssistantId ? { ...msg, ...assistantMessageData, isTyping: false, isNew: true } : msg));
 
-      const savedAssistantMessage = await saveMessageToDB(currentConvId, assistantMessage);
-      if (savedAssistantMessage) {
-        setMessages(prev =>
-          prev.map(msg =>
-            msg.id === assistantMessage.id ? savedAssistantMessage : msg
-          )
-        );
-      } else {
-        setMessages(prev => prev.filter(msg => msg.id !== assistantMessage.id));
-        toast.error('Error al guardar la respuesta del asistente.');
-      }
+      saveMessageToDB(finalConvId, assistantMessageData).then(savedData => {
+        if (savedData) {
+          setMessages(prev => prev.map(msg => msg.id === tempAssistantId ? { ...msg, id: savedData.id, timestamp: savedData.timestamp } : msg));
+        }
+      });
 
     } catch (error) {
-      console.error('Error sending message:', error);
-      
-      let errorMessage = 'Error al enviar el mensaje. Por favor, intenta de nuevo.';
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      } else if (typeof error === 'object' && error !== null) {
-        const errorString = JSON.stringify(error);
-        if (errorString !== '{}') {
-          errorMessage = `La API devolvió un error: ${errorString}`;
-        }
-      } else if (typeof error === 'string' && error) {
-        errorMessage = error;
-      }
-
+      const errorMessage = error instanceof Error ? error.message : 'Ocurrió un error desconocido.';
       toast.error(errorMessage);
-      setIsLoading(false);
-      setIsContextLoading(false);
+      setMessages(prev => prev.map(msg => msg.id === tempAssistantId ? { ...msg, content: `Error: ${errorMessage}`, isTyping: false } : msg));
+    } finally {
+      setIsLoading(false); // Habilita el botón de enviar
     }
   };
 
@@ -317,7 +276,6 @@ export function ChatInterface({
   const startNewChat = () => {
     setMessages([]);
     onNewConversationCreated(null as any);
-    setIsContextInitialized(false);
     toast.success('Nuevo chat iniciado');
   };
 
@@ -410,8 +368,15 @@ export function ChatInterface({
                           : 'bg-muted'
                       }`}
                     >
-                      <MessageContent content={message.content} isNew={!!message.isNew} />
-                      {message.model && (
+                      {message.isTyping ? (
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="text-sm">Pensando...</span>
+                        </div>
+                      ) : (
+                        <MessageContent content={message.content} isNew={!!message.isNew} />
+                      )}
+                      {message.model && !message.isTyping && (
                         <div className="text-xs opacity-70 mt-2">
                           {AVAILABLE_MODELS.find(m => m.value === message.model)?.label}
                         </div>
@@ -420,40 +385,6 @@ export function ChatInterface({
                   </div>
                 </div>
               ))
-            )}
-            {isLoading && messages[messages.length - 1]?.role === 'user' && (
-              <div className="flex gap-3 justify-start">
-                <div className="flex gap-3 max-w-[80%]">
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center">
-                      <Bot className="h-4 w-4 text-secondary-foreground" />
-                    </div>
-                  </div>
-                  <div className="bg-muted rounded-lg p-3">
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-sm">Pensando...</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            {isContextLoading && (
-              <div className="flex gap-3 justify-start">
-                <div className="flex gap-3 max-w-[80%]">
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center">
-                      <Bot className="h-4 w-4 text-secondary-foreground" />
-                    </div>
-                  </div>
-                  <div className="bg-muted rounded-lg p-3">
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-sm">Cargando contexto...</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
             )}
           </div>
         </ScrollArea>
