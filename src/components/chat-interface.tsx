@@ -325,6 +325,9 @@ export function ChatInterface({
     toast.success('Nuevo chat iniciado');
   };
 
+  const lastMessage = messages[messages.length - 1];
+  const isAIThinking = isLoading && lastMessage?.role === 'user';
+
   if (!isPuterReady) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -425,6 +428,23 @@ export function ChatInterface({
                     </div>
                   </div>
                 ))
+              )}
+              {isAIThinking && (
+                <div className="flex gap-3 justify-start">
+                  <div className="flex gap-3 max-w-[80%]">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center">
+                        <Bot className="h-4 w-4 text-secondary-foreground" />
+                      </div>
+                    </div>
+                    <div className="bg-muted rounded-lg p-3">
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-sm">Pensando...</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               )}
               {isContextLoading && (
                 <div className="flex gap-3 justify-start">
