@@ -368,8 +368,8 @@ export function ChatInterface({
           </div>
         </CardHeader>
 
-        <CardContent className="flex-1 flex flex-col p-0">
-          <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+        <CardContent className="flex-1 flex flex-col p-0 min-h-0"> {/* Añadido min-h-0 */}
+          <ScrollArea className="flex-1 p-4 min-h-0" ref={scrollAreaRef}> {/* Añadido min-h-0 */}
             <div className="space-y-4">
               {messages.length === 0 && !isLoading ? (
                 <div className="text-center text-muted-foreground py-8">
