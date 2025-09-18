@@ -43,6 +43,10 @@
 
     --info-foreground: 216 91% 35%;
 
+    --warning: 38 92% 50%;
+    
+    --warning-foreground: 0 0% 100%;
+
     --border: 0 0% 89.8%;
 
     --input: 0 0% 89.8%;
@@ -114,6 +118,10 @@
     --info: 216 91% 25%;
 
     --info-foreground: 214 91% 85%;
+
+    --warning: 38 92% 50%;
+
+    --warning-foreground: 0 0% 0%;
 
     --border: 220 10% 15%; /* Darker gray for borders */
 

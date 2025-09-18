@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Button } from '@/components/ui/button';
-import { Check, Clipboard, Download, ChevronsUpDown, FileCode } from 'lucide-react';
+import { Check, Clipboard, Download, ChevronsUpDown, Loader2, CheckCircle2 } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface CodeBlockProps {
   language: string;
@@ -19,13 +20,16 @@ export function CodeBlock({ language, code, filename, isNew }: CodeBlockProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [isOpen, setIsOpen] = useState(true);
   const [displayedCode, setDisplayedCode] = useState(isNew ? '' : code);
+  const [isTyping, setIsTyping] = useState(!!isNew);
 
   useEffect(() => {
     if (!isNew) {
       setDisplayedCode(code);
+      setIsTyping(false);
       return;
     }
 
+    setIsTyping(true);
     setDisplayedCode('');
     let timeoutId: NodeJS.Timeout;
 
@@ -37,9 +41,13 @@ export function CodeBlock({ language, code, filename, isNew }: CodeBlockProps) {
           i++;
           const delay = 1; // Velocidad de escritura muy rápida
           timeoutId = setTimeout(typeCharacter, delay);
+        } else {
+          setIsTyping(false);
         }
       };
       typeCharacter();
+    } else {
+      setIsTyping(false);
     }
 
     return () => {
@@ -82,11 +90,22 @@ export function CodeBlock({ language, code, filename, isNew }: CodeBlockProps) {
   };
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="rounded-lg border bg-muted/50 my-2">
+    <Collapsible
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      className={cn(
+        "rounded-lg border bg-muted/50 my-2 transition-all duration-300",
+        isTyping && "border-warning shadow-[0_0_10px_1px_hsl(var(--warning))]"
+      )}
+    >
       <div className="flex items-center justify-between p-2 pl-4 bg-muted/80 rounded-t-lg">
-        <div className="flex items-center gap-2">
-          <FileCode className="h-4 w-4" />
-          <span className="text-sm font-mono">{filename || `${language} code`}</span>
+        <div className="flex items-center gap-2 overflow-hidden">
+          {isTyping ? (
+            <Loader2 className="h-4 w-4 animate-spin text-warning flex-shrink-0" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+          )}
+          <span className="text-sm font-mono truncate">{filename || `${language} code`}</span>
         </div>
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" onClick={handleDownload} className="h-7 w-7">

@@ -235,7 +235,12 @@ export function ChatInterface({
         }));
       }
 
-      const response = await window.puter.ai.chat(puterMessages, {
+      const systemMessage: PuterMessage = {
+        role: 'system',
+        content: "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante."
+      };
+
+      const response = await window.puter.ai.chat([systemMessage, ...puterMessages], {
         model: selectedModel
       });
       setIsContextLoading(false);
