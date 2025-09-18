@@ -34,11 +34,12 @@ type RenderablePart = PuterTextContentPart | PuterImageContentPart | CodeBlockPa
 interface MessageContentProps {
   content: string | PuterContentPart[]; // Updated to allow array of parts
   isNew?: boolean;
+  aiResponseSpeed: 'slow' | 'normal' | 'fast'; // New prop for AI response speed
 }
 
 const codeBlockRegex = /```(\w+)(?::([\w./-]+))?\n([\s\S]*?)\n```/g;
 
-export function MessageContent({ content, isNew }: MessageContentProps) {
+export function MessageContent({ content, isNew, aiResponseSpeed }: MessageContentProps) {
   const [animatedPartsCount, setAnimatedPartsCount] = useState(0);
 
   // Helper to render a single part
@@ -80,6 +81,7 @@ export function MessageContent({ content, isNew }: MessageContentProps) {
                 code={segment.code || ''}
                 isNew={isAnimating}
                 onAnimationComplete={onComplete}
+                animationSpeed={aiResponseSpeed} // Pass speed
               />
             );
           }
@@ -90,6 +92,7 @@ export function MessageContent({ content, isNew }: MessageContentProps) {
               className="whitespace-pre-wrap"
               isNew={isAnimating}
               onAnimationComplete={onComplete}
+              animationSpeed={aiResponseSpeed} // Pass speed
             />
           );
         });
@@ -103,6 +106,7 @@ export function MessageContent({ content, isNew }: MessageContentProps) {
           className="whitespace-pre-wrap"
           isNew={isAnimating}
           onAnimationComplete={onComplete}
+          animationSpeed={aiResponseSpeed} // Pass speed
         />
       );
     } else if (part.type === 'image_url') {
@@ -127,6 +131,7 @@ export function MessageContent({ content, isNew }: MessageContentProps) {
           code={part.code || ''}
           isNew={isAnimating}
           onAnimationComplete={onComplete}
+          animationSpeed={aiResponseSpeed} // Pass speed
         />
       );
     }

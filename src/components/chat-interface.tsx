@@ -83,6 +83,7 @@ interface ChatInterfaceProps {
   conversationId: string | null;
   onNewConversationCreated: (conversationId: string) => void;
   onConversationTitleUpdate: (conversationId: string, newTitle: string) => void;
+  aiResponseSpeed: 'slow' | 'normal' | 'fast'; // New prop for AI response speed
 }
 
 export function ChatInterface({
@@ -90,6 +91,7 @@ export function ChatInterface({
   conversationId,
   onNewConversationCreated,
   onConversationTitleUpdate,
+  aiResponseSpeed, // Destructure new prop
 }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -588,7 +590,7 @@ export function ChatInterface({
                           <span className="text-sm">Pensando...</span>
                         </div>
                       ) : (
-                        <MessageContent content={message.content} isNew={!!message.isNew} />
+                        <MessageContent content={message.content} isNew={!!message.isNew} aiResponseSpeed={aiResponseSpeed} />
                       )}
                       {message.model && !message.isTyping && (
                         <div className="text-xs opacity-70 mt-2">

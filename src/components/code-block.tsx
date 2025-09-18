@@ -15,9 +15,16 @@ interface CodeBlockProps {
   filename?: string;
   isNew?: boolean;
   onAnimationComplete?: () => void;
+  animationSpeed: 'slow' | 'normal' | 'fast'; // New prop
 }
 
-export function CodeBlock({ language, code, filename, isNew, onAnimationComplete }: CodeBlockProps) {
+const SPEED_CONFIG = {
+  slow: { targetCharsPerSecond: 500, chunkSize: 10, minDelay: 2 },
+  normal: { targetCharsPerSecond: 1000, chunkSize: 15, minDelay: 1 },
+  fast: { targetCharsPerSecond: 2000, chunkSize: 20, minDelay: 0.5 },
+};
+
+export function CodeBlock({ language, code, filename, isNew, onAnimationComplete, animationSpeed }: CodeBlockProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [isOpen, setIsOpen] = useState(true);
   const [displayedCode, setDisplayedCode] = useState(isNew ? '' : code);
@@ -39,24 +46,21 @@ export function CodeBlock({ language, code, filename, isNew, onAnimationComplete
     setDisplayedCode('');
     
     if (code) {
-      // --- Lógica de animación adaptativa y gradual ---
-      const TARGET_CHARS_PER_SECOND = 1000;
-      const CHUNK_SIZE = 15;
-      const MIN_DELAY = 1;
-      const MAX_DURATION = 6000;
+      const { targetCharsPerSecond, chunkSize, minDelay } = SPEED_CONFIG[animationSpeed];
+      const MAX_DURATION = 6000; // Max duration remains constant
 
       const totalDuration = Math.min(
-        (code.length / TARGET_CHARS_PER_SECOND) * 1000,
+        (code.length / targetCharsPerSecond) * 1000,
         MAX_DURATION
       );
       
-      const numberOfChunks = Math.ceil(code.length / CHUNK_SIZE);
-      const delayPerChunk = Math.max(totalDuration / numberOfChunks, MIN_DELAY);
+      const numberOfChunks = Math.ceil(code.length / chunkSize);
+      const delayPerChunk = Math.max(totalDuration / numberOfChunks, minDelay);
 
       let i = 0;
       const typeChunk = () => {
         if (i < code.length) {
-          const nextI = Math.min(i + CHUNK_SIZE, code.length);
+          const nextI = Math.min(i + chunkSize, code.length);
           setDisplayedCode(code.substring(0, nextI));
           i = nextI;
           timeoutRef.current = setTimeout(typeChunk, delayPerChunk);
@@ -76,7 +80,7 @@ export function CodeBlock({ language, code, filename, isNew, onAnimationComplete
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [code, isNew, onAnimationComplete]);
+  }, [code, isNew, onAnimationComplete, animationSpeed]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(code).then(() => {

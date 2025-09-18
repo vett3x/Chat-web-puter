@@ -4,13 +4,21 @@ import { ChatInterface } from "@/components/chat-interface";
 import { ConversationSidebar } from "@/components/conversation-sidebar";
 import { useSession } from "@/components/session-context-provider";
 import { useState, useEffect } from "react";
-import { ProfileSettingsDialog } from "@/components/profile-settings-dialog"; // Import the new dialog component
+import { ProfileSettingsDialog } from "@/components/profile-settings-dialog";
+import { AppSettingsDialog } from "@/components/app-settings-dialog"; // Import the new dialog component
 
 export default function Home() {
   const { session, isLoading: isSessionLoading } = useSession();
   const userId = session?.user?.id;
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
-  const [isProfileSettingsOpen, setIsProfileSettingsOpen] = useState(false); // State for dialog visibility
+  const [isProfileSettingsOpen, setIsProfileSettingsOpen] = useState(false);
+  const [isAppSettingsOpen, setIsAppSettingsOpen] = useState(false); // State for AppSettingsDialog visibility
+  const [aiResponseSpeed, setAiResponseSpeed] = useState<'slow' | 'normal' | 'fast'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('aiResponseSpeed') as 'slow' | 'normal' | 'fast') || 'normal';
+    }
+    return 'normal';
+  });
 
   // When user logs in, if there are no conversations, create a new one automatically
   useEffect(() => {
@@ -20,6 +28,12 @@ export default function Home() {
     }
   }, [userId, isSessionLoading]);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('aiResponseSpeed', aiResponseSpeed);
+    }
+  }, [aiResponseSpeed]);
+
   const handleNewConversationCreated = (conversationId: string) => {
     setSelectedConversationId(conversationId);
   };
@@ -28,13 +42,24 @@ export default function Home() {
     setIsProfileSettingsOpen(true);
   };
 
+  const handleOpenAppSettings = () => {
+    setIsAppSettingsOpen(true);
+  };
+
+  const handleAiResponseSpeedChange = (speed: 'slow' | 'normal' | 'fast') => {
+    setAiResponseSpeed(speed);
+    // Optionally, close the dialog after changing speed
+    // setIsAppSettingsOpen(false);
+  };
+
   return (
     <div className="flex h-screen bg-background">
       <aside className="w-[300px] flex-shrink-0">
         <ConversationSidebar
           selectedConversationId={selectedConversationId}
           onSelectConversation={setSelectedConversationId}
-          onOpenProfileSettings={handleOpenProfileSettings} // Pass the function to open the dialog
+          onOpenProfileSettings={handleOpenProfileSettings}
+          onOpenAppSettings={handleOpenAppSettings} // Pass the function to open AppSettingsDialog
         />
       </aside>
       <main className="flex-1 flex flex-col min-w-0">
@@ -46,11 +71,17 @@ export default function Home() {
             // This prop will be used to update the title in the sidebar if the chat interface changes it
             // For now, the sidebar manages its own titles.
           }}
+          aiResponseSpeed={aiResponseSpeed} // Pass AI response speed to ChatInterface
         />
-        {/* Render the ProfileSettingsDialog here */}
         <ProfileSettingsDialog
           open={isProfileSettingsOpen}
           onOpenChange={setIsProfileSettingsOpen}
+        />
+        <AppSettingsDialog
+          open={isAppSettingsOpen}
+          onOpenChange={setIsAppSettingsOpen}
+          aiResponseSpeed={aiResponseSpeed}
+          onAiResponseSpeedChange={handleAiResponseSpeedChange}
         />
       </main>
     </div>

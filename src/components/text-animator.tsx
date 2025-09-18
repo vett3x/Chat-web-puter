@@ -7,9 +7,16 @@ interface TextAnimatorProps {
   className?: string;
   isNew?: boolean;
   onAnimationComplete?: () => void;
+  animationSpeed: 'slow' | 'normal' | 'fast'; // New prop
 }
 
-export function TextAnimator({ text, className, isNew, onAnimationComplete }: TextAnimatorProps) {
+const SPEED_DELAYS = {
+  slow: 50,
+  normal: 25,
+  fast: 15,
+};
+
+export function TextAnimator({ text, className, isNew, onAnimationComplete, animationSpeed }: TextAnimatorProps) {
   const [displayedText, setDisplayedText] = useState(isNew ? '' : text);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -26,6 +33,7 @@ export function TextAnimator({ text, className, isNew, onAnimationComplete }: Te
     setDisplayedText('');
     if (text) {
       let i = 0;
+      const delay = SPEED_DELAYS[animationSpeed];
       intervalRef.current = setInterval(() => {
         if (i < text.length) {
           setDisplayedText(text.substring(0, i + 1));
@@ -36,7 +44,7 @@ export function TextAnimator({ text, className, isNew, onAnimationComplete }: Te
           }
           onAnimationComplete?.();
         }
-      }, 25);
+      }, delay);
     } else {
       onAnimationComplete?.();
     }
@@ -46,7 +54,7 @@ export function TextAnimator({ text, className, isNew, onAnimationComplete }: Te
         clearInterval(intervalRef.current);
       }
     };
-  }, [text, isNew, onAnimationComplete]);
+  }, [text, isNew, onAnimationComplete, animationSpeed]);
 
   return <span className={className}>{displayedText}</span>;
 }

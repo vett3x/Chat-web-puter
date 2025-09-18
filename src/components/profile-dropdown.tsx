@@ -27,10 +27,11 @@ interface Profile {
 }
 
 interface ProfileDropdownProps {
-  onOpenProfileSettings: () => void; // New prop to open the dialog
+  onOpenProfileSettings: () => void; // Prop para abrir el diálogo de perfil
+  onOpenAppSettings: () => void; // Nueva prop para abrir el diálogo de configuración de la app
 }
 
-export function ProfileDropdown({ onOpenProfileSettings }: ProfileDropdownProps) {
+export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings }: ProfileDropdownProps) {
   const { session } = useSession();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -136,7 +137,7 @@ export function ProfileDropdown({ onOpenProfileSettings }: ProfileDropdownProps)
             />
           )}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={onOpenProfileSettings} className="flex items-center cursor-pointer">
+        <DropdownMenuItem onClick={onOpenAppSettings} className="flex items-center cursor-pointer">
           <div className="flex items-center">
             <Settings className="mr-2 h-4 w-4" />
             <span>Configuración</span>
