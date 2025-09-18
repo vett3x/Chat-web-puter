@@ -430,7 +430,7 @@ export function ChatInterface({
               rows={1}
             />
             
-            {/* Nuevo botón redondo para la selección de IA */}
+            {/* Botón redondo para la selección de IA */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -442,7 +442,11 @@ export function ChatInterface({
                   <Bot className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-64 bg-popover text-popover-foreground border-border">
+              <DropdownMenuContent 
+                side="top" 
+                align="end" 
+                className="w-64 bg-popover text-popover-foreground border-border rounded-none"
+              >
                 <DropdownMenuLabel className="text-sm font-semibold">Seleccionar Modelo de IA</DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-border" />
                 {AI_PROVIDERS.map((provider, providerIndex) => (
