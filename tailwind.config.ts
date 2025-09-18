@@ -103,7 +103,11 @@ export default {
   			'accordion-down': 'accordion-down 0.2s ease-out',
   			'accordion-up': 'accordion-up 0.2s ease-out',
         'pulse-glow': 'pulse-glow 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-  		}
+  		},
+      boxShadow: {
+        'avatar-user': '0 0 8px 2px hsl(var(--user-avatar-shadow) / 0.5)',
+        'avatar-ai': '0 0 8px 2px hsl(var(--ai-avatar-shadow) / 0.5)',
+      },
   	}
   },
   plugins: [require("tailwindcss-animate")],
