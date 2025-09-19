@@ -9,6 +9,7 @@ import {
   DialogDescription,
   DialogFooter,
   DialogClose,
+  DialogTrigger,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Server, Dock, HardDrive, Link, Loader2, RefreshCw, XCircle, Play, StopCircle, Trash2, PlusCircle, Terminal } from 'lucide-react';
@@ -62,55 +63,20 @@ const createContainerFormSchema = z.object({
 
 type CreateContainerFormValues = z.infer<typeof createContainerFormSchema>;
 
-function CreateContainerDialog({
-  open,
-  onOpenChange,
-  onCreate,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onCreate: (values: CreateContainerFormValues) => void;
-}) {
-  const form = useForm<CreateContainerFormValues>({
-    resolver: zodResolver(createContainerFormSchema),
-    defaultValues: { image: '', name: '', ports: '' },
-  });
-
-  const onSubmit = (values: CreateContainerFormValues) => {
-    onCreate(values);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Crear Nuevo Contenedor</DialogTitle>
-          <DialogDescription>Ejecuta un nuevo contenedor Docker en este servidor.</DialogDescription>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-            <FormField control={form.control} name="image" render={({ field }) => (<FormItem><FormLabel>Imagen</FormLabel><FormControl><Input placeholder="ubuntu:latest" {...field} /></FormControl><FormMessage /></FormItem>)} />
-            <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nombre (Opcional)</FormLabel><FormControl><Input placeholder="mi-contenedor" {...field} /></FormControl><FormMessage /></FormItem>)} />
-            <FormField control={form.control} name="ports" render={({ field }) => (<FormItem><FormLabel>Puertos (Opcional)</FormLabel><FormControl><Input placeholder="8080:80" {...field} /></FormControl><FormMessage /></FormItem>)} />
-            <DialogFooter>
-              <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
-              <Button type="submit">Crear</Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
   const [containers, setContainers] = useState<DockerContainer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [isConsoleOpen, setIsConsoleOpen] = useState(false);
   const [selectedContainer, setSelectedContainer] = useState<DockerContainer | null>(null);
+
+  const form = useForm<CreateContainerFormValues>({
+    resolver: zodResolver(createContainerFormSchema),
+    defaultValues: { image: '', name: '', ports: '' },
+  });
 
   const fetchContainers = useCallback(async () => {
     setIsLoading(true);
@@ -162,9 +128,7 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
   };
 
   const handleCreateContainer = async (values: CreateContainerFormValues) => {
-    setIsCreateDialogOpen(false);
-    setIsLoading(true);
-    
+    setIsCreating(true);
     try {
       const response = await fetch(`/api/servers/${server.id}/docker/containers/create`, {
         method: 'POST',
@@ -178,11 +142,13 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
       
       toast.success('Contenedor creado exitosamente.');
       await fetchContainers();
+      setIsCreateDialogOpen(false);
+      form.reset();
       
     } catch (error: any) {
       toast.error(error.message);
     } finally {
-      setIsLoading(false);
+      setIsCreating(false);
     }
   };
 
@@ -197,7 +163,31 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2"><Dock className="h-5 w-5" /> Contenedores Docker</CardTitle>
           <div className="flex items-center gap-2">
-            <Button size="sm" onClick={() => setIsCreateDialogOpen(true)}><PlusCircle className="mr-2 h-4 w-4" /> Crear Contenedor</Button>
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Crear Contenedor</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Crear Nuevo Contenedor</DialogTitle>
+                  <DialogDescription>Ejecuta un nuevo contenedor Docker en este servidor.</DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(handleCreateContainer)} className="space-y-4 py-4">
+                    <FormField control={form.control} name="image" render={({ field }) => (<FormItem><FormLabel>Imagen</FormLabel><FormControl><Input placeholder="ubuntu:latest" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nombre (Opcional)</FormLabel><FormControl><Input placeholder="mi-contenedor" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="ports" render={({ field }) => (<FormItem><FormLabel>Puertos (Opcional)</FormLabel><FormControl><Input placeholder="8080:80" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                    <DialogFooter>
+                      <DialogClose asChild><Button type="button" variant="outline" disabled={isCreating}>Cancelar</Button></DialogClose>
+                      <Button type="submit" disabled={isCreating}>
+                        {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Crear
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
             <Button variant="ghost" size="icon" onClick={fetchContainers} disabled={isLoading || actionLoading !== null} title="Refrescar">{isLoading || actionLoading !== null ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}</Button>
           </div>
         </CardHeader>
