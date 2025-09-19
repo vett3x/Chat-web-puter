@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
     }
     // Add the image and a command to keep basic OS containers running for testing.
     // This might not be suitable for all images, but works well for images like 'ubuntu'.
-    command += ` ${image} tail -f /dev/null`;
+    command += ` --entrypoint tail ${image} -f /dev/null`;
 
     const conn = new Client();
     await new Promise<void>((resolve, reject) => {
