@@ -70,7 +70,7 @@ function CreateContainerDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   serverId: string;
-  onContainerCreated: () => void;
+  onContainerCreated: () => Promise<void>; // Make it a promise
 }) {
   const [isCreating, setIsCreating] = useState(false);
   const form = useForm<CreateContainerFormValues>({
@@ -80,6 +80,7 @@ function CreateContainerDialog({
 
   const onSubmit = async (values: CreateContainerFormValues) => {
     setIsCreating(true);
+    toast.info("Iniciando la creación del contenedor. Esto puede tardar unos minutos si la imagen se está descargando...");
     try {
       const response = await fetch(`/api/servers/${serverId}/docker/containers/create`, {
         method: 'POST',
@@ -89,7 +90,7 @@ function CreateContainerDialog({
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || 'Error al crear el contenedor.');
       toast.success(result.message || 'Contenedor creado exitosamente.');
-      onContainerCreated();
+      await onContainerCreated(); // Await the callback
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -165,13 +166,18 @@ function ServerDetailDockerTab({ serverId }: { serverId: string }) {
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || `HTTP error! status: ${response.status}`);
       toast.success(result.message || `Acción '${action}' realizada correctamente.`);
-      fetchContainers(); // Refresh without awaiting
+      await fetchContainers(); // Await the refresh to ensure data is up-to-date
     } catch (err: any) {
       console.error(`Error performing ${action} on container ${containerId}:`, err);
       toast.error(err.message || `Error al realizar la acción '${action}'.`);
     } finally {
       setActionLoading(null);
     }
+  };
+
+  const handleContainerCreated = async () => {
+    setIsCreateDialogOpen(false);
+    await fetchContainers();
   };
 
   return (
@@ -231,7 +237,7 @@ function ServerDetailDockerTab({ serverId }: { serverId: string }) {
           )}
         </CardContent>
       </Card>
-      <CreateContainerDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} serverId={serverId} onContainerCreated={() => { setIsCreateDialogOpen(false); fetchContainers(); }} />
+      <CreateContainerDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} serverId={serverId} onContainerCreated={handleContainerCreated} />
     </>
   );
 }
