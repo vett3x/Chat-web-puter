@@ -11,7 +11,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Server, Dock, HardDrive, Link, Loader2, RefreshCw, XCircle, Play, StopCircle, Trash2, PlusCircle } from 'lucide-react';
+import { Server, Dock, HardDrive, Link, Loader2, RefreshCw, XCircle, Play, StopCircle, Trash2, PlusCircle, Terminal } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from './ui/scroll-area';
@@ -40,6 +40,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { ContainerConsoleDialog } from './container-console-dialog';
 
 interface RegisteredServer {
   id: string;
@@ -102,18 +103,20 @@ function CreateContainerDialog({
   );
 }
 
-function ServerDetailDockerTab({ serverId }: { serverId: string }) {
+function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
   const [containers, setContainers] = useState<DockerContainer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isConsoleOpen, setIsConsoleOpen] = useState(false);
+  const [selectedContainer, setSelectedContainer] = useState<DockerContainer | null>(null);
 
   const fetchContainers = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/servers/${serverId}/docker/containers`);
+      const response = await fetch(`/api/servers/${server.id}/docker/containers`);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
@@ -127,48 +130,43 @@ function ServerDetailDockerTab({ serverId }: { serverId: string }) {
     } finally {
       setIsLoading(false);
     }
-  }, [serverId]);
+  }, [server.id]);
 
   useEffect(() => {
-    if (serverId) {
+    if (server.id) {
       fetchContainers();
     }
-  }, [serverId, fetchContainers]);
+  }, [server.id, fetchContainers]);
 
   const handleContainerAction = async (containerId: string, action: 'start' | 'stop' | 'delete') => {
     setActionLoading(containerId);
     try {
       let response;
       if (action === 'delete') {
-        response = await fetch(`/api/servers/${serverId}/docker/containers/${containerId}`, { method: 'DELETE' });
+        response = await fetch(`/api/servers/${server.id}/docker/containers/${containerId}`, { method: 'DELETE' });
       } else {
-        response = await fetch(`/api/servers/${serverId}/docker/containers/${containerId}/${action}`, { method: 'POST' });
+        response = await fetch(`/api/servers/${server.id}/docker/containers/${containerId}/${action}`, { method: 'POST' });
       }
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || `HTTP error! status: ${response.status}`);
       
       toast.success(result.message || `Acción '${action}' realizada correctamente.`);
-      
-      // Esperar a que se complete la actualización antes de quitar el loading
       await fetchContainers();
       
     } catch (err: any) {
       console.error(`Error performing ${action} on container ${containerId}:`, err);
       toast.error(err.message || `Error al realizar la acción '${action}'.`);
     } finally {
-      // Ahora sí quitar el loading después de que todo haya terminado
       setActionLoading(null);
     }
   };
 
   const handleCreateContainer = async (values: CreateContainerFormValues) => {
     setIsCreateDialogOpen(false);
-    
-    // Mostrar loading en el botón de refresh mientras se crea
     setIsLoading(true);
     
     try {
-      const response = await fetch(`/api/servers/${serverId}/docker/containers/create`, {
+      const response = await fetch(`/api/servers/${server.id}/docker/containers/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
@@ -186,6 +184,11 @@ function ServerDetailDockerTab({ serverId }: { serverId: string }) {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const openConsoleFor = (container: DockerContainer) => {
+    setSelectedContainer(container);
+    setIsConsoleOpen(true);
   };
 
   return (
@@ -221,20 +224,25 @@ function ServerDetailDockerTab({ serverId }: { serverId: string }) {
                         <TableCell>{container.Status}</TableCell>
                         <TableCell>{container.Ports || '-'}</TableCell>
                         <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild><Button variant="outline" size="sm" disabled={isActionInProgress}>{isActionInProgress ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Acciones</Button></DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleContainerAction(container.ID, 'start')} disabled={isRunning || isActionInProgress}><Play className="mr-2 h-4 w-4" /> Iniciar</DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleContainerAction(container.ID, 'stop')} disabled={!isRunning || isActionInProgress}><StopCircle className="mr-2 h-4 w-4" /> Detener</DropdownMenuItem>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={isActionInProgress} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Eliminar</DropdownMenuItem></AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader><AlertDialogTitle>¿Estás seguro de eliminar este contenedor?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará permanentemente el contenedor "{container.Names}" ({container.ID.substring(0, 12)}).</AlertDialogDescription></AlertDialogHeader>
-                                  <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleContainerAction(container.ID, 'delete')} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <div className="flex items-center justify-end gap-2">
+                            <Button variant="outline" size="icon" onClick={() => openConsoleFor(container)} title="Abrir consola">
+                              <Terminal className="h-4 w-4" />
+                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild><Button variant="outline" size="sm" disabled={isActionInProgress}>{isActionInProgress ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Acciones</Button></DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleContainerAction(container.ID, 'start')} disabled={isRunning || isActionInProgress}><Play className="mr-2 h-4 w-4" /> Iniciar</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleContainerAction(container.ID, 'stop')} disabled={!isRunning || isActionInProgress}><StopCircle className="mr-2 h-4 w-4" /> Detener</DropdownMenuItem>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={isActionInProgress} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Eliminar</DropdownMenuItem></AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader><AlertDialogTitle>¿Estás seguro de eliminar este contenedor?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará permanentemente el contenedor "{container.Names}" ({container.ID.substring(0, 12)}).</AlertDialogDescription></AlertDialogHeader>
+                                    <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleContainerAction(container.ID, 'delete')} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -245,11 +253,14 @@ function ServerDetailDockerTab({ serverId }: { serverId: string }) {
           )}
         </CardContent>
       </Card>
-      <CreateContainerDialog
-        open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
-        onCreate={handleCreateContainer}
-      />
+      {selectedContainer && (
+        <ContainerConsoleDialog
+          open={isConsoleOpen}
+          onOpenChange={setIsConsoleOpen}
+          server={server}
+          container={selectedContainer}
+        />
+      )}
     </>
   );
 }
@@ -277,7 +288,7 @@ export function ServerDetailDialog({ open, onOpenChange, server }: ServerDetailD
             <TabsList className="grid w-full grid-cols-3"><TabsTrigger value="docker" className="flex items-center gap-2"><Dock className="h-4 w-4" /> Docker</TabsTrigger><TabsTrigger value="resources" className="flex items-center gap-2"><HardDrive className="h-4 w-4" /> Recursos</TabsTrigger><TabsTrigger value="weblinks" className="flex items-center gap-2"><Link className="h-4 w-4" /> Web</TabsTrigger></TabsList>
             <div className="flex-1 overflow-hidden mt-4">
               <ScrollArea className="h-full w-full">
-                <TabsContent value="docker" className="h-full"><ServerDetailDockerTab serverId={server.id} /></TabsContent>
+                <TabsContent value="docker" className="h-full"><ServerDetailDockerTab server={server} /></TabsContent>
                 <TabsContent value="resources" className="h-full"><ServerDetailResourcesTab serverId={server.id} /></TabsContent>
                 <TabsContent value="weblinks" className="h-full"><ServerDetailWebLinksTab serverId={server.id} /></TabsContent>
               </ScrollArea>
