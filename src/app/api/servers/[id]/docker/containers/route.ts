@@ -33,9 +33,10 @@ async function getSession() {
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } } // Destructure params directly
+  context: { params: { id: string } } // Make context required
 ) {
-  const serverId = params.id;
+  const serverId = context.params.id;
+
   const { data: { session } } = await getSession();
   if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });

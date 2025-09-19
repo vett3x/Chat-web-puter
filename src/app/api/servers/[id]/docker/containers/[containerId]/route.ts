@@ -26,10 +26,10 @@ async function getSession() {
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string; containerId: string } } // Destructure params directly
+  context: { params: { id: string; containerId: string } } // Make context required
 ) {
-  const serverId = params.id;
-  const containerId = params.containerId;
+  const serverId = context.params.id;
+  const containerId = context.params.containerId;
 
   const { data: { session } } = await getSession();
   if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
