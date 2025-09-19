@@ -65,6 +65,8 @@ export async function POST(req: NextRequest) {
     await new Promise<void>((resolve, reject) => conn.on('ready', resolve).on('error', reject).connect({ host: server.ip_address, port: server.ssh_port || 22, username: server.ssh_username, password: server.ssh_password, readyTimeout: 10000 }));
 
     const { stderr: startStderr, code: startCode } = await executeSshCommand(conn, `docker start ${containerId}`);
+    // Docker's `start` command is idempotent and exits with 0 even if already running.
+    // However, we'll handle other potential errors.
     if (startCode !== 0) {
       throw new Error(`Error al iniciar contenedor: ${startStderr}`);
     }

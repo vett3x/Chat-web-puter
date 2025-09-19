@@ -65,7 +65,9 @@ export async function POST(req: NextRequest) {
     await new Promise<void>((resolve, reject) => conn.on('ready', resolve).on('error', reject).connect({ host: server.ip_address, port: server.ssh_port || 22, username: server.ssh_username, password: server.ssh_password, readyTimeout: 10000 }));
 
     const { stderr: stopStderr, code: stopCode } = await executeSshCommand(conn, `docker stop ${containerId}`);
-    if (stopCode !== 0) {
+    // If the command fails, check if it's because the container doesn't exist/is already stopped.
+    // In that case, we can consider the operation successful.
+    if (stopCode !== 0 && !stopStderr.includes('No such container')) {
       throw new Error(`Error al detener contenedor: ${stopStderr}`);
     }
 
@@ -76,7 +78,8 @@ export async function POST(req: NextRequest) {
 
     while (Date.now() - startTime < timeout) {
       const { stdout: inspectOutput, code: inspectCode } = await executeSshCommand(conn, `docker inspect --format '{{.State.Running}}' ${containerId}`);
-      if (inspectCode === 0 && inspectOutput.trim() === 'false') {
+      // If inspect fails, it means the container is gone, which is a stopped state.
+      if (inspectCode !== 0 || inspectOutput.trim() === 'false') {
         isStopped = true;
         break;
       }
