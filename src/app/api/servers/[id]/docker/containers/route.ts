@@ -19,12 +19,8 @@ async function getSession() {
         get(name: string) {
           return cookieStore.get(name)?.value;
         },
-        set(name: string, value: string, options: CookieOptions) {
-          // In a Route Handler, the cookie store is read-only.
-        },
-        remove(name: string, options: CookieOptions) {
-          // In a Route Handler, the cookie store is read-only.
-        },
+        set(name: string, value: string, options: CookieOptions) {},
+        remove(name: string, options: CookieOptions) {},
       },
     }
   );
@@ -32,10 +28,16 @@ async function getSession() {
 }
 
 export async function GET(
-  req: NextRequest,
-  context: { params: { id: string } } // Make context required
+  req: NextRequest
 ) {
-  const serverId = context.params.id;
+  const url = new URL(req.url);
+  const pathSegments = url.pathname.split('/');
+  // Expected path: /api/servers/[id]/docker/containers
+  const serverId = pathSegments[3];
+
+  if (!serverId) {
+    return NextResponse.json({ message: 'ID de servidor no proporcionado en la URL.' }, { status: 400 });
+  }
 
   const { data: { session } } = await getSession();
   if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
@@ -44,7 +46,7 @@ export async function GET(
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     console.error('SUPABASE_SERVICE_ROLE_KEY is not set in environment variables.');
-    return NextResponse.json({ message: 'Error de configuración del servidor: Clave de servicio de Supabase no encontrada.' }, { status: 500 });
+    return NextResponse.json({ message: 'Error de configuración del servidor.' }, { status: 500 });
   }
 
   const supabaseAdmin = createClient(
@@ -83,7 +85,7 @@ export async function GET(
             conn.end();
             if (code === 0) {
               try {
-                containers = output.trim().split('\n').map(line => JSON.parse(line));
+                containers = output.trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
                 resolve();
               } catch (parseError) {
                 reject(new Error(`Error parsing Docker output: ${parseError}`));
@@ -102,7 +104,7 @@ export async function GET(
         port: server.ssh_port || 22,
         username: server.ssh_username,
         password: server.ssh_password,
-        readyTimeout: 10000, // 10 seconds timeout
+        readyTimeout: 10000,
       });
     });
 

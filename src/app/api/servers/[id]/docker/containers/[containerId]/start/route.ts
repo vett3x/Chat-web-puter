@@ -25,11 +25,17 @@ async function getSession() {
 }
 
 export async function POST(
-  req: NextRequest,
-  context: { params: { id: string; containerId: string } } // Make context required
+  req: NextRequest
 ) {
-  const serverId = context.params.id;
-  const containerId = context.params.containerId;
+  const url = new URL(req.url);
+  const pathSegments = url.pathname.split('/');
+  // Expected path: /api/servers/[id]/docker/containers/[containerId]/start
+  const serverId = pathSegments[3];
+  const containerId = pathSegments[6];
+
+  if (!serverId || !containerId) {
+    return NextResponse.json({ message: 'ID de servidor o contenedor no proporcionado en la URL.' }, { status: 400 });
+  }
 
   const { data: { session } } = await getSession();
   if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
