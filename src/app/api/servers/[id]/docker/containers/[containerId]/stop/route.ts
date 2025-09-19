@@ -22,7 +22,6 @@ async function getSession() {
   return supabase.auth.getSession();
 }
 
-// Helper to execute a command and return its output
 function executeSshCommand(conn: Client, command: string): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolve, reject) => {
     let stdout = '';
@@ -64,32 +63,20 @@ export async function POST(req: NextRequest) {
   try {
     await new Promise<void>((resolve, reject) => conn.on('ready', resolve).on('error', reject).connect({ host: server.ip_address, port: server.ssh_port || 22, username: server.ssh_username, password: server.ssh_password, readyTimeout: 10000 }));
 
-    const { stderr: stopStderr, code: stopCode } = await executeSshCommand(conn, `docker stop ${containerId}`);
-    // If the command fails, check if it's because the container doesn't exist/is already stopped.
-    // In that case, we can consider the operation successful.
-    if (stopCode !== 0 && !stopStderr.includes('No such container')) {
-      throw new Error(`Error al detener contenedor: ${stopStderr}`);
-    }
-
-    // Poll to verify the container is stopped
-    const startTime = Date.now();
-    const timeout = 15000; // 15 seconds
-    let isStopped = false;
-
-    while (Date.now() - startTime < timeout) {
-      const { stdout: inspectOutput, code: inspectCode } = await executeSshCommand(conn, `docker inspect --format '{{.State.Running}}' ${containerId}`);
-      // If inspect fails, it means the container is gone, which is a stopped state.
-      if (inspectCode !== 0 || inspectOutput.trim() === 'false') {
-        isStopped = true;
-        break;
-      }
-      await new Promise(res => setTimeout(res, 2000));
-    }
-
+    // The `docker stop` command waits for the container to stop.
+    // It returns exit code 0 if the container was running and is now stopped,
+    // or if it was already stopped.
+    const { stderr, code } = await executeSshCommand(conn, `docker stop ${containerId}`);
     conn.end();
 
-    if (!isStopped) {
-      throw new Error('El contenedor no se pudo detener a tiempo.');
+    // A non-zero exit code is an error, unless the container doesn't exist.
+    if (code !== 0) {
+      if (stderr.includes('No such container')) {
+        // If it doesn't exist, it's effectively "stopped".
+        return NextResponse.json({ message: `Contenedor ${containerId.substring(0,12)} no encontrado, se considera detenido.` }, { status: 200 });
+      }
+      // Any other error is a failure.
+      throw new Error(`Error al detener contenedor: ${stderr}`);
     }
 
     return NextResponse.json({ message: `Contenedor ${containerId.substring(0,12)} detenido.` }, { status: 200 });

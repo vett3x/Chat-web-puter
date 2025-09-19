@@ -22,7 +22,6 @@ async function getSession() {
   return supabase.auth.getSession();
 }
 
-// Helper to execute a command and return its output
 function executeSshCommand(conn: Client, command: string): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolve, reject) => {
     let stdout = '';
@@ -64,31 +63,14 @@ export async function POST(req: NextRequest) {
   try {
     await new Promise<void>((resolve, reject) => conn.on('ready', resolve).on('error', reject).connect({ host: server.ip_address, port: server.ssh_port || 22, username: server.ssh_username, password: server.ssh_password, readyTimeout: 10000 }));
 
-    const { stderr: startStderr, code: startCode } = await executeSshCommand(conn, `docker start ${containerId}`);
-    // Docker's `start` command is idempotent and exits with 0 even if already running.
-    // However, we'll handle other potential errors.
-    if (startCode !== 0) {
-      throw new Error(`Error al iniciar contenedor: ${startStderr}`);
-    }
-
-    // Poll to verify the container is running
-    const startTime = Date.now();
-    const timeout = 15000; // 15 seconds
-    let isRunning = false;
-
-    while (Date.now() - startTime < timeout) {
-      const { stdout: inspectOutput, code: inspectCode } = await executeSshCommand(conn, `docker inspect --format '{{.State.Running}}' ${containerId}`);
-      if (inspectCode === 0 && inspectOutput.trim() === 'true') {
-        isRunning = true;
-        break;
-      }
-      await new Promise(res => setTimeout(res, 2000));
-    }
-
+    // The `docker start` command is idempotent. It returns exit code 0
+    // if the container is now running or was already running.
+    const { stderr, code } = await executeSshCommand(conn, `docker start ${containerId}`);
     conn.end();
 
-    if (!isRunning) {
-      throw new Error('El contenedor no se pudo iniciar a tiempo.');
+    if (code !== 0) {
+      // Any non-zero exit code is an error.
+      throw new Error(`Error al iniciar contenedor: ${stderr}`);
     }
 
     return NextResponse.json({ message: `Contenedor ${containerId.substring(0,12)} iniciado.` }, { status: 200 });
