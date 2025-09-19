@@ -12,7 +12,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Server, Dock, HardDrive, Link, Loader2, RefreshCw, XCircle, Play, StopCircle, Trash2, PlusCircle, Terminal } from 'lucide-react';
+import { Server, Dock, HardDrive, Link, Loader2, RefreshCw, XCircle, Play, StopCircle, Trash2, PlusCircle, Terminal, AlertCircle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from './ui/scroll-area';
@@ -44,6 +44,14 @@ import { Input } from '@/components/ui/input';
 import { ContainerConsoleDialog } from './container-console-dialog';
 import { Progress } from '@/components/ui/progress'; // Import Progress component
 import { ServerResources } from '@/types/server-resources'; // Import new type
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
 
 interface RegisteredServer {
   id: string;
@@ -159,12 +167,19 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
     setIsConsoleOpen(true);
   };
 
+  const errorContainers = containers.filter(c => !c.Status.includes('Up'));
+
   return (
     <>
       <Card className="h-full flex flex-col">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2"><Dock className="h-5 w-5" /> Contenedores Docker</CardTitle>
           <div className="flex items-center gap-2">
+            {errorContainers.length > 0 && (
+              <span className="text-sm font-medium text-destructive flex items-center gap-1" title={`${errorContainers.length} contenedor(es) con problemas`}>
+                <AlertCircle className="h-4 w-4" /> {errorContainers.length} Errores
+              </span>
+            )}
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
                 <Button size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Crear Contenedor</Button>
@@ -259,9 +274,11 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
 
 function ServerDetailResourcesTab({ serverId }: { serverId: string }) {
   const [resources, setResources] = useState<ServerResources | null>(null);
+  const [resourceHistory, setResourceHistory] = useState<ServerResources[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const POLLING_INTERVAL = 5000; // Poll every 5 seconds
+  const MAX_HISTORY_POINTS = 12; // Keep last 12 points (1 minute of data)
 
   const fetchResources = useCallback(async () => {
     setIsLoading(true);
@@ -274,6 +291,10 @@ function ServerDetailResourcesTab({ serverId }: { serverId: string }) {
       }
       const data: ServerResources = await response.json();
       setResources(data);
+      setResourceHistory(prev => {
+        const newHistory = [...prev, data];
+        return newHistory.slice(-MAX_HISTORY_POINTS); // Keep only the last N points
+      });
     } catch (err: any) {
       console.error('Error fetching server resources:', err);
       setError(err.message || 'Error al cargar los recursos del servidor.');
@@ -291,6 +312,11 @@ function ServerDetailResourcesTab({ serverId }: { serverId: string }) {
     }
   }, [serverId, fetchResources]);
 
+  const formatChartTick = (value: string) => {
+    const date = new Date(value);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  };
+
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -305,30 +331,90 @@ function ServerDetailResourcesTab({ serverId }: { serverId: string }) {
         ) : error ? (
           <div className="flex items-center justify-center h-full text-destructive"><XCircle className="h-6 w-6 mr-2" /><p>{error}</p></div>
         ) : resources ? (
-          <div className="space-y-6 py-4">
-            <div>
-              <div className="flex justify-between text-sm font-medium mb-1">
-                <span>CPU</span>
-                <span>{resources.cpu_usage_percent.toFixed(1)}%</span>
+          <ScrollArea className="h-full w-full p-1">
+            <div className="space-y-6 py-4">
+              {/* Current Usage */}
+              <div>
+                <h4 className="text-md font-semibold mb-3">Uso Actual</h4>
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex justify-between text-sm font-medium mb-1">
+                      <span>CPU</span>
+                      <span>{resources.cpu_usage_percent.toFixed(1)}%</span>
+                    </div>
+                    <Progress value={resources.cpu_usage_percent} className="h-2" />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-sm font-medium mb-1">
+                      <span>Memoria</span>
+                      <span>{resources.memory_used} / {resources.memory_total}</span>
+                    </div>
+                    <Progress value={(parseFloat(resources.memory_used) / parseFloat(resources.memory_total)) * 100} className="h-2" />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-sm font-medium mb-1">
+                      <span>Disco (Root)</span>
+                      <span>{resources.disk_usage_percent.toFixed(1)}%</span>
+                    </div>
+                    <Progress value={resources.disk_usage_percent} className="h-2" />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-4">Última actualización: {new Date(resources.timestamp).toLocaleTimeString()}</p>
               </div>
-              <Progress value={resources.cpu_usage_percent} className="h-2" />
+
+              {/* Historical Charts */}
+              {resourceHistory.length > 1 && (
+                <div>
+                  <h4 className="text-md font-semibold mb-3">Historial Reciente (último minuto)</h4>
+                  <div className="space-y-6">
+                    {/* CPU Chart */}
+                    <div className="h-[150px] w-full">
+                      <h5 className="text-sm font-medium mb-1">CPU (%)</h5>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={resourceHistory} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                          <XAxis dataKey="timestamp" tickFormatter={formatChartTick} tick={{ fontSize: 10 }} />
+                          <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                          <Tooltip labelFormatter={formatChartTick} formatter={(value: number) => `${value.toFixed(1)}%`} />
+                          <Line type="monotone" dataKey="cpu_usage_percent" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Memory Chart */}
+                    <div className="h-[150px] w-full">
+                      <h5 className="text-sm font-medium mb-1">Memoria (%)</h5>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={resourceHistory} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                          <XAxis dataKey="timestamp" tickFormatter={formatChartTick} tick={{ fontSize: 10 }} />
+                          <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                          <Tooltip labelFormatter={formatChartTick} formatter={(value: number, name: string, props: any) => {
+                            const total = parseFloat(props.payload.memory_total);
+                            const used = parseFloat(props.payload.memory_used);
+                            if (isNaN(total) || isNaN(used) || total === 0) return [`N/A`, 'Uso'];
+                            return [`${((used / total) * 100).toFixed(1)}% (${props.payload.memory_used} / ${props.payload.memory_total})`, 'Uso'];
+                          }} />
+                          <Line type="monotone" dataKey={(data: ServerResources) => (parseFloat(data.memory_used) / parseFloat(data.memory_total)) * 100} stroke="hsl(var(--chart-2))" strokeWidth={2} dot={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Disk Chart */}
+                    <div className="h-[150px] w-full">
+                      <h5 className="text-sm font-medium mb-1">Disco (%)</h5>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={resourceHistory} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                          <XAxis dataKey="timestamp" tickFormatter={formatChartTick} tick={{ fontSize: 10 }} />
+                          <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                          <Tooltip labelFormatter={formatChartTick} formatter={(value: number) => `${value.toFixed(1)}%`} />
+                          <Line type="monotone" dataKey="disk_usage_percent" stroke="hsl(var(--chart-3))" strokeWidth={2} dot={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            <div>
-              <div className="flex justify-between text-sm font-medium mb-1">
-                <span>Memoria</span>
-                <span>{resources.memory_used} / {resources.memory_total}</span>
-              </div>
-              <Progress value={(parseFloat(resources.memory_used) / parseFloat(resources.memory_total)) * 100} className="h-2" />
-            </div>
-            <div>
-              <div className="flex justify-between text-sm font-medium mb-1">
-                <span>Disco (Root)</span>
-                <span>{resources.disk_usage_percent.toFixed(1)}%</span>
-              </div>
-              <Progress value={resources.disk_usage_percent} className="h-2" />
-            </div>
-            <p className="text-xs text-muted-foreground mt-4">Última actualización: {new Date(resources.timestamp).toLocaleTimeString()}</p>
-          </div>
+          </ScrollArea>
         ) : (
           <div className="flex items-center justify-center h-full text-muted-foreground"><p>No hay datos de recursos disponibles.</p></div>
         )}
