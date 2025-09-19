@@ -49,9 +49,16 @@ import {
   Line,
   XAxis,
   YAxis,
-  Tooltip,
+  Tooltip as RechartsTooltip, // Alias Tooltip from recharts
   ResponsiveContainer,
 } from 'recharts';
+import { cn } from '@/lib/utils'; // Import cn utility
+import {
+  Tooltip, // Keep Tooltip from Shadcn/UI
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface RegisteredServer {
   id: string;
@@ -223,12 +230,31 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
                   {containers.map((container) => {
                     const isRunning = container.Status.includes('Up');
                     const isActionInProgress = actionLoading === container.ID;
+                    const isErrorState = !isRunning; // Consider any non-'Up' state as an error for highlighting
+
                     return (
-                      <TableRow key={container.ID}>
+                      <TableRow 
+                        key={container.ID} 
+                        className={cn(isErrorState && "bg-destructive/10 text-destructive hover:bg-destructive/20")}
+                      >
                         <TableCell className="font-mono text-xs">{container.ID.substring(0, 12)}</TableCell>
                         <TableCell>{container.Names}</TableCell>
                         <TableCell>{container.Image}</TableCell>
-                        <TableCell>{container.Status}</TableCell>
+                        <TableCell className="flex items-center gap-1">
+                          {isErrorState && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <AlertCircle className="h-4 w-4" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Contenedor con problemas</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                          {container.Status}
+                        </TableCell>
                         <TableCell>{container.Ports || '-'}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
@@ -374,7 +400,7 @@ function ServerDetailResourcesTab({ serverId }: { serverId: string }) {
                         <LineChart data={resourceHistory} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                           <XAxis dataKey="timestamp" tickFormatter={formatChartTick} tick={{ fontSize: 10 }} />
                           <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-                          <Tooltip labelFormatter={formatChartTick} formatter={(value: number) => `${value.toFixed(1)}%`} />
+                          <RechartsTooltip labelFormatter={formatChartTick} formatter={(value: number) => `${value.toFixed(1)}%`} />
                           <Line type="monotone" dataKey="cpu_usage_percent" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={false} />
                         </LineChart>
                       </ResponsiveContainer>
@@ -387,7 +413,7 @@ function ServerDetailResourcesTab({ serverId }: { serverId: string }) {
                         <LineChart data={resourceHistory} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                           <XAxis dataKey="timestamp" tickFormatter={formatChartTick} tick={{ fontSize: 10 }} />
                           <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-                          <Tooltip labelFormatter={formatChartTick} formatter={(value: number, name: string, props: any) => {
+                          <RechartsTooltip labelFormatter={formatChartTick} formatter={(value: number, name: string, props: any) => {
                             const total = parseFloat(props.payload.memory_total);
                             const used = parseFloat(props.payload.memory_used);
                             if (isNaN(total) || isNaN(used) || total === 0) return [`N/A`, 'Uso'];
@@ -405,7 +431,7 @@ function ServerDetailResourcesTab({ serverId }: { serverId: string }) {
                         <LineChart data={resourceHistory} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                           <XAxis dataKey="timestamp" tickFormatter={formatChartTick} tick={{ fontSize: 10 }} />
                           <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-                          <Tooltip labelFormatter={formatChartTick} formatter={(value: number) => `${value.toFixed(1)}%`} />
+                          <RechartsTooltip labelFormatter={formatChartTick} formatter={(value: number) => `${value.toFixed(1)}%`} />
                           <Line type="monotone" dataKey="disk_usage_percent" stroke="hsl(var(--chart-3))" strokeWidth={2} dot={false} />
                         </LineChart>
                       </ResponsiveContainer>
