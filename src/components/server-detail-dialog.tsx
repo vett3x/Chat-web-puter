@@ -170,12 +170,8 @@ function ServerDetailDockerTab({ serverId }: { serverId: string }) {
       if (!response.ok) {
         throw new Error(result.message || 'Error al crear el contenedor.');
       }
-      
-      setTimeout(() => {
-        toast.success('Actualizando lista de contenedores...');
-        fetchContainers();
-      }, 3000);
-
+      toast.success('Comando de creación enviado. Actualizando lista...');
+      await fetchContainers();
     } catch (error: any) {
       toast.error(error.message);
     }
