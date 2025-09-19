@@ -68,16 +68,21 @@ export async function DELETE(
   try {
     await new Promise<void>((resolve, reject) => {
       conn.on('ready', () => {
-        conn.exec(`docker rm ${containerId}`, (err, stream) => {
+        conn.exec(`docker rm -f ${containerId}`, (err, stream) => { // Use -f to force remove
           if (err) {
             conn.end();
             return reject(new Error(`SSH exec error: ${err.message}`));
           }
+          let stderr = '';
           stream.on('close', (code: number) => {
             conn.end();
-            if (code === 0) resolve();
-            else reject(new Error(`Docker command exited with code ${code}`));
+            if (code === 0) {
+              resolve();
+            } else {
+              reject(new Error(`Docker command exited with code ${code}. Error: ${stderr}`));
+            }
           }).stderr.on('data', (data: Buffer) => {
+            stderr += data.toString();
             console.error(`STDERR from docker rm: ${data.toString()}`);
           });
         });

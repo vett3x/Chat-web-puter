@@ -147,11 +147,15 @@ function ServerDetailDockerTab({ serverId }: { serverId: string }) {
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || `HTTP error! status: ${response.status}`);
       toast.success(result.message || `Acción '${action}' realizada correctamente.`);
-      await fetchContainers();
+      
+      // Trigger refresh but don't wait for it to finish before hiding the spinner
+      fetchContainers();
+
     } catch (err: any) {
       console.error(`Error performing ${action} on container ${containerId}:`, err);
       toast.error(err.message || `Error al realizar la acción '${action}'.`);
     } finally {
+      // This will now run immediately after the fetch is initiated
       setActionLoading(null);
     }
   };
