@@ -59,6 +59,7 @@
     "react-syntax-highlighter": "^15.6.6",
     "recharts": "^2.15.3",
     "sonner": "^2.0.3",
+    "ssh2": "^1.17.0",
     "tailwind-merge": "^3.3.0",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^1.1.2"
@@ -75,7 +76,6 @@
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "postcss": "latest",
-    "ssh2": "^1.17.0",
     "tailwindcss": "^3.4.1",
     "typescript": "^5",
     "zod": "^3.25.28"
