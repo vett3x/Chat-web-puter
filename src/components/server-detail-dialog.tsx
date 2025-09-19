@@ -42,6 +42,8 @@ import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { ContainerConsoleDialog } from './container-console-dialog';
+import { Progress } from '@/components/ui/progress'; // Import Progress component
+import { ServerResources } from '@/types/server-resources'; // Import new type
 
 interface RegisteredServer {
   id: string;
@@ -256,8 +258,82 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
 }
 
 function ServerDetailResourcesTab({ serverId }: { serverId: string }) {
+  const [resources, setResources] = useState<ServerResources | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const POLLING_INTERVAL = 5000; // Poll every 5 seconds
+
+  const fetchResources = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/servers/${serverId}/resources`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+      const data: ServerResources = await response.json();
+      setResources(data);
+    } catch (err: any) {
+      console.error('Error fetching server resources:', err);
+      setError(err.message || 'Error al cargar los recursos del servidor.');
+      toast.error(err.message || 'Error al cargar los recursos del servidor.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [serverId]);
+
+  useEffect(() => {
+    if (serverId) {
+      fetchResources();
+      const interval = setInterval(fetchResources, POLLING_INTERVAL);
+      return () => clearInterval(interval);
+    }
+  }, [serverId, fetchResources]);
+
   return (
-    <Card className="h-full"><CardHeader><CardTitle className="flex items-center gap-2"><HardDrive className="h-5 w-5" /> Uso de Recursos</CardTitle></CardHeader><CardContent><p className="text-muted-foreground">Mostrando uso de CPU, RAM, Disco para el servidor: {serverId}</p><p className="text-sm text-muted-foreground mt-2">(Gráficos y métricas en desarrollo)</p></CardContent></Card>
+    <Card className="h-full flex flex-col">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="flex items-center gap-2"><HardDrive className="h-5 w-5" /> Uso de Recursos</CardTitle>
+        <Button variant="ghost" size="icon" onClick={fetchResources} disabled={isLoading} title="Refrescar">
+          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+        </Button>
+      </CardHeader>
+      <CardContent className="flex-1 overflow-hidden pt-0">
+        {isLoading && !resources ? (
+          <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin text-primary" /><p className="ml-2 text-muted-foreground">Cargando recursos...</p></div>
+        ) : error ? (
+          <div className="flex items-center justify-center h-full text-destructive"><XCircle className="h-6 w-6 mr-2" /><p>{error}</p></div>
+        ) : resources ? (
+          <div className="space-y-6 py-4">
+            <div>
+              <div className="flex justify-between text-sm font-medium mb-1">
+                <span>CPU</span>
+                <span>{resources.cpu_usage_percent.toFixed(1)}%</span>
+              </div>
+              <Progress value={resources.cpu_usage_percent} className="h-2" />
+            </div>
+            <div>
+              <div className="flex justify-between text-sm font-medium mb-1">
+                <span>Memoria</span>
+                <span>{resources.memory_used} / {resources.memory_total}</span>
+              </div>
+              <Progress value={(parseFloat(resources.memory_used) / parseFloat(resources.memory_total)) * 100} className="h-2" />
+            </div>
+            <div>
+              <div className="flex justify-between text-sm font-medium mb-1">
+                <span>Disco (Root)</span>
+                <span>{resources.disk_usage_percent.toFixed(1)}%</span>
+              </div>
+              <Progress value={resources.disk_usage_percent} className="h-2" />
+            </div>
+            <p className="text-xs text-muted-foreground mt-4">Última actualización: {new Date(resources.timestamp).toLocaleTimeString()}</p>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-full text-muted-foreground"><p>No hay datos de recursos disponibles.</p></div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
