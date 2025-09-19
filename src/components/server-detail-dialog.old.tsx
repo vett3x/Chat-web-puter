@@ -146,27 +146,24 @@ function ServerDetailDockerTab({ serverId }: { serverId: string }) {
       }
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || `HTTP error! status: ${response.status}`);
-      
       toast.success(result.message || `Acción '${action}' realizada correctamente.`);
       
-      // Esperar a que se complete la actualización antes de quitar el loading
-      await fetchContainers();
-      
+      // Trigger refresh but don't wait for it to finish before hiding the spinner
+      fetchContainers();
+
     } catch (err: any) {
       console.error(`Error performing ${action} on container ${containerId}:`, err);
       toast.error(err.message || `Error al realizar la acción '${action}'.`);
     } finally {
-      // Ahora sí quitar el loading después de que todo haya terminado
+      // This will now run immediately after the fetch is initiated
       setActionLoading(null);
     }
   };
 
   const handleCreateContainer = async (values: CreateContainerFormValues) => {
     setIsCreateDialogOpen(false);
-    
-    // Mostrar loading en el botón de refresh mientras se crea
-    setIsLoading(true);
-    
+    toast.info("Enviando comando de creación. La lista se actualizará en breve...");
+
     try {
       const response = await fetch(`/api/servers/${serverId}/docker/containers/create`, {
         method: 'POST',
@@ -177,14 +174,10 @@ function ServerDetailDockerTab({ serverId }: { serverId: string }) {
       if (!response.ok) {
         throw new Error(result.message || 'Error al crear el contenedor.');
       }
-      
-      toast.success('Contenedor creado exitosamente.');
+      toast.success('Comando de creación enviado. Actualizando lista...');
       await fetchContainers();
-      
     } catch (error: any) {
       toast.error(error.message);
-    } finally {
-      setIsLoading(false);
     }
   };
 

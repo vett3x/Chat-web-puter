@@ -73,11 +73,13 @@ export async function POST(
             conn.end();
             return reject(new Error(`SSH exec error: ${err.message}`));
           }
+          let stderr = '';
           stream.on('close', (code: number) => {
             conn.end();
             if (code === 0) resolve();
-            else reject(new Error(`Docker command exited with code ${code}`));
+            else reject(new Error(`Docker command exited with code ${code}. Error: ${stderr}`));
           }).stderr.on('data', (data: Buffer) => {
+            stderr += data.toString();
             console.error(`STDERR from docker stop: ${data.toString()}`);
           });
         });
