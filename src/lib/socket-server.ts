@@ -1,4 +1,4 @@
-import { WebSocketServer, WebSocket, type RawData } from 'ws';
+import { WebSocketServer, WebSocket } from 'ws';
 import { createClient } from '@supabase/supabase-js';
 import { Client as SshClient } from 'ssh2';
 import type { ClientChannel } from 'ssh2';
@@ -54,9 +54,9 @@ export function setupWebSocketServer(port: number) {
 
           activeConnections.set(connectionId, { ws, ssh, stream });
 
-          ws.on('message', (data: RawData) => {
-            stream.write(data);
-          });
+          ws.onmessage = (event) => {
+            stream.write(event.data);
+          };
 
           stream.on('data', (data: Buffer) => {
             ws.send(data);
@@ -78,7 +78,7 @@ export function setupWebSocketServer(port: number) {
         password: server.ssh_password,
       });
 
-      ws.on('close', () => {
+      ws.onclose = () => {
         console.log(`[SocketServer] Client disconnected: ${connectionId}`);
         const conn = activeConnections.get(connectionId);
         if (conn) {
@@ -86,7 +86,7 @@ export function setupWebSocketServer(port: number) {
           conn.ssh.end();
           activeConnections.delete(connectionId);
         }
-      });
+      };
 
     } catch (error: any) {
       console.error(`[SocketServer] Error during connection setup for ${connectionId}:`, error);
