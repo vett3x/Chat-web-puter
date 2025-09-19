@@ -7,11 +7,10 @@ import { z } from 'zod';
 
 const SUPERUSER_EMAILS = ['martinpensa1@gmail.com'];
 
-// Zod schema for validation
 const createContainerSchema = z.object({
   image: z.string().min(1, { message: 'El nombre de la imagen es requerido.' }),
   name: z.string().optional(),
-  ports: z.string().optional(), // e.g., "8080:80"
+  ports: z.string().optional(),
 });
 
 async function getSession() {
@@ -21,9 +20,7 @@ async function getSession() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
+        get(name: string) { return cookieStore.get(name)?.value; },
         set(name: string, value: string, options: CookieOptions) {},
         remove(name: string, options: CookieOptions) {},
       },
@@ -32,14 +29,28 @@ async function getSession() {
   return supabase.auth.getSession();
 }
 
+// Helper to execute a command and return its output
+function executeSshCommand(conn: Client, command: string): Promise<{ stdout: string; stderr: string; code: number }> {
+  return new Promise((resolve, reject) => {
+    let stdout = '';
+    let stderr = '';
+    conn.exec(command, (err, stream) => {
+      if (err) return reject(err);
+      stream.on('data', (data: Buffer) => { stdout += data.toString(); });
+      stream.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
+      stream.on('close', (code: number) => {
+        resolve({ stdout, stderr, code });
+      });
+    });
+  });
+}
+
 export async function POST(req: NextRequest) {
   const url = new URL(req.url);
-  const pathSegments = url.pathname.split('/');
-  // Expected path: /api/servers/[id]/docker/containers/create
-  const serverId = pathSegments[3];
+  const serverId = url.pathname.split('/')[3];
 
   if (!serverId) {
-    return NextResponse.json({ message: 'ID de servidor no proporcionado en la URL.' }, { status: 400 });
+    return NextResponse.json({ message: 'ID de servidor no proporcionado.' }, { status: 400 });
   }
 
   const { data: { session } } = await getSession();
@@ -47,83 +58,60 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
   }
 
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    console.error('SUPABASE_SERVICE_ROLE_KEY is not set.');
-    return NextResponse.json({ message: 'Error de configuración del servidor.' }, { status: 500 });
-  }
-
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
-  const { data: server, error: fetchError } = await supabaseAdmin
-    .from('user_servers')
-    .select('ip_address, ssh_port, ssh_username, ssh_password')
-    .eq('id', serverId)
-    .eq('user_id', session.user.id)
-    .single();
+  const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  const { data: server, error: fetchError } = await supabaseAdmin.from('user_servers').select('ip_address, ssh_port, ssh_username, ssh_password').eq('id', serverId).single();
 
   if (fetchError || !server) {
-    console.error(`Error fetching server ${serverId}:`, fetchError);
-    return NextResponse.json({ message: 'Servidor no encontrado o acceso denegado.' }, { status: 404 });
+    return NextResponse.json({ message: 'Servidor no encontrado.' }, { status: 404 });
   }
 
+  const conn = new Client();
   try {
     const body = await req.json();
     const { image, name, ports } = createContainerSchema.parse(body);
 
-    // Build the docker run command
-    let command = 'docker run -d';
-    if (name) {
-      // Sanitize name to prevent command injection
-      command += ` --name ${name.replace(/[^a-zA-Z0-9_.-]/g, '')}`;
+    let runCommand = 'docker run -d';
+    if (name) runCommand += ` --name ${name.replace(/[^a-zA-Z0-9_.-]/g, '')}`;
+    if (ports && /^\d{1,5}:\d{1,5}$/.test(ports)) runCommand += ` -p ${ports}`;
+    runCommand += ` --entrypoint tail ${image} -f /dev/null`;
+
+    await new Promise<void>((resolve, reject) => conn.on('ready', resolve).on('error', reject).connect({ host: server.ip_address, port: server.ssh_port || 22, username: server.ssh_username, password: server.ssh_password, readyTimeout: 10000 }));
+
+    const { stdout: newContainerId, stderr: runStderr, code: runCode } = await executeSshCommand(conn, runCommand);
+    if (runCode !== 0) {
+      throw new Error(`Error al crear contenedor: ${runStderr}`);
     }
-    if (ports) {
-      // Basic validation for ports format
-      if (/^\d{1,5}:\d{1,5}$/.test(ports)) {
-        command += ` -p ${ports}`;
+    const trimmedId = newContainerId.trim();
+
+    // Poll to verify the container is running
+    const startTime = Date.now();
+    const timeout = 15000; // 15 seconds
+    let isRunning = false;
+
+    while (Date.now() - startTime < timeout) {
+      const { stdout: psOutput } = await executeSshCommand(conn, `docker ps -a --filter "id=${trimmedId}"`);
+      if (psOutput.includes(trimmedId)) {
+        isRunning = true;
+        break;
       }
+      await new Promise(res => setTimeout(res, 2000)); // Wait 2 seconds before next check
     }
-    // Add the image and a command to keep basic OS containers running for testing.
-    // This might not be suitable for all images, but works well for images like 'ubuntu'.
-    command += ` --entrypoint tail ${image} -f /dev/null`;
 
-    const conn = new Client();
-    await new Promise<void>((resolve, reject) => {
-      conn.on('ready', () => {
-        conn.exec(command, (err, stream) => {
-          if (err) {
-            conn.end();
-            return reject(new Error(`SSH exec error: ${err.message}`));
-          }
-          let stderr = '';
-          stream.on('close', (code: number) => {
-            conn.end();
-            if (code === 0) resolve();
-            else reject(new Error(`Docker command exited with code ${code}. Error: ${stderr}`));
-          }).stderr.on('data', (data: Buffer) => {
-            stderr += data.toString();
-            console.error(`STDERR from docker run: ${data.toString()}`);
-          });
-        });
-      }).on('error', (err) => {
-        reject(new Error(`SSH connection error: ${err.message}`));
-      }).connect({
-        host: server.ip_address,
-        port: server.ssh_port || 22,
-        username: server.ssh_username,
-        password: server.ssh_password,
-        readyTimeout: 10000,
-      });
-    });
+    conn.end();
 
-    return NextResponse.json({ message: `Contenedor de la imagen ${image} se está creando.` }, { status: 201 });
+    if (!isRunning) {
+      // Cleanup failed container
+      await executeSshCommand(conn, `docker rm -f ${trimmedId}`);
+      throw new Error('El contenedor no se pudo iniciar a tiempo y ha sido eliminado.');
+    }
+
+    return NextResponse.json({ message: `Contenedor ${trimmedId.substring(0,12)} creado.` }, { status: 201 });
+
   } catch (error: any) {
+    conn.end();
     if (error instanceof z.ZodError) {
       return NextResponse.json({ message: 'Error de validación', errors: error.errors }, { status: 400 });
     }
-    console.error(`Error creating Docker container on server ${serverId}:`, error.message);
-    return NextResponse.json({ message: `Error al crear contenedor Docker: ${error.message}` }, { status: 500 });
+    return NextResponse.json({ message: `Error: ${error.message}` }, { status: 500 });
   }
 }

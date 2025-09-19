@@ -13,9 +13,7 @@ async function getSession() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
+        get(name: string) { return cookieStore.get(name)?.value; },
         set(name: string, value: string, options: CookieOptions) {},
         remove(name: string, options: CookieOptions) {},
       },
@@ -24,17 +22,30 @@ async function getSession() {
   return supabase.auth.getSession();
 }
 
-export async function POST(
-  req: NextRequest
-) {
+// Helper to execute a command and return its output
+function executeSshCommand(conn: Client, command: string): Promise<{ stdout: string; stderr: string; code: number }> {
+  return new Promise((resolve, reject) => {
+    let stdout = '';
+    let stderr = '';
+    conn.exec(command, (err, stream) => {
+      if (err) return reject(err);
+      stream.on('data', (data: Buffer) => { stdout += data.toString(); });
+      stream.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
+      stream.on('close', (code: number) => {
+        resolve({ stdout, stderr, code });
+      });
+    });
+  });
+}
+
+export async function POST(req: NextRequest) {
   const url = new URL(req.url);
   const pathSegments = url.pathname.split('/');
-  // Expected path: /api/servers/[id]/docker/containers/[containerId]/stop
   const serverId = pathSegments[3];
   const containerId = pathSegments[6];
 
   if (!serverId || !containerId) {
-    return NextResponse.json({ message: 'ID de servidor o contenedor no proporcionado en la URL.' }, { status: 400 });
+    return NextResponse.json({ message: 'ID de servidor o contenedor no proporcionado.' }, { status: 400 });
   }
 
   const { data: { session } } = await getSession();
@@ -42,60 +53,46 @@ export async function POST(
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
   }
 
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    console.error('SUPABASE_SERVICE_ROLE_KEY is not set.');
-    return NextResponse.json({ message: 'Error de configuración del servidor.' }, { status: 500 });
-  }
-
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
-  const { data: server, error: fetchError } = await supabaseAdmin
-    .from('user_servers')
-    .select('ip_address, ssh_port, ssh_username, ssh_password')
-    .eq('id', serverId)
-    .eq('user_id', session.user.id)
-    .single();
+  const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  const { data: server, error: fetchError } = await supabaseAdmin.from('user_servers').select('ip_address, ssh_port, ssh_username, ssh_password').eq('id', serverId).single();
 
   if (fetchError || !server) {
-    console.error(`Error fetching server ${serverId}:`, fetchError);
-    return NextResponse.json({ message: 'Servidor no encontrado o acceso denegado.' }, { status: 404 });
+    return NextResponse.json({ message: 'Servidor no encontrado.' }, { status: 404 });
   }
 
   const conn = new Client();
   try {
-    await new Promise<void>((resolve, reject) => {
-      conn.on('ready', () => {
-        conn.exec(`docker stop ${containerId}`, (err, stream) => {
-          if (err) {
-            conn.end();
-            return reject(new Error(`SSH exec error: ${err.message}`));
-          }
-          let stderr = '';
-          stream.on('close', (code: number) => {
-            conn.end();
-            if (code === 0) resolve();
-            else reject(new Error(`Docker command exited with code ${code}. Error: ${stderr}`));
-          }).stderr.on('data', (data: Buffer) => {
-            stderr += data.toString();
-            console.error(`STDERR from docker stop: ${data.toString()}`);
-          });
-        });
-      }).on('error', (err) => {
-        reject(new Error(`SSH connection error: ${err.message}`));
-      }).connect({
-        host: server.ip_address,
-        port: server.ssh_port || 22,
-        username: server.ssh_username,
-        password: server.ssh_password,
-        readyTimeout: 10000,
-      });
-    });
-    return NextResponse.json({ message: `Contenedor ${containerId} detenido.` }, { status: 200 });
+    await new Promise<void>((resolve, reject) => conn.on('ready', resolve).on('error', reject).connect({ host: server.ip_address, port: server.ssh_port || 22, username: server.ssh_username, password: server.ssh_password, readyTimeout: 10000 }));
+
+    const { stderr: stopStderr, code: stopCode } = await executeSshCommand(conn, `docker stop ${containerId}`);
+    if (stopCode !== 0) {
+      throw new Error(`Error al detener contenedor: ${stopStderr}`);
+    }
+
+    // Poll to verify the container is stopped
+    const startTime = Date.now();
+    const timeout = 15000; // 15 seconds
+    let isStopped = false;
+
+    while (Date.now() - startTime < timeout) {
+      const { stdout: psOutput } = await executeSshCommand(conn, `docker ps --filter "id=${containerId}"`);
+      if (!psOutput.includes(containerId)) { // If it's not in the active list, it's stopped
+        isStopped = true;
+        break;
+      }
+      await new Promise(res => setTimeout(res, 2000));
+    }
+
+    conn.end();
+
+    if (!isStopped) {
+      throw new Error('El contenedor no se pudo detener a tiempo.');
+    }
+
+    return NextResponse.json({ message: `Contenedor ${containerId.substring(0,12)} detenido.` }, { status: 200 });
+
   } catch (error: any) {
-    console.error(`Error stopping Docker container ${containerId} on server ${serverId}:`, error.message);
-    return NextResponse.json({ message: `Error al detener contenedor Docker: ${error.message}` }, { status: 500 });
+    conn.end();
+    return NextResponse.json({ message: `Error: ${error.message}` }, { status: 500 });
   }
 }
