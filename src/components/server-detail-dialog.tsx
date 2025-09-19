@@ -64,38 +64,21 @@ type CreateContainerFormValues = z.infer<typeof createContainerFormSchema>;
 function CreateContainerDialog({
   open,
   onOpenChange,
-  serverId,
-  onContainerCreated,
+  onCreate,
+  isCreating,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  serverId: string;
-  onContainerCreated: () => Promise<void>; // Make it a promise
+  onCreate: (values: CreateContainerFormValues) => void;
+  isCreating: boolean;
 }) {
-  const [isCreating, setIsCreating] = useState(false);
   const form = useForm<CreateContainerFormValues>({
     resolver: zodResolver(createContainerFormSchema),
     defaultValues: { image: '', name: '', ports: '' },
   });
 
-  const onSubmit = async (values: CreateContainerFormValues) => {
-    setIsCreating(true);
-    toast.info("Iniciando la creación del contenedor. Esto puede tardar unos minutos si la imagen se está descargando...");
-    try {
-      const response = await fetch(`/api/servers/${serverId}/docker/containers/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Error al crear el contenedor.');
-      toast.success(result.message || 'Contenedor creado exitosamente.');
-      await onContainerCreated(); // Await the callback
-    } catch (error: any) {
-      toast.error(error.message);
-    } finally {
-      setIsCreating(false);
-    }
+  const onSubmit = (values: CreateContainerFormValues) => {
+    onCreate(values);
   };
 
   return (
@@ -107,9 +90,9 @@ function CreateContainerDialog({
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-            <FormField control={form.control} name="image" render={({ field }) => (<FormItem><FormLabel>Imagen</FormLabel><FormControl><Input placeholder="ubuntu:latest" {...field} /></FormControl><FormMessage /></FormItem>)} />
-            <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nombre (Opcional)</FormLabel><FormControl><Input placeholder="mi-contenedor" {...field} /></FormControl><FormMessage /></FormItem>)} />
-            <FormField control={form.control} name="ports" render={({ field }) => (<FormItem><FormLabel>Puertos (Opcional)</FormLabel><FormControl><Input placeholder="8080:80" {...field} /></FormControl><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="image" render={({ field }) => (<FormItem><FormLabel>Imagen</FormLabel><FormControl><Input placeholder="ubuntu:latest" {...field} disabled={isCreating} /></FormControl><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nombre (Opcional)</FormLabel><FormControl><Input placeholder="mi-contenedor" {...field} disabled={isCreating} /></FormControl><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="ports" render={({ field }) => (<FormItem><FormLabel>Puertos (Opcional)</FormLabel><FormControl><Input placeholder="8080:80" {...field} disabled={isCreating} /></FormControl><FormMessage /></FormItem>)} />
             <DialogFooter>
               <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
               <Button type="submit" disabled={isCreating}>{isCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Crear</Button>
@@ -127,6 +110,7 @@ function ServerDetailDockerTab({ serverId }: { serverId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isCreatingContainer, setIsCreatingContainer] = useState(false);
 
   const fetchContainers = useCallback(async () => {
     setIsLoading(true);
@@ -166,7 +150,7 @@ function ServerDetailDockerTab({ serverId }: { serverId: string }) {
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || `HTTP error! status: ${response.status}`);
       toast.success(result.message || `Acción '${action}' realizada correctamente.`);
-      await fetchContainers(); // Await the refresh to ensure data is up-to-date
+      await fetchContainers();
     } catch (err: any) {
       console.error(`Error performing ${action} on container ${containerId}:`, err);
       toast.error(err.message || `Error al realizar la acción '${action}'.`);
@@ -175,9 +159,26 @@ function ServerDetailDockerTab({ serverId }: { serverId: string }) {
     }
   };
 
-  const handleContainerCreated = async () => {
+  const handleCreateContainer = async (values: CreateContainerFormValues) => {
+    setIsCreatingContainer(true);
     setIsCreateDialogOpen(false);
-    await fetchContainers();
+    toast.info("Iniciando la creación del contenedor. Esto puede tardar si la imagen no está en el servidor...");
+
+    try {
+      const response = await fetch(`/api/servers/${serverId}/docker/containers/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Error al crear el contenedor.');
+      toast.success(result.message || 'Contenedor creado exitosamente.');
+      await fetchContainers();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setIsCreatingContainer(false);
+    }
   };
 
   return (
@@ -237,7 +238,12 @@ function ServerDetailDockerTab({ serverId }: { serverId: string }) {
           )}
         </CardContent>
       </Card>
-      <CreateContainerDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} serverId={serverId} onContainerCreated={handleContainerCreated} />
+      <CreateContainerDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        onCreate={handleCreateContainer}
+        isCreating={isCreatingContainer}
+      />
     </>
   );
 }
