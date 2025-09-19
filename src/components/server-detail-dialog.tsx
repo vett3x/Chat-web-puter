@@ -65,12 +65,10 @@ function CreateContainerDialog({
   open,
   onOpenChange,
   onCreate,
-  isCreating,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreate: (values: CreateContainerFormValues) => void;
-  isCreating: boolean;
 }) {
   const form = useForm<CreateContainerFormValues>({
     resolver: zodResolver(createContainerFormSchema),
@@ -90,12 +88,12 @@ function CreateContainerDialog({
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-            <FormField control={form.control} name="image" render={({ field }) => (<FormItem><FormLabel>Imagen</FormLabel><FormControl><Input placeholder="ubuntu:latest" {...field} disabled={isCreating} /></FormControl><FormMessage /></FormItem>)} />
-            <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nombre (Opcional)</FormLabel><FormControl><Input placeholder="mi-contenedor" {...field} disabled={isCreating} /></FormControl><FormMessage /></FormItem>)} />
-            <FormField control={form.control} name="ports" render={({ field }) => (<FormItem><FormLabel>Puertos (Opcional)</FormLabel><FormControl><Input placeholder="8080:80" {...field} disabled={isCreating} /></FormControl><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="image" render={({ field }) => (<FormItem><FormLabel>Imagen</FormLabel><FormControl><Input placeholder="ubuntu:latest" {...field} /></FormControl><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nombre (Opcional)</FormLabel><FormControl><Input placeholder="mi-contenedor" {...field} /></FormControl><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="ports" render={({ field }) => (<FormItem><FormLabel>Puertos (Opcional)</FormLabel><FormControl><Input placeholder="8080:80" {...field} /></FormControl><FormMessage /></FormItem>)} />
             <DialogFooter>
               <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
-              <Button type="submit" disabled={isCreating}>{isCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Crear</Button>
+              <Button type="submit">Crear</Button>
             </DialogFooter>
           </form>
         </Form>
@@ -110,7 +108,6 @@ function ServerDetailDockerTab({ serverId }: { serverId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isCreatingContainer, setIsCreatingContainer] = useState(false);
 
   const fetchContainers = useCallback(async () => {
     setIsLoading(true);
@@ -160,9 +157,8 @@ function ServerDetailDockerTab({ serverId }: { serverId: string }) {
   };
 
   const handleCreateContainer = async (values: CreateContainerFormValues) => {
-    setIsCreatingContainer(true);
     setIsCreateDialogOpen(false);
-    toast.info("Iniciando la creación del contenedor. Esto puede tardar si la imagen no está en el servidor...");
+    toast.info("Enviando comando de creación. La lista se actualizará en breve...");
 
     try {
       const response = await fetch(`/api/servers/${serverId}/docker/containers/create`, {
@@ -171,13 +167,17 @@ function ServerDetailDockerTab({ serverId }: { serverId: string }) {
         body: JSON.stringify(values),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Error al crear el contenedor.');
-      toast.success(result.message || 'Contenedor creado exitosamente.');
-      await fetchContainers();
+      if (!response.ok) {
+        throw new Error(result.message || 'Error al crear el contenedor.');
+      }
+      
+      setTimeout(() => {
+        toast.success('Actualizando lista de contenedores...');
+        fetchContainers();
+      }, 3000);
+
     } catch (error: any) {
       toast.error(error.message);
-    } finally {
-      setIsCreatingContainer(false);
     }
   };
 
@@ -242,7 +242,6 @@ function ServerDetailDockerTab({ serverId }: { serverId: string }) {
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
         onCreate={handleCreateContainer}
-        isCreating={isCreatingContainer}
       />
     </>
   );
