@@ -32,21 +32,20 @@ export function ContainerConsoleDialog({ open, onOpenChange, server, container }
     await fetch('/api/socket');
 
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const host = window.location.hostname;
+    const host = window.location.hostname; // Use the browser's hostname, NOT localhost
     const wsUrl = `${protocol}://${host}:3001?serverId=${server.id}&containerId=${container.ID}&userId=${session.user.id}`;
     
-    termRef.current?.writeln(`Intentando conectar a: ${wsUrl}`);
+    termRef.current?.writeln(`\x1b[33mIntentando conectar a: ${wsUrl}\x1b[0m`);
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
       console.log('WebSocket connection established');
-      termRef.current?.writeln('\r\n\x1b[32mConexión establecida. Bienvenido a la terminal del contenedor.\x1b[0m');
+      termRef.current?.writeln('\r\n\x1b[32mConexión establecida. Bienvenido a la terminal del contenedor.\x1b[0m\r\n');
     };
 
     ws.onmessage = (event) => {
-      // Data from server is ArrayBuffer, need to convert to Uint8Array for xterm
       if (event.data instanceof ArrayBuffer) {
         termRef.current?.write(new Uint8Array(event.data));
       } else {
@@ -70,7 +69,7 @@ export function ContainerConsoleDialog({ open, onOpenChange, server, container }
       }
     };
 
-  }, [server.id, container.ID, session?.user?.id]);
+  }, [server.id, container.ID, session?.user.id]);
 
   useEffect(() => {
     const initializeTerminal = async () => {
@@ -92,21 +91,21 @@ export function ContainerConsoleDialog({ open, onOpenChange, server, container }
         const fitAddon = new FitAddon();
         term.loadAddon(fitAddon);
         term.open(terminalRef.current);
-        fitAddon.fit();
+        
+        // Delay fit to ensure container is sized correctly
+        setTimeout(() => fitAddon.fit(), 10);
 
-        // Handle user input
         term.onData((data) => {
           if (wsRef.current?.readyState === WebSocket.OPEN) {
             wsRef.current?.send(data);
           }
         });
 
-        // Handle resize
         const resizeObserver = new ResizeObserver(() => {
           try {
             fitAddon.fit();
           } catch (e) {
-            // This can throw if the terminal is not fully initialized, safe to ignore
+            // Ignore errors on fast resize
           }
         });
         if (terminalRef.current) {
@@ -120,7 +119,6 @@ export function ContainerConsoleDialog({ open, onOpenChange, server, container }
     initializeTerminal();
 
     return () => {
-      // Cleanup on dialog close or component unmount
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
