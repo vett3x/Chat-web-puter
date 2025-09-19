@@ -46,16 +46,23 @@ export function setupWebSocketServer(port: number) {
 
       const ssh = new SshClient();
       ssh.on('ready', () => {
+        console.log(`[SocketServer] SSH ready for ${connectionId}. Executing docker command...`);
         ws.send('Conexión SSH establecida. Iniciando shell en el contenedor...\r\n');
-        ssh.exec(`docker exec -it ${containerId} /bin/sh`, (err, stream) => {
+        
+        // Request a pseudo-terminal (PTY) for a true interactive session
+        ssh.exec(`docker exec -it ${containerId} /bin/sh`, { pty: true }, (err, stream) => {
           if (err) {
-            throw err;
+            console.error(`[SocketServer] SSH exec error for ${connectionId}:`, err);
+            ws.send(`\r\nError al ejecutar comando en SSH: ${err.message}\r\n`);
+            ssh.end();
+            return;
           }
 
+          console.log(`[SocketServer] Docker exec stream started for ${connectionId}`);
           activeConnections.set(connectionId, { ws, ssh, stream });
 
           ws.onmessage = (event) => {
-            stream.write(event.data);
+            stream.write(event.data as Buffer);
           };
 
           stream.on('data', (data: Buffer) => {
