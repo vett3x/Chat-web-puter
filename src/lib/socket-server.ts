@@ -1,11 +1,12 @@
-import { WebSocketServer, WebSocket } from 'ws';
+import { WebSocketServer, WebSocket, type RawData } from 'ws';
 import { createClient } from '@supabase/supabase-js';
 import { Client as SshClient } from 'ssh2';
-import type { Stream } from 'ssh2';
+import type { ClientChannel } from 'ssh2';
 import url from 'url';
+import type { IncomingMessage } from 'http';
 
 // This is a simple in-memory store. In a real-world scalable app, you'd use Redis or similar.
-const activeConnections = new Map<string, { ws: WebSocket; ssh: SshClient; stream: Stream }>();
+const activeConnections = new Map<string, { ws: WebSocket; ssh: SshClient; stream: ClientChannel }>();
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,7 +17,7 @@ export function setupWebSocketServer(port: number) {
   const wss = new WebSocketServer({ port });
   console.log(`[SocketServer] WebSocket server started on port ${port}`);
 
-  wss.on('connection', async (ws, req) => {
+  wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
     const connectionId = Math.random().toString(36).substring(7);
     console.log(`[SocketServer] Client connected: ${connectionId}`);
 
@@ -53,7 +54,7 @@ export function setupWebSocketServer(port: number) {
 
           activeConnections.set(connectionId, { ws, ssh, stream });
 
-          ws.on('message', (data) => {
+          ws.on('message', (data: RawData) => {
             stream.write(data);
           });
 
