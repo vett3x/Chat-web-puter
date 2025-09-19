@@ -35,14 +35,14 @@ export function ContainerConsoleDialog({ open, onOpenChange, server, container }
     const host = window.location.hostname; // Use the browser's hostname, NOT localhost
     const wsUrl = `${protocol}://${host}:3001?serverId=${server.id}&containerId=${container.ID}&userId=${session.user.id}`;
     
-    termRef.current?.writeln(`\x1b[33mIntentando conectar a: ${wsUrl}\x1b[0m`);
+    termRef.current?.writeln(`\x1b[33m[CLIENT] Intentando conectar a: ${wsUrl}\x1b[0m`);
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
       console.log('WebSocket connection established');
-      termRef.current?.writeln('\r\n\x1b[32mConexión establecida. Bienvenido a la terminal del contenedor.\x1b[0m\r\n');
+      termRef.current?.writeln('\r\n\x1b[32m[CLIENT] Conexión WebSocket establecida.\x1b[0m\r\n');
     };
 
     ws.onmessage = (event) => {
@@ -55,17 +55,17 @@ export function ContainerConsoleDialog({ open, onOpenChange, server, container }
 
     ws.onerror = (error) => {
       console.error('WebSocket error:', error);
-      termRef.current?.writeln(`\r\n\x1b[31m--- Error de Conexión WebSocket ---\x1b[0m`);
-      termRef.current?.writeln(`\x1b[31mNo se pudo conectar a ${wsUrl}\x1b[0m`);
-      termRef.current?.writeln(`\x1b[33mEsto puede ocurrir si el entorno de desarrollo no expone el puerto 3001.\x1b[0m`);
+      termRef.current?.writeln(`\r\n\x1b[31m[CLIENT] --- Error de Conexión WebSocket ---\x1b[0m`);
+      termRef.current?.writeln(`\x1b[31m[CLIENT] No se pudo conectar a ${wsUrl}\x1b[0m`);
+      termRef.current?.writeln(`\x1b[33m[CLIENT] Esto puede ocurrir si el entorno de desarrollo no expone el puerto 3001.\x1b[0m`);
     };
 
     ws.onclose = (event) => {
       console.log('WebSocket connection closed', event);
       if (!event.wasClean) {
-        termRef.current?.writeln(`\r\n\x1b[31m--- Conexión perdida (código: ${event.code}) ---\x1b[0m`);
+        termRef.current?.writeln(`\r\n\x1b[31m[CLIENT] --- Conexión perdida (código: ${event.code}) ---\x1b[0m`);
       } else {
-        termRef.current?.writeln(`\r\n\x1b[33m--- Desconectado ---\x1b[0m`);
+        termRef.current?.writeln(`\r\n\x1b[33m[CLIENT] --- Desconectado ---\x1b[0m`);
       }
     };
 

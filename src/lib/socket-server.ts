@@ -47,13 +47,13 @@ export function setupWebSocketServer(port: number) {
       const ssh = new SshClient();
       ssh.on('ready', () => {
         console.log(`[SocketServer] SSH ready for ${connectionId}. Executing docker command...`);
-        ws.send('Conexión SSH establecida. Iniciando shell en el contenedor...\r\n');
+        ws.send('\r\n\x1b[32m[SERVER] Conexión SSH establecida. Iniciando shell en el contenedor...\x1b[0m\r\n');
         
         // Request a pseudo-terminal (PTY) for a true interactive session
         ssh.exec(`docker exec -it ${containerId} /bin/sh`, { pty: true }, (err, stream) => {
           if (err) {
             console.error(`[SocketServer] SSH exec error for ${connectionId}:`, err);
-            ws.send(`\r\nError al ejecutar comando en SSH: ${err.message}\r\n`);
+            ws.send(`\r\n\x1b[31m[SERVER] Error al ejecutar comando en SSH: ${err.message}\x1b[0m\r\n`);
             ssh.end();
             return;
           }
@@ -76,7 +76,7 @@ export function setupWebSocketServer(port: number) {
         });
       }).on('error', (err) => {
         console.error(`[SocketServer] SSH connection error for ${connectionId}:`, err);
-        ws.send(`\r\nError de conexión SSH: ${err.message}\r\n`);
+        ws.send(`\r\n\x1b[31m[SERVER] Error de conexión SSH: ${err.message}\x1b[0m\r\n`);
         ws.close();
       }).connect({
         host: server.ip_address,
@@ -97,7 +97,7 @@ export function setupWebSocketServer(port: number) {
 
     } catch (error: any) {
       console.error(`[SocketServer] Error during connection setup for ${connectionId}:`, error);
-      ws.send(`\r\nError: ${error.message}\r\n`);
+      ws.send(`\r\n\x1b[31m[SERVER] Error: ${error.message}\x1b[0m\r\n`);
       ws.close();
     }
   });
