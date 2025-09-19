@@ -25,108 +25,111 @@ export function ContainerConsoleDialog({ open, onOpenChange, server, container }
   const wsRef = useRef<WebSocket | null>(null);
   const termRef = useRef<any | null>(null); // To hold the xterm instance
 
-  const initializeSocket = useCallback(async () => {
-    if (!session?.user?.id || typeof window === 'undefined') return;
+  const initializeSocket = useCallback(async (term: any) => {
+    if (!session?.user?.id || typeof window === 'undefined') {
+      term.writeln('\x1b[31m[CLIENT] Error: Sesión de usuario no encontrada.\x1b[0m');
+      return;
+    }
 
-    // First, ensure the WebSocket server is running by pinging the API route
-    await fetch('/api/socket');
+    try {
+      term.writeln('\x1b[33m[CLIENT] Asegurando que el servidor de sockets esté activo...\x1b[0m');
+      await fetch('/api/socket');
+      term.writeln('\x1b[32m[CLIENT] Servidor de sockets confirmado.\x1b[0m');
 
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const host = window.location.hostname; // Use the browser's hostname, NOT localhost
-    const wsUrl = `${protocol}://${host}:3001?serverId=${server.id}&containerId=${container.ID}&userId=${session.user.id}`;
-    
-    termRef.current?.writeln(`\x1b[33m[CLIENT] Intentando conectar a: ${wsUrl}\x1b[0m`);
+      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const host = window.location.hostname;
+      const wsUrl = `${protocol}://${host}:3001?serverId=${server.id}&containerId=${container.ID}&userId=${session.user.id}`;
+      
+      term.writeln(`\x1b[33m[CLIENT] Conectando a: ${wsUrl}\x1b[0m`);
 
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
 
-    ws.onopen = () => {
-      console.log('WebSocket connection established');
-      termRef.current?.writeln('\r\n\x1b[32m[CLIENT] Conexión WebSocket establecida.\x1b[0m\r\n');
-    };
+      ws.onopen = () => {
+        term.writeln('\r\n\x1b[32m[CLIENT] Conexión WebSocket establecida.\x1b[0m\r\n');
+      };
 
-    ws.onmessage = (event) => {
-      if (event.data instanceof ArrayBuffer) {
-        termRef.current?.write(new Uint8Array(event.data));
-      } else {
-        termRef.current?.write(event.data);
-      }
-    };
+      ws.onmessage = (event) => {
+        if (event.data instanceof ArrayBuffer) {
+          term.write(new Uint8Array(event.data));
+        } else {
+          term.write(event.data);
+        }
+      };
 
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      termRef.current?.writeln(`\r\n\x1b[31m[CLIENT] --- Error de Conexión WebSocket ---\x1b[0m`);
-      termRef.current?.writeln(`\x1b[31m[CLIENT] No se pudo conectar a ${wsUrl}\x1b[0m`);
-      termRef.current?.writeln(`\x1b[33m[CLIENT] Esto puede ocurrir si el entorno de desarrollo no expone el puerto 3001.\x1b[0m`);
-    };
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        term.writeln(`\r\n\x1b[31m[CLIENT] --- Error de Conexión WebSocket ---\x1b[0m`);
+        term.writeln(`\x1b[31m[CLIENT] No se pudo conectar a ${wsUrl}\x1b[0m`);
+      };
 
-    ws.onclose = (event) => {
-      console.log('WebSocket connection closed', event);
-      if (!event.wasClean) {
-        termRef.current?.writeln(`\r\n\x1b[31m[CLIENT] --- Conexión perdida (código: ${event.code}) ---\x1b[0m`);
-      } else {
-        termRef.current?.writeln(`\r\n\x1b[33m[CLIENT] --- Desconectado ---\x1b[0m`);
-      }
-    };
-
+      ws.onclose = (event) => {
+        if (!event.wasClean) {
+          term.writeln(`\r\n\x1b[31m[CLIENT] --- Conexión perdida (código: ${event.code}) ---\x1b[0m`);
+        } else {
+          term.writeln(`\r\n\x1b[33m[CLIENT] --- Desconectado ---\x1b[0m`);
+        }
+      };
+    } catch (e: any) {
+      term.writeln(`\x1b[31m[CLIENT] Error al inicializar el socket: ${e.message}\x1b[0m`);
+    }
   }, [server.id, container.ID, session?.user.id]);
 
   useEffect(() => {
-    const initializeTerminal = async () => {
-      if (open && terminalRef.current && !termRef.current) {
+    if (!open) {
+      return;
+    }
+
+    let term: any = null;
+    let fitAddon: any = null;
+    let resizeObserver: ResizeObserver | null = null;
+
+    const initTerminal = async () => {
+      if (terminalRef.current && !termRef.current) {
         const { Terminal } = await import('xterm');
         const { FitAddon } = await import('xterm-addon-fit');
 
-        const term = new Terminal({
+        term = new Terminal({
           cursorBlink: true,
           convertEol: true,
           fontFamily: 'var(--font-geist-mono)',
-          theme: {
-            background: '#000000',
-            foreground: '#FFFFFF',
-          },
+          theme: { background: '#000000', foreground: '#FFFFFF' },
         });
         termRef.current = term;
 
-        const fitAddon = new FitAddon();
+        fitAddon = new FitAddon();
         term.loadAddon(fitAddon);
         term.open(terminalRef.current);
         
-        // Delay fit to ensure container is sized correctly
+        term.writeln('\x1b[32m[CLIENT] Terminal inicializada.\x1b[0m');
+        
         setTimeout(() => fitAddon.fit(), 10);
 
-        term.onData((data) => {
+        term.onData((data: string) => {
           if (wsRef.current?.readyState === WebSocket.OPEN) {
             wsRef.current?.send(data);
           }
         });
 
-        const resizeObserver = new ResizeObserver(() => {
+        resizeObserver = new ResizeObserver(() => {
           try {
-            fitAddon.fit();
-          } catch (e) {
-            // Ignore errors on fast resize
-          }
+            fitAddon?.fit();
+          } catch (e) {}
         });
-        if (terminalRef.current) {
-          resizeObserver.observe(terminalRef.current);
-        }
+        resizeObserver.observe(terminalRef.current);
 
-        await initializeSocket();
+        await initializeSocket(term);
       }
     };
 
-    initializeTerminal();
+    initTerminal();
 
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
-      if (termRef.current) {
-        termRef.current.dispose();
-        termRef.current = null;
-      }
+      resizeObserver?.disconnect();
+      wsRef.current?.close();
+      wsRef.current = null;
+      termRef.current?.dispose();
+      termRef.current = null;
     };
   }, [open, initializeSocket]);
 

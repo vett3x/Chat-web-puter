@@ -46,11 +46,14 @@ export function setupWebSocketServer(port: number) {
 
       const ssh = new SshClient();
       ssh.on('ready', () => {
-        console.log(`[SocketServer] SSH ready for ${connectionId}. Executing docker command...`);
-        ws.send('\r\n\x1b[32m[SERVER] Conexión SSH establecida. Iniciando shell en el contenedor...\x1b[0m\r\n');
+        console.log(`[SocketServer] SSH ready for ${connectionId}.`);
+        ws.send('\r\n\x1b[32m[SERVER] Conexión SSH establecida.\x1b[0m\r\n');
         
-        // Request a pseudo-terminal (PTY) for a true interactive session
-        ssh.exec(`docker exec -it ${containerId} /bin/sh`, { pty: true }, (err, stream) => {
+        const command = `docker exec -it ${containerId} /bin/bash`;
+        console.log(`[SocketServer] Executing command: ${command}`);
+        ws.send(`\x1b[33m[SERVER] Ejecutando: ${command}\x1b[0m\r\n`);
+
+        ssh.exec(command, { pty: true }, (err, stream) => {
           if (err) {
             console.error(`[SocketServer] SSH exec error for ${connectionId}:`, err);
             ws.send(`\r\n\x1b[31m[SERVER] Error al ejecutar comando en SSH: ${err.message}\x1b[0m\r\n`);
@@ -69,9 +72,15 @@ export function setupWebSocketServer(port: number) {
             ws.send(data);
           });
 
-          stream.on('close', () => {
-            console.log(`[SocketServer] Stream closed for ${connectionId}`);
+          stream.on('close', (code: number, signal: string) => {
+            console.log(`[SocketServer] Stream closed for ${connectionId}. Code: ${code}, Signal: ${signal}`);
+            ws.send(`\r\n\x1b[33m[SERVER] La sesión del contenedor ha finalizado.\x1b[0m\r\n`);
             ws.close();
+          });
+
+          stream.stderr.on('data', (data: Buffer) => {
+            console.error(`[SocketServer] STDERR for ${connectionId}: ${data.toString()}`);
+            ws.send(`\r\n\x1b[31m[SERVER-STDERR] ${data.toString()}\x1b[0m\r\n`);
           });
         });
       }).on('error', (err) => {
