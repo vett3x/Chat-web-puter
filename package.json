@@ -62,7 +62,10 @@
     "ssh2": "^1.17.0",
     "tailwind-merge": "^3.3.0",
     "tailwindcss-animate": "^1.0.7",
-    "vaul": "^1.1.2"
+    "vaul": "^1.1.2",
+    "ws": "^8.18.3",
+    "xterm": "^5.3.0",
+    "xterm-addon-fit": "^0.8.0"
   },
   "devDependencies": {
     "@dyad-sh/nextjs-webpack-component-tagger": "latest",

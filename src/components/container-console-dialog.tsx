@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -8,16 +8,9 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
 import { DockerContainer } from '@/types/docker';
-
-interface ConsoleLine {
-  id: number;
-  type: 'command' | 'output';
-  content: string;
-}
+import { useSession } from '@/components/session-context-provider';
+import 'xterm/css/xterm.css';
 
 interface ContainerConsoleDialogProps {
   open: boolean;
@@ -27,116 +20,112 @@ interface ContainerConsoleDialogProps {
 }
 
 export function ContainerConsoleDialog({ open, onOpenChange, server, container }: ContainerConsoleDialogProps) {
-  const [lines, setLines] = useState<ConsoleLine[]>([]);
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [history, setHistory] = useState<string[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
-  const outputRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const terminalRef = useRef<HTMLDivElement>(null);
+  const { session } = useSession();
+  const wsRef = useRef<WebSocket | null>(null);
+  const termRef = useRef<any | null>(null); // To hold the xterm instance
 
-  useEffect(() => {
-    if (outputRef.current) {
-      outputRef.current.scrollTop = outputRef.current.scrollHeight;
-    }
-  }, [lines]);
+  const initializeSocket = useCallback(async () => {
+    if (!session?.user?.id) return;
 
-  useEffect(() => {
-    if (open) {
-      // Focus input when dialog opens
-      setTimeout(() => inputRef.current?.focus(), 100);
-    }
-  }, [open]);
+    // First, ensure the WebSocket server is running by pinging the API route
+    await fetch('/api/socket');
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInput(e.target.value);
-  };
+    const ws = new WebSocket(`ws://localhost:3001?serverId=${server.id}&containerId=${container.ID}&userId=${session.user.id}`);
+    wsRef.current = ws;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    ws.onopen = () => {
+      console.log('WebSocket connection established');
+      termRef.current?.writeln('Conectado al contenedor...');
+    };
 
-    const command = input.trim();
-    setIsLoading(true);
-    setInput('');
-    if (command) {
-      setHistory(prev => [command, ...prev]);
-    }
-    setHistoryIndex(-1);
-
-    setLines(prev => [...prev, { id: Date.now(), type: 'command', content: command }]);
-
-    try {
-      const response = await fetch(`/api/servers/${server.id}/docker/containers/${container.ID}/exec`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command }),
-      });
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.message || 'Error al ejecutar el comando.');
-      }
-      setLines(prev => [...prev, { id: Date.now() + 1, type: 'output', content: result.output.trimEnd() || ' ' }]);
-    } catch (err: any) {
-      toast.error(err.message);
-      setLines(prev => [...prev, { id: Date.now() + 1, type: 'output', content: `Error: ${err.message}` }]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      if (historyIndex < history.length - 1) {
-        const newIndex = historyIndex + 1;
-        setHistoryIndex(newIndex);
-        setInput(history[newIndex]);
-      }
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      if (historyIndex > 0) {
-        const newIndex = historyIndex - 1;
-        setHistoryIndex(newIndex);
-        setInput(history[newIndex]);
+    ws.onmessage = (event) => {
+      // Data from server is ArrayBuffer, need to convert to Uint8Array for xterm
+      if (event.data instanceof ArrayBuffer) {
+        termRef.current?.write(new Uint8Array(event.data));
       } else {
-        setHistoryIndex(-1);
-        setInput('');
+        termRef.current?.write(event.data);
       }
-    }
-  };
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      termRef.current?.writeln('\r\n--- Error de conexión ---');
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket connection closed');
+      termRef.current?.writeln('\r\n--- Desconectado ---');
+    };
+
+  }, [server.id, container.ID, session?.user?.id]);
+
+  useEffect(() => {
+    const initializeTerminal = async () => {
+      if (open && terminalRef.current && !termRef.current) {
+        const { Terminal } = await import('xterm');
+        const { FitAddon } = await import('xterm-addon-fit');
+
+        const term = new Terminal({
+          cursorBlink: true,
+          convertEol: true,
+          fontFamily: 'var(--font-geist-mono)',
+          theme: {
+            background: '#000000',
+            foreground: '#FFFFFF',
+          },
+        });
+        termRef.current = term;
+
+        const fitAddon = new FitAddon();
+        term.loadAddon(fitAddon);
+        term.open(terminalRef.current);
+        fitAddon.fit();
+
+        // Handle user input
+        term.onData((data) => {
+          wsRef.current?.send(data);
+        });
+
+        // Handle resize
+        const resizeObserver = new ResizeObserver(() => {
+          try {
+            fitAddon.fit();
+          } catch (e) {
+            // This can throw if the terminal is not fully initialized, safe to ignore
+          }
+        });
+        resizeObserver.observe(terminalRef.current);
+
+        await initializeSocket();
+      }
+    };
+
+    initializeTerminal();
+
+    return () => {
+      // Cleanup on dialog close or component unmount
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      if (termRef.current) {
+        termRef.current.dispose();
+        termRef.current = null;
+      }
+    };
+  }, [open, initializeSocket]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] h-[70vh] flex flex-col p-4">
+      <DialogContent className="sm:max-w-[80vw] w-[80vw] h-[80vh] flex flex-col p-4">
         <DialogHeader className="px-2 pt-2">
-          <DialogTitle>Consola: {container.Names} ({container.ID.substring(0, 12)})</DialogTitle>
+          <DialogTitle>Consola Interactiva: {container.Names} ({container.ID.substring(0, 12)})</DialogTitle>
           <DialogDescription>
-            Ejecuta comandos en el contenedor. El estado (directorio, variables) no se mantiene entre comandos.
+            Terminal en tiempo real conectada al contenedor.
           </DialogDescription>
         </DialogHeader>
-        <div ref={outputRef} className="flex-1 bg-black text-white font-mono text-sm p-4 rounded-md overflow-y-auto my-2">
-          {lines.map(line => (
-            <div key={line.id}>
-              {line.type === 'command' && <span className="text-green-400">$ </span>}
-              <pre className="whitespace-pre-wrap inline">{line.content}</pre>
-            </div>
-          ))}
-        </div>
-        <form onSubmit={handleSubmit} className="flex items-center gap-2">
-          <span className="text-green-400 font-mono">$</span>
-          <Input
-            ref={inputRef}
-            value={input}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            disabled={isLoading}
-            className="font-mono bg-black text-white border-gray-700 focus:ring-green-500"
-            placeholder="Escribe un comando y presiona Enter"
-            autoComplete="off"
-          />
-          {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-        </form>
+        <div ref={terminalRef} className="flex-1 w-full h-full bg-black rounded-md p-2" />
       </DialogContent>
     </Dialog>
   );
