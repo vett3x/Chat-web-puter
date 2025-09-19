@@ -26,17 +26,23 @@ export function ContainerConsoleDialog({ open, onOpenChange, server, container }
   const termRef = useRef<any | null>(null); // To hold the xterm instance
 
   const initializeSocket = useCallback(async () => {
-    if (!session?.user?.id) return;
+    if (!session?.user?.id || typeof window === 'undefined') return;
 
     // First, ensure the WebSocket server is running by pinging the API route
     await fetch('/api/socket');
 
-    const ws = new WebSocket(`ws://localhost:3001?serverId=${server.id}&containerId=${container.ID}&userId=${session.user.id}`);
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const host = window.location.hostname;
+    const wsUrl = `${protocol}://${host}:3001?serverId=${server.id}&containerId=${container.ID}&userId=${session.user.id}`;
+    
+    termRef.current?.writeln(`Intentando conectar a: ${wsUrl}`);
+
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
       console.log('WebSocket connection established');
-      termRef.current?.writeln('Conectado al contenedor...');
+      termRef.current?.writeln('\r\n\x1b[32mConexión establecida. Bienvenido a la terminal del contenedor.\x1b[0m');
     };
 
     ws.onmessage = (event) => {
@@ -50,12 +56,18 @@ export function ContainerConsoleDialog({ open, onOpenChange, server, container }
 
     ws.onerror = (error) => {
       console.error('WebSocket error:', error);
-      termRef.current?.writeln('\r\n--- Error de conexión ---');
+      termRef.current?.writeln(`\r\n\x1b[31m--- Error de Conexión WebSocket ---\x1b[0m`);
+      termRef.current?.writeln(`\x1b[31mNo se pudo conectar a ${wsUrl}\x1b[0m`);
+      termRef.current?.writeln(`\x1b[33mEsto puede ocurrir si el entorno de desarrollo no expone el puerto 3001.\x1b[0m`);
     };
 
-    ws.onclose = () => {
-      console.log('WebSocket connection closed');
-      termRef.current?.writeln('\r\n--- Desconectado ---');
+    ws.onclose = (event) => {
+      console.log('WebSocket connection closed', event);
+      if (!event.wasClean) {
+        termRef.current?.writeln(`\r\n\x1b[31m--- Conexión perdida (código: ${event.code}) ---\x1b[0m`);
+      } else {
+        termRef.current?.writeln(`\r\n\x1b[33m--- Desconectado ---\x1b[0m`);
+      }
     };
 
   }, [server.id, container.ID, session?.user?.id]);
@@ -84,7 +96,9 @@ export function ContainerConsoleDialog({ open, onOpenChange, server, container }
 
         // Handle user input
         term.onData((data) => {
-          wsRef.current?.send(data);
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current?.send(data);
+          }
         });
 
         // Handle resize
@@ -95,7 +109,9 @@ export function ContainerConsoleDialog({ open, onOpenChange, server, container }
             // This can throw if the terminal is not fully initialized, safe to ignore
           }
         });
-        resizeObserver.observe(terminalRef.current);
+        if (terminalRef.current) {
+          resizeObserver.observe(terminalRef.current);
+        }
 
         await initializeSocket();
       }
