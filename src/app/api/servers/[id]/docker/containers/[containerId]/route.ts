@@ -75,8 +75,8 @@ export async function DELETE(req: NextRequest) {
     let isGone = false;
 
     while (Date.now() - startTime < timeout) {
-      const { stdout: psOutput } = await executeSshCommand(conn, `docker ps -a --filter "id=${containerId}"`);
-      if (!psOutput.includes(containerId)) {
+      const { code: inspectCode } = await executeSshCommand(conn, `docker inspect ${containerId}`);
+      if (inspectCode !== 0) { // Command fails when container doesn't exist
         isGone = true;
         break;
       }

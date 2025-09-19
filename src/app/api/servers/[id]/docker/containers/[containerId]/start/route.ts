@@ -75,8 +75,8 @@ export async function POST(req: NextRequest) {
     let isRunning = false;
 
     while (Date.now() - startTime < timeout) {
-      const { stdout: psOutput } = await executeSshCommand(conn, `docker ps --filter "id=${containerId}" --format "{{.Status}}"`);
-      if (psOutput.includes('Up')) {
+      const { stdout: inspectOutput, code: inspectCode } = await executeSshCommand(conn, `docker inspect --format '{{.State.Running}}' ${containerId}`);
+      if (inspectCode === 0 && inspectOutput.trim() === 'true') {
         isRunning = true;
         break;
       }

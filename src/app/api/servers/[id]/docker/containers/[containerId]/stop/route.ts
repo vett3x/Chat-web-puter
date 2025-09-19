@@ -75,8 +75,8 @@ export async function POST(req: NextRequest) {
     let isStopped = false;
 
     while (Date.now() - startTime < timeout) {
-      const { stdout: psOutput } = await executeSshCommand(conn, `docker ps --filter "id=${containerId}"`);
-      if (!psOutput.includes(containerId)) { // If it's not in the active list, it's stopped
+      const { stdout: inspectOutput, code: inspectCode } = await executeSshCommand(conn, `docker inspect --format '{{.State.Running}}' ${containerId}`);
+      if (inspectCode === 0 && inspectOutput.trim() === 'false') {
         isStopped = true;
         break;
       }

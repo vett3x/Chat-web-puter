@@ -86,12 +86,12 @@ export async function POST(req: NextRequest) {
     // Poll to verify the container is running
     const startTime = Date.now();
     const timeout = 15000; // 15 seconds
-    let isRunning = false;
+    let isVerified = false;
 
     while (Date.now() - startTime < timeout) {
-      const { stdout: psOutput } = await executeSshCommand(conn, `docker ps -a --filter "id=${trimmedId}"`);
-      if (psOutput.includes(trimmedId)) {
-        isRunning = true;
+      const { stdout: inspectOutput, code: inspectCode } = await executeSshCommand(conn, `docker inspect --format '{{.State.Running}}' ${trimmedId}`);
+      if (inspectCode === 0 && inspectOutput.trim() === 'true') {
+        isVerified = true;
         break;
       }
       await new Promise(res => setTimeout(res, 2000)); // Wait 2 seconds before next check
@@ -99,13 +99,12 @@ export async function POST(req: NextRequest) {
 
     conn.end();
 
-    if (!isRunning) {
-      // Cleanup failed container
-      await executeSshCommand(conn, `docker rm -f ${trimmedId}`);
-      throw new Error('El contenedor no se pudo iniciar a tiempo y ha sido eliminado.');
+    if (!isVerified) {
+      // Don't auto-delete, as it might be a slow-starting container. Let the user decide.
+      throw new Error('El contenedor fue creado pero no se pudo verificar su estado "running" a tiempo.');
     }
 
-    return NextResponse.json({ message: `Contenedor ${trimmedId.substring(0,12)} creado.` }, { status: 201 });
+    return NextResponse.json({ message: `Contenedor ${trimmedId.substring(0,12)} creado y en ejecución.` }, { status: 201 });
 
   } catch (error: any) {
     conn.end();
