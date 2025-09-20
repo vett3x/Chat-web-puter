@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # --- Configuración ---
-# IMPORTANTE: Cambia esto a la ruta ABSOLUTA de tu directorio de proyecto en Proxmox
-PROJECT_DIR="/var/www/Chat-web-puter" 
-REPO_URL="https://github.com/vett3x/Chat-web-puter"
+# El directorio del proyecto será el directorio actual desde donde se ejecuta este script.
+PROJECT_DIR="$(pwd)"
+REPO_URL="https://github.com/vett3x/Chat-web-puter" # URL del repositorio para git pull
 
 # --- Comprobación de prerrequisitos ---
 echo "Comprobando prerrequisitos..."
@@ -13,18 +13,13 @@ command -v npm >/dev/null 2>&1 || { echo >&2 "npm no está instalado. Por favor,
 command -v pm2 >/dev/null 2>&1 || { echo >&2 "PM2 no está instalado. Instalando PM2 globalmente..."; npm install -g pm2; }
 command -v ts-node >/dev/null 2>&1 || { echo >&2 "ts-node no está instalado. Instalando ts-node globalmente..."; npm install -g ts-node; }
 
+# --- Navegar al directorio del proyecto (ya estamos allí si se ejecuta desde la raíz) ---
+echo "Navegando al directorio del proyecto: $PROJECT_DIR"
+cd "$PROJECT_DIR" || { echo "Error al cambiar al directorio $PROJECT_DIR"; exit 1; }
 
-# --- Navegar o clonar el directorio del proyecto ---
-if [ ! -d "$PROJECT_DIR" ]; then
-  echo "El directorio del proyecto $PROJECT_DIR no existe. Clonando repositorio..."
-  git clone "$REPO_URL" "$PROJECT_DIR"
-  cd "$PROJECT_DIR" || { echo "Error al cambiar al directorio $PROJECT_DIR"; exit 1; }
-else
-  echo "Navegando al directorio del proyecto: $PROJECT_DIR"
-  cd "$PROJECT_DIR" || { echo "Error al cambiar al directorio $PROJECT_DIR"; exit 1; }
-  echo "Obteniendo los últimos cambios de Git..."
-  git pull origin main # Asumiendo que tu rama principal es 'main'
-fi
+# --- Obtener los últimos cambios de Git ---
+echo "Obteniendo los últimos cambios de Git..."
+git pull origin main # Asumiendo que tu rama principal es 'main'
 
 # --- Crear .env.local si no existe ---
 if [ ! -f ".env.local" ]; then
