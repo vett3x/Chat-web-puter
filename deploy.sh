@@ -27,10 +27,18 @@ if [ -d ".git" ]; then
     exit 1
   fi
 else
-  echo "El directorio actual no es un repositorio Git. Clonando repositorio..."
-  git clone "$REPO_URL" .
-  if [ $? -ne 0 ]; then
-    echo "Error al clonar el repositorio. Por favor, revisa la URL o los permisos."
+  echo "El directorio actual no es un repositorio Git."
+  # Verificar si el directorio está vacío antes de clonar
+  if [ -z "$(ls -A "$PROJECT_DIR")" ]; then
+    echo "El directorio está vacío. Clonando repositorio..."
+    git clone "$REPO_URL" .
+    if [ $? -ne 0 ]; then
+      echo "Error al clonar el repositorio. Por favor, revisa la URL o los permisos."
+      exit 1
+    fi
+  else
+    echo "FATAL: El directorio '$PROJECT_DIR' no está vacío y no es un repositorio Git."
+    echo "Por favor, vacía el directorio o ejecuta el script en un directorio vacío para clonar el repositorio."
     exit 1
   fi
 fi
