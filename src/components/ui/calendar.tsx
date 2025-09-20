@@ -59,7 +59,6 @@ function Calendar({
           <ChevronRight className={cn("h-4 w-4", className)} {...props} />
         ),
       } as Partial<CustomComponents>}
-      {/* Changed to Partial<CustomComponents> and added explicit types */}
       {...props}
     />
   )
