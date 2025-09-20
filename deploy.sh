@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Cambiar al directorio donde se encuentra este script
+# Esto asegura que los comandos npm se ejecuten en la raíz del proyecto.
+cd "$(dirname "$0")"
+
 # --- Node.js Version Check and Auto-Update ---
 echo "Verificando la versión de Node.js..."
 
