@@ -33,6 +33,7 @@ export function ContainerConsoleDialog({ open, onOpenChange, server, container }
 
     try {
       term.writeln('\x1b[33m[CLIENT] Asegurando que el servidor de sockets esté activo...\x1b[0m');
+      // This fetch call ensures the WebSocket server is initialized on the Next.js backend
       await fetch('/api/socket');
       term.writeln('\x1b[32m[CLIENT] Servidor de sockets confirmado.\x1b[0m');
 
@@ -41,6 +42,7 @@ export function ContainerConsoleDialog({ open, onOpenChange, server, container }
       const wsUrl = `${protocol}://${host}:3001?serverId=${server.id}&containerId=${container.ID}&userId=${session.user.id}`;
       
       term.writeln(`\x1b[33m[CLIENT] Conectando a: ${wsUrl}\x1b[0m`);
+      console.log(`[ContainerConsoleDialog] Attempting WebSocket connection to: ${wsUrl}`);
 
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
@@ -58,20 +60,24 @@ export function ContainerConsoleDialog({ open, onOpenChange, server, container }
       };
 
       ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        console.error('[ContainerConsoleDialog] WebSocket error:', error);
         term.writeln(`\r\n\x1b[31m[CLIENT] --- Error de Conexión WebSocket ---\x1b[0m`);
         term.writeln(`\x1b[31m[CLIENT] No se pudo conectar a ${wsUrl}\x1b[0m`);
+        term.writeln(`\x1b[31m[CLIENT] Por favor, verifica que el servidor de sockets esté corriendo en el puerto 3001 y que no haya problemas de red o firewall.\x1b[0m`);
       };
 
       ws.onclose = (event) => {
         if (!event.wasClean) {
           term.writeln(`\r\n\x1b[31m[CLIENT] --- Conexión perdida (código: ${event.code}) ---\x1b[0m`);
+          term.writeln(`\x1b[31m[CLIENT] Razón: ${event.reason || 'Desconocida'}\x1b[0m`);
         } else {
           term.writeln(`\r\n\x1b[33m[CLIENT] --- Desconectado ---\x1b[0m`);
         }
       };
     } catch (e: any) {
+      console.error('[ContainerConsoleDialog] Error during socket initialization:', e);
       term.writeln(`\x1b[31m[CLIENT] Error al inicializar el socket: ${e.message}\x1b[0m`);
+      term.writeln(`\x1b[31m[CLIENT] Asegúrate de que el servidor Next.js esté funcionando y que la ruta /api/socket sea accesible.\x1b[0m`);
     }
   }, [server.id, container.ID, session?.user.id]);
 
@@ -114,7 +120,9 @@ export function ContainerConsoleDialog({ open, onOpenChange, server, container }
         resizeObserver = new ResizeObserver(() => {
           try {
             fitAddon?.fit();
-          } catch (e) {}
+          } catch (e) {
+            console.error('[ContainerConsoleDialog] ResizeObserver fit error:', e);
+          }
         });
         resizeObserver.observe(terminalRef.current);
 
