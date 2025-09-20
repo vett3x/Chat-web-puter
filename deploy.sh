@@ -1,9 +1,10 @@
 #!/bin/bash
 
 # --- Configuración ---
-# El directorio del proyecto será el directorio actual desde donde se ejecuta este script.
-PROJECT_DIR="$(pwd)"
 REPO_URL="https://github.com/vett3x/Chat-web-puter" # URL del repositorio
+# Extraer el nombre del proyecto de la URL del repositorio
+PROJECT_NAME=$(basename "$REPO_URL" .git)
+PROJECT_DIR="$(pwd)/$PROJECT_NAME"
 
 # --- Comprobación de prerrequisitos ---
 echo "Comprobando prerrequisitos..."
@@ -13,37 +14,34 @@ command -v npm >/dev/null 2>&1 || { echo >&2 "npm no está instalado. Por favor,
 command -v pm2 >/dev/null 2>&1 || { echo >&2 "PM2 no está instalado. Instalando PM2 globalmente..."; npm install -g pm2; }
 command -v ts-node >/dev/null 2>&1 || { echo >&2 "ts-node no está instalado. Instalando ts-node globalmente..."; npm install -g ts-node; }
 
-# --- Navegar al directorio del proyecto ---
-echo "Navegando al directorio del proyecto: $PROJECT_DIR"
-cd "$PROJECT_DIR" || { echo "Error al cambiar al directorio $PROJECT_DIR"; exit 1; }
-
 # --- Clonar o actualizar el repositorio ---
-if [ -d ".git" ]; then
-  echo "El directorio actual ya es un repositorio Git. Obteniendo los últimos cambios y reseteando..."
-  git fetch origin main # Asumiendo que tu rama principal es 'main'
-  git reset --hard origin/main
-  if [ $? -ne 0 ]; then
-    echo "Error al actualizar el repositorio. Por favor, revisa los permisos o el estado de Git."
-    exit 1
-  fi
-else
-  echo "El directorio actual no es un repositorio Git."
-  # Verificar si el directorio está vacío antes de clonar
-  if [ -z "$(ls -A "$PROJECT_DIR")" ]; then
-    echo "El directorio está vacío. Clonando repositorio..."
-    git clone "$REPO_URL" .
+if [ -d "$PROJECT_DIR" ]; then
+  echo "El directorio del proyecto '$PROJECT_DIR' ya existe."
+  if [ -d "$PROJECT_DIR/.git" ]; then
+    echo "Es un repositorio Git. Obteniendo los últimos cambios y reseteando..."
+    cd "$PROJECT_DIR" || { echo "Error al cambiar al directorio $PROJECT_DIR"; exit 1; }
+    git fetch origin main # Asumiendo que tu rama principal es 'main'
+    git reset --hard origin/main
     if [ $? -ne 0 ]; then
-      echo "Error al clonar el repositorio. Por favor, revisa la URL o los permisos."
+      echo "Error al actualizar el repositorio. Por favor, revisa los permisos o el estado de Git."
       exit 1
     fi
   else
-    echo "FATAL: El directorio '$PROJECT_DIR' no está vacío y no es un repositorio Git."
-    echo "Por favor, vacía el directorio o ejecuta el script en un directorio vacío para clonar el repositorio."
+    echo "FATAL: El directorio '$PROJECT_DIR' existe pero NO es un repositorio Git."
+    echo "Por favor, mueve o elimina el directorio existente para poder clonar el repositorio."
     exit 1
   fi
+else
+  echo "El directorio del proyecto '$PROJECT_DIR' no existe. Clonando repositorio..."
+  git clone "$REPO_URL" "$PROJECT_DIR"
+  if [ $? -ne 0 ]; then
+    echo "Error al clonar el repositorio. Por favor, revisa la URL o los permisos."
+    exit 1
+  fi
+  cd "$PROJECT_DIR" || { echo "Error al cambiar al directorio $PROJECT_DIR"; exit 1; }
 fi
 
-# --- Crear .env.local si no existe ---
+# --- Crear .env.local si no existe (dentro del PROJECT_DIR) ---
 if [ ! -f ".env.local" ]; then
   echo "Creando archivo .env.local con placeholders. Por favor, edítalo con tus credenciales reales."
   cat << EOF > .env.local
