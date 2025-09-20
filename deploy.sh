@@ -68,6 +68,9 @@ pm2 stop chat-web-app || true
 pm2 delete chat-web-app || true
 pm2 stop websocket-server || true
 pm2 delete websocket-server || true
+# Añadido para eliminar la aplicación anterior
+pm2 stop claude-chat-app || true
+pm2 delete claude-chat-app || true
 
 # --- Instalar/actualizar dependencias ---
 echo "Instalando/actualizando dependencias npm..."
