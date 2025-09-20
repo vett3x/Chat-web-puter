@@ -3,7 +3,7 @@
 # --- Configuración ---
 # El directorio del proyecto será el directorio actual desde donde se ejecuta este script.
 PROJECT_DIR="$(pwd)"
-REPO_URL="https://github.com/vett3x/Chat-web-puter" # URL del repositorio para git pull
+REPO_URL="https://github.com/vett3x/Chat-web-puter" # URL del repositorio
 
 # --- Comprobación de prerrequisitos ---
 echo "Comprobando prerrequisitos..."
@@ -13,13 +13,27 @@ command -v npm >/dev/null 2>&1 || { echo >&2 "npm no está instalado. Por favor,
 command -v pm2 >/dev/null 2>&1 || { echo >&2 "PM2 no está instalado. Instalando PM2 globalmente..."; npm install -g pm2; }
 command -v ts-node >/dev/null 2>&1 || { echo >&2 "ts-node no está instalado. Instalando ts-node globalmente..."; npm install -g ts-node; }
 
-# --- Navegar al directorio del proyecto (ya estamos allí si se ejecuta desde la raíz) ---
+# --- Navegar al directorio del proyecto ---
 echo "Navegando al directorio del proyecto: $PROJECT_DIR"
 cd "$PROJECT_DIR" || { echo "Error al cambiar al directorio $PROJECT_DIR"; exit 1; }
 
-# --- Obtener los últimos cambios de Git ---
-echo "Obteniendo los últimos cambios de Git..."
-git pull origin main # Asumiendo que tu rama principal es 'main'
+# --- Clonar o actualizar el repositorio ---
+if [ -d ".git" ]; then
+  echo "El directorio actual ya es un repositorio Git. Obteniendo los últimos cambios y reseteando..."
+  git fetch origin main # Asumiendo que tu rama principal es 'main'
+  git reset --hard origin/main
+  if [ $? -ne 0 ]; then
+    echo "Error al actualizar el repositorio. Por favor, revisa los permisos o el estado de Git."
+    exit 1
+  fi
+else
+  echo "El directorio actual no es un repositorio Git. Clonando repositorio..."
+  git clone "$REPO_URL" .
+  if [ $? -ne 0 ]; then
+    echo "Error al clonar el repositorio. Por favor, revisa la URL o los permisos."
+    exit 1
+  fi
+fi
 
 # --- Crear .env.local si no existe ---
 if [ ! -f ".env.local" ]; then
