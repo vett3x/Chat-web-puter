@@ -32,10 +32,8 @@ export function ContainerConsoleDialog({ open, onOpenChange, server, container }
     }
 
     try {
-      term.writeln('\x1b[33m[CLIENT] Asegurando que el servidor de sockets esté activo...\x1b[0m');
-      // This fetch call ensures the WebSocket server is initialized on the Next.js backend
-      await fetch('/api/socket');
-      term.writeln('\x1b[32m[CLIENT] Servidor de sockets confirmado.\x1b[0m');
+      // Removed fetch('/api/socket') as the WebSocket server will run independently
+      term.writeln('\x1b[32m[CLIENT] Servidor de sockets asumido como activo.\x1b[0m');
 
       const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
       const host = window.location.hostname;

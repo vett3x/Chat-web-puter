@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "concurrently \"next dev\" \"ts-node server/websocket.ts\"",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "ws-dev": "ts-node server/websocket.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
@@ -76,11 +77,13 @@
     "@types/react-dom": "^19",
     "@types/ssh2": "^1.15.5",
     "@types/ws": "^8.5.10",
+    "concurrently": "^8.2.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "postcss": "latest",
     "tailwindcss": "^3.4.1",
+    "ts-node": "^10.9.2",
     "typescript": "^5",
     "zod": "^3.25.28"
   }
