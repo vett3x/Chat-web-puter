@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # --- Configuración ---
-# REEMPLAZA ESTO con la URL de tu repositorio Git.
-REPO_URL="TU_URL_DEL_REPOSITORIO_GIT" 
+# URL del repositorio Git.
+REPO_URL="https://github.com/vett3x/Chat-web-puter" 
 # Directorio donde se clonará y desplegará el proyecto.
 PROJECT_DIR="/home/Web-chat" 
 
@@ -75,5 +75,5 @@ pm2 start npm --name "chat-web-app" -- start
 echo "Iniciando el servidor WebSocket con PM2..."
 pm2 start ts-node --name "websocket-server" -- server/websocket.ts
 
-echo "--- Despliegue completado ---"
+echo "--- Desplegue completado ---"
 pm2 list
