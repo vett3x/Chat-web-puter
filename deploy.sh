@@ -26,6 +26,27 @@ else
   git pull origin main # Asumiendo que tu rama principal es 'main'
 fi
 
+# --- Crear .env.local si no existe ---
+if [ ! -f ".env.local" ]; then
+  echo "Creando archivo .env.local con placeholders. Por favor, edítalo con tus credenciales reales."
+  cat << EOF > .env.local
+# Variables de entorno para Supabase
+# Reemplaza con tus credenciales de Supabase
+NEXT_PUBLIC_SUPABASE_URL="https://juxrggowingqlchwfuct.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1eHJnZ293aW5ncWxjaHdmdWN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgxNDY4OTYsImV4cCI6MjA3MzcyMjg5Nn0.Bf05aFnLW_YCAZdCZC2Kgqtf7is9WcORdDagC2Nq0ec"
+SUPABASE_SERVICE_ROLE_KEY="TU_SERVICE_ROLE_KEY_SUPABASE" # ¡IMPORTANTE! Esta clave debe ser secreta y no debe exponerse en el frontend.
+
+# Configuración para que el frontend (desplegado en Proxmox) se conecte al WebSocket (también en Proxmox)
+# Si el frontend y el WebSocket están en la misma máquina, puedes usar 'localhost' para NEXT_PUBLIC_WEBSOCKET_HOST.
+# Si el frontend se accede desde otra máquina y el WebSocket está en Proxmox, usa la IP pública o el hostname de Proxmox.
+NEXT_PUBLIC_WEBSOCKET_HOST="localhost" # O la IP de tu servidor Proxmox (ej. 10.10.10.200)
+NEXT_PUBLIC_WEBSOCKET_PORT="3001"
+EOF
+  echo "Archivo .env.local creado. ¡Recuerda editarlo con tus valores reales!"
+else
+  echo "El archivo .env.local ya existe. No se ha modificado."
+fi
+
 # --- Detener y eliminar procesos existentes de PM2 ---
 echo "Deteniendo y eliminando procesos PM2 existentes para la aplicación y el servidor websocket..."
 pm2 stop chat-web-app || true
