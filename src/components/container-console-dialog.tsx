@@ -32,12 +32,14 @@ export function ContainerConsoleDialog({ open, onOpenChange, server, container }
     }
 
     try {
-      // Removed fetch('/api/socket') as the WebSocket server will run independently
       term.writeln('\x1b[32m[CLIENT] Servidor de sockets asumido como activo.\x1b[0m');
 
       const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      const host = window.location.hostname;
-      const wsUrl = `${protocol}://${host}:3001?serverId=${server.id}&containerId=${container.ID}&userId=${session.user.id}`;
+      // Use an environment variable for the WebSocket host, fallback to window.location.hostname
+      const wsHost = process.env.NEXT_PUBLIC_WEBSOCKET_HOST || window.location.hostname;
+      const wsPort = process.env.NEXT_PUBLIC_WEBSOCKET_PORT || '3001'; // Default to 3001
+      
+      const wsUrl = `${protocol}://${wsHost}:${wsPort}?serverId=${server.id}&containerId=${container.ID}&userId=${session.user.id}`;
       
       term.writeln(`\x1b[33m[CLIENT] Conectando a: ${wsUrl}\x1b[0m`);
       console.log(`[ContainerConsoleDialog] Attempting WebSocket connection to: ${wsUrl}`);
@@ -61,7 +63,7 @@ export function ContainerConsoleDialog({ open, onOpenChange, server, container }
         console.error('[ContainerConsoleDialog] WebSocket error:', error);
         term.writeln(`\r\n\x1b[31m[CLIENT] --- Error de Conexión WebSocket ---\x1b[0m`);
         term.writeln(`\x1b[31m[CLIENT] No se pudo conectar a ${wsUrl}\x1b[0m`);
-        term.writeln(`\x1b[31m[CLIENT] Por favor, verifica que el servidor de sockets esté corriendo en el puerto 3001 y que no haya problemas de red o firewall.\x1b[0m`);
+        term.writeln(`\x1b[31m[CLIENT] Por favor, verifica que el servidor de sockets esté corriendo en el puerto ${wsPort} en ${wsHost} y que no haya problemas de red o firewall.\x1b[0m`);
       };
 
       ws.onclose = (event) => {
