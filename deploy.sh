@@ -67,7 +67,6 @@ echo "--- Desplegando la aplicación ---"
 # Detener y eliminar la aplicación PM2 existente
 echo "Deteniendo y eliminando la aplicación PM2 existente..."
 pm2 delete chat-web-app &>/dev/null || true
-pm2 delete websocket-server &>/dev/null || true
 
 # Instalar dependencias
 echo "Instalando dependencias de npm..."
@@ -77,13 +76,13 @@ npm install || { echo "ERROR: 'npm install' falló."; exit 1; }
 echo "Construyendo la aplicación Next.js..."
 npm run build || { echo "ERROR: 'npm run build' falló."; exit 1; }
 
-# Iniciar la aplicación Next.js con PM2
-echo "Iniciando la aplicación Next.js con PM2..."
-pm2 start npm --name "chat-web-app" -- start
+# Compilar el servidor personalizado
+echo "Compilando el servidor personalizado..."
+npx tsc --project tsconfig.server.json
 
-# Iniciar el servidor WebSocket con PM2
-echo "Iniciando el servidor WebSocket con PM2..."
-pm2 start ts-node --name "websocket-server" -- server/websocket.ts
+# Iniciar la aplicación con el servidor personalizado usando PM2
+echo "Iniciando la aplicación con PM2..."
+pm2 start .next/server.js --name "chat-web-app"
 
 echo "--- Despliegue completado ---"
 pm2 list
