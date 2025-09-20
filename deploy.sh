@@ -29,11 +29,11 @@ fi
 CURRENT_NODE_VERSION=$(node -v 2>/dev/null || echo "v0.0.0")
 NODE_MAJOR_VERSION=$(echo "$CURRENT_NODE_VERSION" | cut -d '.' -f 1 | sed 's/v//')
 
-REQUIRED_NODE_MAJOR=20 # Versión mínima requerida
+REQUIRED_NODE_MAJOR=22 # Versión mínima requerida, actualizada a Node.js 22
 
 if [ "$NODE_MAJOR_VERSION" -lt "$REQUIRED_NODE_MAJOR" ]; then
   echo "Node.js versión $NODE_MAJOR_VERSION detectada. Se requiere Node.js versión $REQUIRED_NODE_MAJOR o superior."
-  echo "Instalando y activando Node.js $REQUIRED_NODE_MAJOR (LTS) usando nvm..."
+  echo "Instalando y activando Node.js $REQUIRED_NODE_MAJOR usando nvm..."
   nvm install "$REQUIRED_NODE_MAJOR" || { echo "ERROR: Falló la instalación de Node.js $REQUIRED_NODE_MAJOR con nvm."; exit 1; }
   nvm use "$REQUIRED_NODE_MAJOR" || { echo "ERROR: Falló la activación de Node.js $REQUIRED_NODE_MAJOR con nvm."; exit 1; }
   nvm alias default "$REQUIRED_NODE_MAJOR" || { echo "ADVERTENCIA: Falló al establecer Node.js $REQUIRED_NODE_MAJOR como predeterminado."; }
