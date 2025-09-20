@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { DockerContainer } from '@/types/docker';
 import { useSession } from '@/components/session-context-provider';
-import 'xterm/css/xterm.css';
+import '@xterm/xterm/css/xterm.css'; // Corrected import path
 
 interface ContainerConsoleDialogProps {
   open: boolean;
@@ -92,8 +92,8 @@ export function ContainerConsoleDialog({ open, onOpenChange, server, container }
 
     const initTerminal = async () => {
       if (terminalRef.current && !termRef.current) {
-        const { Terminal } = await import('xterm');
-        const { FitAddon } = await import('xterm-addon-fit');
+        const { Terminal } = await import('@xterm/xterm'); // Corrected import path
+        const { FitAddon } = await import('@xterm/addon-fit'); // Corrected import path
 
         term = new Terminal({
           cursorBlink: true,
