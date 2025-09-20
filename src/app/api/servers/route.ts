@@ -1,3 +1,5 @@
+export const runtime = 'nodejs'; // Force Node.js runtime
+
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';

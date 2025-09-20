@@ -51,7 +51,17 @@ else
   nvm use "$NODE_MAJOR_VERSION"
 fi
 
-# --- 3. Instalar, Construir y Desplegar ---
+# --- 3. Crear archivo de entorno ---
+echo "--- Creando archivo de entorno .env.local ---"
+cat > .env.local << EOF
+NEXT_PUBLIC_SUPABASE_URL=https://juxrggowingqlchwfuct.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1eHJnZ293aW5ncWxjaHdmdWN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgxNDY4OTYsImV4cCI6MjA3MzcyMjg5Nn0.Bf05aFnLW_YCAZdCZC2Kgqtf7is9WcORdDagC2Nq0ec
+# IMPORTANTE: Reemplaza el siguiente valor con tu clave de servicio de Supabase.
+# La puedes encontrar en tu panel de Supabase -> Project Settings -> API -> Service role key.
+SUPABASE_SERVICE_ROLE_KEY=TU_CLAVE_DE_SERVICIO_AQUI
+EOF
+
+# --- 4. Instalar, Construir y Desplegar ---
 echo "--- Desplegando la aplicación ---"
 
 # Detener y eliminar la aplicación PM2 existente
@@ -75,5 +85,5 @@ pm2 start npm --name "chat-web-app" -- start
 echo "Iniciando el servidor WebSocket con PM2..."
 pm2 start ts-node --name "websocket-server" -- server/websocket.ts
 
-echo "--- Desplegue completado ---"
+echo "--- Despliegue completado ---"
 pm2 list

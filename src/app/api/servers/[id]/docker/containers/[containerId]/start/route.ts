@@ -1,3 +1,5 @@
+export const runtime = 'nodejs'; // Force Node.js runtime
+
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Client } from 'ssh2';
