@@ -65,7 +65,7 @@ function executeSshCommand(conn: Client, command: string): Promise<string> {
 
 export async function GET(
   req: NextRequest,
-  context: any // Simplified type to resolve internal Next.js type conflict
+  context: any // Usamos 'any' para resolver el error de compilación de TypeScript
 ) {
   const serverId = context.params.id;
 
@@ -96,7 +96,7 @@ export async function GET(
     .from('user_servers')
     .select('ip_address, ssh_port, ssh_username, ssh_password')
     .eq('id', serverId)
-    .eq('user_id', session.user.id)
+    // .eq('user_id', session.user.id) // <-- REMOVED THIS LINE
     .single();
 
   if (fetchError || !server) {
