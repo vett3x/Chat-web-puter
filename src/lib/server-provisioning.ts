@@ -47,30 +47,8 @@ docker-compose --version
 echo "--- Pulling ubuntu:latest Docker image ---"
 docker pull ubuntu:latest
 
-echo "--- Starting Cloudflared Installation ---"
-# Update package list and install dependencies for cloudflared
-apt-get update -y
-apt-get install -y lsb-release curl gnupg -y
-
-# Add Cloudflare's official GPG key using gpg --dearmor
-mkdir -p --mode=0755 /usr/share/keyrings
-curl -fsSL https://pkg.cloudflare.com/cloudflare-release.gpg | gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-archive-keyring.gpg
-chmod 644 /usr/share/keyrings/cloudflare-archive-keyring.gpg # Ensure correct permissions
-
-# Add the Cloudflare repository to Apt sources
-echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/cloudflared.list > /dev/null
-
-# Update package list again and install cloudflared
-apt-get update -y
-apt-get install -y cloudflared
-
-# Verify cloudflared installation
-echo "--- Cloudflared Version ---"
-cloudflared --version
-
-echo "--- Cloudflared Installation Complete ---"
-
-echo "--- Provisioning Complete ---"
+# Removed Cloudflared installation from host provisioning
+echo "--- Host Provisioning Complete ---"
 `;
 
 async function updateServerLog(serverId: string, logChunk: string) {

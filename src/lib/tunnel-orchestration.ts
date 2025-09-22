@@ -40,7 +40,7 @@ export async function createAndProvisionCloudflareTunnel({
   containerId,
   cloudflareDomainId,
   containerPort,
-  hostPort,
+  hostPort, // hostPort is still passed but not used for ingress service URL
   subdomain: userSubdomain,
   serverDetails,
   cloudflareDomainDetails,
@@ -132,14 +132,14 @@ export async function createAndProvisionCloudflareTunnel({
         cloudflareDomainDetails.account_id,
         tunnelId,
         fullDomain,
-        `http://localhost:${hostPort}`, // Service URL for ingress
+        `http://localhost:${containerPort}`, // Service URL for ingress now points to CONTAINER_PORT
         userId
     );
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Ingress rules configured.\n` });
 
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Installing and running cloudflared service on host via SSH...\n` });
-    await installAndRunCloudflaredService(serverDetails, tunnelToken, userId);
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] cloudflared service installed and running.\n` });
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Installing and running cloudflared client inside container ${containerId.substring(0,12)} via SSH...\n` });
+    await installAndRunCloudflaredService(serverDetails, containerId, tunnelId, tunnelToken, userId); // MODIFIED LINE
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] cloudflared client installed and running inside container.\n` });
 
 
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Updating tunnel status to 'active' in database.\n` });
@@ -180,12 +180,11 @@ export async function createAndProvisionCloudflareTunnel({
         await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Rollback ERROR: Failed to delete Cloudflare DNS record ${dnsRecordId}: ${rollbackError}\n` });
       }
     }
-    if (serverDetails && tunnelToken) { // Only attempt uninstall if serverDetails and token were available
+    if (serverDetails && tunnelId) { // Only attempt uninstall if serverDetails and tunnelId were available
       try {
-        await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Attempting rollback: Uninstalling cloudflared service on host via SSH...\n` });
-        // Pass the tunnelId to uninstallCloudflaredService for cleanup
-        await uninstallCloudflaredService(serverDetails, tunnelId!, userId); // tunnelId is defined if tunnelToken is
-        await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Rollback: cloudflared service uninstalled from host.\n` });
+        await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Attempting rollback: Uninstalling cloudflared client from container ${containerId.substring(0,12)} via SSH...\n` });
+        await uninstallCloudflaredService(serverDetails, containerId, tunnelId, userId); // MODIFIED LINE
+        await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Rollback: cloudflared client uninstalled from container.\n` });
       } catch (rollbackError) {
         console.error(`[Rollback] Failed to uninstall cloudflared service:`, rollbackError);
         await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Rollback ERROR: Failed to uninstall cloudflared service: ${rollbackError}\n` });
@@ -237,10 +236,9 @@ export async function deleteCloudflareTunnelAndCleanup({
     }
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Tunnel details fetched. Cloudflare Tunnel ID: ${tunnel.tunnel_id}\n` });
 
-    // NEW: Ensure cloudflared service is stopped and connections are cleaned up BEFORE API delete
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Cleaning up cloudflared service on host via SSH...\n` });
-    await uninstallCloudflaredService(serverDetails, tunnel.tunnel_id, userId); // Pass tunnel.tunnel_id
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] cloudflared service cleaned up from host.\n` });
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Cleaning up cloudflared client from container ${containerId.substring(0,12)} via SSH...\n` });
+    await uninstallCloudflaredService(serverDetails, containerId, tunnel.tunnel_id, userId); // MODIFIED LINE
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] cloudflared client cleaned up from container.\n` });
 
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Deleting Cloudflare Tunnel ${tunnel.tunnel_id} via API...\n` });
     await deleteCloudflareTunnelApi(cloudflareDomainDetails.api_token, cloudflareDomainDetails.account_id, tunnel.tunnel_id, userId);

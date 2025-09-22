@@ -220,40 +220,51 @@ export async function POST(
         description: `Contenedor '${name || image}' (ID: ${containerId?.substring(0,12)}) creado y en ejecución en '${server.name || server.ip_address}'. Puertos mapeados: ${finalPorts}.`,
       });
 
-      // --- Instalar Node.js y npm dentro del contenedor ---
+      // --- Instalar Node.js, npm y cloudflared dentro del contenedor ---
       await supabaseAdmin.from('server_events_log').insert({
         user_id: session.user.id,
         server_id: serverId,
         event_type: 'container_created',
-        description: `Instalando Node.js y npm en el contenedor ${containerId?.substring(0,12)}...`,
+        description: `Instalando Node.js, npm y cloudflared en el contenedor ${containerId?.substring(0,12)}...`,
       });
 
-      // Reescrito el script para ser más robusto y evitar errores de sintaxis con sh -c
-      const installNodeScript = `
+      // Script para instalar Node.js, npm y cloudflared dentro del contenedor
+      const installContainerDependenciesScript = `
         set -e && \\
         export DEBIAN_FRONTEND=noninteractive && \\
         apt-get update -y && \\
-        apt-get install -y curl && \\
+        apt-get install -y curl gnupg lsb-release && \\
+        
+        # Install Node.js and npm
         curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \\
         apt-get install -y nodejs && \\
         node -v && \\
-        npm -v
-      `.replace(/\\(?=\n)/g, '').replace(/\n/g, ' ').trim(); // Eliminar saltos de línea y backslashes de continuación
+        npm -v && \\
 
-      const { stderr: nodeInstallStderr, code: nodeInstallCode } = await executeSshCommand(server, `docker exec ${containerId} sh -c "${installNodeScript}"`);
-      if (nodeInstallCode !== 0) {
-        throw new Error(`Error al instalar Node.js/npm en el contenedor: ${nodeInstallStderr}`);
+        # Install cloudflared
+        mkdir -p --mode=0755 /usr/share/keyrings && \\
+        curl -fsSL https://pkg.cloudflare.com/cloudflare-release.gpg | gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-archive-keyring.gpg && \\
+        chmod 644 /usr/share/keyrings/cloudflare-archive-keyring.gpg && \\
+        echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/cloudflared.list > /dev/null && \\
+        apt-get update -y && \\
+        apt-get install -y cloudflared && \\
+        cloudflared --version
+      `.replace(/\\(?=\n)/g, '').replace(/\n/g, ' ').trim();
+
+      const { stderr: installStderr, code: installCode } = await executeSshCommand(server, `docker exec ${containerId} sh -c "${installContainerDependenciesScript}"`);
+      if (installCode !== 0) {
+        throw new Error(`Error al instalar Node.js/npm/cloudflared en el contenedor: ${installStderr}`);
       }
       await supabaseAdmin.from('server_events_log').insert({
         user_id: session.user.id,
         server_id: serverId,
         event_type: 'container_created',
-        description: `Node.js y npm instalados en el contenedor ${containerId?.substring(0,12)}.`,
+        description: `Node.js, npm y cloudflared instalados en el contenedor ${containerId?.substring(0,12)}.`,
       });
-      // --- FIN NUEVO ---
+      // --- FIN INSTALACIÓN DE DEPENDENCIAS EN CONTENEDOR ---
 
     } catch (e: any) {
-      throw new Error(`Error en la fase de creación/ejecución del contenedor o instalación de Node.js: ${e.message}`);
+      throw new Error(`Error en la fase de creación/ejecución del contenedor o instalación de dependencias: ${e.message}`);
     }
 
     // Tunnel creation logic (always for Next.js)
@@ -301,7 +312,7 @@ export async function POST(
       user_id: session.user.id,
       server_id: serverId,
       event_type: 'container_created',
-      description: `Contenedor Next.js (ID: ${containerId?.substring(0,12)}) creado. Node.js y npm preinstalados. Pasos siguientes:
+      description: `Contenedor Next.js (ID: ${containerId?.substring(0,12)}) creado. Node.js, npm y cloudflared preinstalados. Pasos siguientes:
       1. Conéctate al servidor SSH: ssh ${server.ssh_username}@${server.ip_address} -p ${server.ssh_port || 22}
       2. Accede al contenedor: docker exec -it ${containerId?.substring(0,12)} /bin/bash
       3. Dentro del contenedor, crea tu app Next.js: npx create-next-app@latest my-next-app --use-npm --example "https://github.com/vercel/next.js/tree/canary/examples/hello-world"
