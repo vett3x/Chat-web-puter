@@ -60,6 +60,25 @@ npm -v
 
 echo "--- Node.js Environment Setup Complete ---"
 
+echo "--- Starting Cloudflared Installation ---"
+# Update package list and install dependencies for cloudflared
+apt-get update -y
+apt-get install -y ca-certificates curl gnupg lsb-release
+
+# Add Cloudflare's official GPG key
+mkdir -p --mode=0755 /usr/share/keyrings
+curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
+chmod 644 /usr/share/keyrings/cloudflare-main.gpg # Ensure correct permissions
+
+# Add the Cloudflare repository to Apt sources
+echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' | tee /etc/apt/sources.list.d/cloudflared.list >/dev/null
+
+# Update package list again and install cloudflared
+apt-get update -y
+apt-get install -y cloudflared
+
+echo "--- Cloudflared Installation Complete ---"
+
 echo "--- Provisioning Complete ---"
 `;
 

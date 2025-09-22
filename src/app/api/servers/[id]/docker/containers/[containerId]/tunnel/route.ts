@@ -88,6 +88,22 @@ async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | '
   return { session, userRole, userPermissions };
 }
 
+// Helper to execute an SSH command and return its output
+function executeSshCommand(conn: SshClient, command: string): Promise<{ stdout: string; stderr: string; code: number }> {
+  return new Promise((resolve, reject) => {
+    let stdout = '';
+    let stderr = '';
+    conn.exec(command, (err, stream) => {
+      if (err) return reject(err);
+      stream.on('data', (data: Buffer) => { stdout += data.toString(); });
+      stream.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
+      stream.on('close', (code: number) => {
+        resolve({ stdout, stderr, code });
+      });
+    });
+  });
+}
+
 // POST /api/servers/[id]/docker/containers/[containerId]/tunnel - Crear un nuevo túnel
 export async function POST(
   req: NextRequest,
@@ -143,6 +159,40 @@ export async function POST(
       throw new Error('Dominio de Cloudflare no encontrado o acceso denegado.');
     }
 
+    // 3. Dynamically get the host_port for the container
+    const conn = new SshClient();
+    let hostPort: number | undefined;
+    try {
+      await new Promise<void>((resolve, reject) => conn.on('ready', resolve).on('error', reject).connect({
+        host: server.ip_address,
+        port: server.ssh_port || 22,
+        username: server.ssh_username,
+        password: server.ssh_password,
+        readyTimeout: 10000,
+      }));
+
+      const dockerPortCommand = `docker port ${containerId} ${container_port}`;
+      const { stdout: portOutput, stderr: portStderr, code: portCode } = await executeSshCommand(conn, dockerPortCommand);
+
+      if (portCode !== 0) {
+        throw new Error(`Error al obtener el puerto del host para el contenedor: ${portStderr}`);
+      }
+
+      // Expected output format: 0.0.0.0:HOST_PORT or HOST_IP:HOST_PORT
+      const match = portOutput.trim().match(/:(\d+)$/);
+      if (!match || !match[1]) {
+        throw new Error(`No se pudo parsear el puerto del host de la salida: ${portOutput.trim()}`);
+      }
+      hostPort = parseInt(match[1], 10);
+
+    } finally {
+      conn.end();
+    }
+
+    if (!hostPort) {
+      throw new Error('No se pudo determinar el puerto del host para el contenedor.');
+    }
+
     // Call the new server action to create and provision the tunnel
     const { tunnelId: newTunnelRecordId } = await createAndProvisionCloudflareTunnel({
       userId: session.user.id,
@@ -150,6 +200,7 @@ export async function POST(
       containerId: containerId,
       cloudflareDomainId: cloudflare_domain_id,
       containerPort: container_port,
+      hostPort: hostPort, // <-- Ahora se pasa el hostPort
       subdomain: userSubdomain,
       serverDetails: {
         ip_address: server.ip_address,

@@ -174,13 +174,13 @@ export async function POST(
 
     // --- Phase 2: Create and run the Docker container ---
     const runConn = new Client();
+    let actualHostPort = host_port; // Declare actualHostPort here
     try {
       await new Promise<void>((resolve, reject) => runConn.on('ready', resolve).on('error', reject).connect({ host: server.ip_address, port: server.ssh_port || 22, username: server.ssh_username, password: server.ssh_password, readyTimeout: 10000 }));
 
       if (name) runCommand += ` --name ${name.replace(/[^a-zA-Z0-9_.-]/g, '')}`;
       
-      // --- NUEVO: Lógica para encontrar un puerto disponible ---
-      let actualHostPort = host_port;
+      // --- Lógica para encontrar un puerto disponible ---
       if (!actualHostPort) {
         let isPortAvailable = false;
         let attempts = 0;
@@ -242,7 +242,7 @@ export async function POST(
         description: `Contenedor '${name || image}' (ID: ${containerId?.substring(0,12)}) creado y en ejecución en '${server.name || server.ip_address}'. Puertos mapeados: ${finalPorts}.`,
       });
 
-      // --- NUEVO: Instalar Node.js y npm dentro del contenedor ---
+      // --- Instalar Node.js y npm dentro del contenedor ---
       await supabaseAdmin.from('server_events_log').insert({
         user_id: session.user.id,
         server_id: serverId,
@@ -279,7 +279,7 @@ export async function POST(
     }
 
     // Tunnel creation logic (always for Next.js)
-    if (cloudflare_domain_id && container_port && userPermissions[PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_TUNNELS]) {
+    if (cloudflare_domain_id && container_port && actualHostPort && userPermissions[PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_TUNNELS]) {
       // Fetch Cloudflare domain details
       const { data: cfDomainDetails, error: cfDomainError } = await supabaseAdmin
         .from('cloudflare_domains')
@@ -296,7 +296,7 @@ export async function POST(
           containerId: containerId!, // containerId is guaranteed to be defined here
           cloudflareDomainId: cloudflare_domain_id,
           containerPort: container_port,
-          hostPort: host_port, // Pasar el puerto del host a la orquestación
+          hostPort: actualHostPort, // Pasar el puerto del host a la orquestación
           subdomain: subdomain,
           serverDetails: {
             ip_address: server.ip_address,
