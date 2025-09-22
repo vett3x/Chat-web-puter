@@ -49,9 +49,6 @@ export function AllDockerContainersTab() {
     return () => clearInterval(interval);
   }, [fetchAllDockerStats]);
 
-  const runningContainers = containerStats.filter(c => parseFloat(c['CPU %']) > 0 || parseFloat(c['Mem %']) > 0);
-  const stoppedContainers = containerStats.filter(c => parseFloat(c['CPU %']) === 0 && parseFloat(c['Mem %']) === 0);
-
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -100,50 +97,53 @@ export function AllDockerContainersTab() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {containerStats.map((stat) => (
-                  <TableRow key={`${stat.serverId}-${stat.ID}`} className={cn(
-                    (parseFloat(stat['CPU %']) === 0 && parseFloat(stat['Mem %']) === 0) && "text-muted-foreground opacity-70"
-                  )}>
-                    <TableCell className="flex items-center gap-1">
-                      <Server className="h-4 w-4 text-muted-foreground" />
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="truncate max-w-[100px]">{stat.serverName}</span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{stat.serverName} ({stat.serverIpAddress})</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{stat.ID.substring(0, 12)}</TableCell>
-                    <TableCell>{stat.Name}</TableCell>
-                    <TableCell>{stat.Image}</TableCell>
-                    <TableCell>{stat['CPU %']}</TableCell>
-                    <TableCell>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span>{stat['Mem Usage'] ? stat['Mem Usage'].split('/')[0].trim() : 'N/A'}</span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Uso: {stat['Mem Usage'] || 'N/A'}</p>
-                            <p>Porcentaje: {stat['Mem %'] || 'N/A'}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </TableCell>
-                    <TableCell>{stat['Net I/O']}</TableCell>
-                    <TableCell>
-                      {parseFloat(stat['CPU %']) > 0 || parseFloat(stat['Mem %']) > 0 ? (
-                        <span className="text-green-500">Activo</span>
-                      ) : (
-                        <span className="text-red-500">Inactivo</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {containerStats.map((stat) => {
+                  const isRunning = stat.Status.includes('Up'); // Check if status indicates "Up"
+                  return (
+                    <TableRow key={`${stat.serverId}-${stat.ID}`} className={cn(
+                      !isRunning && "text-muted-foreground opacity-70"
+                    )}>
+                      <TableCell className="flex items-center gap-1">
+                        <Server className="h-4 w-4 text-muted-foreground" />
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="truncate max-w-[100px]">{stat.serverName}</span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{stat.serverName} ({stat.serverIpAddress})</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{stat.ID.substring(0, 12)}</TableCell>
+                      <TableCell>{stat.Name}</TableCell>
+                      <TableCell>{stat.Image}</TableCell>
+                      <TableCell>{stat['CPU %']}</TableCell>
+                      <TableCell>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span>{stat['Mem Usage'] ? stat['Mem Usage'].split('/')[0].trim() : 'N/A'}</span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Uso: {stat['Mem Usage'] || 'N/A'}</p>
+                              <p>Porcentaje: {stat['Mem %'] || 'N/A'}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
+                      <TableCell>{stat['Net I/O']}</TableCell>
+                      <TableCell>
+                        {isRunning ? (
+                          <span className="text-green-500">Activo</span>
+                        ) : (
+                          <span className="text-red-500">Inactivo</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </ScrollArea>

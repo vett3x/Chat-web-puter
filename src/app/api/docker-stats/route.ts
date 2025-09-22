@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
 
       // Get stats for all running containers
       const statsOutput = await executeSshCommand(conn, `docker stats --no-stream --format "{{json .}}"`);
-      const containersOutput = await executeSshCommand(conn, `docker ps -a --format "{{json .}}"`); // To get Image name
+      const containersOutput = await executeSshCommand(conn, `docker ps -a --format "{{json .}}`); // To get Image name and Status
 
       conn.end();
 
@@ -110,6 +110,7 @@ export async function GET(req: NextRequest) {
           allContainerStats.push({
             ...stat,
             Image: containerInfo?.Image || 'N/A', // Add Image from docker ps
+            Status: containerInfo?.Status || 'N/A', // Add Status from docker ps
             serverId: server.id,
             serverName: server.name || server.ip_address,
             serverIpAddress: server.ip_address,
