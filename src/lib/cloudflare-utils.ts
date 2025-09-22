@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { randomBytes } from 'crypto';
 
 // Helper para generar un subdominio aleatorio de 15 caracteres (minúsculas y números)
 export function generateRandomSubdomain(length: number = 15): string {
@@ -95,7 +96,8 @@ export async function createCloudflareTunnel(
   tunnelName: string
 ): Promise<CloudflareTunnel> {
   const path = `/accounts/${accountId}/cfd_tunnel`;
-  const body = { name: tunnelName, tunnel_secret: generateRandomSubdomain(32) }; // Generate a random secret
+  const tunnel_secret = randomBytes(32).toString('base64');
+  const body = { name: tunnelName, tunnel_secret };
   return callCloudflareApi<CloudflareTunnel>('POST', path, { apiToken }, body);
 }
 
