@@ -3,11 +3,11 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Server, Dock, History, Cloud } from 'lucide-react';
-import { ServerListTab } from './server-tabs/server-list-tab'; // Removed .tsx
-import { DockerContainersTab } from './server-tabs/docker-containers-tab'; // Removed .tsx
-import { UsageHistoryTab } from './server-tabs/usage-history-tab'; // Removed .tsx
-import { CloudflareTunnelTab } from './server-tabs/cloudflare-tunnel-tab'; // Removed .tsx
+import { ServerListTab } from './server-tabs/server-list-tab';
+import { UsageHistoryTab } from './server-tabs/usage-history-tab';
+import { CloudflareTunnelTab } from './server-tabs/cloudflare-tunnel-tab';
 import { ScrollArea } from './ui/scroll-area';
+import { AllDockerContainersTab } from './server-tabs/all-docker-containers-tab'; // Import the new component
 
 export function ServerManagementTabs() {
   const [activeTab, setActiveTab] = useState('servers');
@@ -34,7 +34,7 @@ export function ServerManagementTabs() {
             <ServerListTab />
           </TabsContent>
           <TabsContent value="docker" className="h-full">
-            <DockerContainersTab />
+            <AllDockerContainersTab /> {/* Using the new component here */}
           </TabsContent>
           <TabsContent value="history" className="h-full">
             <UsageHistoryTab />
