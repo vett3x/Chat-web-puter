@@ -182,13 +182,15 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
 
   return (
     <Dialog open={open} onOpenChange={(newOpenState) => {
-      // If there's an error message and the dialog is attempting to close, prevent it.
-      // The user must explicitly click 'Cancel' or fix the error.
-      if (statusMessage?.type === 'error' && newOpenState === false) {
-        // Do nothing, keep the dialog open to show the error
-      } else {
-        onOpenChange(newOpenState); // Allow closing otherwise
+      // Prevent closing the dialog while an operation is in progress or if an error is displayed.
+      // The user must explicitly click "Cancel" or the "X" button.
+      if (isCreatingContainer && !newOpenState) {
+        return; // Don't close while creating
       }
+      if (statusMessage?.type === 'error' && !newOpenState) {
+        return; // Don't close if there's an error displayed
+      }
+      onOpenChange(newOpenState);
     }}>
       <DialogContent>
         <DialogHeader>

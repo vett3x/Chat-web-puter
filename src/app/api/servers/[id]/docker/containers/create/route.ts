@@ -270,10 +270,11 @@ export async function POST(
         .single();
 
       if (cfDomainDetails && !cfDomainError) {
-        createAndProvisionCloudflareTunnel({
+        // AWAIT the tunnel creation to ensure we catch errors before responding
+        await createAndProvisionCloudflareTunnel({
           userId: session.user.id,
           serverId: serverId,
-          containerId: containerId!, // containerId is guaranteed to be defined here if we reach this point without error
+          containerId: containerId!, // containerId is guaranteed to be defined here
           cloudflareDomainId: cloudflare_domain_id,
           containerPort: container_port,
           subdomain: subdomain,
@@ -285,23 +286,15 @@ export async function POST(
             name: server.name,
           },
           cloudflareDomainDetails: cfDomainDetails,
-        }).catch(tunnelError => {
-          console.error(`Error during automated tunnel creation for container ${containerId}:`, tunnelError);
-          supabaseAdmin.from('server_events_log').insert({
-            user_id: session.user.id,
-            server_id: serverId,
-            event_type: 'tunnel_create_failed',
-            description: `Fallo en la creación automática del túnel para el contenedor ${containerId?.substring(0,12)}. Error: ${tunnelError.message}`,
-          }).then();
         });
       } else {
         console.warn(`[Container Create] Tunnel details provided for Next.js container ${containerId}, but Cloudflare domain details could not be fetched or user lacks permissions. Tunnel not created automatically.`);
-        supabaseAdmin.from('server_events_log').insert({
+        await supabaseAdmin.from('server_events_log').insert({
           user_id: session.user.id,
           server_id: serverId,
           event_type: 'tunnel_create_warning',
           description: `Advertencia: No se pudo crear el túnel automáticamente para el contenedor ${containerId?.substring(0,12)}. Detalles de dominio de Cloudflare no encontrados o permisos insuficientes.`,
-        }).then();
+        });
       }
     }
 
