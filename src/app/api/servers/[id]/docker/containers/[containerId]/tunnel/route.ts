@@ -72,18 +72,17 @@ export async function POST(
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
   }
 
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.CLOUDFLARE_ACCOUNT_ID) {
-    console.error('SUPABASE_SERVICE_ROLE_KEY or CLOUDFLARE_ACCOUNT_ID is not set.');
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('SUPABASE_SERVICE_ROLE_KEY is not set.');
     return NextResponse.json({ message: 'Error de configuración del servidor.' }, { status: 500 });
   }
 
   const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  const cloudflareAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
 
   let tunnelId: string | undefined;
   let dnsRecordId: string | undefined;
   // Declare cfDomain outside the try block
-  let cfDomain: { domain_name: string; api_token: string; zone_id: string } | null = null;
+  let cfDomain: { domain_name: string; api_token: string; zone_id: string; account_id: string } | null = null;
 
   try {
     const body = await req.json();
@@ -103,7 +102,7 @@ export async function POST(
     // 2. Fetch Cloudflare domain details
     const { data: fetchedCfDomain, error: cfDomainError } = await supabaseAdmin
       .from('cloudflare_domains')
-      .select('domain_name, api_token, zone_id')
+      .select('domain_name, api_token, zone_id, account_id') // Select account_id
       .eq('id', cloudflare_domain_id)
       .eq('user_id', session.user.id)
       .single();
@@ -118,7 +117,7 @@ export async function POST(
     const tunnelName = `tunnel-${subdomain}-${containerId.substring(0, 8)}`; // Unique name for Cloudflare
 
     // 3. Create Cloudflare Tunnel
-    const tunnel = await createCloudflareTunnel(cfDomain.api_token, cloudflareAccountId, tunnelName);
+    const tunnel = await createCloudflareTunnel(cfDomain.api_token, cfDomain.account_id, tunnelName); // Use cfDomain.account_id
     tunnelId = tunnel.id;
     const tunnelSecret = tunnel.secret;
     const tunnelCnameTarget = `${tunnelId}.cfargotunnel.com`;
@@ -177,9 +176,9 @@ export async function POST(
     console.error('Error creating Cloudflare tunnel:', error);
 
     // Rollback Cloudflare resources if creation failed at an intermediate step
-    if (tunnelId && cfDomain?.api_token && cloudflareAccountId) {
+    if (tunnelId && cfDomain?.api_token && cfDomain?.account_id) { // Use cfDomain.account_id
       try {
-        await deleteCloudflareTunnel(cfDomain.api_token, cloudflareAccountId, tunnelId);
+        await deleteCloudflareTunnel(cfDomain.api_token, cfDomain.account_id, tunnelId);
         console.warn(`[Rollback] Cloudflare Tunnel ${tunnelId} deleted.`);
       } catch (rollbackError) {
         console.error(`[Rollback] Failed to delete Cloudflare Tunnel ${tunnelId}:`, rollbackError);
@@ -226,13 +225,12 @@ export async function DELETE(
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
   }
 
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.CLOUDFLARE_ACCOUNT_ID) {
-    console.error('SUPABASE_SERVICE_ROLE_KEY or CLOUDFLARE_ACCOUNT_ID is not set.');
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('SUPABASE_SERVICE_ROLE_KEY is not set.');
     return NextResponse.json({ message: 'Error de configuración del servidor.' }, { status: 500 });
   }
 
   const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  const cloudflareAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
 
   try {
     // 1. Fetch tunnel details from Supabase
@@ -251,7 +249,7 @@ export async function DELETE(
     // 2. Fetch Cloudflare domain details to get API token and zone ID
     const { data: cfDomain, error: cfDomainError } = await supabaseAdmin
       .from('cloudflare_domains')
-      .select('domain_name, api_token, zone_id')
+      .select('domain_name, api_token, zone_id, account_id') // Select account_id
       .eq('id', tunnel.cloudflare_domain_id)
       .eq('user_id', session.user.id)
       .single();
@@ -262,7 +260,7 @@ export async function DELETE(
 
     // 3. Delete Cloudflare Tunnel
     if (tunnel.tunnel_id) {
-      await deleteCloudflareTunnel(cfDomain.api_token, cloudflareAccountId, tunnel.tunnel_id);
+      await deleteCloudflareTunnel(cfDomain.api_token, cfDomain.account_id, tunnel.tunnel_id); // Use cfDomain.account_id
     }
 
     // 4. Delete DNS CNAME record (need to find its ID first)

@@ -39,6 +39,7 @@ interface CloudflareDomain {
   domain_name: string;
   api_token: string; // Storing as plain text as per user's request for now
   zone_id: string;
+  account_id: string; // Added account_id
   created_at: string;
 }
 
@@ -63,6 +64,7 @@ const cloudflareDomainSchema = z.object({
   domain_name: z.string().min(1, { message: 'El nombre de dominio es requerido.' }).regex(/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, { message: 'Formato de dominio inválido.' }),
   api_token: z.string().min(1, { message: 'El API Token es requerido.' }),
   zone_id: z.string().min(1, { message: 'El Zone ID es requerido.' }),
+  account_id: z.string().min(1, { message: 'El Account ID es requerido.' }), // Added account_id
 });
 
 type CloudflareDomainFormValues = z.infer<typeof cloudflareDomainSchema>;
@@ -82,6 +84,7 @@ export function CloudflareTunnelTab() {
       domain_name: '',
       api_token: '',
       zone_id: '',
+      account_id: '', // Added default value
     },
   });
 
@@ -225,6 +228,19 @@ export function CloudflareTunnelTab() {
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={domainForm.control}
+                  name="account_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cloudflare Account ID</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Tu Account ID de Cloudflare" {...field} disabled={isAddingDomain} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <Button type="submit" disabled={isAddingDomain}>
                   {isAddingDomain ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -269,6 +285,7 @@ export function CloudflareTunnelTab() {
                   <TableRow>
                     <TableHead>Dominio</TableHead>
                     <TableHead>Zone ID</TableHead>
+                    <TableHead>Account ID</TableHead> {/* Added Account ID header */}
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -277,6 +294,7 @@ export function CloudflareTunnelTab() {
                     <TableRow key={domain.id}>
                       <TableCell className="font-medium">{domain.domain_name}</TableCell>
                       <TableCell className="font-mono text-xs">{domain.zone_id}</TableCell>
+                      <TableCell className="font-mono text-xs">{domain.account_id}</TableCell> {/* Display Account ID */}
                       <TableCell className="text-right">
                         <AlertDialog>
                           <AlertDialogTrigger asChild>

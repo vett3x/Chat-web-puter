@@ -14,6 +14,7 @@ const cloudflareDomainSchema = z.object({
   domain_name: z.string().min(1, { message: 'El nombre de dominio es requerido.' }).regex(/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, { message: 'Formato de dominio inválido.' }),
   api_token: z.string().min(1, { message: 'El API Token es requerido.' }),
   zone_id: z.string().min(1, { message: 'El Zone ID es requerido.' }),
+  account_id: z.string().min(1, { message: 'El Account ID es requerido.' }), // Added account_id
 });
 
 // Helper function to get the session
@@ -58,7 +59,7 @@ export async function GET(req: NextRequest) {
 
   const { data: domains, error } = await supabaseAdmin
     .from('cloudflare_domains')
-    .select('id, domain_name, zone_id, created_at') // Do not return api_token for security
+    .select('id, domain_name, zone_id, account_id, created_at') // Select account_id
     .eq('user_id', session.user.id);
 
   if (error) {
@@ -113,6 +114,7 @@ export async function POST(req: NextRequest) {
         domain_name: newDomainData.domain_name,
         api_token: newDomainData.api_token, // Storing as plain text as per user's request
         zone_id: newDomainData.zone_id,
+        account_id: newDomainData.account_id, // Insert account_id
       })
       .select()
       .single();
