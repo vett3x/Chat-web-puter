@@ -24,6 +24,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+
 } from '@/components/ui/select';
 
 const addUserFormSchema = z.object({
@@ -31,7 +32,7 @@ const addUserFormSchema = z.object({
   password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
   first_name: z.string().optional(),
   last_name: z.string().optional(),
-  role: z.enum(['user', 'admin']).default('user'),
+  role: z.enum(['user', 'admin']), // Removed .default() from schema to make it non-optional in inferred type
 });
 
 // Explicitly define the inferred type from the schema, ensuring 'role' is not optional
@@ -51,8 +52,8 @@ export function AddUserForm({ onUserAdded }: AddUserFormProps) {
       password: '',
       first_name: '',
       last_name: '',
-      role: 'user', // This is explicitly provided and matches the non-optional type
-    } as AddUserFormValues, // Explicitly cast defaultValues to match the inferred type
+      role: 'user', // Explicitly set default role here, matching the non-optional schema type
+    },
   });
 
   const onSubmit = async (values: AddUserFormValues) => {
@@ -137,7 +138,7 @@ export function AddUserForm({ onUserAdded }: AddUserFormProps) {
               name="last_name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Apellido (Opcional)</FormLabel>
+                  <FormLabel>Apellido (Opcional)</FormLabel> {/* Corrected closing tag */}
                   <FormControl>
                     <Input placeholder="Apellido del usuario" {...field} disabled={isAddingUser} />
                   </FormControl>
