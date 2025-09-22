@@ -103,7 +103,7 @@ export async function createAndProvisionCloudflareTunnel({
     // 1. Create Cloudflare Tunnel
     const tunnel = await createCloudflareTunnel(cloudflareDomainDetails.api_token, cloudflareDomainDetails.account_id, tunnelName);
     tunnelId = tunnel.id;
-    const tunnelSecret = tunnel.secret;
+    const tunnelSecret = tunnel.secret; // This is the base64 token
     const tunnelCnameTarget = `${tunnelId}.cfargotunnel.com`;
 
     // 2. Create DNS CNAME record
@@ -150,33 +150,10 @@ export async function createAndProvisionCloudflareTunnel({
       readyTimeout: 20000,
     }));
 
-    // Create cloudflared config directory and credentials file
-    const configDir = `~/.cloudflared`;
-    const credsFile = `${configDir}/${tunnelId}.json`;
-    const tunnelConfigFile = `${configDir}/config-${tunnelId}.yml`; // Specific config file for this tunnel
     const serviceName = `cloudflared-tunnel-${tunnelId}`; // Consistent service name
 
-    await executeSshCommand(conn, `mkdir -p ${configDir}`);
-    await executeSshCommand(conn, `echo '${JSON.stringify(tunnel)}' > ${credsFile}`);
-
-    // Create config.yml for this specific tunnel
-    const configContent = `
-tunnel: ${tunnelId}
-credentials-file: ${credsFile}
-metrics: 0.0.0.0:2006
-warp-routing:
-  enabled: true
-ingress:
-  - hostname: ${fullDomain}
-    service: http://localhost:${hostPort}
-    originRequest:
-      noTLSVerify: true
-  - service: http_status:404
-`;
-    await executeSshCommand(conn, `echo "${configContent.replace(/"/g, '\\"').replace(/\n/g, '\\n')}" > ${tunnelConfigFile}`);
-
-    // Install cloudflared as a system service for this specific tunnel
-    const serviceInstallCommand = `cloudflared service install --config ${tunnelConfigFile} --name ${serviceName}`;
+    // Install cloudflared as a system service for this specific tunnel using --token
+    const serviceInstallCommand = `cloudflared service install --token ${tunnelSecret} --hostname ${fullDomain} --url http://localhost:${hostPort} --name ${serviceName}`;
     const { stderr: installServiceStderr, code: installServiceCode } = await executeSshCommand(conn, serviceInstallCommand);
     if (installServiceCode !== 0) {
       throw new Error(`Error al instalar el servicio cloudflared para el túnel: ${installServiceStderr}`);
@@ -299,7 +276,7 @@ export async function deleteCloudflareTunnelAndCleanup({
     }
 
     // Uninstall the specific cloudflared service
-    const uninstallServiceCommand = `cloudflared service uninstall --config ~/.cloudflared/config-${tunnel.tunnel_id}.yml --name ${serviceName}`;
+    const uninstallServiceCommand = `cloudflared service uninstall --name ${serviceName}`;
     const { stderr: uninstallStderr, code: uninstallCode } = await executeSshCommand(conn, uninstallServiceCommand);
     if (uninstallCode !== 0 && !uninstallStderr.includes('No such file or directory')) {
       console.warn(`[Tunnel Deletion] Warning: Could not uninstall cloudflared service for tunnel ${tunnel.tunnel_id}: ${uninstallStderr}`);
@@ -308,9 +285,9 @@ export async function deleteCloudflareTunnelAndCleanup({
     // Reload systemd daemon to remove the service unit
     await executeSshCommand(conn, `systemctl daemon-reload`);
 
-    // Clean up cloudflared config files
+    // Clean up credentials file (created by Cloudflare API, not cloudflared service install --token)
     const configDir = `~/.cloudflared`;
-    await executeSshCommand(conn, `rm -f ${configDir}/${tunnel.tunnel_id}.json ${configDir}/config-${tunnel.tunnel_id}.yml`);
+    await executeSshCommand(conn, `rm -f ${configDir}/${tunnel.tunnel_id}.json`);
 
     conn.end();
 
