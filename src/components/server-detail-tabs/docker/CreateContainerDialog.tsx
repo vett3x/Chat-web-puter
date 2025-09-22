@@ -40,6 +40,7 @@ const createContainerFormSchema = z.object({
   name: z.string().optional(),
   cloudflare_domain_id: z.string().uuid({ message: 'ID de dominio de Cloudflare inválido.' }).optional(),
   container_port: z.coerce.number().int().min(1).max(65535, { message: 'Puerto de contenedor inválido.' }).optional(),
+  host_port: z.coerce.number().int().min(1).max(65535, { message: 'Puerto del host inválido.' }).optional(), // Nuevo campo para el puerto del host
   subdomain: z.string().regex(/^[a-z0-9-]{1,63}$/, { message: 'Subdominio inválido. Solo minúsculas, números y guiones.' }).optional(),
 });
 type CreateContainerFormValues = z.infer<typeof createContainerFormSchema>;
@@ -49,6 +50,7 @@ const INITIAL_CREATE_CONTAINER_DEFAULTS: CreateContainerFormValues = {
   name: '',
   cloudflare_domain_id: undefined,
   container_port: 3000,
+  host_port: undefined, // Por defecto, se generará uno aleatorio
   subdomain: undefined,
 };
 
@@ -179,7 +181,15 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(newOpenState) => {
+      // If there's an error message and the dialog is attempting to close, prevent it.
+      // The user must explicitly click 'Cancel' or fix the error.
+      if (statusMessage?.type === 'error' && newOpenState === false) {
+        // Do nothing, keep the dialog open to show the error
+      } else {
+        onOpenChange(newOpenState); // Allow closing otherwise
+      }
+    }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Crear Nuevo Contenedor Next.js</DialogTitle>
@@ -189,6 +199,39 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
           <form onSubmit={form.handleSubmit(handleCreateContainer)} className="space-y-4 py-4">
             <FormField control={form.control} name="image" render={({ field }) => (<FormItem><FormLabel>Imagen</FormLabel><FormControl><Input placeholder="ubuntu:latest" {...field} disabled /></FormControl><FormDescription>Imagen base para Next.js (no editable).</FormDescription><FormMessage /></FormItem>)} />
             <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nombre (Opcional)</FormLabel><FormControl><Input placeholder="mi-app-nextjs" {...field} /></FormControl><FormMessage /></FormItem>)} />
+            
+            <FormField
+              control={form.control}
+              name="container_port"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Puerto Interno del Contenedor</FormLabel>
+                  <FormControl>
+                    <Input type="number" placeholder="3000" {...field} disabled={isCreatingContainer} />
+                  </FormControl>
+                  <FormDescription>
+                    El puerto dentro del contenedor al que tu aplicación Next.js escuchará (ej. 3000).
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="host_port"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Puerto del Host (Opcional)</FormLabel>
+                  <FormControl>
+                    <Input type="number" placeholder="Dejar vacío para asignar uno aleatorio" {...field} disabled={isCreatingContainer} />
+                  </FormControl>
+                  <FormDescription>
+                    El puerto en el servidor físico que se mapeará al puerto interno del contenedor. Si se deja vacío, se asignará uno aleatorio.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             
             <>
               <FormField
@@ -219,22 +262,6 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
                     </Select>
                     <FormDescription>
                       Se usará para crear un túnel Cloudflare automáticamente.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="container_port"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Puerto Interno del Contenedor (para túnel)</FormLabel>
-                    <FormControl>
-                      <Input type="number" placeholder="3000" {...field} disabled={isCreatingContainer || !canManageCloudflareTunnels} />
-                    </FormControl>
-                    <FormDescription>
-                      El puerto interno del contenedor al que Cloudflare Tunnel debe redirigir (ej. 3000 para Next.js).
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

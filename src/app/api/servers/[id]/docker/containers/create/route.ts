@@ -8,14 +8,14 @@ import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { z } from 'zod';
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
 import { createAndProvisionCloudflareTunnel } from '@/lib/tunnel-orchestration'; // Import the new server action
+import { generateRandomPort } from '@/lib/utils'; // Importar la nueva función
 
 const createContainerSchema = z.object({
   image: z.string().min(1, { message: 'El nombre de la imagen es requerido.' }),
   name: z.string().optional(),
-  // Removed 'ports' field as it's not needed for Next.js template
-  // Removed 'framework' field as Next.js is the only template
   cloudflare_domain_id: z.string().uuid({ message: 'ID de dominio de Cloudflare inválido.' }).optional(),
   container_port: z.coerce.number().int().min(1).max(65535, { message: 'Puerto de contenedor inválido.' }).optional(),
+  host_port: z.coerce.number().int().min(1).max(65535, { message: 'Puerto del host inválido.' }).optional(), // Nuevo campo
   subdomain: z.string().regex(/^[a-z0-9-]{1,63}$/, { message: 'Subdominio inválido. Solo minúsculas, números y guiones.' }).optional(),
 });
 
@@ -137,7 +137,7 @@ export async function POST(
 
   try {
     const body = await req.json();
-    const { image, name, cloudflare_domain_id, container_port, subdomain } = createContainerSchema.parse(body);
+    const { image, name, cloudflare_domain_id, container_port, host_port, subdomain } = createContainerSchema.parse(body); // Obtener host_port
 
     let runCommand = 'docker run -d';
     const baseImage = 'ubuntu:latest'; // Changed to ubuntu:latest
@@ -178,7 +178,10 @@ export async function POST(
       await new Promise<void>((resolve, reject) => runConn.on('ready', resolve).on('error', reject).connect({ host: server.ip_address, port: server.ssh_port || 22, username: server.ssh_username, password: server.ssh_password, readyTimeout: 10000 }));
 
       if (name) runCommand += ` --name ${name.replace(/[^a-zA-Z0-9_.-]/g, '')}`;
-      const finalPorts = container_port ? `${container_port}:${container_port}` : '3000:3000';
+      
+      // Determinar el puerto del host a usar
+      const actualHostPort = host_port || generateRandomPort();
+      const finalPorts = `${actualHostPort}:${container_port || 3000}`; // Usar el puerto del host y el puerto del contenedor
       runCommand += ` -p ${finalPorts}`;
       
       runCommand += ` --entrypoint ${entrypointExecutable} ${baseImage} ${entrypointArgs}`;
@@ -217,7 +220,7 @@ export async function POST(
         user_id: session.user.id,
         server_id: serverId,
         event_type: 'container_created',
-        description: `Contenedor '${name || image}' (ID: ${containerId?.substring(0,12)}) creado y en ejecución en '${server.name || server.ip_address}'.`,
+        description: `Contenedor '${name || image}' (ID: ${containerId?.substring(0,12)}) creado y en ejecución en '${server.name || server.ip_address}'. Puertos mapeados: ${finalPorts}.`,
       });
 
       // --- NUEVO: Instalar Node.js y npm dentro del contenedor ---

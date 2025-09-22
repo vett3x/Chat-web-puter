@@ -39,3 +39,13 @@ export function formatMemory(mib: number): string {
   if (mib < 1024) return `${mib.toFixed(1)} MiB`;
   return `${(mib / 1024).toFixed(1)} GiB`;
 }
+
+/**
+ * Generates a random port number in the IANA registered ephemeral port range (49152-65535).
+ * @returns A random port number.
+ */
+export function generateRandomPort(): number {
+  const minPort = 49152;
+  const maxPort = 65535;
+  return Math.floor(Math.random() * (maxPort - minPort + 1)) + minPort;
+}
