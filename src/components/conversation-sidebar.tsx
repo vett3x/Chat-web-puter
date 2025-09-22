@@ -369,19 +369,19 @@ export function ConversationSidebar({
 
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold">Navegación</h2>
-        <div className="flex gap-2"> {/* Cambiado de gap-3 a gap-2 */}
+        <div className="flex gap-2">
           <Button
             variant="default"
             size="icon"
             onClick={createNewConversation}
             disabled={isCreatingConversation}
-            className="bg-green-500 hover:bg-green-600 text-white animate-pulse-glow rounded-full"
+            className="bg-green-500 hover:bg-green-600 text-white animate-pulse-glow rounded-full h-7 w-7" // Reduced size
             title="Nueva conversación"
           >
             {isCreatingConversation ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> /* Reduced icon size */
             ) : (
-              <Plus className="h-4 w-4" />
+              <Plus className="h-3.5 w-3.5" /> /* Reduced icon size */
             )}
           </Button>
           <Button
@@ -389,13 +389,13 @@ export function ConversationSidebar({
             size="icon"
             onClick={() => createNewFolder()}
             disabled={isCreatingFolder}
-            className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full"
+            className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7" // Reduced size
             title="Nueva carpeta"
           >
             {isCreatingFolder ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> /* Reduced icon size */
             ) : (
-              <Folder className="h-4 w-4" />
+              <Folder className="h-3.5 w-3.5" /> /* Reduced icon size */
             )}
           </Button>
           {isAdmin && ( // Show Server Management button for Admins and Super Admins
@@ -403,10 +403,10 @@ export function ConversationSidebar({
               variant="outline"
               size="icon"
               onClick={onOpenServerManagement}
-              className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full"
+              className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7" // Reduced size
               title="Gestión de Servidores"
             >
-              <Server className="h-4 w-4" />
+              <Server className="h-3.5 w-3.5" /> {/* Reduced icon size */}
             </Button>
           )}
           {isAdmin && ( // New: Show User Management button for Admins and Super Admins
@@ -414,10 +414,10 @@ export function ConversationSidebar({
               variant="outline"
               size="icon"
               onClick={onOpenUserManagement}
-              className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full"
+              className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7" // Reduced size
               title="Gestión de Usuarios"
             >
-              <Users className="h-4 w-4" />
+              <Users className="h-3.5 w-3.5" /> {/* Reduced icon size */}
             </Button>
           )}
         </div>
