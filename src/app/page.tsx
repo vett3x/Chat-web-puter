@@ -65,6 +65,7 @@ export default function Home() {
   };
 
   const isSuperAdmin = userRole === 'super_admin'; // Helper for conditional rendering
+  const isAdmin = userRole === 'admin' || userRole === 'super_admin'; // Helper for admin access
 
   return (
     <div className="flex h-screen bg-background">
@@ -99,17 +100,17 @@ export default function Home() {
           aiResponseSpeed={aiResponseSpeed}
           onAiResponseSpeedChange={handleAiResponseSpeedChange}
         />
-        {isSuperAdmin && ( // Render ServerManagementDialog and UserManagementDialog conditionally based on isSuperAdmin
-          <>
-            <ServerManagementDialog
-              open={isServerManagementOpen}
-              onOpenChange={setIsServerManagementOpen}
-            />
-            <UserManagementDialog
-              open={isUserManagementOpen}
-              onOpenChange={setIsUserManagementOpen}
-            />
-          </>
+        {isAdmin && ( // Render ServerManagementDialog for Admins and Super Admins
+          <ServerManagementDialog
+            open={isServerManagementOpen}
+            onOpenChange={setIsServerManagementOpen}
+          />
+        )}
+        {isSuperAdmin && ( // Render UserManagementDialog only for Super Admins
+          <UserManagementDialog
+            open={isUserManagementOpen}
+            onOpenChange={setIsUserManagementOpen}
+          />
         )}
       </main>
     </div>
