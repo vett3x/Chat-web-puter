@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Client } from 'ssh2';
 import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
-import { SUPERUSER_EMAILS, UserPermissions } from '@/lib/constants'; // Importación actualizada
+import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
 
 // Helper function to get the session and user role
 async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null; userPermissions: UserPermissions }> {
@@ -80,9 +80,9 @@ export async function DELETE(
   if (!session || !userRole) {
     return NextResponse.json({ message: 'Acceso denegado. No autenticado.' }, { status: 401 });
   }
-  // Only Super Admins can delete containers
-  if (userRole !== 'super_admin') {
-    return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden eliminar contenedores.' }, { status: 403 });
+  // Check for granular permission: can_manage_docker_containers
+  if (!userPermissions[PERMISSION_KEYS.CAN_MANAGE_DOCKER_CONTAINERS]) {
+    return NextResponse.json({ message: 'Acceso denegado. No tienes permiso para eliminar contenedores Docker.' }, { status: 403 });
   }
 
   const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
