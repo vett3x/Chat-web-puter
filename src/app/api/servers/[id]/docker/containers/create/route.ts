@@ -12,8 +12,8 @@ import { createAndProvisionCloudflareTunnel } from '@/lib/tunnel-orchestration';
 const createContainerSchema = z.object({
   image: z.string().min(1, { message: 'El nombre de la imagen es requerido.' }),
   name: z.string().optional(),
-  ports: z.string().optional(),
-  framework: z.enum(['nextjs', 'other']).default('other'), // New field
+  // Removed 'ports' field as it's not needed for Next.js template
+  // Removed 'framework' field as Next.js is the only template
   cloudflare_domain_id: z.string().uuid({ message: 'ID de dominio de Cloudflare inválido.' }).optional(),
   container_port: z.coerce.number().int().min(1).max(65535, { message: 'Puerto de contenedor inválido.' }).optional(),
   subdomain: z.string().regex(/^[a-z0-9-]{1,63}$/, { message: 'Subdominio inválido. Solo minúsculas, números y guiones.' }).optional(),
@@ -137,41 +137,39 @@ export async function POST(
 
   try {
     const body = await req.json();
-    const { image, name, ports, framework, cloudflare_domain_id, container_port, subdomain } = createContainerSchema.parse(body);
+    // Removed 'ports' and 'framework' from parsing
+    const { image, name, cloudflare_domain_id, container_port, subdomain } = createContainerSchema.parse(body);
 
     let runCommand = 'docker run -d';
-    let baseImage = image;
-    let entrypointCommand = 'tail -f /dev/null';
+    const baseImage = 'node:lts-alpine'; // Hardcoded for Next.js
+    const entrypointCommand = 'tail -f /dev/null';
 
-    // --- Phase 1: Handle image check/pull for Next.js framework ---
-    if (framework === 'nextjs') {
-      baseImage = 'node:lts-alpine';
-      const imageConn = new Client(); // New Client instance for image operations
-      try {
-        await new Promise<void>((resolve, reject) => imageConn.on('ready', resolve).on('error', reject).connect({ host: server.ip_address, port: server.ssh_port || 22, username: server.ssh_username, password: server.ssh_password, readyTimeout: 10000 }));
-        
-        const { code: inspectCode } = await executeSshCommand(imageConn, `docker inspect --type=image ${baseImage}`);
-        if (inspectCode !== 0) {
-          await supabaseAdmin.from('server_events_log').insert({
-            user_id: session.user.id,
-            server_id: serverId,
-            event_type: 'container_create_warning',
-            description: `Imagen '${baseImage}' no encontrada en '${server.name || server.ip_address}'. Intentando descargar...`,
-          });
-          const { stderr: pullStderr, code: pullCode } = await executeSshCommand(imageConn, `docker pull ${baseImage}`);
-          if (pullCode !== 0) {
-            throw new Error(`Error al descargar la imagen '${baseImage}': ${pullStderr}`);
-          }
-          await supabaseAdmin.from('server_events_log').insert({
-            user_id: session.user.id,
-            server_id: serverId,
-            event_type: 'container_created', // Log as created for image pull success
-            description: `Imagen '${baseImage}' descargada exitosamente en '${server.name || server.ip_address}'.`,
-          });
+    // --- Phase 1: Handle image check/pull for Next.js framework (always) ---
+    const imageConn = new Client(); // New Client instance for image operations
+    try {
+      await new Promise<void>((resolve, reject) => imageConn.on('ready', resolve).on('error', reject).connect({ host: server.ip_address, port: server.ssh_port || 22, username: server.ssh_username, password: server.ssh_password, readyTimeout: 10000 }));
+      
+      const { code: inspectCode } = await executeSshCommand(imageConn, `docker inspect --type=image ${baseImage}`);
+      if (inspectCode !== 0) {
+        await supabaseAdmin.from('server_events_log').insert({
+          user_id: session.user.id,
+          server_id: serverId,
+          event_type: 'container_create_warning',
+          description: `Imagen '${baseImage}' no encontrada en '${server.name || server.ip_address}'. Intentando descargar...`,
+        });
+        const { stderr: pullStderr, code: pullCode } = await executeSshCommand(imageConn, `docker pull ${baseImage}`);
+        if (pullCode !== 0) {
+          throw new Error(`Error al descargar la imagen '${baseImage}': ${pullStderr}`);
         }
-      } finally {
-        imageConn.end(); // Ensure connection is closed
+        await supabaseAdmin.from('server_events_log').insert({
+          user_id: session.user.id,
+          server_id: serverId,
+          event_type: 'container_created', // Log as created for image pull success
+          description: `Imagen '${baseImage}' descargada exitosamente en '${server.name || server.ip_address}'.`,
+        });
       }
+    } finally {
+      imageConn.end(); // Ensure connection is closed
     }
 
     // --- Phase 2: Create and run the Docker container ---
@@ -180,8 +178,9 @@ export async function POST(
       await new Promise<void>((resolve, reject) => runConn.on('ready', resolve).on('error', reject).connect({ host: server.ip_address, port: server.ssh_port || 22, username: server.ssh_username, password: server.ssh_password, readyTimeout: 10000 }));
 
       if (name) runCommand += ` --name ${name.replace(/[^a-zA-Z0-9_.-]/g, '')}`;
-      const finalPorts = ports || (framework === 'nextjs' && container_port ? `${container_port}:${container_port}` : (framework === 'nextjs' ? '3000:3000' : undefined));
-      if (finalPorts) runCommand += ` -p ${finalPorts}`;
+      // Simplified finalPorts logic as 'ports' field is removed and framework is implicitly Next.js
+      const finalPorts = container_port ? `${container_port}:${container_port}` : '3000:3000';
+      runCommand += ` -p ${finalPorts}`;
       
       runCommand += ` --entrypoint ${entrypointCommand} ${baseImage}`;
 
@@ -226,8 +225,8 @@ export async function POST(
       runConn.end(); // Ensure connection is closed
     }
 
-    // If Next.js framework and tunnel details are provided, initiate tunnel creation
-    if (framework === 'nextjs' && cloudflare_domain_id && container_port && userPermissions[PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_TUNNELS]) {
+    // Tunnel creation logic (always for Next.js)
+    if (cloudflare_domain_id && container_port && userPermissions[PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_TUNNELS]) {
       // Fetch Cloudflare domain details
       const { data: cfDomainDetails, error: cfDomainError } = await supabaseAdmin
         .from('cloudflare_domains')
@@ -272,28 +271,24 @@ export async function POST(
       }
     }
 
-    if (framework === 'nextjs') {
-      await supabaseAdmin.from('server_events_log').insert({
-        user_id: session.user.id,
-        server_id: serverId,
-        event_type: 'container_created',
-        description: `Contenedor Next.js (ID: ${containerId?.substring(0,12)}) creado. Pasos siguientes:
-        1. Conéctate al servidor SSH: ssh ${server.ssh_username}@${server.ip_address} -p ${server.ssh_port || 22}
-        2. Accede al contenedor: docker exec -it ${containerId?.substring(0,12)} /bin/bash
-        3. Dentro del contenedor, crea tu app Next.js: npx create-next-app@latest my-next-app --use-npm --example "https://github.com/vercel/next.js/tree/canary/examples/hello-world"
-        4. Navega a tu app: cd my-next-app
-        5. Inicia el servidor de desarrollo: npm run dev -- -p ${container_port || 3000}
-        6. Si configuraste un túnel Cloudflare, tu app estará accesible en el dominio.`,
-      });
-    }
+    // Add guidance for Next.js setup (always)
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: session.user.id,
+      server_id: serverId,
+      event_type: 'container_created',
+      description: `Contenedor Next.js (ID: ${containerId?.substring(0,12)}) creado. Pasos siguientes:
+      1. Conéctate al servidor SSH: ssh ${server.ssh_username}@${server.ip_address} -p ${server.ssh_port || 22}
+      2. Accede al contenedor: docker exec -it ${containerId?.substring(0,12)} /bin/bash
+      3. Dentro del contenedor, crea tu app Next.js: npx create-next-app@latest my-next-app --use-npm --example "https://github.com/vercel/next.js/tree/canary/examples/hello-world"
+      4. Navega a tu app: cd my-next-app
+      5. Inicia el servidor de desarrollo: npm run dev -- -p ${container_port || 3000}
+      6. Si configuraste un túnel Cloudflare, tu app estará accesible en el dominio.`,
+    });
 
     return NextResponse.json({ message: `Contenedor ${containerId?.substring(0,12)} creado y en ejecución.` }, { status: 201 });
 
   } catch (error: any) {
-    // Ensure any SSH connections are closed in case of error
-    // This is handled by the finally blocks for imageConn and runConn
     if (error instanceof z.ZodError) {
-      // Log event for validation error
       await supabaseAdmin.from('server_events_log').insert({
         user_id: session.user.id,
         server_id: serverId,
@@ -302,7 +297,6 @@ export async function POST(
       });
       return NextResponse.json({ message: 'Error de validación', errors: error.errors }, { status: 400 });
     }
-    // Log event for general error during container creation
     await supabaseAdmin.from('server_events_log').insert({
       user_id: session.user.id,
       server_id: serverId,
