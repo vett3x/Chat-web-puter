@@ -19,7 +19,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, User as UserIcon, Upload, XCircle, Save } from 'lucide-react';
+import { Loader2, User as UserIcon, Upload, XCircle, Save, Bot } from 'lucide-react'; // Import Bot icon
 import Image from 'next/image';
 import {
   Dialog,
@@ -232,7 +232,7 @@ export function ProfileSettingsDialog({ open, onOpenChange }: ProfileSettingsDia
                       <AvatarImage src={avatarPreview} alt="Avatar" />
                     ) : (
                       <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
-                        {getInitials(profile?.first_name, profile?.last_name)}
+                        <Bot className="h-12 w-12" /> {/* Changed to Bot icon, adjusted size */}
                       </AvatarFallback>
                     )}
                   </Avatar>

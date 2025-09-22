@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
-import { Moon, Sun, Settings, LogOut, User as UserIcon, Server, Users, Crown, Shield } from 'lucide-react'; // Import Crown and Shield icons
+import { Moon, Sun, Settings, LogOut, User as UserIcon, Server, Users, Crown, Shield, Bot } from 'lucide-react'; // Import Bot icon
 import { useTheme } from 'next-themes';
 import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
@@ -99,7 +99,7 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
               <AvatarImage src={profile.avatar_url} alt="Avatar" />
             ) : (
               <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground">
-                {getInitials(profile?.first_name, profile?.last_name)}
+                <Bot className="h-4 w-4" /> {/* Changed to Bot icon */}
               </AvatarFallback>
             )}
           </Avatar>
