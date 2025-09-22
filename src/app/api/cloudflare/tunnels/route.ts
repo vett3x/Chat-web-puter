@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
-import { SUPERUSER_EMAILS, UserPermissions } from '@/lib/constants'; // Importación actualizada
+import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
 
 // Helper function to get the session and user role
 async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null; userPermissions: UserPermissions }> {
@@ -26,30 +26,53 @@ async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | '
 
   let userRole: 'user' | 'admin' | 'super_admin' | null = null;
   let userPermissions: UserPermissions = {};
+
   if (session?.user?.id) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, permissions')
-      .eq('id', session.user.id)
-      .single();
-    if (profile) {
-      userRole = profile.role as 'user' | 'admin' | 'super_admin';
-      userPermissions = profile.permissions || {};
-    } else if (session.user.email && SUPERUSER_EMAILS.includes(session.user.email)) {
-      userRole = 'super_admin'; // Fallback for initial Super Admin
-      userPermissions = {
-        can_create_server: true,
-        can_manage_docker_containers: true,
-        can_manage_cloudflare_domains: true,
-        can_manage_cloudflare_tunnels: true,
-      };
+    // First, determine the role, prioritizing SUPERUSER_EMAILS
+    if (session.user.email && SUPERUSER_EMAILS.includes(session.user.email)) {
+      userRole = 'super_admin';
+    } else {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('role') // Only need role for initial determination
+        .eq('id', session.user.id)
+        .single();
+      if (profile) {
+        userRole = profile.role as 'user' | 'admin' | 'super_admin';
+      } else {
+        userRole = 'user'; // Default to user if no profile found and not superuser email
+      }
+    }
+
+    // Then, fetch permissions from profile, or set all if super_admin
+    if (userRole === 'super_admin') {
+      for (const key of Object.values(PERMISSION_KEYS)) {
+        userPermissions[key] = true;
+      }
+    } else {
+      const { data: profilePermissions, error: permissionsError } = await supabase
+        .from('profiles')
+        .select('permissions')
+        .eq('id', session.user.id)
+        .single();
+      if (profilePermissions) {
+        userPermissions = profilePermissions.permissions || {};
+      } else {
+        // Default permissions for non-super-admin if profile fetch failed
+        userPermissions = {
+          [PERMISSION_KEYS.CAN_CREATE_SERVER]: false,
+          [PERMISSION_KEYS.CAN_MANAGE_DOCKER_CONTAINERS]: false,
+          [PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_DOMAINS]: false,
+          [PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_TUNNELS]: false,
+        };
+      }
     }
   }
   return { session, userRole, userPermissions };
 }
 
 export async function GET(req: NextRequest) {
-  const { session, userRole, userPermissions } = await getSessionAndRole();
+  const { session, userRole } = await getSessionAndRole();
   if (!session || !userRole) {
     return NextResponse.json({ message: 'Acceso denegado. No autenticado.' }, { status: 401 });
   }

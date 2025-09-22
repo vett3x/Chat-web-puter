@@ -5,14 +5,14 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
-import { SUPERUSER_EMAILS, PERMISSION_KEYS } from '@/lib/constants'; // Importar PERMISSION_KEYS
+import { SUPERUSER_EMAILS, PERMISSION_KEYS, UserPermissions } from '@/lib/constants'; // Importar PERMISSION_KEYS
 
 // Esquema de validación para actualizar permisos
 const updatePermissionsSchema = z.object({
   permissions: z.record(z.string(), z.boolean()), // Un objeto donde las claves son strings y los valores son booleanos
 });
 
-async function getSessionAndRole() {
+async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null; userPermissions: UserPermissions }> {
   const cookieStore = cookies() as any;
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -28,19 +28,50 @@ async function getSessionAndRole() {
   const { data: { session } } = await supabase.auth.getSession();
 
   let userRole: 'user' | 'admin' | 'super_admin' | null = null;
+  let userPermissions: UserPermissions = {};
+
   if (session?.user?.id) {
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', session.user.id)
-      .single();
-    if (profile) {
-      userRole = profile.role as 'user' | 'admin' | 'super_admin';
-    } else if (session.user.email && SUPERUSER_EMAILS.includes(session.user.email)) {
-      userRole = 'super_admin'; // Fallback for initial Super Admin
+    // First, determine the role, prioritizing SUPERUSER_EMAILS
+    if (session.user.email && SUPERUSER_EMAILS.includes(session.user.email)) {
+      userRole = 'super_admin';
+    } else {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('role') // Only need role for initial determination
+        .eq('id', session.user.id)
+        .single();
+      if (profile) {
+        userRole = profile.role as 'user' | 'admin' | 'super_admin';
+      } else {
+        userRole = 'user'; // Default to user if no profile found and not superuser email
+      }
+    }
+
+    // Then, fetch permissions from profile, or set all if super_admin
+    if (userRole === 'super_admin') {
+      for (const key of Object.values(PERMISSION_KEYS)) {
+        userPermissions[key] = true;
+      }
+    } else {
+      const { data: profilePermissions, error: permissionsError } = await supabase
+        .from('profiles')
+        .select('permissions')
+        .eq('id', session.user.id)
+        .single();
+      if (profilePermissions) {
+        userPermissions = profilePermissions.permissions || {};
+      } else {
+        // Default permissions for non-super-admin if profile fetch failed
+        userPermissions = {
+          [PERMISSION_KEYS.CAN_CREATE_SERVER]: false,
+          [PERMISSION_KEYS.CAN_MANAGE_DOCKER_CONTAINERS]: false,
+          [PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_DOMAINS]: false,
+          [PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_TUNNELS]: false,
+        };
+      }
     }
   }
-  return { session, userRole };
+  return { session, userRole, userPermissions };
 }
 
 export async function GET(
@@ -93,7 +124,7 @@ export async function PUT(
   req: NextRequest,
   context: any // Simplified type to resolve internal Next.js type conflict
 ) {
-  try {
+  try { // Bloque try-catch global para capturar cualquier error
     const userIdToUpdate = context.params.id;
 
     if (!userIdToUpdate) {

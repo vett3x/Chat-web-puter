@@ -6,10 +6,10 @@ import { Client } from 'ssh2';
 import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { parseMemoryString } from '@/lib/utils'; // Import the utility function
-import { SUPERUSER_EMAILS } from '@/lib/constants'; // Importación actualizada
+import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
 
 // Helper function to get the session and user role
-async function getSessionAndRole() {
+async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null; userPermissions: UserPermissions }> {
   const cookieStore = cookies() as any;
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,19 +27,50 @@ async function getSessionAndRole() {
   const { data: { session } } = await supabase.auth.getSession();
 
   let userRole: 'user' | 'admin' | 'super_admin' | null = null;
+  let userPermissions: UserPermissions = {};
+
   if (session?.user?.id) {
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', session.user.id)
-      .single();
-    if (profile) {
-      userRole = profile.role as 'user' | 'admin' | 'super_admin';
-    } else if (session.user.email && SUPERUSER_EMAILS.includes(session.user.email)) {
-      userRole = 'super_admin'; // Fallback for initial Super Admin
+    // First, determine the role, prioritizing SUPERUSER_EMAILS
+    if (session.user.email && SUPERUSER_EMAILS.includes(session.user.email)) {
+      userRole = 'super_admin';
+    } else {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('role') // Only need role for initial determination
+        .eq('id', session.user.id)
+        .single();
+      if (profile) {
+        userRole = profile.role as 'user' | 'admin' | 'super_admin';
+      } else {
+        userRole = 'user'; // Default to user if no profile found and not superuser email
+      }
+    }
+
+    // Then, fetch permissions from profile, or set all if super_admin
+    if (userRole === 'super_admin') {
+      for (const key of Object.values(PERMISSION_KEYS)) {
+        userPermissions[key] = true;
+      }
+    } else {
+      const { data: profilePermissions, error: permissionsError } = await supabase
+        .from('profiles')
+        .select('permissions')
+        .eq('id', session.user.id)
+        .single();
+      if (profilePermissions) {
+        userPermissions = profilePermissions.permissions || {};
+      } else {
+        // Default permissions for non-super-admin if profile fetch failed
+        userPermissions = {
+          [PERMISSION_KEYS.CAN_CREATE_SERVER]: false,
+          [PERMISSION_KEYS.CAN_MANAGE_DOCKER_CONTAINERS]: false,
+          [PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_DOMAINS]: false,
+          [PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_TUNNELS]: false,
+        };
+      }
     }
   }
-  return { session, userRole };
+  return { session, userRole, userPermissions };
 }
 
 function executeSshCommand(conn: Client, command: string): Promise<string> {
