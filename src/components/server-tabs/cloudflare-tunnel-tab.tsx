@@ -89,7 +89,7 @@ export function CloudflareTunnelTab() {
     setIsLoadingDomains(true);
     setErrorDomains(null);
     try {
-      const response = await fetch('/api/cloudflare/domains');
+      const response = await fetch('/api/cloudflare/domains', { credentials: 'include' });
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
@@ -110,7 +110,7 @@ export function CloudflareTunnelTab() {
     setErrorTunnels(null);
     try {
       // This endpoint will be created later
-      const response = await fetch('/api/cloudflare/tunnels'); // Placeholder endpoint
+      const response = await fetch('/api/cloudflare/tunnels', { credentials: 'include' }); // Placeholder endpoint
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
@@ -138,6 +138,7 @@ export function CloudflareTunnelTab() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
+        credentials: 'include',
       });
       const result = await response.json();
       if (!response.ok) {
@@ -158,6 +159,7 @@ export function CloudflareTunnelTab() {
     try {
       const response = await fetch(`/api/cloudflare/domains?id=${domainId}`, {
         method: 'DELETE',
+        credentials: 'include',
       });
       const result = await response.json();
       if (!response.ok) {
