@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import Image from 'next/image'; // Importar el componente Image de Next.js
+import { cn } from '@/lib/utils'; // Import cn for conditional classNames
 
 // New types for multimodal content
 interface PuterTextContentPart {
@@ -693,10 +694,13 @@ export function ChatInterface({
                         <DropdownMenuItem
                           key={model.value}
                           onClick={() => handleModelChange(model.value)}
-                          className="flex items-center justify-between cursor-pointer pl-8"
+                          className={cn(
+                            "flex items-center justify-between cursor-pointer pl-8",
+                            selectedModel === model.value && "bg-accent text-accent-foreground" // Apply accent styling when selected
+                          )}
                         >
                           <span>{model.label}</span>
-                          {selectedModel === model.value && <Check className="h-4 w-4 text-primary" />}
+                          {selectedModel === model.value && <Check className="h-4 w-4 text-green-500" />} {/* Green checkmark */}
                         </DropdownMenuItem>
                       ))}
                       {providerIndex < AI_PROVIDERS.length - 1 && <DropdownMenuSeparator className="bg-border" />}
