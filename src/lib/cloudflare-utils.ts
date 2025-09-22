@@ -123,7 +123,7 @@ async function callCloudflareApi<T>(
 
   // Lógica de error mejorada: considera success: false O la presencia de errores
   if (parsedData.data.success === false || (parsedData.data.errors && parsedData.data.errors.length > 0)) {
-    const errorMessages = parsedData.data.errors?.map(e => `(Code: ${e.code}) ${e.message}`).join('; ') || 'Error desconocido de Cloudflare API.';
+    const errorMessages = parsedData.data.errors?.map((e: { code: number; message: string }) => `(Code: ${e.code}) ${e.message}`).join('; ') || 'Error desconocido de Cloudflare API.';
     const logDescriptionApiError = `[Cloudflare API Response]
 - Status: ${response.status}
 - Success: false
@@ -172,9 +172,8 @@ export async function createCloudflareTunnel(
   await executeSshCommand(serverDetails, 'mkdir -p /root/.cloudflared');
   await logApiCall(userId, 'cloudflare_tunnel_create_ssh_mkdir', `Ensured /root/.cloudflared directory exists on ${serverDetails.ip_address}.`);
 
-  // Explicitly set TUNNEL_ORIGIN_CERT to empty to prevent it from looking for cert.pem
-  // Wrapped in bash -c to ensure environment variable is set correctly for the command.
-  const command = `bash -c 'TUNNEL_ORIGIN_CERT="" cloudflared tunnel create ${tunnelName}'`;
+  // Explicitly set TUNNEL_ORIGIN_CERT to empty and force --config /dev/null
+  const command = `bash -c 'TUNNEL_ORIGIN_CERT="" cloudflared --config /dev/null tunnel create ${tunnelName}'`;
   const { stdout, stderr, code } = await executeSshCommand(serverDetails, command);
 
   if (code !== 0) {
@@ -251,8 +250,9 @@ export async function deleteCloudflareTunnel(
   // Stop cloudflared service
   await executeSshCommand(serverDetails, 'systemctl stop cloudflared').catch(e => console.warn(`[CloudflareUtils] Could not stop cloudflared service cleanly for tunnel ${tunnelId}: ${e.message}`));
 
-  // Delete the tunnel
-  const { stderr: deleteStderr, code: deleteCode } = await executeSshCommand(serverDetails, `cloudflared tunnel delete ${tunnelId} -f`);
+  // Delete the tunnel, explicitly setting TUNNEL_ORIGIN_CERT and --config /dev/null
+  const command = `bash -c 'TUNNEL_ORIGIN_CERT="" cloudflared --config /dev/null tunnel delete ${tunnelId} -f'`;
+  const { stderr: deleteStderr, code: deleteCode } = await executeSshCommand(serverDetails, command);
   if (deleteCode !== 0 && !deleteStderr.includes('No such tunnel')) { // Allow "No such tunnel" as a non-error
     await logApiCall(userId, 'cloudflare_tunnel_delete_ssh_failed', `Failed to delete tunnel ${tunnelId} on ${serverDetails.ip_address}. STDERR: ${deleteStderr}`);
     throw new Error(`Error deleting Cloudflare tunnel via SSH: ${deleteStderr}`);
