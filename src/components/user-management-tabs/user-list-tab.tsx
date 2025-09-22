@@ -229,7 +229,8 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
                   </TableRow>
                 );
               })}
-            </TableBody>
+              </TableBody>
+            </Table>
           </ScrollArea>
         )}
       </CardContent>
