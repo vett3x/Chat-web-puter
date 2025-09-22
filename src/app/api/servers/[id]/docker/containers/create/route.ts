@@ -230,29 +230,34 @@ export async function POST(
 
       // Script para instalar Node.js, npm y cloudflared dentro del contenedor
       const installContainerDependenciesScript = `
-        set -e && \\
-        export DEBIAN_FRONTEND=noninteractive && \\
-        apt-get update -y && \\
-        apt-get install -y curl gnupg lsb-release && \\
+        set -e
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update -y
+        apt-get install -y curl gnupg lsb-release sudo -y
         
         # Install Node.js and npm
-        curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \\
-        apt-get install -y nodejs && \\
-        node -v && \\
-        npm -v && \\
+        curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo bash -
+        sudo apt-get install -y nodejs
+        node -v
+        npm -v
 
         # Install cloudflared
-        mkdir -p --mode=0755 /usr/share/keyrings && \\
-        curl -fsSL https://pkg.cloudflare.com/cloudflare-release.gpg | gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-archive-keyring.gpg && \\
-        chmod 644 /usr/share/keyrings/cloudflare-archive-keyring.gpg && \\
-        DISTRO_CODENAME=$(lsb_release -cs) && \\
-        echo \\"deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflare.com/cloudflared \\\${DISTRO_CODENAME} main\\" | tee /etc/apt/sources.list.d/cloudflared.list > /dev/null && \\
-        apt-get update -y && \\
-        apt-get install -y cloudflared && \\
+        sudo mkdir -p --mode=0755 /usr/share/keyrings
+        curl -fsSL https://pkg.cloudflare.com/cloudflare-release.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-archive-keyring.gpg
+        sudo chmod 644 /usr/share/keyrings/cloudflare-archive-keyring.gpg
+        DISTRO_CODENAME=$(lsb_release -cs)
+        echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflare.com/cloudflared \${DISTRO_CODENAME} main" | sudo tee /etc/apt/sources.list.d/cloudflared.list > /dev/null
+        sudo apt-get update -y
+        sudo apt-get install -y cloudflared
         cloudflared --version
-      `.replace(/\\(?=\n)/g, '').replace(/\n/g, ' ').trim();
+      `;
 
-      const { stderr: installStderr, code: installCode } = await executeSshCommand(server, `docker exec ${containerId} sh -c "${installContainerDependenciesScript}"`);
+      // Base64 encode the script
+      const encodedScript = Buffer.from(installContainerDependenciesScript).toString('base64');
+
+      // Execute the encoded script inside the container using bash
+      const { stderr: installStderr, code: installCode } = await executeSshCommand(server, `docker exec ${containerId} bash -c "echo '${encodedScript}' | base64 -d | bash"`);
+      
       if (installCode !== 0) {
         throw new Error(`Error al instalar Node.js/npm/cloudflared en el contenedor: ${installStderr}`);
       }
