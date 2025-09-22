@@ -154,6 +154,7 @@ export async function createAndProvisionCloudflareTunnel({
     const configDir = `~/.cloudflared`;
     const credsFile = `${configDir}/${tunnelId}.json`;
     const tunnelConfigFile = `${configDir}/config-${tunnelId}.yml`; // Specific config file for this tunnel
+    const serviceName = `cloudflared-tunnel-${tunnelId}`; // Consistent service name
 
     await executeSshCommand(conn, `mkdir -p ${configDir}`);
     await executeSshCommand(conn, `echo '${JSON.stringify(tunnel)}' > ${credsFile}`);
@@ -174,15 +175,18 @@ ingress:
 `;
     await executeSshCommand(conn, `echo "${configContent.replace(/"/g, '\\"').replace(/\n/g, '\\n')}" > ${tunnelConfigFile}`);
 
-    // Install and start cloudflared as a system service for this specific tunnel
-    const serviceInstallCommand = `cloudflared service install --config ${tunnelConfigFile} --name tunnel-${tunnelId}`;
+    // Install cloudflared as a system service for this specific tunnel
+    const serviceInstallCommand = `cloudflared service install --config ${tunnelConfigFile} --name ${serviceName}`;
     const { stderr: installServiceStderr, code: installServiceCode } = await executeSshCommand(conn, serviceInstallCommand);
     if (installServiceCode !== 0) {
       throw new Error(`Error al instalar el servicio cloudflared para el túnel: ${installServiceStderr}`);
     }
 
+    // Reload systemd daemon to recognize the new service unit
+    await executeSshCommand(conn, `systemctl daemon-reload`);
+
     // Start the newly installed service
-    const startServiceCommand = `systemctl start cloudflared-tunnel-${tunnelId}`;
+    const startServiceCommand = `systemctl start ${serviceName}`;
     const { stderr: startServiceStderr, code: startServiceCode } = await executeSshCommand(conn, startServiceCommand);
     if (startServiceCode !== 0) {
       throw new Error(`Error al iniciar el servicio cloudflared para el túnel: ${startServiceStderr}`);
@@ -285,18 +289,24 @@ export async function deleteCloudflareTunnelAndCleanup({
       readyTimeout: 20000,
     }));
 
-    // Stop and uninstall the specific cloudflared service
-    const stopServiceCommand = `systemctl stop cloudflared-tunnel-${tunnel.tunnel_id}`;
+    const serviceName = `cloudflared-tunnel-${tunnel.tunnel_id}`;
+
+    // Stop the specific cloudflared service
+    const stopServiceCommand = `systemctl stop ${serviceName}`;
     const { stderr: stopStderr, code: stopCode } = await executeSshCommand(conn, stopServiceCommand);
     if (stopCode !== 0 && !stopStderr.includes('Unit cloudflared-tunnel-') && !stopStderr.includes('not loaded')) {
       console.warn(`[Tunnel Deletion] Warning: Could not stop cloudflared service for tunnel ${tunnel.tunnel_id}: ${stopStderr}`);
     }
 
-    const uninstallServiceCommand = `cloudflared service uninstall --config ~/.cloudflared/config-${tunnel.tunnel_id}.yml --name tunnel-${tunnel.tunnel_id}`;
+    // Uninstall the specific cloudflared service
+    const uninstallServiceCommand = `cloudflared service uninstall --config ~/.cloudflared/config-${tunnel.tunnel_id}.yml --name ${serviceName}`;
     const { stderr: uninstallStderr, code: uninstallCode } = await executeSshCommand(conn, uninstallServiceCommand);
     if (uninstallCode !== 0 && !uninstallStderr.includes('No such file or directory')) {
       console.warn(`[Tunnel Deletion] Warning: Could not uninstall cloudflared service for tunnel ${tunnel.tunnel_id}: ${uninstallStderr}`);
     }
+
+    // Reload systemd daemon to remove the service unit
+    await executeSshCommand(conn, `systemctl daemon-reload`);
 
     // Clean up cloudflared config files
     const configDir = `~/.cloudflared`;
