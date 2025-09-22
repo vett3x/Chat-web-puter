@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Cloud, PlusCircle, Loader2, Trash2, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Cloud, PlusCircle, Loader2, Trash2, RefreshCw, AlertCircle, CheckCircle2, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useForm } from 'react-hook-form';
@@ -290,19 +290,12 @@ export function CloudflareTunnelTab() {
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Dominio</TableHead>
-                    <TableHead>Zone ID</TableHead>
-                    <TableHead>Account ID</TableHead> {/* Added Account ID header */}
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
+                  <TableRow><TableHead>Dominio</TableHead><TableHead>Zone ID</TableHead><TableHead>Account ID</TableHead>{/* Added Account ID header */}<TableHead className="text-right">Acciones</TableHead></TableRow>
                 </TableHeader>
                 <TableBody>
                   {cloudflareDomains.map((domain) => (
                     <TableRow key={domain.id}>
-                      <TableCell className="font-medium">{domain.domain_name}</TableCell>
-                      <TableCell className="font-mono text-xs">{domain.zone_id}</TableCell>
-                      <TableCell className="font-mono text-xs">{domain.account_id}</TableCell> {/* Display Account ID */}
+                      <TableCell className="font-medium">{domain.domain_name}</TableCell><TableCell className="font-mono text-xs">{domain.zone_id}</TableCell><TableCell className="font-mono text-xs">{domain.account_id}</TableCell>{/* Display Account ID */}
                       <TableCell className="text-right">
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
@@ -362,19 +355,16 @@ export function CloudflareTunnelTab() {
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Dominio Completo</TableHead>
-                    <TableHead>Servidor</TableHead>
-                    <TableHead>Contenedor</TableHead>
-                    <TableHead>Puerto</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
+                  <TableRow><TableHead>Dominio Completo</TableHead><TableHead>Servidor</TableHead><TableHead>Contenedor</TableHead><TableHead>Puerto</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow>
                 </TableHeader>
                 <TableBody>
                   {dockerTunnels.map((tunnel) => (
                     <TableRow key={tunnel.id}>
-                      <TableCell className="font-medium">{tunnel.full_domain}</TableCell>
+                      <TableCell className="font-medium">
+                        <a href={`https://${tunnel.full_domain}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline flex items-center gap-1">
+                          <Globe className="h-4 w-4" /> {tunnel.full_domain}
+                        </a>
+                      </TableCell>
                       <TableCell className="font-mono text-xs">{tunnel.server_id.substring(0, 8)}</TableCell> {/* Placeholder */}
                       <TableCell className="font-mono text-xs">{tunnel.container_id.substring(0, 8)}</TableCell> {/* Placeholder */}
                       <TableCell>{tunnel.container_port}</TableCell>
