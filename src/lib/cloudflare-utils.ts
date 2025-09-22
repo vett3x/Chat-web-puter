@@ -72,7 +72,7 @@ async function callCloudflareApi<T>(
   }
 
   if (!parsedData.data.success) {
-    const errorMessages = parsedData.data.errors?.map(e => e.message).join(', ') || 'Error desconocido de Cloudflare API.';
+    const errorMessages = parsedData.data.errors?.map(e => `(Code: ${e.code}) ${e.message}`).join('; ') || 'Error desconocido de Cloudflare API.';
     console.error('Cloudflare API error:', parsedData.data.errors);
     throw new Error(`Error de Cloudflare API: ${errorMessages}`);
   }
