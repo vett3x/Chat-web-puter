@@ -231,35 +231,45 @@ export async function POST(
       // Script para instalar Node.js, npm y cloudflared dentro del contenedor
       const installContainerDependenciesScript = `
         set -e
+        echo "--- Starting container dependency installation ---"
         export DEBIAN_FRONTEND=noninteractive
-        apt-get update -y
-        apt-get install -y curl gnupg lsb-release sudo -y
-        
-        # Install Node.js and npm
+
+        echo "Updating apt package list and installing core dependencies (curl, gnupg, lsb-release, sudo)..."
+        sudo apt-get update -y
+        sudo apt-get install -y curl gnupg lsb-release sudo
+        echo "Core dependencies installed."
+
+        echo "Installing Node.js and npm..."
         curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo bash -
         sudo apt-get install -y nodejs
-        node -v
-        npm -v
+        echo "Node.js version: $(node -v)"
+        echo "npm version: $(npm -v)"
+        echo "Node.js and npm installed."
 
-        # Install cloudflared
+        echo "Installing cloudflared..."
         sudo mkdir -p --mode=0755 /usr/share/keyrings
         curl -fsSL https://pkg.cloudflare.com/cloudflare-release.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-archive-keyring.gpg
         sudo chmod 644 /usr/share/keyrings/cloudflare-archive-keyring.gpg
         DISTRO_CODENAME=$(lsb_release -cs)
+        echo "Detected distribution codename: \${DISTRO_CODENAME}"
         echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflare.com/cloudflared \${DISTRO_CODENAME} main" | sudo tee /etc/apt/sources.list.d/cloudflared.list > /dev/null
         sudo apt-get update -y
         sudo apt-get install -y cloudflared
-        cloudflared --version
+        echo "cloudflared version: $(cloudflared --version)"
+        echo "cloudflared installed."
+
+        echo "--- Container dependency installation complete ---"
       `;
 
       // Base64 encode the script
       const encodedScript = Buffer.from(installContainerDependenciesScript).toString('base64');
 
       // Execute the encoded script inside the container using bash
-      const { stderr: installStderr, code: installCode } = await executeSshCommand(server, `docker exec ${containerId} bash -c "echo '${encodedScript}' | base64 -d | bash"`);
+      const { stdout: installStdout, stderr: installStderr, code: installCode } = await executeSshCommand(server, `docker exec ${containerId} bash -c "echo '${encodedScript}' | base64 -d | bash"`);
       
       if (installCode !== 0) {
-        throw new Error(`Error al instalar Node.js/npm/cloudflared en el contenedor: ${installStderr}`);
+        console.error(`[Container Create] Error installing Node.js/npm/cloudflared in container ${containerId?.substring(0,12)}: STDOUT: ${installStdout}, STDERR: ${installStderr}`);
+        throw new Error(`Error al instalar Node.js/npm/cloudflared en el contenedor: ${installStderr || installStdout}`);
       }
       await supabaseAdmin.from('server_events_log').insert({
         user_id: session.user.id,
