@@ -78,7 +78,7 @@ const createContainerFormSchema = z.object({
   image: z.string().min(1, { message: 'La imagen es requerida.' }),
   name: z.string().optional(),
   ports: z.string().optional(), // e.g., "8080:80"
-  framework: z.enum(['nextjs', 'other']).default('other'), // New field
+  framework: z.enum(['nextjs', 'other']).default('other'), // Changed: Removed .optional()
   cloudflare_domain_id: z.string().uuid({ message: 'ID de dominio de Cloudflare inválido.' }).optional(),
   container_port: z.coerce.number().int().min(1).max(65535, { message: 'Puerto de contenedor inválido.' }).optional(),
   subdomain: z.string().regex(/^[a-z0-9-]{1,63}$/, { message: 'Subdominio inválido. Solo minúsculas, números y guiones.' }).optional(),
@@ -91,6 +91,23 @@ const createTunnelFormSchema = z.object({
   subdomain: z.string().regex(/^[a-z0-9-]{1,63}$/, { message: 'Subdominio inválido. Solo minúsculas, números y guiones.' }).optional(),
 });
 type CreateTunnelFormValues = z.infer<typeof createTunnelFormSchema>;
+
+// Define initial default values as constants
+const INITIAL_CREATE_CONTAINER_DEFAULTS: CreateContainerFormValues = {
+  image: '',
+  name: undefined,
+  ports: undefined,
+  framework: 'other', // Explicitly set default
+  cloudflare_domain_id: undefined,
+  container_port: undefined,
+  subdomain: undefined,
+};
+
+const INITIAL_CREATE_TUNNEL_DEFAULTS: CreateTunnelFormValues = {
+  cloudflare_domain_id: '',
+  container_port: 80,
+  subdomain: undefined,
+};
 
 interface ServerDetailDockerTabProps {
   server: RegisteredServer;
@@ -120,24 +137,12 @@ export function ServerDetailDockerTab({ server, userRole }: ServerDetailDockerTa
 
   const createContainerForm = useForm<CreateContainerFormValues>({
     resolver: zodResolver(createContainerFormSchema),
-    defaultValues: { 
-      image: '', 
-      name: undefined, // Optional fields should be undefined
-      ports: undefined, // Optional fields should be undefined
-      framework: 'other', // Explicitly set default from schema
-      cloudflare_domain_id: undefined, // Optional fields should be undefined
-      container_port: undefined, // Optional fields should be undefined
-      subdomain: undefined // Optional fields should be undefined
-    },
+    defaultValues: INITIAL_CREATE_CONTAINER_DEFAULTS,
   });
 
   const createTunnelForm = useForm<CreateTunnelFormValues>({
     resolver: zodResolver(createTunnelFormSchema),
-    defaultValues: { 
-      cloudflare_domain_id: '', 
-      container_port: 80, 
-      subdomain: undefined // Optional fields should be undefined
-    },
+    defaultValues: INITIAL_CREATE_TUNNEL_DEFAULTS,
   });
 
   const fetchContainers = useCallback(async () => {
@@ -224,7 +229,7 @@ export function ServerDetailDockerTab({ server, userRole }: ServerDetailDockerTa
       toast.success('Contenedor creado exitosamente.');
       await fetchContainers();
       setIsCreateContainerDialogOpen(false);
-      createContainerForm.reset(createContainerForm.defaultValues); // Reset with default values
+      createContainerForm.reset(INITIAL_CREATE_CONTAINER_DEFAULTS); // Reset with default values
       
     } catch (error: any) {
       toast.error(error.message);
@@ -251,7 +256,7 @@ export function ServerDetailDockerTab({ server, userRole }: ServerDetailDockerTa
       toast.success('Túnel de Cloudflare creado y aprovisionamiento iniciado.');
       // No need to fetch containers, as tunnels are in a separate tab
       setIsCreateTunnelDialogOpen(false);
-      createTunnelForm.reset(createTunnelForm.defaultValues); // Reset with default values
+      createTunnelForm.reset(INITIAL_CREATE_TUNNEL_DEFAULTS); // Reset with default values
       
     } catch (error: any) {
       toast.error(error.message);
@@ -270,7 +275,7 @@ export function ServerDetailDockerTab({ server, userRole }: ServerDetailDockerTa
     setIsCreateTunnelDialogOpen(true);
     // Pre-fill container port if available, or default to 80
     const defaultPort = container.Ports ? parseInt(container.Ports.split('->')[1]?.split('/')[0] || '80') : 80;
-    createTunnelForm.reset({ ...createTunnelForm.defaultValues, container_port: defaultPort });
+    createTunnelForm.reset({ ...INITIAL_CREATE_TUNNEL_DEFAULTS, container_port: defaultPort });
   };
 
   // Filter containers for error count: only count non-running containers that are NOT gracefully exited
@@ -300,7 +305,7 @@ export function ServerDetailDockerTab({ server, userRole }: ServerDetailDockerTa
                   <DialogTitle>Crear Nuevo Contenedor</DialogTitle>
                   <DialogDescription>Ejecuta un nuevo contenedor Docker en este servidor.</DialogDescription>
                 </DialogHeader>
-                <Form {...createContainerForm}>
+                <Form<CreateContainerFormValues> {...createContainerForm}>
                   <form onSubmit={createContainerForm.handleSubmit(handleCreateContainer)} className="space-y-4 py-4">
                     <FormField control={createContainerForm.control} name="image" render={({ field }) => (<FormItem><FormLabel>Imagen</FormLabel><FormControl><Input placeholder="ubuntu:latest" {...field} /></FormControl><FormMessage /></FormItem>)} />
                     <FormField control={createContainerForm.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nombre (Opcional)</FormLabel><FormControl><Input placeholder="mi-contenedor" {...field} /></FormControl><FormMessage /></FormItem>)} />
@@ -522,7 +527,7 @@ export function ServerDetailDockerTab({ server, userRole }: ServerDetailDockerTa
                 Conecta tu contenedor Docker a Internet a través de Cloudflare Tunnel.
               </DialogDescription>
             </DialogHeader>
-            <Form {...createTunnelForm}>
+            <Form<CreateTunnelFormValues> {...createTunnelForm}>
               <form onSubmit={createTunnelForm.handleSubmit(handleCreateTunnel)} className="space-y-4 py-4">
                 <FormField
                   control={createTunnelForm.control}
