@@ -48,7 +48,7 @@ type CreateContainerFormValues = z.infer<typeof createContainerFormSchema>;
 
 const INITIAL_CREATE_CONTAINER_DEFAULTS: CreateContainerFormValues = {
   image: 'node:lts-alpine', // Default for Next.js
-  name: undefined,
+  name: '', // Changed from undefined to ''
   // ports: undefined, // Removed
   // framework: 'nextjs', // Removed
   cloudflare_domain_id: undefined,
