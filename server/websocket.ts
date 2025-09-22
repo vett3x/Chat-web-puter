@@ -1,29 +1,21 @@
-import { createServer } from 'http';
-import { parse } from 'url';
-import next from 'next';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createClient } from '@supabase/supabase-js';
 import { Client as SshClient } from 'ssh2';
 import type { ClientChannel } from 'ssh2';
 import type { IncomingMessage } from 'http';
+import { parse } from 'url';
 import dotenv from 'dotenv';
 
-// Load environment variables from .env.local
+// Load environment variables from the root .env.local file
 dotenv.config({ path: '.env.local' });
 
-const dev = process.env.NODE_ENV !== 'production';
-const hostname = 'localhost';
-const port = parseInt(process.env.PORT || '3000', 10);
+const port = parseInt(process.env.WEBSOCKET_PORT || '3001', 10);
+const wss = new WebSocketServer({ port });
 
-const app = next({ dev, hostname, port });
-const handle = app.getRequestHandler();
-
-// --- WebSocket Server Logic ---
-const activeConnections = new Map<string, { ws: WebSocket; ssh: SshClient; stream: ClientChannel }>();
+console.log(`[WSS] WebSocket Server started on port ${port}`);
 
 if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
-  console.error('[Server] ERROR: Supabase environment variables are not set. WebSocket connections will fail.');
-  // We don't exit here to allow the Next.js app to potentially run, but WS will be broken.
+  console.error('[WSS] ERROR: Supabase environment variables are not set. Connections will fail.');
 }
 
 const supabaseAdmin = createClient(
@@ -31,7 +23,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const wss = new WebSocketServer({ noServer: true });
+const activeConnections = new Map<string, { ws: WebSocket; ssh: SshClient; stream: ClientChannel }>();
 
 wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
   const connectionId = Math.random().toString(36).substring(7);
@@ -108,27 +100,4 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
     ws.send(`\r\n\x1b[31m[SERVER] Error: ${error.message}\x1b[0m\r\n`);
     ws.close();
   }
-});
-
-// --- HTTP Server and Next.js Integration ---
-app.prepare().then(() => {
-  const server = createServer((req, res) => {
-    const parsedUrl = parse(req.url!, true);
-    handle(req, res, parsedUrl);
-  });
-
-  server.on('upgrade', (req, socket, head) => {
-    const { pathname } = parse(req.url!, true);
-    if (pathname === '/ws') {
-      wss.handleUpgrade(req, socket as any, head, (ws: WebSocket) => {
-        wss.emit('connection', ws, req);
-      });
-    } else {
-      socket.destroy();
-    }
-  });
-
-  server.listen(port, () => {
-    console.log(`> Ready on http://${hostname}:${port}`);
-  });
 });

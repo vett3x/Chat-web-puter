@@ -33,8 +33,9 @@ export function ContainerConsoleDialog({ open, onOpenChange, server, container }
 
     try {
       const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      const host = window.location.host; // Use the same host and port as the web app
-      const wsUrl = `${protocol}://${host}/ws?serverId=${server.id}&containerId=${container.ID}&userId=${session.user.id}`;
+      const host = window.location.hostname;
+      const wsPort = 3001; // Connect to the standalone WebSocket server port
+      const wsUrl = `${protocol}://${host}:${wsPort}/?serverId=${server.id}&containerId=${container.ID}&userId=${session.user.id}`;
       
       term.writeln(`\x1b[33m[CLIENT] Conectando a: ${wsUrl}\x1b[0m`);
       console.log(`[ContainerConsoleDialog] Attempting WebSocket connection to: ${wsUrl}`);

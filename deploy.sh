@@ -59,6 +59,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 # IMPORTANTE: Reemplaza el siguiente valor con tu clave de servicio de Supabase.
 # La puedes encontrar en tu panel de Supabase -> Project Settings -> API -> Service role key.
 SUPABASE_SERVICE_ROLE_KEY=TU_CLAVE_DE_SERVICIO_AQUI
+WEBSOCKET_PORT=3001
 EOF
 
 # --- 4. Instalar, Construir y Desplegar ---
@@ -67,6 +68,7 @@ echo "--- Desplegando la aplicación ---"
 # Detener y eliminar la aplicación PM2 existente
 echo "Deteniendo y eliminando la aplicación PM2 existente..."
 pm2 delete chat-web-app &>/dev/null || true
+pm2 delete websocket-server &>/dev/null || true
 
 # Instalar dependencias
 echo "Instalando dependencias de npm..."
@@ -76,13 +78,13 @@ npm install || { echo "ERROR: 'npm install' falló."; exit 1; }
 echo "Construyendo la aplicación Next.js..."
 npm run build || { echo "ERROR: 'npm run build' falló."; exit 1; }
 
-# Compilar el servidor personalizado
-echo "Compilando el servidor personalizado..."
-npx tsc --project tsconfig.server.json
+# Iniciar la aplicación Next.js con PM2
+echo "Iniciando la aplicación Next.js con PM2..."
+pm2 start npm --name "chat-web-app" -- start
 
-# Iniciar la aplicación con el servidor personalizado usando PM2
-echo "Iniciando la aplicación con PM2..."
-pm2 start .next/server.js --name "chat-web-app"
+# Iniciar el servidor WebSocket con PM2
+echo "Iniciando el servidor WebSocket con PM2..."
+pm2 start ts-node --name "websocket-server" -- server/websocket.ts
 
 echo "--- Despliegue completado ---"
 pm2 list
