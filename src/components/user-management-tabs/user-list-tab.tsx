@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useImperativeHandle } from 'react'; // Import useImperativeHandle
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, Users, Trash2, RefreshCw, AlertCircle } from 'lucide-react';
@@ -29,7 +29,12 @@ interface User {
   avatar_url: string | null;
 }
 
-export function UserListTab() {
+// Define the interface for the ref handle
+export interface UserListTabRef {
+  fetchUsers: () => void;
+}
+
+export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => { // Use React.forwardRef
   const { session, isLoading: isSessionLoading } = useSession();
   const currentUserId = session?.user?.id;
   const [users, setUsers] = useState<User[]>([]);
@@ -56,6 +61,11 @@ export function UserListTab() {
       setIsLoadingUsers(false);
     }
   }, []);
+
+  // Expose fetchUsers via the ref
+  useImperativeHandle(ref, () => ({
+    fetchUsers,
+  }));
 
   useEffect(() => {
     if (!isSessionLoading && session) {
@@ -208,4 +218,6 @@ export function UserListTab() {
       </CardContent>
     </Card>
   );
-}
+});
+
+UserListTab.displayName = 'UserListTab'; // Add display name for forwardRef

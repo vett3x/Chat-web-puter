@@ -3,11 +3,22 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Users, UserPlus } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area'; // Usando alias para consistencia
-import { UserListTab } from '@/components/user-management-tabs/user-list-tab'; // Esta ruta debería resolverse correctamente ahora
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { UserListTab } from '@/components/user-management-tabs/user-list-tab';
+import { AddUserForm } from '@/components/user-management-tabs/add-user-form'; // Import the new form component
 
 export function UserManagementTabs() {
   const [activeTab, setActiveTab] = useState('user-list');
+  const userListTabRef = React.useRef<any>(null); // Ref to call refresh method on UserListTab
+
+  const handleUserAdded = () => {
+    // If the user list tab is active, refresh it
+    if (activeTab === 'user-list' && userListTabRef.current && userListTabRef.current.fetchUsers) {
+      userListTabRef.current.fetchUsers();
+    }
+    // Optionally switch to user-list tab after adding a user
+    setActiveTab('user-list');
+  };
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col">
@@ -22,13 +33,10 @@ export function UserManagementTabs() {
       <div className="flex-1 overflow-hidden mt-4">
         <ScrollArea className="h-full w-full">
           <TabsContent value="user-list" className="h-full">
-            <UserListTab />
+            <UserListTab ref={userListTabRef} /> {/* Pass ref to UserListTab */}
           </TabsContent>
           <TabsContent value="add-user" className="h-full">
-            {/* Placeholder for Add User form */}
-            <div className="p-4 text-muted-foreground">
-              Funcionalidad para añadir usuarios en desarrollo.
-            </div>
+            <AddUserForm onUserAdded={handleUserAdded} />
           </TabsContent>
         </ScrollArea>
       </div>
