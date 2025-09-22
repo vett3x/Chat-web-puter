@@ -108,7 +108,7 @@ export async function createAndProvisionCloudflareTunnel({
 
     // 2. Create DNS CNAME record
     const dnsRecord = await createCloudflareDnsRecord(
-      cloudflareDomainDetails.api_token, // Corregido: api_token en lugar de apiToken
+      cloudflareDomainDetails.api_token,
       cloudflareDomainDetails.zone_id,
       fullDomain,
       tunnelCnameTarget
@@ -156,10 +156,24 @@ export async function createAndProvisionCloudflareTunnel({
     if (cloudflaredCheckCode !== 0) {
       // Install cloudflared
       const installCloudflaredScript = `
+        set -e # Exit immediately if a command exits with a non-zero status.
+        set -x # Print commands and their arguments as they are executed.
+
+        echo "--- Installing prerequisites for Cloudflared ---"
+        sudo apt-get update -y
+        sudo apt-get install -y gnupg ca-certificates curl lsb-release # Ensure lsb-release is also there for $(lsb_release -cs)
+
+        echo "--- Adding Cloudflare GPG key ---"
         curl -fsSL https://pkg.cloudflare.com/cloudflare-release.gpg | sudo gpg --yes --dearmor -o /usr/share/keyrings/cloudflare-archive-keyring.gpg
-        echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg arch=$(dpkg --print-architecture)] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflared.list
+
+        echo "--- Adding Cloudflare repository ---"
+        echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/cloudflared.list > /dev/null
+
+        echo "--- Updating package list and installing cloudflared ---"
         sudo apt-get update -y
         sudo apt-get install -y cloudflared
+
+        echo "--- Cloudflared installation complete ---"
       `;
       const { stderr: installStderr, code: installCode } = await executeSshCommand(conn, installCloudflaredScript);
       if (installCode !== 0) {
