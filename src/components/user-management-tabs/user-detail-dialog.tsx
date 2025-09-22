@@ -110,7 +110,7 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole }: 
             <Label htmlFor="user-role" className="text-base">Rol:</Label>
             <Select
               value={selectedRole}
-              onValueChange={(value: UserRole) => setSelectedRole(value)} {/* Corrected: Cast value to UserRole */}
+              onValueChange={(value: UserRole) => setSelectedRole(value)}
               disabled={!isCurrentUserSuperAdmin || isChangingOwnRole || isUpdatingRole || isTargetUserSuperAdmin}
             >
               <SelectTrigger id="user-role" className="w-[180px]">

@@ -11,6 +11,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,7 @@ const addUserFormSchema = z.object({
   role: z.enum(['user', 'admin']).default('user'),
 });
 
+// Explicitly define the inferred type from the schema, ensuring 'role' is not optional
 type AddUserFormValues = z.infer<typeof addUserFormSchema>;
 
 interface AddUserFormProps {
@@ -49,11 +51,11 @@ export function AddUserForm({ onUserAdded }: AddUserFormProps) {
       password: '',
       first_name: '',
       last_name: '',
-      role: 'user', // Explicitly set default role to match the schema's default
-    },
+      role: 'user', // This is explicitly provided and matches the non-optional type
+    } as AddUserFormValues, // Explicitly cast defaultValues to match the inferred type
   });
 
-  const onSubmit = async (values: AddUserFormValues) => { // Corrected: values is of type AddUserFormValues
+  const onSubmit = async (values: AddUserFormValues) => {
     setIsAddingUser(true);
     try {
       const response = await fetch('/api/users/create', {
