@@ -33,6 +33,7 @@ import { ServerDetailDialog } from '../server-detail-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { useSession } from '@/components/session-context-provider'; // Import useSession
 
 const serverFormSchema = z.object({
   ip_address: z.string().ip({ message: 'Dirección IP inválida.' }),
@@ -55,8 +56,9 @@ interface RegisteredServer {
 
 const DEEPCODER_API_BASE_PATH = '/api/servers';
 
-function AddServerForm({ onServerAdded }: { onServerAdded: () => void }) {
+function AddServerForm({ onServerAdded, userRole }: { onServerAdded: () => void; userRole: 'user' | 'admin' | 'super_admin' | null }) {
   const [isAddingServer, setIsAddingServer] = useState(false);
+  const isSuperAdmin = userRole === 'super_admin';
 
   const form = useForm<ServerFormValues>({
     resolver: zodResolver(serverFormSchema),
@@ -97,6 +99,21 @@ function AddServerForm({ onServerAdded }: { onServerAdded: () => void }) {
     }
   };
 
+  if (!isSuperAdmin) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-muted-foreground">
+            <PlusCircle className="h-6 w-6" /> Añadir Nuevo Servidor
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">Solo los Super Admins pueden añadir nuevos servidores.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -120,8 +137,9 @@ function AddServerForm({ onServerAdded }: { onServerAdded: () => void }) {
   );
 }
 
-function ServerListItem({ server, onDeleteServer, onSelectServerForDetails }: { server: RegisteredServer; onDeleteServer: (serverId: string) => void; onSelectServerForDetails: (server: RegisteredServer) => void; }) {
+function ServerListItem({ server, onDeleteServer, onSelectServerForDetails, userRole }: { server: RegisteredServer; onDeleteServer: (serverId: string) => void; onSelectServerForDetails: (server: RegisteredServer) => void; userRole: 'user' | 'admin' | 'super_admin' | null }) {
   const [isLogOpen, setIsLogOpen] = useState(false);
+  const isSuperAdmin = userRole === 'super_admin';
 
   const getStatusIndicator = () => {
     switch (server.status) {
@@ -160,7 +178,7 @@ function ServerListItem({ server, onDeleteServer, onSelectServerForDetails }: { 
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="icon" className="h-8 w-8" title="Eliminar servidor">
+              <Button variant="destructive" size="icon" className="h-8 w-8" title="Eliminar servidor" disabled={!isSuperAdmin}>
                 <Trash2 className="h-4 w-4" />
               </Button>
             </AlertDialogTrigger>
@@ -204,6 +222,7 @@ function ServerListItem({ server, onDeleteServer, onSelectServerForDetails }: { 
 }
 
 export function ServerListTab() {
+  const { userRole } = useSession(); // Get user role
   const [servers, setServers] = useState<RegisteredServer[]>([]);
   const [isLoadingServers, setIsLoadingServers] = useState(true);
   const [selectedServer, setSelectedServer] = useState<RegisteredServer | null>(null);
@@ -258,7 +277,7 @@ export function ServerListTab() {
 
   return (
     <div className="space-y-8 h-full overflow-y-auto p-1">
-      <AddServerForm onServerAdded={fetchServers} />
+      <AddServerForm onServerAdded={fetchServers} userRole={userRole} />
       <Separator />
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><Server className="h-6 w-6" /> Servidores Registrados</CardTitle></CardHeader>
@@ -270,13 +289,13 @@ export function ServerListTab() {
           ) : (
             <div className="space-y-4">
               {servers.map((server) => (
-                <ServerListItem key={server.id} server={server} onDeleteServer={handleDeleteServer} onSelectServerForDetails={handleSelectServerForDetails} />
+                <ServerListItem key={server.id} server={server} onDeleteServer={handleDeleteServer} onSelectServerForDetails={handleSelectServerForDetails} userRole={userRole} />
               ))}
             </div>
           )}
         </CardContent>
       </Card>
-      {selectedServer && <ServerDetailDialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen} server={selectedServer} />}
+      {selectedServer && <ServerDetailDialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen} server={selectedServer} userRole={userRole} />}
     </div>
   );
 }

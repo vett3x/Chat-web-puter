@@ -111,6 +111,11 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
             <span className="text-xs text-muted-foreground truncate">
               {profile?.first_name && profile?.last_name ? `${profile.first_name} ${profile.last_name}` : session.user.email}
             </span>
+            {userRole && (
+              <span className="text-xs font-semibold text-primary-foreground bg-primary/80 px-1.5 py-0.5 rounded-full mt-1 capitalize">
+                {userRole === 'super_admin' ? 'Super Admin' : userRole}
+              </span>
+            )}
           </div>
         </Button>
       </DropdownMenuTrigger>
@@ -155,7 +160,7 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
             </div>
           </DropdownMenuItem>
         )}
-        {isSuperAdmin && ( // Show User Management only for Super Admins
+        {isAdmin && ( // Show User Management for Admins and Super Admins
           <DropdownMenuItem onClick={onOpenUserManagement} className="flex items-center cursor-pointer">
             <div className="flex items-center">
               <Users className="mr-2 h-4 w-4" />

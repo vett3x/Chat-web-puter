@@ -32,6 +32,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { useSession } from '@/components/session-context-provider'; // Import useSession
 
 // Tipos para los datos de Cloudflare
 interface CloudflareDomain {
@@ -70,6 +71,9 @@ const cloudflareDomainSchema = z.object({
 type CloudflareDomainFormValues = z.infer<typeof cloudflareDomainSchema>;
 
 export function CloudflareTunnelTab() {
+  const { userRole } = useSession(); // Get user role
+  const isSuperAdmin = userRole === 'super_admin';
+
   const [cloudflareDomains, setCloudflareDomains] = useState<CloudflareDomain[]>([]);
   const [dockerTunnels, setDockerTunnels] = useState<DockerTunnel[]>([]);
   const [isLoadingDomains, setIsLoadingDomains] = useState(true);
@@ -187,70 +191,74 @@ export function CloudflareTunnelTab() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Form {...domainForm}>
-              <form onSubmit={domainForm.handleSubmit(handleAddDomain)} className="space-y-6">
-                <FormField
-                  control={domainForm.control}
-                  name="domain_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nombre de Dominio (ej. example.com)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="tudominio.com" {...field} disabled={isAddingDomain} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={domainForm.control}
-                  name="api_token"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Cloudflare API Token</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="Tu API Token de Cloudflare" {...field} disabled={isAddingDomain} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={domainForm.control}
-                  name="zone_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Cloudflare Zone ID</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Tu Zone ID de Cloudflare" {...field} disabled={isAddingDomain} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={domainForm.control}
-                  name="account_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Cloudflare Account ID</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Tu Account ID de Cloudflare" {...field} disabled={isAddingDomain} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" disabled={isAddingDomain}>
-                  {isAddingDomain ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                  )}
-                  Añadir Dominio
-                </Button>
-              </form>
-            </Form>
+            {!isSuperAdmin ? (
+              <p className="text-muted-foreground">Solo los Super Admins pueden añadir nuevos dominios de Cloudflare.</p>
+            ) : (
+              <Form {...domainForm}>
+                <form onSubmit={domainForm.handleSubmit(handleAddDomain)} className="space-y-6">
+                  <FormField
+                    control={domainForm.control}
+                    name="domain_name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nombre de Dominio (ej. example.com)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="tudominio.com" {...field} disabled={isAddingDomain} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={domainForm.control}
+                    name="api_token"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cloudflare API Token</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="Tu API Token de Cloudflare" {...field} disabled={isAddingDomain} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={domainForm.control}
+                    name="zone_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cloudflare Zone ID</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Tu Zone ID de Cloudflare" {...field} disabled={isAddingDomain} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={domainForm.control}
+                    name="account_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cloudflare Account ID</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Tu Account ID de Cloudflare" {...field} disabled={isAddingDomain} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button type="submit" disabled={isAddingDomain}>
+                    {isAddingDomain ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <PlusCircle className="mr-2 h-4 w-4" />
+                    )}
+                    Añadir Dominio
+                  </Button>
+                </form>
+              </Form>
+            )}
           </CardContent>
         </Card>
 
@@ -298,7 +306,7 @@ export function CloudflareTunnelTab() {
                       <TableCell className="text-right">
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="icon" className="h-8 w-8">
+                            <Button variant="destructive" size="icon" className="h-8 w-8" disabled={!isSuperAdmin}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </AlertDialogTrigger>
@@ -387,7 +395,7 @@ export function CloudflareTunnelTab() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="destructive" size="icon" className="h-8 w-8" disabled={true}> {/* Placeholder */}
+                        <Button variant="destructive" size="icon" className="h-8 w-8" disabled={!isSuperAdmin}> {/* Disabled for admin */}
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </TableCell>

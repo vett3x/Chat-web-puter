@@ -409,6 +409,17 @@ export function ConversationSidebar({
               <Server className="h-4 w-4" />
             </Button>
           )}
+          {isAdmin && ( // New: Show User Management button for Admins and Super Admins
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onOpenUserManagement}
+              className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full"
+              title="Gestión de Usuarios"
+            >
+              <Users className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
 

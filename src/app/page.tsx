@@ -106,7 +106,7 @@ export default function Home() {
             onOpenChange={setIsServerManagementOpen}
           />
         )}
-        {isSuperAdmin && ( // Render UserManagementDialog only for Super Admins
+        {isAdmin && ( // Render UserManagementDialog for Admins and Super Admins
           <UserManagementDialog
             open={isUserManagementOpen}
             onOpenChange={setIsUserManagementOpen}

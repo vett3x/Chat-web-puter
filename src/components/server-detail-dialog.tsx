@@ -14,7 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Server, Dock, HardDrive, Link, Loader2, RefreshCw, XCircle, Play, StopCircle, Trash2, PlusCircle, Terminal, AlertCircle, Globe, CheckCircle2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
@@ -68,6 +68,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useSession } from '@/components/session-context-provider'; // Import useSession
 
 interface RegisteredServer {
   id: string;
@@ -96,6 +97,7 @@ interface ServerDetailDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   server: RegisteredServer;
+  userRole: 'user' | 'admin' | 'super_admin' | null; // Pass userRole
 }
 
 const createContainerFormSchema = z.object({
@@ -114,7 +116,9 @@ const createTunnelFormSchema = z.object({
 
 type CreateTunnelFormValues = z.infer<typeof createTunnelFormSchema>;
 
-function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
+function ServerDetailDockerTab({ server, userRole }: { server: RegisteredServer; userRole: 'user' | 'admin' | 'super_admin' | null }) {
+  const isSuperAdmin = userRole === 'super_admin';
+
   const [containers, setContainers] = useState<DockerContainer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -294,7 +298,7 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
             )}
             <Dialog open={isCreateContainerDialogOpen} onOpenChange={setIsCreateContainerDialogOpen}>
               <DialogTrigger asChild>
-                <Button size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Crear Contenedor</Button>
+                <Button size="sm" disabled={!isSuperAdmin}><PlusCircle className="mr-2 h-4 w-4" /> Crear Contenedor</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
@@ -375,19 +379,19 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
                           <TableCell>{container.Ports || '-'}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
-                              <Button variant="outline" size="icon" onClick={() => openConsoleFor(container)} title="Abrir consola">
+                              <Button variant="outline" size="icon" onClick={() => openConsoleFor(container)} title="Abrir consola" disabled={!isSuperAdmin}>
                                 <Terminal className="h-4 w-4" />
                               </Button>
                               <DropdownMenu>
-                                <DropdownMenuTrigger asChild><Button variant="outline" size="sm" disabled={isActionInProgress}>{isActionInProgress ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Acciones</Button></DropdownMenuTrigger>
+                                <DropdownMenuTrigger asChild><Button variant="outline" size="sm" disabled={isActionInProgress || !isSuperAdmin}>{isActionInProgress ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Acciones</Button></DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => handleContainerAction(container.ID, 'start')} disabled={isRunning || isActionInProgress}><Play className="mr-2 h-4 w-4" /> Iniciar</DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleContainerAction(container.ID, 'stop')} disabled={!isRunning || isActionInProgress}><StopCircle className="mr-2 h-4 w-4" /> Detener</DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => openCreateTunnelDialogFor(container)} disabled={isActionInProgress || isLoadingCloudflareDomains || cloudflareDomains.length === 0}>
+                                  <DropdownMenuItem onClick={() => handleContainerAction(container.ID, 'start')} disabled={isRunning || isActionInProgress || !isSuperAdmin}><Play className="mr-2 h-4 w-4" /> Iniciar</DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleContainerAction(container.ID, 'stop')} disabled={!isRunning || isActionInProgress || !isSuperAdmin}><StopCircle className="mr-2 h-4 w-4" /> Detener</DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => openCreateTunnelDialogFor(container)} disabled={isActionInProgress || isLoadingCloudflareDomains || cloudflareDomains.length === 0 || !isSuperAdmin}>
                                     <Globe className="mr-2 h-4 w-4" /> Crear Túnel Cloudflare
                                   </DropdownMenuItem>
                                   <AlertDialog>
-                                    <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={isActionInProgress} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Eliminar</DropdownMenuItem></AlertDialogTrigger>
+                                    <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={isActionInProgress || !isSuperAdmin} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Eliminar</DropdownMenuItem></AlertDialogTrigger>
                                     <AlertDialogContent>
                                       <AlertDialogHeader><AlertDialogTitle>¿Estás seguro de eliminar este contenedor?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará permanentemente el contenedor "{container.Names}" ({container.ID.substring(0, 12)}).</AlertDialogDescription></AlertDialogHeader>
                                       <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleContainerAction(container.ID, 'delete')} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter>
@@ -434,7 +438,7 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Dominio de Cloudflare</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isCreatingTunnel || isLoadingCloudflareDomains}>
+                      <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isCreatingTunnel || isLoadingCloudflareDomains || !isSuperAdmin}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecciona un dominio registrado" />
@@ -465,7 +469,7 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
                     <FormItem>
                       <FormLabel>Puerto del Contenedor</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="80" {...field} disabled={isCreatingTunnel} />
+                        <Input type="number" placeholder="80" {...field} disabled={isCreatingTunnel || !isSuperAdmin} />
                       </FormControl>
                       <FormDescription>
                         El puerto interno del contenedor Docker al que Cloudflare Tunnel debe redirigir.
@@ -481,7 +485,7 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
                     <FormItem>
                       <FormLabel>Subdominio (Opcional)</FormLabel>
                       <FormControl>
-                        <Input placeholder="mi-app" {...field} disabled={isCreatingTunnel} />
+                        <Input placeholder="mi-app" {...field} disabled={isCreatingTunnel || !isSuperAdmin} />
                       </FormControl>
                       <FormDescription>
                         Si se deja vacío, se generará un subdominio aleatorio de 15 caracteres.
@@ -494,7 +498,7 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
                   <DialogClose asChild>
                     <Button type="button" variant="outline" disabled={isCreatingTunnel}>Cancelar</Button>
                   </DialogClose>
-                  <Button type="submit" disabled={isCreatingTunnel || isLoadingCloudflareDomains || cloudflareDomains.length === 0}>
+                  <Button type="submit" disabled={isCreatingTunnel || isLoadingCloudflareDomains || cloudflareDomains.length === 0 || !isSuperAdmin}>
                     {isCreatingTunnel && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Crear Túnel
                   </Button>
@@ -779,7 +783,7 @@ function ServerDetailWebLinksTab({ serverId }: { serverId: string }) {
   );
 }
 
-export function ServerDetailDialog({ open, onOpenChange, server }: ServerDetailDialogProps) {
+export function ServerDetailDialog({ open, onOpenChange, server, userRole }: ServerDetailDialogProps) {
   const [activeTab, setActiveTab] = useState('docker');
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -790,7 +794,7 @@ export function ServerDetailDialog({ open, onOpenChange, server }: ServerDetailD
             <TabsList className="grid w-full grid-cols-3"><TabsTrigger value="docker" className="flex items-center gap-2"><Dock className="h-4 w-4" /> Docker</TabsTrigger><TabsTrigger value="resources" className="flex items-center gap-2"><HardDrive className="h-4 w-4" /> Recursos</TabsTrigger><TabsTrigger value="weblinks" className="flex items-center gap-2"><Link className="h-4 w-4" /> Web</TabsTrigger></TabsList>
             <div className="flex-1 overflow-hidden mt-4">
               <ScrollArea className="h-full w-full">
-                <TabsContent value="docker" className="h-full"><ServerDetailDockerTab server={server} /></TabsContent>
+                <TabsContent value="docker" className="h-full"><ServerDetailDockerTab server={server} userRole={userRole} /></TabsContent>
                 <TabsContent value="resources" className="h-full"><ServerDetailResourcesTab serverId={server.id} /></TabsContent>
                 <TabsContent value="weblinks" className="h-full"><ServerDetailWebLinksTab serverId={server.id} /></TabsContent>
               </ScrollArea>
