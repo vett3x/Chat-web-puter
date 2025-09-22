@@ -70,11 +70,11 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
     } finally {
       setIsLoadingUsers(false);
     }
-  }, []);
+  }, [toast]); // Añadido toast a las dependencias
 
   useImperativeHandle(ref, () => ({
     fetchUsers,
-  }));
+  }), [fetchUsers]); // Añadido fetchUsers a las dependencias
 
   useEffect(() => {
     if (!isSessionLoading && session) {
