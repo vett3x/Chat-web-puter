@@ -245,7 +245,7 @@ export async function POST(
         mkdir -p --mode=0755 /usr/share/keyrings && \\
         curl -fsSL https://pkg.cloudflare.com/cloudflare-release.gpg | gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-archive-keyring.gpg && \\
         chmod 644 /usr/share/keyrings/cloudflare-archive-keyring.gpg && \\
-        echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/cloudflared.list > /dev/null && \\
+        echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflare.com/cloudflared \\\$(lsb_release -cs) main" | tee /etc/apt/sources.list.d/cloudflared.list > /dev/null && \\
         apt-get update -y && \\
         apt-get install -y cloudflared && \\
         cloudflared --version
