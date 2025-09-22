@@ -228,17 +228,19 @@ export async function POST(
         description: `Instalando Node.js y npm en el contenedor ${containerId?.substring(0,12)}...`,
       });
 
+      // Reescrito el script para ser más robusto y evitar errores de sintaxis con sh -c
       const installNodeScript = `
-        set -e
-        export DEBIAN_FRONTEND=noninteractive
-        apt-get update -y
-        apt-get install -y curl
-        curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
-        apt-get install -y nodejs
-        node -v
+        set -e && \\
+        export DEBIAN_FRONTEND=noninteractive && \\
+        apt-get update -y && \\
+        apt-get install -y curl && \\
+        curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \\
+        apt-get install -y nodejs && \\
+        node -v && \\
         npm -v
-      `;
-      const { stderr: nodeInstallStderr, code: nodeInstallCode } = await executeSshCommand(runConn, `docker exec ${containerId} sh -c "${installNodeScript.replace(/\n/g, ';')}"`);
+      `.replace(/\\(?=\n)/g, '').replace(/\n/g, ' ').trim(); // Eliminar saltos de línea y backslashes de continuación
+
+      const { stderr: nodeInstallStderr, code: nodeInstallCode } = await executeSshCommand(runConn, `docker exec ${containerId} sh -c "${installNodeScript}"`);
       if (nodeInstallCode !== 0) {
         throw new Error(`Error al instalar Node.js/npm en el contenedor: ${nodeInstallStderr}`);
       }

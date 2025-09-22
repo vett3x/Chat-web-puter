@@ -66,7 +66,7 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
   const [cloudflareDomains, setCloudflareDomains] = useState<CloudflareDomain[]>([]);
   const [isLoadingCloudflareDomains, setIsLoadingCloudflareDomains] = useState(true);
   const [statusMessage, setStatusMessage] = useState<{ message: string; type: 'info' | 'success' | 'error' } | null>(null);
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState(0); // 0: initial, 1: starting, 2: creating container, 3: installing node, 4: configuring tunnel
 
   const form = useForm<CreateContainerFormValues>({
     resolver: zodResolver(createContainerFormSchema),
@@ -116,9 +116,9 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
     setCurrentStep(1);
 
     try {
-      // Step 1: Create Container
-      setStatusMessage({ message: 'Verificando imagen Docker y creando contenedor...', type: 'info' });
-      setCurrentStep(2);
+      // Step 2: Create Container (API call handles container creation AND Node.js installation)
+      setStatusMessage({ message: 'Verificando imagen Docker, creando contenedor e instalando Node.js/npm...', type: 'info' });
+      setCurrentStep(2); // This step now covers container creation and Node.js installation
       const response = await fetch(`/api/servers/${serverId}/docker/containers/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -129,24 +129,24 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
         throw new Error(result.message || 'Error al crear el contenedor.');
       }
       
-      setStatusMessage({ message: 'Contenedor creado exitosamente.', type: 'success' });
-      setCurrentStep(3);
+      setStatusMessage({ message: 'Contenedor creado y Node.js/npm instalados exitosamente.', type: 'success' });
+      setCurrentStep(3); // Advance to next logical step after container+node setup
 
       // If tunnel details were provided and user has permissions, the tunnel creation
       // is initiated on the server-side within the same API call.
-      // We can't get real-time updates for it here without polling, so we'll assume
-      // it's part of the "container created" phase for this UI.
       if (values.cloudflare_domain_id && values.container_port && canManageCloudflareTunnels) {
         setStatusMessage({ message: 'Túnel Cloudflare iniciado (ver historial para detalles)...', type: 'info' });
-        setCurrentStep(4);
+        setCurrentStep(4); // New step for tunnel configuration
       }
 
-      toast.success('Contenedor y túnel (si aplica) creados exitosamente.');
+      toast.success('Contenedor, Node.js/npm y túnel (si aplica) creados exitosamente.');
       onContainerCreated();
       onOpenChange(false); // Only close on success
       form.reset(INITIAL_CREATE_CONTAINER_DEFAULTS);
       
     } catch (error: any) {
+      // The currentStep will be the last one set before the error.
+      // The statusMessage will reflect the error.
       setStatusMessage({ message: `Error: ${error.message}`, type: 'error' });
       toast.error(error.message);
     } finally {
@@ -158,7 +158,7 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
   const renderStatusStep = (stepNumber: number, message: string, current: number, type: 'info' | 'success' | 'error') => {
     const isActive = current === stepNumber;
     const isCompleted = current > stepNumber;
-    const isError = type === 'error' && isActive;
+    const isError = type === 'error' && isActive; // Only show error icon if this is the active (failed) step
 
     return (
       <div className="flex items-center gap-2 text-sm">
@@ -262,11 +262,9 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
               <div className="space-y-2 p-4 border rounded-md bg-muted/50">
                 <h4 className="font-semibold">Progreso:</h4>
                 {renderStatusStep(1, 'Iniciando proceso...', currentStep, statusMessage.type)}
-                {renderStatusStep(2, 'Verificando imagen Docker y creando contenedor...', currentStep, statusMessage.type)}
-                {renderStatusStep(3, 'Contenedor creado y en ejecución.', currentStep, statusMessage.type)}
-                {renderStatusStep(4, 'Instalando Node.js y npm en el contenedor...', currentStep, statusMessage.type)} {/* Nuevo paso */}
+                {renderStatusStep(2, 'Verificando imagen Docker, creando contenedor e instalando Node.js/npm...', currentStep, statusMessage.type)}
                 {form.getValues('cloudflare_domain_id') && form.getValues('container_port') && canManageCloudflareTunnels && (
-                  renderStatusStep(5, 'Configurando túnel Cloudflare...', currentStep, statusMessage.type)
+                  renderStatusStep(3, 'Configurando túnel Cloudflare...', currentStep, statusMessage.type)
                 )}
                 {statusMessage.type === 'error' && (
                   <div className="flex items-center gap-2 text-sm text-destructive">
