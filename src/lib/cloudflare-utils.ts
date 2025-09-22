@@ -42,6 +42,13 @@ async function callCloudflareApi<T>(
   const baseUrl = 'https://api.cloudflare.com/client/v4';
   let url = `${baseUrl}${path}`;
 
+  // --- DEBUGGING LOG ---
+  console.log(`[Cloudflare API Call]
+    - Method: ${method}
+    - URL: ${url}
+    - API Token (first 8 chars): ${apiToken.substring(0, 8)}...`);
+  // --- END DEBUGGING LOG ---
+
   const headers: HeadersInit = {
     'Authorization': `Bearer ${apiToken}`,
     'Content-Type': 'application/json',
