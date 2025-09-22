@@ -30,12 +30,10 @@ async function getSession() {
 }
 
 export async function GET(
-  req: NextRequest
+  req: NextRequest,
+  context: { params: { id: string } }
 ) {
-  const url = new URL(req.url);
-  const pathSegments = url.pathname.split('/');
-  // Expected path: /api/servers/[id]/docker/containers
-  const serverId = pathSegments[3];
+  const serverId = context.params.id;
 
   if (!serverId) {
     return NextResponse.json({ message: 'ID de servidor no proporcionado en la URL.' }, { status: 400 });

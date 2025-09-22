@@ -47,9 +47,11 @@ function executeSshCommand(conn: Client, command: string): Promise<{ stdout: str
   });
 }
 
-export async function POST(req: NextRequest) {
-  const url = new URL(req.url);
-  const serverId = url.pathname.split('/')[3];
+export async function POST(
+  req: NextRequest,
+  context: { params: { id: string } }
+) {
+  const serverId = context.params.id;
 
   if (!serverId) {
     return NextResponse.json({ message: 'ID de servidor no proporcionado.' }, { status: 400 });

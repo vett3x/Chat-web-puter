@@ -45,10 +45,11 @@ function executeSshCommand(conn: Client, command: string): Promise<string> {
   });
 }
 
-export async function GET(req: NextRequest) {
-  const url = new URL(req.url);
-  const pathSegments = url.pathname.split('/');
-  const serverId = pathSegments[3];
+export async function GET(
+  req: NextRequest,
+  context: { params: { id: string } }
+) {
+  const serverId = context.params.id;
 
   if (!serverId) {
     return NextResponse.json({ message: 'ID de servidor no proporcionado.' }, { status: 400 });

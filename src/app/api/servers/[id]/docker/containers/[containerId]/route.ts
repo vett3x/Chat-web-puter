@@ -40,11 +40,12 @@ function executeSshCommand(conn: Client, command: string): Promise<{ stdout: str
   });
 }
 
-export async function DELETE(req: NextRequest) {
-  const url = new URL(req.url);
-  const pathSegments = url.pathname.split('/');
-  const serverId = pathSegments[3];
-  const containerId = pathSegments[6];
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string; containerId: string } }
+) {
+  const serverId = params.id;
+  const containerId = params.containerId;
 
   if (!serverId || !containerId) {
     return NextResponse.json({ message: 'ID de servidor o contenedor no proporcionado.' }, { status: 400 });
