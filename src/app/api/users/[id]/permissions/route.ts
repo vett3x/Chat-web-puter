@@ -43,6 +43,52 @@ async function getSessionAndRole() {
   return { session, userRole };
 }
 
+export async function GET(
+  req: NextRequest,
+  context: any
+) {
+  try {
+    const userIdToFetch = context.params.id;
+
+    if (!userIdToFetch) {
+      return NextResponse.json({ message: 'ID de usuario no proporcionado.' }, { status: 400 });
+    }
+
+    const { session, userRole: currentUserRole } = await getSessionAndRole();
+    // Solo los Super Admins pueden ver los permisos de otros usuarios
+    if (!session || currentUserRole !== 'super_admin') {
+      return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden ver permisos.' }, { status: 403 });
+    }
+
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('SUPABASE_SERVICE_ROLE_KEY is not set in environment variables.');
+      return NextResponse.json({ message: 'Error de configuración del servidor.' }, { status: 500 });
+    }
+
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { data: profile, error: fetchProfileError } = await supabaseAdmin
+      .from('profiles')
+      .select('permissions')
+      .eq('id', userIdToFetch)
+      .single();
+
+    if (fetchProfileError || !profile) {
+      console.error(`Error fetching permissions for user ${userIdToFetch}:`, fetchProfileError);
+      return NextResponse.json({ message: 'Usuario no encontrado o permisos no disponibles.' }, { status: 404 });
+    }
+
+    return NextResponse.json({ permissions: profile.permissions || {} }, { status: 200 });
+
+  } catch (error: any) {
+    console.error('Unhandled error in GET /api/users/[id]/permissions:', error);
+    return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
+  }
+}
+
 export async function PUT(
   req: NextRequest,
   context: any // Simplified type to resolve internal Next.js type conflict
