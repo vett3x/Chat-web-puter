@@ -31,10 +31,10 @@ async function getSession() {
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string; containerId: string } }
+  context: any // Simplified type to resolve internal Next.js type conflict
 ) {
-  const serverId = params.id;
-  const containerId = params.containerId;
+  const serverId = context.params.id;
+  const containerId = context.params.containerId;
 
   if (!serverId || !containerId) {
     return NextResponse.json({ message: 'ID de servidor o contenedor no proporcionado.' }, { status: 400 });
