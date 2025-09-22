@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Client } from 'ssh2';
 import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
+import { parseMemoryString } from '@/lib/utils'; // Import the utility function
 
 const SUPERUSER_EMAILS = ['martinpensa1@gmail.com'];
 
@@ -105,13 +106,19 @@ export async function GET(
     conn.end();
 
     const cpu_usage_percent = parseFloat(cpuOutput);
-    const [memory_used, memory_total] = memOutput.split(' ');
+    const [raw_memory_used_str, raw_memory_total_str] = memOutput.split(' ');
+
+    const memory_used_mib = parseMemoryString(raw_memory_used_str || '0B');
+    const memory_total_mib = parseMemoryString(raw_memory_total_str || '0B');
+
     const disk_usage_percent = parseFloat(diskOutput.replace('%', ''));
 
     return NextResponse.json({
       cpu_usage_percent: isNaN(cpu_usage_percent) ? 0 : cpu_usage_percent,
-      memory_used: memory_used || 'N/A',
-      memory_total: memory_total || 'N/A',
+      memory_used: raw_memory_used_str || 'N/A', // Keep raw string for display
+      memory_total: raw_memory_total_str || 'N/A', // Keep raw string for display
+      memory_used_mib: memory_used_mib, // New numeric field
+      memory_total_mib: memory_total_mib, // New numeric field
       disk_usage_percent: isNaN(disk_usage_percent) ? 0 : disk_usage_percent,
       timestamp: new Date().toISOString(),
     }, { status: 200 });

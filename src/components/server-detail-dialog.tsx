@@ -586,7 +586,7 @@ function ServerDetailResourcesTab({ serverId }: { serverId: string }) {
                       <span>{resources.memory_used} / {resources.memory_total}</span>
                     </div>
                     <Progress 
-                      value={(parseMemoryString(resources.memory_used) / parseMemoryString(resources.memory_total)) * 100} 
+                      value={resources.memory_total_mib === 0 ? 0 : (resources.memory_used_mib / resources.memory_total_mib) * 100} 
                       className="h-2" 
                     />
                   </div>
@@ -627,18 +627,14 @@ function ServerDetailResourcesTab({ serverId }: { serverId: string }) {
                           <XAxis dataKey="timestamp" tickFormatter={formatChartTick} tick={{ fontSize: 10 }} />
                           <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} /> {/* Set domain to 0-100 */}
                           <RechartsTooltip labelFormatter={formatChartTick} formatter={(value: number, name: string, props: any) => {
-                            const totalMiB = parseMemoryString(props.payload.memory_total);
-                            const usedMiB = parseMemoryString(props.payload.memory_used);
+                            const totalMiB = props.payload.memory_total_mib;
+                            const usedMiB = props.payload.memory_used_mib;
                             if (totalMiB === 0) return [`N/A`, 'Uso'];
                             return [`${((usedMiB / totalMiB) * 100).toFixed(1)}% (${props.payload.memory_used} / ${props.payload.memory_total})`, 'Uso'];
                           }} />
                           <Line 
                             type="monotone" 
-                            dataKey={(data: ServerResources) => {
-                              const totalMiB = parseMemoryString(data.memory_total);
-                              const usedMiB = parseMemoryString(data.memory_used);
-                              return totalMiB === 0 ? 0 : (usedMiB / totalMiB) * 100;
-                            }} 
+                            dataKey={(data: ServerResources) => data.memory_total_mib === 0 ? 0 : (data.memory_used_mib / data.memory_total_mib) * 100} 
                             stroke="hsl(var(--chart-2))" 
                             strokeWidth={2} 
                             dot={false} 
