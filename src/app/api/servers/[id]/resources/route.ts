@@ -47,7 +47,7 @@ function executeSshCommand(conn: Client, command: string): Promise<string> {
 
 export async function GET(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: any // Simplified type to resolve internal Next.js type conflict
 ) {
   const serverId = context.params.id;
 
