@@ -1,0 +1,111 @@
+export const runtime = 'nodejs'; // Force Node.js runtime
+
+import { NextResponse, type NextRequest } from 'next/server';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
+import { cookies } from 'next/headers';
+
+const SUPERUSER_EMAILS = ['martinpensa1@gmail.com']; // Define SuperUser emails
+
+async function getSession() {
+  const cookieStore = cookies() as any;
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) { return cookieStore.get(name)?.value; },
+        set(name: string, value: string, options: CookieOptions) {},
+        remove(name: string, options: CookieOptions) {},
+      },
+    }
+  );
+  return supabase.auth.getSession();
+}
+
+// Define una interfaz para el resultado de la consulta de Supabase
+interface SupabaseUserProfileWithAuth {
+  first_name: string | null;
+  last_name: string | null;
+  auth_users: { email: string | null } | null;
+}
+
+export async function DELETE(
+  req: NextRequest,
+  context: { params: { id: string } }
+) {
+  const userIdToDelete = context.params.id;
+
+  if (!userIdToDelete) {
+    return NextResponse.json({ message: 'ID de usuario no proporcionado.' }, { status: 400 });
+  }
+
+  const { data: { session } } = await getSession();
+  if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
+    return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
+  }
+
+  // Prevent SuperUser from deleting themselves
+  if (session.user.id === userIdToDelete) {
+    return NextResponse.json({ message: 'No puedes eliminar tu propia cuenta de Super Admin.' }, { status: 403 });
+  }
+
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('SUPABASE_SERVICE_ROLE_KEY is not set in environment variables.');
+    return NextResponse.json({ message: 'Error de configuración del servidor.' }, { status: 500 });
+  }
+
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  try {
+    // First, get user details for logging
+    const { data: userProfile, error: fetchProfileError } = await supabaseAdmin
+      .from('profiles')
+      .select('first_name, last_name, auth_users:auth.users(email)')
+      .eq('id', userIdToDelete)
+      .single() as { data: SupabaseUserProfileWithAuth | null, error: any }; // Castear el resultado
+
+    const userEmail = userProfile?.auth_users?.email || 'N/A';
+    const userName = userProfile?.first_name && userProfile?.last_name 
+      ? `${userProfile.first_name} ${userProfile.last_name}` 
+      : userEmail;
+
+    if (fetchProfileError || !userProfile) {
+      console.error(`Error fetching profile for user ${userIdToDelete}:`, fetchProfileError);
+      await supabaseAdmin.from('server_events_log').insert({
+        user_id: session.user.id,
+        event_type: 'user_delete_failed',
+        description: `Fallo al eliminar usuario con ID ${userIdToDelete}: no encontrado o acceso denegado.`,
+      });
+      return NextResponse.json({ message: 'Usuario no encontrado o acceso denegado.' }, { status: 404 });
+    }
+
+    // Delete the user from auth.users. This should cascade to public.profiles
+    const { error: deleteUserError } = await supabaseAdmin.auth.admin.deleteUser(userIdToDelete);
+
+    if (deleteUserError) {
+      console.error(`Error deleting user ${userIdToDelete}:`, deleteUserError);
+      await supabaseAdmin.from('server_events_log').insert({
+        user_id: session.user.id,
+        event_type: 'user_delete_failed',
+        description: `Fallo al eliminar usuario '${userName}' (ID: ${userIdToDelete}). Error: ${deleteUserError.message}`,
+      });
+      throw new Error(`Error al eliminar el usuario: ${deleteUserError.message}`);
+    }
+
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: session.user.id,
+      event_type: 'user_deleted',
+      description: `Usuario '${userName}' (ID: ${userIdToDelete}) eliminado por Super Admin '${session.user.email}'.`,
+    });
+
+    return NextResponse.json({ message: `Usuario '${userName}' eliminado correctamente.` }, { status: 200 });
+
+  } catch (error: any) {
+    console.error('Error in DELETE /api/users/[id]:', error);
+    return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
+  }
+}

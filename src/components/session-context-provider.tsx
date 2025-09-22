@@ -15,7 +15,7 @@ interface SessionContextType {
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
 // Define SuperUser emails (for client-side check, should be managed by backend later)
-const SUPERUSER_EMAILS = ['martinpensa1@gmail.com'];
+export const SUPERUSER_EMAILS = ['martinpensa1@gmail.com']; // Exported
 
 export const SessionContextProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
