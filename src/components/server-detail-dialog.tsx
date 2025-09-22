@@ -174,7 +174,12 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
     setIsConsoleOpen(true);
   };
 
-  const errorContainers = containers.filter(c => !c.Status.includes('Up'));
+  // Filter containers for error count: only count non-running containers that are NOT gracefully exited
+  const errorContainers = containers.filter(c => {
+    const isRunning = c.Status.includes('Up');
+    const isGracefullyExited = c.Status.includes('Exited (0)') || c.Status.includes('Exited (137)');
+    return !isRunning && !isGracefullyExited;
+  });
 
   return (
     <>
@@ -229,13 +234,19 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
                 <TableBody>
                   {containers.map((container) => {
                     const isRunning = container.Status.includes('Up');
+                    const isGracefullyExited = container.Status.includes('Exited (0)') || container.Status.includes('Exited (137)');
+                    const isErrorState = !isRunning && !isGracefullyExited; // Actual error
+                    const isWarningState = !isRunning && isGracefullyExited; // Stopped by admin/gracefully
+
                     const isActionInProgress = actionLoading === container.ID;
-                    const isErrorState = !isRunning; // Consider any non-'Up' state as an error for highlighting
 
                     return (
                       <TableRow 
                         key={container.ID} 
-                        className={cn(isErrorState && "bg-destructive/10 text-destructive hover:bg-destructive/20")}
+                        className={cn(
+                          isErrorState && "bg-destructive/10 text-destructive hover:bg-destructive/20",
+                          isWarningState && "bg-warning/10 text-warning hover:bg-warning/20"
+                        )}
                       >
                         <TableCell className="font-mono text-xs">{container.ID.substring(0, 12)}</TableCell>
                         <TableCell>{container.Names}</TableCell>
@@ -249,6 +260,18 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
                                 </TooltipTrigger>
                                 <TooltipContent>
                                   <p>Contenedor con problemas</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                          {isWarningState && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <AlertCircle className="h-4 w-4 text-warning" /> {/* Use AlertCircle for warning too */}
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Contenedor detenido</p>
                                 </TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
