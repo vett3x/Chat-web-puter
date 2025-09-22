@@ -208,8 +208,10 @@ export async function configureCloudflareTunnelIngressApi(
       ingress: [
         {
           hostname: fullDomain,
-          service: serviceUrl,
-          originRequest: {},
+          service: serviceUrl, // This is `http://localhost:${containerPort}`
+          originRequest: {
+            noTLSVerify: true // ADDED THIS LINE
+          },
         },
         {
           service: "http_status:404", // Catch-all rule
