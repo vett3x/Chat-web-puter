@@ -82,11 +82,18 @@ export async function GET(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const { data: servers, error: fetchError } = await supabaseAdmin
+  let query = supabaseAdmin
     .from('user_servers')
     .select('id, name, ip_address, ssh_port, ssh_username, ssh_password')
-    .eq('user_id', session.user.id)
     .eq('status', 'ready'); // Only fetch from ready servers
+
+  // Super Admins see all servers, Admins see only their own
+  if (userRole === 'admin') {
+    query = query.eq('user_id', session.user.id);
+  }
+  // If userRole is 'super_admin', no user_id filter is applied, so they see all.
+
+  const { data: servers, error: fetchError } = await query;
 
   if (fetchError) {
     console.error('Error fetching servers from Supabase (admin):', fetchError);

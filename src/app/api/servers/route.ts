@@ -78,10 +78,17 @@ export async function GET(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const { data: servers, error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from('user_servers')
-    .select('id, name, ip_address, ssh_port, ssh_username, status, provisioning_log')
-    .eq('user_id', session.user.id);
+    .select('id, name, ip_address, ssh_port, ssh_username, status, provisioning_log');
+
+  // Super Admins see all servers, Admins see only their own
+  if (userRole === 'admin') {
+    query = query.eq('user_id', session.user.id);
+  }
+  // If userRole is 'super_admin', no user_id filter is applied, so they see all.
+
+  const { data: servers, error } = await query;
 
   if (error) {
     console.error('Error fetching servers from Supabase (admin):', JSON.stringify(error, null, 2));
@@ -208,7 +215,7 @@ export async function DELETE(req: NextRequest) {
     .from('user_servers')
     .select('name, ip_address')
     .eq('id', id)
-    .eq('user_id', session.user.id)
+    .eq('user_id', session.user.id) // Still check user_id for safety
     .single();
 
   if (fetchServerError || !serverToDelete) {
