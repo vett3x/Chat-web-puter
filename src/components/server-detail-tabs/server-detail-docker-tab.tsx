@@ -78,7 +78,7 @@ const createContainerFormSchema = z.object({
   image: z.string().min(1, { message: 'La imagen es requerida.' }),
   name: z.string().optional(),
   ports: z.string().optional(), // e.g., "8080:80"
-  framework: z.enum(['nextjs', 'other']).default('other'), // Changed: Removed .optional()
+  framework: z.enum(['nextjs', 'other']), // Changed: Removed .default('other')
   cloudflare_domain_id: z.string().uuid({ message: 'ID de dominio de Cloudflare inválido.' }).optional(),
   container_port: z.coerce.number().int().min(1).max(65535, { message: 'Puerto de contenedor inválido.' }).optional(),
   subdomain: z.string().regex(/^[a-z0-9-]{1,63}$/, { message: 'Subdominio inválido. Solo minúsculas, números y guiones.' }).optional(),
