@@ -198,18 +198,6 @@ export function AppSettingsDialog({ open, onOpenChange, aiResponseSpeed, onAiRes
 
           <Separator />
 
-          {/* Other Customization (Placeholder) */}
-          <div>
-            <h3 className="text-lg font-semibold flex items-center gap-2 mb-3">
-              <Save className="h-5 w-5 text-muted-foreground" /> Otras Opciones
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              Aquí puedes añadir otras opciones de personalización de la aplicación.
-            </p>
-          </div>
-
-          <Separator />
-
           {/* Delete Account Section */}
           <div>
             <h3 className="text-lg font-semibold flex items-center gap-2 mb-3 text-destructive">
