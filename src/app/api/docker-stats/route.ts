@@ -84,45 +84,54 @@ export async function GET(req: NextRequest) {
         readyTimeout: 10000,
       }));
 
-      // Get stats for all running containers
-      const statsOutput = await executeSshCommand(conn, `docker stats --no-stream --format "{{json .}}"`);
-      const containersOutput = await executeSshCommand(conn, `docker ps -a --format "{{json .}}`); // To get Image name and Status
+      // 1. Get all containers (running, stopped, exited) using docker ps -a
+      const psOutput = await executeSshCommand(conn, `docker ps -a --format "{{json .}}"`);
+      const psLines = psOutput.split('\n').filter(Boolean);
+      const psContainers = psLines.map(line => JSON.parse(line));
+
+      // 2. Get stats for currently running containers using docker stats
+      let statsMap = new Map<string, any>();
+      try {
+        const statsOutput = await executeSshCommand(conn, `docker stats --no-stream --format "{{json .}}"`);
+        const statsLines = statsOutput.split('\n').filter(Boolean);
+        statsLines.forEach(line => {
+          try {
+            const stat = JSON.parse(line);
+            statsMap.set(stat.ID, stat);
+          } catch (e) {
+            console.warn(`[API] Could not parse docker stats line for server ${server.id}: ${line}`);
+          }
+        });
+      } catch (statsErr: any) {
+        console.warn(`[API] Could not fetch docker stats for server ${server.id} (might be no running containers): ${statsErr.message}`);
+        // It's okay if docker stats fails, it just means no running containers to report stats for.
+      }
 
       conn.end();
 
-      const statsLines = statsOutput.split('\n').filter(Boolean);
-      const psLines = containersOutput.split('\n').filter(Boolean);
-
-      const psMap = new Map<string, any>();
-      psLines.forEach(line => {
-        try {
-          const containerInfo = JSON.parse(line);
-          psMap.set(containerInfo.ID, containerInfo);
-        } catch (e) {
-          console.warn(`[API] Could not parse docker ps line for server ${server.id}: ${line}`);
-        }
-      });
-
-      statsLines.forEach(line => {
-        try {
-          const stat: DockerContainerStat = JSON.parse(line);
-          const containerInfo = psMap.get(stat.ID);
-          allContainerStats.push({
-            ...stat,
-            Image: containerInfo?.Image || 'N/A', // Add Image from docker ps
-            Status: containerInfo?.Status || 'N/A', // Add Status from docker ps
-            serverId: server.id,
-            serverName: server.name || server.ip_address,
-            serverIpAddress: server.ip_address,
-          });
-        } catch (e) {
-          console.warn(`[API] Could not parse docker stats line for server ${server.id}: ${line}`);
-        }
+      // 3. Combine data
+      psContainers.forEach(psContainer => {
+        const stat = statsMap.get(psContainer.ID);
+        allContainerStats.push({
+          ID: psContainer.ID,
+          Name: psContainer.Names,
+          Image: psContainer.Image,
+          'CPU %': stat?.['CPU %'] || '0.00%',
+          'Mem Usage': stat?.['Mem Usage'] || '0B / 0B',
+          'Mem %': stat?.['Mem %'] || '0.00%',
+          'Net I/O': stat?.['Net I/O'] || '0B / 0B',
+          'Block I/O': stat?.['Block I/O'] || '0B / 0B',
+          PIDs: stat?.PIDs || '0',
+          Status: psContainer.Status, // Use the more accurate status from docker ps
+          serverId: server.id,
+          serverName: server.name || server.ip_address,
+          serverIpAddress: server.ip_address,
+        });
       });
 
     } catch (error: any) {
       conn.end();
-      console.error(`Error fetching Docker stats from server ${server.id} (${server.ip_address}):`, error.message);
+      console.error(`Error fetching Docker info from server ${server.id} (${server.ip_address}):`, error.message);
       // Optionally, send a toast or log this error to the client
     }
   });
