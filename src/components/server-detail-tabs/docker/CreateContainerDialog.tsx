@@ -45,7 +45,7 @@ const createContainerFormSchema = z.object({
 type CreateContainerFormValues = z.infer<typeof createContainerFormSchema>;
 
 const INITIAL_CREATE_CONTAINER_DEFAULTS: CreateContainerFormValues = {
-  image: 'node:lts', // Default for Next.js, changed from node:lts-alpine
+  image: 'ubuntu:latest', // Changed to ubuntu:latest
   name: '',
   cloudflare_domain_id: undefined,
   container_port: 3000,
@@ -187,7 +187,7 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleCreateContainer)} className="space-y-4 py-4">
-            <FormField control={form.control} name="image" render={({ field }) => (<FormItem><FormLabel>Imagen</FormLabel><FormControl><Input placeholder="node:lts" {...field} disabled /></FormControl><FormDescription>Imagen base para Next.js (no editable).</FormDescription><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="image" render={({ field }) => (<FormItem><FormLabel>Imagen</FormLabel><FormControl><Input placeholder="ubuntu:latest" {...field} disabled /></FormControl><FormDescription>Imagen base para Next.js (no editable).</FormDescription><FormMessage /></FormItem>)} />
             <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nombre (Opcional)</FormLabel><FormControl><Input placeholder="mi-app-nextjs" {...field} /></FormControl><FormMessage /></FormItem>)} />
             
             <>
@@ -264,8 +264,9 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
                 {renderStatusStep(1, 'Iniciando proceso...', currentStep, statusMessage.type)}
                 {renderStatusStep(2, 'Verificando imagen Docker y creando contenedor...', currentStep, statusMessage.type)}
                 {renderStatusStep(3, 'Contenedor creado y en ejecución.', currentStep, statusMessage.type)}
+                {renderStatusStep(4, 'Instalando Node.js y npm en el contenedor...', currentStep, statusMessage.type)} {/* Nuevo paso */}
                 {form.getValues('cloudflare_domain_id') && form.getValues('container_port') && canManageCloudflareTunnels && (
-                  renderStatusStep(4, 'Configurando túnel Cloudflare...', currentStep, statusMessage.type)
+                  renderStatusStep(5, 'Configurando túnel Cloudflare...', currentStep, statusMessage.type)
                 )}
                 {statusMessage.type === 'error' && (
                   <div className="flex items-center gap-2 text-sm text-destructive">
@@ -277,9 +278,7 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
             )}
 
             <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="outline" disabled={isCreatingContainer}>Cancelar</Button>
-              </DialogClose>
+              <DialogClose asChild><Button type="button" variant="outline" disabled={isCreatingContainer}>Cancelar</Button></DialogClose>
               <Button type="submit" disabled={isCreatingContainer || !canManageDockerContainers}>
                 {isCreatingContainer && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Crear Contenedor Next.js

@@ -166,7 +166,8 @@ export async function createAndProvisionCloudflareTunnel({
         sudo apt-get install -y gnupg ca-certificates curl lsb-release
 
         echo "Adding Cloudflare GPG key..."
-        curl -fsSL https://pkg.cloudflare.com/cloudflare-release.gpg | sudo gpg --dearmor -o /usr/share/keyrings/cloudflare-archive-keyring.gpg
+        # Use --batch and --yes for non-interactive gpg, and ensure output to correct keyring location
+        curl -fsSL https://pkg.cloudflare.com/cloudflare-release.gpg | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/cloudflare-archive-keyring.gpg
 
         echo "Adding Cloudflare repository..."
         echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg arch=$(dpkg --print-architecture)] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/cloudflared.list > /dev/null

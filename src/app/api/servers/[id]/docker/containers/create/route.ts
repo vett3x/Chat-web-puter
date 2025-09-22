@@ -137,16 +137,15 @@ export async function POST(
 
   try {
     const body = await req.json();
-    // Removed 'ports' and 'framework' from parsing
     const { image, name, cloudflare_domain_id, container_port, subdomain } = createContainerSchema.parse(body);
 
     let runCommand = 'docker run -d';
-    const baseImage = 'node:lts'; // Hardcoded for Next.js, changed from node:lts-alpine
-    const entrypointExecutable = 'tail'; // The actual executable for the entrypoint
-    const entrypointArgs = '-f /dev/null'; // Arguments for the entrypoint executable
+    const baseImage = 'ubuntu:latest'; // Changed to ubuntu:latest
+    const entrypointExecutable = 'tail';
+    const entrypointArgs = '-f /dev/null';
 
     // --- Phase 1: Handle image check/pull for Next.js framework (always) ---
-    const imageConn = new Client(); // New Client instance for image operations
+    const imageConn = new Client();
     try {
       await new Promise<void>((resolve, reject) => imageConn.on('ready', resolve).on('error', reject).connect({ host: server.ip_address, port: server.ssh_port || 22, username: server.ssh_username, password: server.ssh_password, readyTimeout: 10000 }));
       
@@ -170,20 +169,18 @@ export async function POST(
         });
       }
     } finally {
-      imageConn.end(); // Ensure connection is closed
+      imageConn.end();
     }
 
     // --- Phase 2: Create and run the Docker container ---
-    const runConn = new Client(); // New Client instance for container run operations
+    const runConn = new Client();
     try {
       await new Promise<void>((resolve, reject) => runConn.on('ready', resolve).on('error', reject).connect({ host: server.ip_address, port: server.ssh_port || 22, username: server.ssh_username, password: server.ssh_password, readyTimeout: 10000 }));
 
       if (name) runCommand += ` --name ${name.replace(/[^a-zA-Z0-9_.-]/g, '')}`;
-      // Simplified finalPorts logic as 'ports' field is removed and framework is implicitly Next.js
       const finalPorts = container_port ? `${container_port}:${container_port}` : '3000:3000';
       runCommand += ` -p ${finalPorts}`;
       
-      // Correctly pass entrypoint executable and its arguments
       runCommand += ` --entrypoint ${entrypointExecutable} ${baseImage} ${entrypointArgs}`;
 
       const { stdout: newContainerId, stderr: runStderr, code: runCode } = await executeSshCommand(runConn, runCommand);
@@ -223,8 +220,38 @@ export async function POST(
         description: `Contenedor '${name || image}' (ID: ${containerId?.substring(0,12)}) creado y en ejecución en '${server.name || server.ip_address}'.`,
       });
 
+      // --- NUEVO: Instalar Node.js y npm dentro del contenedor ---
+      await supabaseAdmin.from('server_events_log').insert({
+        user_id: session.user.id,
+        server_id: serverId,
+        event_type: 'container_created',
+        description: `Instalando Node.js y npm en el contenedor ${containerId?.substring(0,12)}...`,
+      });
+
+      const installNodeScript = `
+        set -e
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update -y
+        apt-get install -y curl
+        curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
+        apt-get install -y nodejs
+        node -v
+        npm -v
+      `;
+      const { stderr: nodeInstallStderr, code: nodeInstallCode } = await executeSshCommand(runConn, `docker exec ${containerId} sh -c "${installNodeScript.replace(/\n/g, ';')}"`);
+      if (nodeInstallCode !== 0) {
+        throw new Error(`Error al instalar Node.js/npm en el contenedor: ${nodeInstallStderr}`);
+      }
+      await supabaseAdmin.from('server_events_log').insert({
+        user_id: session.user.id,
+        server_id: serverId,
+        event_type: 'container_created',
+        description: `Node.js y npm instalados en el contenedor ${containerId?.substring(0,12)}.`,
+      });
+      // --- FIN NUEVO ---
+
     } finally {
-      runConn.end(); // Ensure connection is closed
+      runConn.end();
     }
 
     // Tunnel creation logic (always for Next.js)
@@ -278,7 +305,7 @@ export async function POST(
       user_id: session.user.id,
       server_id: serverId,
       event_type: 'container_created',
-      description: `Contenedor Next.js (ID: ${containerId?.substring(0,12)}) creado. Pasos siguientes:
+      description: `Contenedor Next.js (ID: ${containerId?.substring(0,12)}) creado. Node.js y npm preinstalados. Pasos siguientes:
       1. Conéctate al servidor SSH: ssh ${server.ssh_username}@${server.ip_address} -p ${server.ssh_port || 22}
       2. Accede al contenedor: docker exec -it ${containerId?.substring(0,12)} /bin/bash
       3. Dentro del contenedor, crea tu app Next.js: npx create-next-app@latest my-next-app --use-npm --example "https://github.com/vercel/next.js/tree/canary/examples/hello-world"
