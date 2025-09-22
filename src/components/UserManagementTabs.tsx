@@ -4,12 +4,12 @@ import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Users, UserPlus } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { UserListTab } from '@/components/user-management-tabs/user-list-tab';
-import { AddUserForm } from '@/components/user-management-tabs/add-user-form'; // Import the new form component
+import { UserListTab, UserListTabRef } from '@/components/user-management-tabs/user-list-tab'; // Import UserListTabRef
+import { AddUserForm } from '@/components/user-management-tabs/add-user-form';
 
 export function UserManagementTabs() {
   const [activeTab, setActiveTab] = useState('user-list');
-  const userListTabRef = React.useRef<any>(null); // Ref to call refresh method on UserListTab
+  const userListTabRef = React.useRef<UserListTabRef>(null); // Correctly type the ref
 
   const handleUserAdded = () => {
     // If the user list tab is active, refresh it

@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useImperativeHandle } from 'react'; // Import useImperativeHandle
+import React, { useState, useEffect, useCallback, useImperativeHandle } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Users, Trash2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Loader2, Users, Trash2, RefreshCw, AlertCircle, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSession, SUPERUSER_EMAILS } from '@/components/session-context-provider';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -20,6 +20,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { UserDetailDialog } from './user-detail-dialog';
 
 interface User {
   id: string;
@@ -29,18 +30,20 @@ interface User {
   avatar_url: string | null;
 }
 
-// Define the interface for the ref handle
+// Define the interface for the ref handle and export it
 export interface UserListTabRef {
   fetchUsers: () => void;
 }
 
-export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => { // Use React.forwardRef
+export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
   const { session, isLoading: isSessionLoading } = useSession();
   const currentUserId = session?.user?.id;
   const [users, setUsers] = useState<User[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   const fetchUsers = useCallback(async () => {
     setIsLoadingUsers(true);
@@ -62,7 +65,6 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => { /
     }
   }, []);
 
-  // Expose fetchUsers via the ref
   useImperativeHandle(ref, () => ({
     fetchUsers,
   }));
@@ -98,6 +100,11 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => { /
     } finally {
       setIsDeleting(null);
     }
+  };
+
+  const handleOpenUserDetails = (user: User) => {
+    setSelectedUser(user);
+    setIsDetailDialogOpen(true);
   };
 
   if (isSessionLoading) {
@@ -176,29 +183,39 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => { /
                           </span>
                         )}
                       </TableCell><TableCell className="text-right">
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="destructive"
-                              size="icon"
-                              className="h-8 w-8"
-                              disabled={isCurrentUser || isDeleting === user.id}
-                              title={isCurrentUser ? "No puedes eliminar tu propia cuenta" : "Eliminar usuario"}
-                            >
-                              {isDeleting === user.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>¿Estás seguro de eliminar este usuario?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Esta acción eliminará permanentemente al usuario "{user.first_name || user.email}" y todos sus datos asociados.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleOpenUserDetails(user)}
+                            title="Ver detalles del usuario"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="destructive"
+                                size="icon"
+                                className="h-8 w-8"
+                                disabled={isCurrentUser || isDeleting === user.id}
+                                title={isCurrentUser ? "No puedes eliminar tu propia cuenta" : "Eliminar usuario"}
+                              >
+                                {isDeleting === user.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>¿Estás seguro de eliminar este usuario?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Esta acción eliminará permanentemente al usuario "{user.first_name || user.email}" y todos sus datos asociados.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancelar</AlertDialogCancel>
                               <AlertDialogAction onClick={() => handleDeleteUser(user.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
@@ -207,17 +224,24 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => { /
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
           </ScrollArea>
         )}
       </CardContent>
+      {selectedUser && (
+        <UserDetailDialog
+          open={isDetailDialogOpen}
+          onOpenChange={setIsDetailDialogOpen}
+          user={selectedUser}
+        />
+      )}
     </Card>
   );
 });
 
-UserListTab.displayName = 'UserListTab'; // Add display name for forwardRef
+UserListTab.displayName = 'UserListTab';
