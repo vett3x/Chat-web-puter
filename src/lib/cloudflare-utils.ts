@@ -42,12 +42,6 @@ async function callCloudflareApi<T>(
   const baseUrl = 'https://api.cloudflare.com/client/v4';
   let url = `${baseUrl}${path}`;
 
-  if (zoneId && !path.includes(`/zones/${zoneId}`)) {
-    // If zoneId is provided and not already in path, assume it's for a zone-specific endpoint
-    // This logic might need refinement based on specific Cloudflare API endpoints used
-    // For now, we'll assume paths will be constructed correctly by calling functions
-  }
-
   const headers: HeadersInit = {
     'Authorization': `Bearer ${apiToken}`,
     'Content-Type': 'application/json',
@@ -63,7 +57,30 @@ async function callCloudflareApi<T>(
   }
 
   const response = await fetch(url, config);
-  const data = await response.json();
+  
+  // Check if the response has a body before trying to parse it
+  const responseText = await response.text();
+  if (!responseText) {
+    if (response.ok) {
+      // If the request was successful but the body is empty,
+      // we need to decide how to handle it. For DELETE, this is fine.
+      // For POST/GET that expect data, this is an error.
+      if (method === 'DELETE') {
+        return {} as T; // Return an empty object for successful deletions
+      }
+      throw new Error('La API de Cloudflare devolvió una respuesta vacía cuando se esperaban datos.');
+    } else {
+      throw new Error(`La API de Cloudflare falló con el estado ${response.status} y una respuesta vacía.`);
+    }
+  }
+
+  let data;
+  try {
+    data = JSON.parse(responseText);
+  } catch (e) {
+    console.error("Failed to parse Cloudflare API response as JSON:", responseText);
+    throw new Error("La respuesta de la API de Cloudflare no es un JSON válido.");
+  }
 
   const parsedData = cloudflareApiResponseSchema.safeParse(data);
 
