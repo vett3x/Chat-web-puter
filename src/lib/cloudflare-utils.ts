@@ -182,7 +182,7 @@ export async function createCloudflareTunnel(
 
   // 2. Install origin certificate (cert.pem)
   // This command requires CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID environment variables
-  const installCertCommand = `bash -c 'CLOUDFLARE_API_TOKEN="${cloudflareDomainDetails.api_token}" CLOUDFLARE_ACCOUNT_ID="${cloudflareDomainDetails.account_id}" cloudflared tunnel origin-cert install'`;
+  const installCertCommand = `CLOUDFLARE_API_TOKEN="${cloudflareDomainDetails.api_token}" CLOUDFLARE_ACCOUNT_ID="${cloudflareDomainDetails.account_id}" cloudflared tunnel origin-cert install`;
   await logApiCall(userId, 'cloudflare_origin_cert_install_ssh', `Attempting to install origin certificate on ${serverDetails.ip_address}.`);
   const { stdout: certStdout, stderr: certStderr, code: certCode } = await executeSshCommand(serverDetails, installCertCommand);
 
