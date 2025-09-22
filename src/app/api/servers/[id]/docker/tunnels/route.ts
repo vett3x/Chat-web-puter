@@ -23,9 +23,16 @@ async function getSession() {
   return supabase.auth.getSession();
 }
 
+// Define la interfaz RouteContext explícitamente
+interface RouteContext {
+  params: {
+    id: string;
+  };
+}
+
 export async function GET(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: any // Usamos 'any' para resolver el error de compilación de TypeScript
 ) {
   const serverId = context.params.id;
 

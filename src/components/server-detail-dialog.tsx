@@ -60,7 +60,7 @@ import {
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { cn } from '@/lib/utils';
+import { cn, parseMemoryString } from '@/lib/utils'; // Import parseMemoryString
 import {
   Tooltip,
   TooltipContent,
@@ -585,7 +585,10 @@ function ServerDetailResourcesTab({ serverId }: { serverId: string }) {
                       <span>Memoria</span>
                       <span>{resources.memory_used} / {resources.memory_total}</span>
                     </div>
-                    <Progress value={(parseFloat(resources.memory_used) / parseFloat(resources.memory_total)) * 100} className="h-2" />
+                    <Progress 
+                      value={(parseMemoryString(resources.memory_used) / parseMemoryString(resources.memory_total)) * 100} 
+                      className="h-2" 
+                    />
                   </div>
                   <div>
                     <div className="flex justify-between text-sm font-medium mb-1">
@@ -622,14 +625,24 @@ function ServerDetailResourcesTab({ serverId }: { serverId: string }) {
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={resourceHistory} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                           <XAxis dataKey="timestamp" tickFormatter={formatChartTick} tick={{ fontSize: 10 }} />
-                          <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                          <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} /> {/* Set domain to 0-100 */}
                           <RechartsTooltip labelFormatter={formatChartTick} formatter={(value: number, name: string, props: any) => {
-                            const total = parseFloat(props.payload.memory_total);
-                            const used = parseFloat(props.payload.memory_used);
-                            if (isNaN(total) || isNaN(used) || total === 0) return [`N/A`, 'Uso'];
-                            return [`${((used / total) * 100).toFixed(1)}% (${props.payload.memory_used} / ${props.payload.memory_total})`, 'Uso'];
+                            const totalMiB = parseMemoryString(props.payload.memory_total);
+                            const usedMiB = parseMemoryString(props.payload.memory_used);
+                            if (totalMiB === 0) return [`N/A`, 'Uso'];
+                            return [`${((usedMiB / totalMiB) * 100).toFixed(1)}% (${props.payload.memory_used} / ${props.payload.memory_total})`, 'Uso'];
                           }} />
-                          <Line type="monotone" dataKey={(data: ServerResources) => (parseFloat(data.memory_used) / parseFloat(data.memory_total)) * 100} stroke="hsl(var(--chart-2))" strokeWidth={2} dot={false} />
+                          <Line 
+                            type="monotone" 
+                            dataKey={(data: ServerResources) => {
+                              const totalMiB = parseMemoryString(data.memory_total);
+                              const usedMiB = parseMemoryString(data.memory_used);
+                              return totalMiB === 0 ? 0 : (usedMiB / totalMiB) * 100;
+                            }} 
+                            stroke="hsl(var(--chart-2))" 
+                            strokeWidth={2} 
+                            dot={false} 
+                          />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
