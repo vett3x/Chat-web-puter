@@ -83,22 +83,56 @@ async function callCloudflareApi<T>(
 
 // --- Tunnel Management ---
 
-interface CloudflareTunnel {
+interface CloudflareDashboardTunnel {
   id: string;
   name: string;
-  secret: string;
-  connections: any[]; // Simplified
+  // No secret is returned for dashboard-managed tunnels
 }
 
+// This function now creates a dashboard-managed tunnel
 export async function createCloudflareTunnel(
   apiToken: string,
-  accountId: string, // Cloudflare Account ID is needed for tunnel creation
+  accountId: string,
   tunnelName: string
-): Promise<CloudflareTunnel> {
-  const path = `/accounts/${accountId}/cfd_tunnel`;
-  const tunnel_secret = randomBytes(32).toString('base64');
-  const body = { name: tunnelName, tunnel_secret };
-  return callCloudflareApi<CloudflareTunnel>('POST', path, { apiToken }, body);
+): Promise<CloudflareDashboardTunnel> {
+  const path = `/accounts/${accountId}/tunnels`;
+  const body = { name: tunnelName, config_src: "cloudflare" }; // Use config_src for dashboard tunnels
+  return callCloudflareApi<CloudflareDashboardTunnel>('POST', path, { apiToken }, body);
+}
+
+// New function to get the tunnel token
+export async function getCloudflareTunnelToken(
+  apiToken: string,
+  accountId: string,
+  tunnelId: string
+): Promise<string> {
+  const path = `/accounts/${accountId}/tunnels/${tunnelId}/token`;
+  // The result is directly the token string
+  return callCloudflareApi<string>('GET', path, { apiToken });
+}
+
+export async function configureCloudflareTunnelIngress(
+  apiToken: string,
+  accountId: string,
+  tunnelId: string,
+  hostname: string,
+  hostPort: number
+): Promise<void> {
+  const path = `/accounts/${accountId}/tunnels/${tunnelId}/configurations`;
+  const body = {
+    config: {
+      ingress: [
+        {
+          hostname: hostname,
+          service: `http://localhost:${hostPort}`,
+        },
+        {
+          service: 'http_status:404', // Catch-all
+        },
+      ],
+    },
+  };
+  await callCloudflareApi<void>('PUT', path, { apiToken }, body);
 }
 
 export async function deleteCloudflareTunnel(
@@ -106,7 +140,8 @@ export async function deleteCloudflareTunnel(
   accountId: string,
   tunnelId: string
 ): Promise<void> {
-  const path = `/accounts/${accountId}/cfd_tunnel/${tunnelId}`;
+  // The endpoint for dashboard tunnels is different
+  const path = `/accounts/${accountId}/tunnels/${tunnelId}`;
   await callCloudflareApi<void>('DELETE', path, { apiToken });
 }
 
