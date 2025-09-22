@@ -38,9 +38,9 @@ export function generateRandomSubdomain(length: number = 15): string {
   return result;
 }
 
-// Esquema para validar la respuesta de la API de Cloudflare
+// Esquema para validar la respuesta de la API de Cloudflare - AHORA MÁS FLEXIBLE
 const cloudflareApiResponseSchema = z.object({
-  success: z.boolean(),
+  success: z.boolean().optional(), // success es ahora opcional
   errors: z.array(z.object({
     code: z.number(),
     message: z.string(),
@@ -116,10 +116,12 @@ async function callCloudflareApi<T>(
 - Error: Zod validation failed.
 - Response Body: ${responseText}`;
     await logApiCall(userId, 'cloudflare_api_response_error', logDescriptionValidationError);
-    throw new Error('Error de validación de la respuesta de la API de Cloudflare.');
+    // Lanzar el error de Zod para una mejor depuración si es necesario
+    throw new Error(`Error de validación de la respuesta de la API de Cloudflare: ${parsedData.error.message}`);
   }
 
-  if (!parsedData.data.success) {
+  // Lógica de error mejorada: considera success: false O la presencia de errores
+  if (parsedData.data.success === false || (parsedData.data.errors && parsedData.data.errors.length > 0)) {
     const errorMessages = parsedData.data.errors?.map(e => `(Code: ${e.code}) ${e.message}`).join('; ') || 'Error desconocido de Cloudflare API.';
     const logDescriptionApiError = `[Cloudflare API Response]
 - Status: ${response.status}
