@@ -132,7 +132,7 @@ export async function createAndProvisionCloudflareTunnel({
         cloudflareDomainDetails.account_id,
         tunnelId,
         fullDomain,
-        `http://localhost:${containerPort}`, // Service URL for ingress now points to CONTAINER_PORT
+        containerPort, // MODIFIED: Pass containerPort directly
         userId
     );
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Ingress rules configured.\n` });

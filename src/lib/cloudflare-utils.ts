@@ -199,7 +199,7 @@ export async function configureCloudflareTunnelIngressApi(
   accountId: string,
   tunnelId: string,
   fullDomain: string,
-  serviceUrl: string, // e.g., "http://localhost:8001"
+  containerPort: number, // Changed from serviceUrl to containerPort
   userId?: string,
 ): Promise<void> {
   const path = `/accounts/${accountId}/cfd_tunnel/${tunnelId}/configurations`;
@@ -208,7 +208,7 @@ export async function configureCloudflareTunnelIngressApi(
       ingress: [
         {
           hostname: fullDomain,
-          service: serviceUrl, // This is `http://localhost:${containerPort}`
+          service: `https://localhost:${containerPort}`, // Changed to HTTPS
           originRequest: {
             noTLSVerify: true // ADDED THIS LINE
           },
