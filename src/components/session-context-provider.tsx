@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/integrations/supabase/client';
 import { Session } from '@supabase/supabase-js';
 import { Loader2 } from 'lucide-react';
-import { SUPERUSER_EMAILS } from '@/lib/constants'; // Importación actualizada
+import { SUPERUSER_EMAILS, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada de PERMISSION_KEYS
 
 type UserRole = 'user' | 'admin' | 'super_admin';
 type UserPermissions = Record<string, boolean>; // Define type for permissions
@@ -35,34 +35,39 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         .eq('id', currentSession.user.id)
         .single();
 
+      let determinedRole: UserRole | null = null;
+      let determinedPermissions: UserPermissions = {};
+
       if (error) {
         console.error('Error fetching user profile role and permissions:', error);
-        setUserRole(null);
-        setUserPermissions({});
+        // Fallback to email check if profile fetch fails
+        determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
       } else if (profile) {
-        setUserRole(profile.role as UserRole);
-        setUserPermissions(profile.permissions || {});
+        determinedRole = profile.role as UserRole;
+        determinedPermissions = profile.permissions || {};
       } else {
         // Fallback if profile not found (shouldn't happen with trigger)
-        const fallbackRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
-        setUserRole(fallbackRole);
-        // Assign default permissions for fallback
-        if (fallbackRole === 'super_admin') {
-          setUserPermissions({
-            can_create_server: true,
-            can_manage_docker_containers: true,
-            can_manage_cloudflare_domains: true,
-            can_manage_cloudflare_tunnels: true,
-          });
-        } else { // Default for 'user' and 'admin' fallback if profile not found
-          setUserPermissions({
-            can_create_server: false,
-            can_manage_docker_containers: false,
-            can_manage_cloudflare_domains: false,
-            can_manage_cloudflare_tunnels: false,
-          });
-        }
+        determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
       }
+
+      // Explicitly set all permissions to true if the determined role is super_admin
+      if (determinedRole === 'super_admin') {
+        determinedPermissions = {}; // Reset to ensure all are set
+        for (const key of Object.values(PERMISSION_KEYS)) {
+          determinedPermissions[key] = true;
+        }
+      } else if (!profile) { // If no profile and not super_admin by email, set default user permissions
+        determinedPermissions = {
+          can_create_server: false,
+          can_manage_docker_containers: false,
+          can_manage_cloudflare_domains: false,
+          can_manage_cloudflare_tunnels: false,
+        };
+      }
+      
+      setUserRole(determinedRole);
+      setUserPermissions(determinedPermissions);
+
     } else {
       setUserRole(null);
       setUserPermissions({});

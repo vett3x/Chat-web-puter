@@ -147,11 +147,11 @@ function ServerListItem({ server, onDeleteServer, onSelectServerForDetails, user
     switch (server.status) {
       case 'pending':
       case 'provisioning':
-        return <span title="Aprovisionando..."><Loader2 className="h-5 w-5 animate-spin text-blue-500" /></span>;
+        return <Loader2 className="h-5 w-5 animate-spin text-blue-500" />;
       case 'ready':
-        return <span title="Listo"><CheckCircle2 className="h-5 w-5 text-green-500" /></span>;
+        return <CheckCircle2 className="h-5 w-5 text-green-500" />;
       case 'failed':
-        return <span title="Falló"><XCircle className="h-5 w-5 text-destructive" /></span>;
+        return <XCircle className="h-5 w-5 text-destructive" />;
       default:
         return null;
     }
@@ -161,8 +161,10 @@ function ServerListItem({ server, onDeleteServer, onSelectServerForDetails, user
     <Collapsible open={isLogOpen} onOpenChange={setIsLogOpen}>
       <div className="border p-4 rounded-md bg-muted/50 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          {getStatusIndicator()}
-          <div>
+          <div className="flex-shrink-0 flex items-center justify-center w-5 h-5"> {/* Wrapper for icon */}
+            {getStatusIndicator()}
+          </div>
+          <div className="flex flex-col justify-center"> {/* Wrapper for text */}
             <h4 className="font-semibold">{server.name || 'Servidor sin nombre'}</h4>
             <p className="text-sm text-muted-foreground">IP: {server.ip_address}{server.ssh_port ? `:${server.ssh_port}` : ''}</p>
           </div>
