@@ -24,12 +24,11 @@ async function getSession() {
 }
 
 // Define una interfaz para el resultado de la consulta de Supabase
-interface SupabaseUserProfile {
+interface SupabaseProfile {
   id: string;
   first_name: string | null;
   last_name: string | null;
   avatar_url: string | null;
-  auth_users: { email: string | null } | null;
 }
 
 export async function GET(req: NextRequest) {
@@ -49,35 +48,44 @@ export async function GET(req: NextRequest) {
   );
 
   try {
-    // Fetch users from auth.users and join with public.profiles
-    const { data: users, error } = await supabaseAdmin
+    // 1. Fetch all profiles
+    const { data: profiles, error: profilesError } = await supabaseAdmin
       .from('profiles')
-      .select(`
-        id,
-        first_name,
-        last_name,
-        avatar_url,
-        auth_users:auth.users(email)
-      `) as { data: SupabaseUserProfile[] | null, error: any }; // Castear el resultado
+      .select(`id, first_name, last_name, avatar_url`);
 
-    if (error) {
-      console.error('Supabase query error in GET /api/users:', error); // Registro detallado del error de Supabase
-      throw new Error('Error al cargar los usuarios desde la base de datos.'); // Mensaje de error más específico
+    if (profilesError) {
+      console.error('Supabase query error fetching profiles in GET /api/users:', profilesError);
+      throw new Error('Error al cargar los perfiles de usuario desde la base de datos.');
     }
 
-    // Flatten the data to include email directly
-    const formattedUsers = (users || []).map(profile => ({
-      id: profile.id,
-      first_name: profile.first_name,
-      last_name: profile.last_name,
-      avatar_url: profile.avatar_url,
-      email: profile.auth_users?.email || 'N/A',
+    // 2. For each profile, fetch the corresponding user email from auth.users
+    const formattedUsers = await Promise.all((profiles || []).map(async (profile: SupabaseProfile) => {
+      const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(profile.id);
+      
+      if (userError) {
+        console.warn(`Error fetching email for user ID ${profile.id}:`, userError);
+        return {
+          id: profile.id,
+          first_name: profile.first_name,
+          last_name: profile.last_name,
+          avatar_url: profile.avatar_url,
+          email: 'N/A (Error al obtener email)',
+        };
+      }
+
+      return {
+        id: profile.id,
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        avatar_url: profile.avatar_url,
+        email: userData.user?.email || 'N/A',
+      };
     }));
 
     return NextResponse.json(formattedUsers, { status: 200 });
 
   } catch (error: any) {
-    console.error('Unhandled error in GET /api/users:', error); // Registro de errores no manejados
+    console.error('Unhandled error in GET /api/users:', error);
     return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
   }
 }
