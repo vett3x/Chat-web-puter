@@ -29,7 +29,7 @@ async function getSession() {
 
 export async function PUT(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: any // Simplified type to resolve internal Next.js type conflict
 ) {
   const userIdToUpdate = context.params.id;
 

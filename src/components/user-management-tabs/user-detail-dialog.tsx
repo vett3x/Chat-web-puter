@@ -78,14 +78,23 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
         credentials: 'include',
       });
 
-      const result = await response.json();
+      // Leer la respuesta como texto primero para depuración
+      const responseText = await response.text();
+      console.log('Raw API response for role update:', responseText);
+
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (jsonError: any) {
+        console.error('Error parsing JSON response for role update:', jsonError);
+        throw new Error(`Respuesta inesperada del servidor: ${responseText.substring(0, 100)}... (Error de JSON: ${jsonError.message})`);
+      }
 
       if (!response.ok) {
         throw new Error(result.message || `HTTP error! status: ${response.status}`);
       }
 
       toast.success(result.message || `Rol de usuario actualizado a '${selectedRole}'.`);
-      // No need to optimistically update user.role here, as onRoleUpdated will trigger a re-fetch
       onRoleUpdated(); // Notify parent to refresh user list
       onOpenChange(false); // Close dialog after successful update
     } catch (error: any) {

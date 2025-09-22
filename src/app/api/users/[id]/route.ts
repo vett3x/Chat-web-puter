@@ -32,7 +32,7 @@ interface SupabaseUserProfileWithAuth {
 
 export async function DELETE(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: any // Simplified type to resolve internal Next.js type conflict
 ) {
   const userIdToDelete = context.params.id;
 

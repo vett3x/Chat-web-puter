@@ -75,7 +75,7 @@ function executeSshCommand(conn: SshClient, command: string): Promise<{ stdout: 
 // POST /api/servers/[id]/docker/containers/[containerId]/tunnel - Crear un nuevo túnel
 export async function POST(
   req: NextRequest,
-  context: { params: { id: string; containerId: string } }
+  context: any // Simplified type to resolve internal Next.js type conflict
 ) {
   const serverId = context.params.id;
   const containerId = context.params.containerId;
@@ -232,7 +232,7 @@ export async function POST(
 // DELETE /api/servers/[id]/docker/containers/[containerId]/tunnel - Eliminar un túnel existente
 export async function DELETE(
   req: NextRequest,
-  context: { params: { id: string; containerId: string } }
+  context: any // Simplified type to resolve internal Next.js type conflict
 ) {
   const serverId = context.params.id;
   const containerId = context.params.containerId;
