@@ -24,16 +24,10 @@ echo "--- Installing sudo... ---"
 apt-get install -y sudo || { echo "ERROR: sudo installation failed"; exit 1; }
 echo "--- sudo installed. ---"
 
-echo "--- Installing core dependencies (curl, gnupg, lsb-release, apt-utils, git)..."
-sudo apt-get install -y curl gnupg lsb-release apt-utils git || { echo "ERROR: core dependencies installation failed"; exit 1; }
-echo "--- Core dependencies installed. ---"
-
-echo "--- Installing Node.js and npm... ---"
-curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo bash - || { echo "ERROR: Node.js setup script failed"; exit 1; }
-sudo apt-get install -y nodejs || { echo "ERROR: Node.js installation failed"; exit 1; }
+echo "--- Verifying Node.js and npm installation... ---"
 echo "Node.js version: $(node -v)"
 echo "npm version: $(npm -v)"
-echo "--- Node.js and npm installed. ---"
+echo "--- Node.js and npm are pre-installed. ---"
 
 echo "--- Installing cloudflared... ---"
 # Add cloudflare gpg key
@@ -95,7 +89,7 @@ export const TUNNEL_CREATION_SUMMARY_SCRIPT = `
 `;
 
 export const INITIAL_CREATE_CONTAINER_DEFAULTS: CreateContainerFormValues = {
-  image: 'ubuntu:latest',
+  image: 'node:lts-bookworm',
   name: '',
   cloudflare_domain_id: undefined,
   container_port: 3000,
