@@ -231,22 +231,21 @@ export async function POST(
       // Script para instalar Node.js, npm y cloudflared dentro del contenedor
       const installContainerDependenciesScript = `
         set -e
-        echo "--- Starting container dependency installation ---"
         export DEBIAN_FRONTEND=noninteractive
 
-        echo "Updating apt package list and installing core dependencies (curl, gnupg, lsb-release, sudo)..."
-        sudo apt-get update -y
-        sudo apt-get install -y curl gnupg lsb-release sudo
-        echo "Core dependencies installed."
+        echo "--- Updating apt package list and installing core dependencies (curl, gnupg, lsb-release, sudo)..."
+        apt-get update -y
+        apt-get install -y curl gnupg lsb-release sudo
+        echo "--- Core dependencies installed, including sudo. ---"
 
-        echo "Installing Node.js and npm..."
+        echo "--- Installing Node.js and npm... ---"
         curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo bash -
         sudo apt-get install -y nodejs
         echo "Node.js version: $(node -v)"
         echo "npm version: $(npm -v)"
-        echo "Node.js and npm installed."
+        echo "--- Node.js and npm installed. ---"
 
-        echo "Installing cloudflared..."
+        echo "--- Installing cloudflared... ---"
         sudo mkdir -p --mode=0755 /usr/share/keyrings
         curl -fsSL https://pkg.cloudflare.com/cloudflare-release.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-archive-keyring.gpg
         sudo chmod 644 /usr/share/keyrings/cloudflare-archive-keyring.gpg
@@ -256,7 +255,7 @@ export async function POST(
         sudo apt-get update -y
         sudo apt-get install -y cloudflared
         echo "cloudflared version: $(cloudflared --version)"
-        echo "cloudflared installed."
+        echo "--- cloudflared installed. ---"
 
         echo "--- Container dependency installation complete ---"
       `;
