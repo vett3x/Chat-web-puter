@@ -34,13 +34,14 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
 
   if (typeof serverId !== 'string' || typeof containerId !== 'string' || typeof userId !== 'string') {
     console.error(`[WSS] ${connectionId} ERROR: Missing connection parameters. Query:`, query);
-    ws.send('Error: Faltan parámetros de conexión (serverId, containerId, userId).\n');
+    ws.send('\r\n\x1b[31m[SERVER] Error: Faltan parámetros de conexión (serverId, containerId, userId).\x1b[0m\r\n');
     ws.close();
     return;
   }
   console.log(`[WSS] ${connectionId} Connection parameters: serverId=${serverId}, containerId=${containerId}, userId=${userId}`);
 
   try {
+    console.log(`[WSS] ${connectionId} Fetching server details from Supabase for serverId: ${serverId}, userId: ${userId}`);
     const { data: server, error: fetchError } = await supabaseAdmin
       .from('user_servers')
       .select('ip_address, ssh_port, ssh_username, ssh_password')
@@ -50,8 +51,12 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
 
     if (fetchError || !server) {
       console.error(`[WSS] ${connectionId} ERROR: Server not found or access denied.`, fetchError);
-      throw new Error('Servidor no encontrado o acceso denegado.');
+      const errorMessage = fetchError ? fetchError.message : 'Servidor no encontrado o acceso denegado.';
+      ws.send(`\r\n\x1b[31m[SERVER] Error: ${errorMessage}\x1b[0m\r\n`);
+      ws.close();
+      return;
     }
+    console.log(`[WSS] ${connectionId} Server details fetched successfully. Attempting SSH connection to ${server.ip_address}:${server.ssh_port}`);
 
     const ssh = new SshClient();
     ssh.on('ready', () => {
@@ -59,6 +64,7 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
       ws.send('\r\n\x1b[32m[SERVER] Conexión SSH establecida.\x1b[0m\r\n');
       
       const command = `docker exec -it ${containerId} /bin/bash`;
+      console.log(`[WSS] ${connectionId} Executing command: "${command}"`);
       ssh.exec(command, { pty: true }, (err, stream) => {
         if (err) {
           console.error(`[WSS] ${connectionId} ERROR: SSH exec error:`, err);
@@ -66,13 +72,26 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
           ssh.end();
           return;
         }
+        console.log(`[WSS] ${connectionId} Docker exec stream opened.`);
 
         activeConnections.set(connectionId, { ws, ssh, stream });
 
-        ws.onmessage = (event) => stream.write(event.data as Buffer);
-        stream.on('data', (data: Buffer) => ws.send(data));
-        stream.on('close', () => ws.close());
-        stream.stderr.on('data', (data: Buffer) => ws.send(`\r\n\x1b[31m[STDERR] ${data.toString()}\x1b[0m\r\n`));
+        ws.onmessage = (event) => {
+          // console.log(`[WSS] ${connectionId} Received from client: ${event.data.toString().substring(0, 50)}...`);
+          stream.write(event.data as Buffer);
+        };
+        stream.on('data', (data: Buffer) => {
+          // console.log(`[WSS] ${connectionId} Sending to client (stdout): ${data.toString().substring(0, 50)}...`);
+          ws.send(data);
+        });
+        stream.on('close', () => {
+          console.log(`[WSS] ${connectionId} Docker exec stream closed.`);
+          ws.close();
+        });
+        stream.stderr.on('data', (data: Buffer) => {
+          console.error(`[WSS] ${connectionId} STDERR from container: ${data.toString()}`);
+          ws.send(`\r\n\x1b[31m[STDERR] ${data.toString()}\x1b[0m\r\n`);
+        });
       });
     }).on('error', (err) => {
       console.error(`[WSS] ${connectionId} ERROR: SSH connection error:`, err);
