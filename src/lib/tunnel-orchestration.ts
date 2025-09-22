@@ -183,7 +183,8 @@ export async function createAndProvisionCloudflareTunnel({
     if (serverDetails && tunnelToken) { // Only attempt uninstall if serverDetails and token were available
       try {
         await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Attempting rollback: Uninstalling cloudflared service on host via SSH...\n` });
-        await uninstallCloudflaredService(serverDetails, userId);
+        // Pass the tunnelId to uninstallCloudflaredService for cleanup
+        await uninstallCloudflaredService(serverDetails, tunnelId!, userId); // tunnelId is defined if tunnelToken is
         await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Rollback: cloudflared service uninstalled from host.\n` });
       } catch (rollbackError) {
         console.error(`[Rollback] Failed to uninstall cloudflared service:`, rollbackError);
@@ -226,7 +227,7 @@ export async function deleteCloudflareTunnelAndCleanup({
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Fetching tunnel details from DB for record ${tunnelRecordId}...\n` });
     const { data: tunnel, error: tunnelError } = await supabaseAdmin
       .from('docker_tunnels')
-      .select('id, tunnel_id, cloudflare_domain_id, full_domain, tunnel_secret') // Fetch tunnel_secret (token)
+      .select('id, tunnel_id, cloudflare_domain_id, full_domain')
       .eq('id', tunnelRecordId)
       .eq('user_id', userId)
       .single();
@@ -235,6 +236,11 @@ export async function deleteCloudflareTunnelAndCleanup({
       throw new Error('Túnel no encontrado o acceso denegado.');
     }
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Tunnel details fetched. Cloudflare Tunnel ID: ${tunnel.tunnel_id}\n` });
+
+    // NEW: Ensure cloudflared service is stopped and connections are cleaned up BEFORE API delete
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Cleaning up cloudflared service on host via SSH...\n` });
+    await uninstallCloudflaredService(serverDetails, tunnel.tunnel_id, userId); // Pass tunnel.tunnel_id
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] cloudflared service cleaned up from host.\n` });
 
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Deleting Cloudflare Tunnel ${tunnel.tunnel_id} via API...\n` });
     await deleteCloudflareTunnelApi(cloudflareDomainDetails.api_token, cloudflareDomainDetails.account_id, tunnel.tunnel_id, userId);
@@ -265,10 +271,6 @@ export async function deleteCloudflareTunnelAndCleanup({
     } else {
       await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] WARNING: Could not find DNS record ID for ${tunnel.full_domain}. Skipping DNS record deletion.\n` });
     }
-
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Uninstalling cloudflared service on host via SSH...\n` });
-    await uninstallCloudflaredService(serverDetails, userId);
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] cloudflared service uninstalled from host.\n` });
 
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Deleting tunnel record ${tunnel.id} from database...\n` });
     const { error: deleteError } = await supabaseAdmin

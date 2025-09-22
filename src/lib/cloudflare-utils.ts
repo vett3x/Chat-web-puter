@@ -257,22 +257,45 @@ export async function installAndRunCloudflaredService(
 
 /**
  * Uninstalls the cloudflared service on the remote server via SSH.
+ * This function now also stops the service, cleans up connections, and removes credentials.
  */
 export async function uninstallCloudflaredService(
   serverDetails: ServerDetails,
+  tunnelId: string, // NEW: tunnelId is now required for cleanup
   userId?: string,
 ): Promise<void> {
-  await logApiCall(userId, 'cloudflared_service_uninstall_ssh', `Attempting to uninstall cloudflared service on ${serverDetails.ip_address}.`);
+  await logApiCall(userId, 'cloudflared_service_uninstall_ssh', `Attempting to uninstall cloudflared service for tunnel ${tunnelId} on ${serverDetails.ip_address}.`);
 
-  // The 'cloudflared service uninstall' command stops the service and removes its configuration.
-  const command = `sudo cloudflared service uninstall`;
-  const { stdout, stderr, code } = await executeSshCommand(serverDetails, command);
+  // 1. Stop the cloudflared service
+  await logApiCall(userId, 'cloudflared_service_stop_ssh', `Stopping cloudflared service for tunnel ${tunnelId} on ${serverDetails.ip_address}.`);
+  // Use `systemctl stop cloudflared` for a clean stop. Catch error if service isn't running.
+  await executeSshCommand(serverDetails, 'sudo systemctl stop cloudflared').catch(e => console.warn(`[CloudflareUtils] Could not stop cloudflared service cleanly for tunnel ${tunnelId}: ${e.message}`));
 
-  if (code !== 0) {
-    await logApiCall(userId, 'cloudflared_service_uninstall_ssh_failed', `Failed to uninstall cloudflared service on ${serverDetails.ip_address}. STDERR: ${stderr}`);
-    throw new Error(`Error uninstalling cloudflared service via SSH: ${stderr}`);
+  // 2. Clean up stale connections using `cloudflared tunnel cleanup`
+  await logApiCall(userId, 'cloudflared_tunnel_cleanup_ssh', `Running cloudflared tunnel cleanup for tunnel ${tunnelId} on ${serverDetails.ip_address}.`);
+  const cleanupCommand = `sudo cloudflared tunnel cleanup ${tunnelId}`;
+  const { stdout: cleanupStdout, stderr: cleanupStderr, code: cleanupCode } = await executeSshCommand(serverDetails, cleanupCommand);
+  if (cleanupCode !== 0) {
+    console.warn(`[CloudflareUtils] cloudflared tunnel cleanup for tunnel ${tunnelId} failed: ${cleanupStderr}`);
+    await logApiCall(userId, 'cloudflared_tunnel_cleanup_ssh_warning', `cloudflared tunnel cleanup for tunnel ${tunnelId} failed: ${cleanupStderr}`);
+    // Don't throw error here, as uninstall might still work or it might be already clean.
+  } else {
+    await logApiCall(userId, 'cloudflared_tunnel_cleanup_ssh_success', `cloudflared tunnel cleanup for tunnel ${tunnelId} successful. STDOUT: ${cleanupStdout}`);
   }
-  await logApiCall(userId, 'cloudflared_service_uninstall_ssh_success', `Cloudflared service uninstalled successfully on ${serverDetails.ip_address}. STDOUT: ${stdout}`);
+
+  // 3. Uninstall the cloudflared service
+  const uninstallCommand = `sudo cloudflared service uninstall`;
+  const { stdout: uninstallStdout, stderr: uninstallStderr, code: uninstallCode } = await executeSshCommand(serverDetails, uninstallCommand);
+
+  if (uninstallCode !== 0) {
+    await logApiCall(userId, 'cloudflared_service_uninstall_ssh_failed', `Failed to uninstall cloudflared service for tunnel ${tunnelId} on ${serverDetails.ip_address}. STDERR: ${uninstallStderr}`);
+    throw new Error(`Error uninstalling cloudflared service via SSH: ${uninstallStderr}`);
+  }
+  await logApiCall(userId, 'cloudflared_service_uninstall_ssh_success', `Cloudflared service uninstalled successfully for tunnel ${tunnelId} on ${serverDetails.ip_address}. STDOUT: ${uninstallStdout}`);
+
+  // 4. Remove credentials file (if it exists)
+  await executeSshCommand(serverDetails, `rm -f /root/.cloudflared/${tunnelId}.json`).catch(e => console.warn(`[CloudflareUtils] Could not remove credentials file for tunnel ${tunnelId}: ${e.message}`));
+  await logApiCall(userId, 'cloudflared_credentials_file_removed', `Credentials file for tunnel ${tunnelId} removed from ${serverDetails.ip_address}.`);
 }
 
 
