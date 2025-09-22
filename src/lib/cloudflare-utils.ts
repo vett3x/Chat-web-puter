@@ -162,6 +162,10 @@ export async function createCloudflareTunnel(
 }
 
 // New function to get the tunnel token
+interface CloudflareTunnelTokenResponse {
+  result: string;
+}
+
 export async function getCloudflareTunnelToken(
   apiToken: string,
   accountId: string,
@@ -169,8 +173,12 @@ export async function getCloudflareTunnelToken(
   userId?: string,
 ): Promise<string> {
   const path = `/accounts/${accountId}/tunnels/${tunnelId}/token`;
-  // The result is directly the token string
-  return callCloudflareApi<string>('GET', path, { apiToken, userId });
+  // Call the API, expecting an object with a 'result' field that contains the token string
+  const response = await callCloudflareApi<CloudflareTunnelTokenResponse>('GET', path, { apiToken, userId });
+  if (!response || !response.result) {
+    throw new Error('La API de Cloudflare no devolvió un token válido en la respuesta.');
+  }
+  return response.result;
 }
 
 export async function configureCloudflareTunnelIngress(
