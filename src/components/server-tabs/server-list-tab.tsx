@@ -159,40 +159,40 @@ function ServerListItem({ server, onDeleteServer, onSelectServerForDetails, user
 
   return (
     <Collapsible open={isLogOpen} onOpenChange={setIsLogOpen}>
-      <div className="border p-4 rounded-md bg-muted/50 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex-shrink-0 flex items-center justify-center w-5 h-5"> {/* Wrapper for icon */}
-            {getStatusIndicator()}
+      <CollapsibleTrigger asChild> {/* The entire div is now the trigger */}
+        <div className="border p-4 rounded-md bg-muted/50 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex-shrink-0 flex items-center justify-center w-5 h-5"> {/* Wrapper for icon */}
+              {getStatusIndicator()}
+            </div>
+            <div className="flex flex-col justify-center"> {/* Wrapper for text */}
+              <h4 className="font-semibold">{server.name || 'Servidor sin nombre'}</h4>
+              <p className="text-sm text-muted-foreground">IP: {server.ip_address}{server.ssh_port ? `:${server.ssh_port}` : ''}</p>
+            </div>
           </div>
-          <div className="flex flex-col justify-center"> {/* Wrapper for text */}
-            <h4 className="font-semibold">{server.name || 'Servidor sin nombre'}</h4>
-            <p className="text-sm text-muted-foreground">IP: {server.ip_address}{server.ssh_port ? `:${server.ssh_port}` : ''}</p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          {(server.status === 'provisioning' || server.status === 'failed') && server.provisioning_log && (
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="icon" title={isLogOpen ? "Ocultar log" : "Mostrar log"} className="h-8 w-8">
+          <div className="flex gap-2">
+            {server.provisioning_log && (
+              <Button variant="ghost" size="icon" title={isLogOpen ? "Ocultar log" : "Mostrar log"} className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
                 {isLogOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </Button>
-            </CollapsibleTrigger>
-          )}
-          <Button variant="outline" size="icon" onClick={() => onSelectServerForDetails(server)} title="Ver detalles" disabled={server.status !== 'ready'} className="h-8 w-8">
-            <Info className="h-4 w-4" />
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="icon" className="h-8 w-8" title="Eliminar servidor" disabled={!isSuperAdmin}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader><AlertDialogTitle>¿Estás seguro de eliminar este servidor?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará el servidor "{server.name || server.ip_address}" de la lista.</AlertDialogDescription></AlertDialogHeader>
-              <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => onDeleteServer(server.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+            )}
+            <Button variant="outline" size="icon" onClick={(e) => { e.stopPropagation(); onSelectServerForDetails(server); }} title="Ver detalles" disabled={server.status !== 'ready'} className="h-8 w-8">
+              <Info className="h-4 w-4" />
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="icon" className="h-8 w-8" title="Eliminar servidor" disabled={!isSuperAdmin} onClick={(e) => e.stopPropagation()}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader><AlertDialogTitle>¿Estás seguro de eliminar este servidor?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará el servidor "{server.name || server.ip_address}" de la lista.</AlertDialogDescription></AlertDialogHeader>
+                <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={(e) => { e.stopPropagation(); onDeleteServer(server.id); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </div>
-      </div>
+      </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="mt-2 border rounded-md overflow-hidden">
           <div className="max-h-[400px] overflow-auto">

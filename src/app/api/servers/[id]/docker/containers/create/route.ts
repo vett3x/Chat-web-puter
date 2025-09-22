@@ -119,6 +119,7 @@ export async function POST(
   }
 
   let containerId: string | undefined;
+  let fullInstallLog: string = ''; // Initialize fullInstallLog
 
   try {
     const body = await req.json();
@@ -234,15 +235,23 @@ export async function POST(
       // Execute the encoded script inside the container using bash
       const { stdout: installStdout, stderr: installStderr, code: installCode } = await executeSshCommand(server, `docker exec ${containerId} bash -c "echo '${encodedScript}' | base64 -d | bash"`);
       
+      fullInstallLog = `STDOUT:\n${installStdout}\n\nSTDERR:\n${installStderr}`; // Capture full log
+
       if (installCode !== 0) {
         console.error(`[Container Create] Error installing Node.js/npm/cloudflared in container ${containerId?.substring(0,12)}: STDOUT: ${installStdout}, STDERR: ${installStderr}`);
+        await supabaseAdmin.from('server_events_log').insert({
+          user_id: session.user.id,
+          server_id: serverId,
+          event_type: 'container_create_failed',
+          description: `Fallo al instalar Node.js/npm/cloudflared en el contenedor ${containerId?.substring(0,12)}. Log:\n${fullInstallLog}`, // Include full log
+        });
         throw new Error(`Error al instalar Node.js/npm/cloudflared en el contenedor: ${installStderr || installStdout}`);
       }
       await supabaseAdmin.from('server_events_log').insert({
         user_id: session.user.id,
         server_id: serverId,
         event_type: 'container_created',
-        description: `Node.js, npm y cloudflared instalados en el contenedor ${containerId?.substring(0,12)} usando el script proporcionado.`,
+        description: `Node.js, npm y cloudflared instalados en el contenedor ${containerId?.substring(0,12)}. Log:\n${fullInstallLog}`, // Include full log
       });
       // --- FIN INSTALACIÓN DE DEPENDENCIAS EN CONTENEDOR ---
 
@@ -305,7 +314,7 @@ export async function POST(
       6. Si configuraste un túnel Cloudflare, tu app estará accesible en el dominio.`,
     });
 
-    return NextResponse.json({ message: `Contenedor ${containerId?.substring(0,12)} creado y en ejecución.` }, { status: 201 });
+    return NextResponse.json({ message: `Contenedor ${containerId?.substring(0,12)} creado y en ejecución.`, installLog: fullInstallLog }, { status: 201 }); // Include fullInstallLog in the response
 
   } catch (error: any) {
     if (error instanceof z.ZodError) {
@@ -315,7 +324,7 @@ export async function POST(
         event_type: 'container_create_failed',
         description: `Fallo de validación al crear contenedor en '${server.name || server.ip_address}'. Error: ${error.message}`,
       });
-      return NextResponse.json({ message: 'Error de validación', errors: error.errors }, { status: 400 });
+      return NextResponse.json({ message: 'Error de validación', errors: error.errors, installLog: fullInstallLog }, { status: 400 }); // Include log on validation error
     }
     await supabaseAdmin.from('server_events_log').insert({
       user_id: session.user.id,
@@ -323,6 +332,6 @@ export async function POST(
       event_type: 'container_create_failed',
       description: `Error al crear contenedor en '${server.name || server.ip_address}'. Error: ${error.message}`,
     });
-    return NextResponse.json({ message: `Error: ${error.message}` }, { status: 500 });
+    return NextResponse.json({ message: `Error: ${error.message}`, installLog: fullInstallLog }, { status: 500 }); // Include log on general error
   }
 }

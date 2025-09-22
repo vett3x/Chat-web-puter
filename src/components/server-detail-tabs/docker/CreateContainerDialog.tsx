@@ -25,9 +25,12 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, ScrollText, ChevronDown, ChevronRight } from 'lucide-react'; // Import ScrollText, ChevronDown, ChevronRight
 import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea'; // Import Textarea
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'; // Import Collapsible components
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'; // Import SyntaxHighlighter
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'; // Import theme
 
 interface CloudflareDomain {
   id: string;
@@ -126,6 +129,8 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
   const [isLoadingCloudflareDomains, setIsLoadingCloudflareDomains] = useState(true);
   const [statusMessage, setStatusMessage] = useState<{ message: string; type: 'info' | 'success' | 'error' } | null>(null);
   const [currentStep, setCurrentStep] = useState(0); // 0: initial, 1: starting, 2: creating container, 3: installing node, 4: configuring tunnel
+  const [containerInstallLog, setContainerInstallLog] = useState<string | null>(null); // NEW STATE
+  const [isInstallLogOpen, setIsInstallLogOpen] = useState(false); // NEW STATE for collapsible
 
   const form = useForm<CreateContainerFormValues>({
     resolver: zodResolver(createContainerFormSchema),
@@ -156,6 +161,8 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
       form.reset(INITIAL_CREATE_CONTAINER_DEFAULTS);
       setStatusMessage(null);
       setCurrentStep(0);
+      setContainerInstallLog(null); // RESET NEW STATE
+      setIsInstallLogOpen(false); // RESET NEW STATE
     }
   }, [open, fetchCloudflareDomains, form]);
 
@@ -173,6 +180,7 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
     setIsCreatingContainer(true);
     setStatusMessage({ message: 'Iniciando creación del contenedor...', type: 'info' });
     setCurrentStep(1);
+    setContainerInstallLog(null); // Clear previous log
 
     try {
       // Step 2: Create Container (API call handles container creation AND Node.js installation)
@@ -185,11 +193,14 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
       });
       const result = await response.json();
       if (!response.ok) {
+        setContainerInstallLog(result.installLog || null); // Capture log on error too
         throw new Error(result.message || 'Error al crear el contenedor.');
       }
       
       setStatusMessage({ message: 'Contenedor creado y Node.js/npm instalados exitosamente.', type: 'success' });
       setCurrentStep(3); // Advance to next logical step after container+node setup
+      setContainerInstallLog(result.installLog || null); // Capture log on success
+      setIsInstallLogOpen(true); // Open log by default on success/completion
 
       // If tunnel details were provided and user has permissions, the tunnel creation
       // is initiated on the server-side within the same API call.
@@ -245,6 +256,8 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
       // When closing, reset the status message so it's clean on next open
       if (!newOpenState) {
         setStatusMessage(null);
+        setContainerInstallLog(null); // RESET NEW STATE on close
+        setIsInstallLogOpen(false); // RESET NEW STATE on close
       }
       onOpenChange(newOpenState);
     }}>
@@ -397,6 +410,50 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
                   </div>
                 )}
               </div>
+            )}
+
+            {/* New: Container Installation Log Section */}
+            {containerInstallLog && (
+              <Collapsible open={isInstallLogOpen} onOpenChange={setIsInstallLogOpen} className="space-y-2 p-4 border rounded-md bg-muted/50">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <ScrollText className="h-5 w-5" /> Log de Instalación del Contenedor
+                  </h4>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="icon" title={isInstallLogOpen ? "Ocultar log" : "Mostrar log"} className="h-7 w-7">
+                      {isInstallLogOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </Button>
+                  </CollapsibleTrigger>
+                </div>
+                <CollapsibleContent>
+                  <div className="mt-2 border rounded-md overflow-hidden">
+                    <div className="max-h-[400px] overflow-auto">
+                      <SyntaxHighlighter
+                        language="bash"
+                        style={vscDarkPlus}
+                        customStyle={{
+                          margin: 0,
+                          padding: '1rem',
+                          fontSize: '0.875rem',
+                          lineHeight: '1.25rem',
+                        }}
+                        codeTagProps={{
+                          style: {
+                            fontFamily: 'var(--font-geist-mono)',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                            overflowWrap: 'break-word',
+                          }
+                        }}
+                        wrapLines={true}
+                        wrapLongLines={true}
+                      >
+                        {containerInstallLog}
+                      </SyntaxHighlighter>
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             )}
 
             <DialogFooter>
