@@ -51,33 +51,38 @@ const createContainerFormSchema = z.object({
 type CreateContainerFormValues = z.infer<typeof createContainerFormSchema>;
 
 const DEFAULT_INSTALL_DEPS_SCRIPT = `
-set -e
+set -ex # -e: exit on error, -x: print commands and arguments as they are executed
 export DEBIAN_FRONTEND=noninteractive
 
 echo "--- Updating apt package list and installing core dependencies (curl, gnupg, lsb-release, sudo, apt-utils)..."
-apt-get update -y
-apt-get install -y curl gnupg lsb-release sudo apt-utils
+apt-get update -y || { echo "ERROR: apt-get update failed"; exit 1; }
+apt-get install -y curl gnupg lsb-release sudo apt-utils || { echo "ERROR: core dependencies installation failed"; exit 1; }
 echo "--- Core dependencies installed, including sudo and apt-utils. ---"
 
 echo "--- Installing Node.js and npm... ---"
-curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo bash -
-sudo apt-get install -y nodejs
+curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo bash - || { echo "ERROR: Node.js setup script failed"; exit 1; }
+sudo apt-get install -y nodejs || { echo "ERROR: Node.js installation failed"; exit 1; }
 echo "Node.js version: $(node -v)"
 echo "npm version: $(npm -v)"
 echo "--- Node.js and npm installed. ---"
 
 echo "--- Installing cloudflared... ---"
 # Add cloudflare gpg key
-sudo mkdir -p --mode=0755 /usr/share/keyrings
-curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
+sudo mkdir -p --mode=0755 /usr/share/keyrings || { echo "ERROR: mkdir /usr/share/keyrings failed"; exit 1; }
+curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null || { echo "ERROR: adding cloudflare gpg key failed"; exit 1; }
+chmod a+r /usr/share/keyrings/cloudflare-main.gpg # Ensure correct permissions
 
 # Add this repo to your apt repositories
-echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' | sudo tee /etc/apt/sources.list.d/cloudflared.list
+echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' | sudo tee /etc/apt/sources.list.d/cloudflared.list >/dev/null || { echo "ERROR: adding cloudflared repo failed"; exit 1; }
 
 # install cloudflared
-sudo apt-get update && sudo apt-get install -y cloudflared
-echo "cloudflared version: $(cloudflared --version)"
-echo "--- cloudflared installed. ---"
+apt-get update -y || { echo "ERROR: apt-get update for cloudflared repo failed"; exit 1; }
+apt-get install -y cloudflared || { echo "ERROR: cloudflared installation failed"; exit 1; }
+
+echo "--- Verifying cloudflared installation ---"
+which cloudflared || { echo "ERROR: cloudflared binary not found in PATH"; exit 1; }
+cloudflared --version || { echo "ERROR: cloudflared --version command failed"; exit 1; }
+echo "--- cloudflared installed and verified. ---"
 
 echo "--- Container dependency installation complete ---"
 `;
