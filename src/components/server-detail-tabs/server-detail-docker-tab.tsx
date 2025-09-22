@@ -305,8 +305,7 @@ export function ServerDetailDockerTab({ server, userRole }: ServerDetailDockerTa
                   <DialogTitle>Crear Nuevo Contenedor</DialogTitle>
                   <DialogDescription>Ejecuta un nuevo contenedor Docker en este servidor.</DialogDescription>
                 </DialogHeader>
-                {/* Corrected Form component usage */}
-                <Form<CreateContainerFormValues> {...createContainerForm}>
+                <Form {...createContainerForm}>
                   <form onSubmit={createContainerForm.handleSubmit(handleCreateContainer)} className="space-y-4 py-4">
                     <FormField control={createContainerForm.control} name="image" render={({ field }) => (<FormItem><FormLabel>Imagen</FormLabel><FormControl><Input placeholder="ubuntu:latest" {...field} /></FormControl><FormMessage /></FormItem>)} />
                     <FormField control={createContainerForm.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nombre (Opcional)</FormLabel><FormControl><Input placeholder="mi-contenedor" {...field} /></FormControl><FormMessage /></FormItem>)} />
@@ -528,7 +527,6 @@ export function ServerDetailDockerTab({ server, userRole }: ServerDetailDockerTa
                 Conecta tu contenedor Docker a Internet a través de Cloudflare Tunnel.
               </DialogDescription>
             </DialogHeader>
-            {/* Corrected Form component usage */}
             <Form<CreateTunnelFormValues> {...createTunnelForm}>
               <form onSubmit={createTunnelForm.handleSubmit(handleCreateTunnel)} className="space-y-4 py-4">
                 <FormField
