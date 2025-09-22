@@ -23,6 +23,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { UserDetailDialog } from './user-detail-dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator'; // Import Separator
 
 interface User {
   id: string;
@@ -146,6 +147,117 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
 
   const isCurrentUserSuperAdmin = currentUserRole === 'super_admin';
 
+  const renderUserTable = (usersToRender: User[], title: string) => (
+    <div className="mb-8">
+      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+        <Users className="h-5 w-5 text-muted-foreground" /> {title} ({usersToRender.length})
+      </h3>
+      {usersToRender.length === 0 ? (
+        <p className="text-muted-foreground text-sm">No hay usuarios en esta categoría.</p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Usuario</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Rol</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {usersToRender.map((user) => {
+              const isCurrentUser = user.id === currentUserId;
+              const isTargetUserSuperAdmin = user.role === 'super_admin';
+
+              return (
+                <TableRow key={user.id}>
+                  <TableCell className="flex items-center gap-2">
+                    <Avatar className="h-8 w-8">
+                      {user.avatar_url ? (
+                        <AvatarImage src={user.avatar_url} alt="Avatar" />
+                      ) : (
+                        <AvatarFallback className="bg-primary text-primary-foreground">
+                          {getInitials(user.first_name, user.last_name, user.email)}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    <div>
+                      <p className="font-medium">{user.first_name || 'N/A'} {user.last_name || ''}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell>{user.email}</TableCell>
+                  <TableCell>
+                    {user.role === 'super_admin' ? (
+                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                        Super Admin
+                      </span>
+                    ) : user.role === 'admin' ? (
+                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                        Admin
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                        Usuario
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handleOpenUserDetails(user)}
+                        title="Ver detalles del usuario"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="destructive"
+                            size="icon"
+                            className="h-8 w-8"
+                            disabled={isCurrentUser || isTargetUserSuperAdmin || isDeleting === user.id || !isCurrentUserSuperAdmin} // Only Super Admin can delete, and not themselves or other Super Admins
+                            title={isCurrentUser ? "No puedes eliminar tu propia cuenta" : (isTargetUserSuperAdmin ? "No puedes eliminar a otro Super Admin" : (isCurrentUserSuperAdmin ? "Eliminar usuario" : "No tienes permiso para eliminar usuarios"))}
+                          >
+                            {isDeleting === user.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>¿Estás seguro de eliminar este usuario?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta acción eliminará permanentemente al usuario "{user.first_name || user.email}" y todos sus datos asociados.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDeleteUser(user.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                              Eliminar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      )}
+    </div>
+  );
+
+  const superAdmins = filteredUsers.filter(user => user.role === 'super_admin');
+  const admins = filteredUsers.filter(user => user.role === 'admin');
+  const normalUsers = filteredUsers.filter(user => user.role === 'user');
+
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -195,102 +307,14 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
             <p>No se encontraron usuarios que coincidan con los criterios.</p>
           </div>
         ) : (
-          <ScrollArea className="h-full w-full">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Usuario</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Rol</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUsers.map((user) => {
-                  const isCurrentUser = user.id === currentUserId;
-                  const isTargetUserSuperAdmin = user.role === 'super_admin';
-
-                  return (
-                    <TableRow key={user.id}>
-                      <TableCell className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8">
-                          {user.avatar_url ? (
-                            <AvatarImage src={user.avatar_url} alt="Avatar" />
-                          ) : (
-                            <AvatarFallback className="bg-primary text-primary-foreground">
-                              {getInitials(user.first_name, user.last_name, user.email)}
-                            </AvatarFallback>
-                          )}
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{user.first_name || 'N/A'} {user.last_name || ''}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>
-                        {user.role === 'super_admin' ? (
-                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                            Super Admin
-                          </span>
-                        ) : user.role === 'admin' ? (
-                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                            Admin
-                          </span>
-                        ) : (
-                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-                            Usuario
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handleOpenUserDetails(user)}
-                            title="Ver detalles del usuario"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="destructive"
-                                size="icon"
-                                className="h-8 w-8"
-                                disabled={isCurrentUser || isTargetUserSuperAdmin || isDeleting === user.id || !isCurrentUserSuperAdmin} // Only Super Admin can delete, and not themselves or other Super Admins
-                                title={isCurrentUser ? "No puedes eliminar tu propia cuenta" : (isTargetUserSuperAdmin ? "No puedes eliminar a otro Super Admin" : (isCurrentUserSuperAdmin ? "Eliminar usuario" : "No tienes permiso para eliminar usuarios"))}
-                              >
-                                {isDeleting === user.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>¿Estás seguro de eliminar este usuario?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Esta acción eliminará permanentemente al usuario "{user.first_name || user.email}" y todos sus datos asociados.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteUser(user.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                  Eliminar
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+          <ScrollArea className="h-full w-full p-1">
+            <div className="space-y-8">
+              {renderUserTable(superAdmins, 'Super Admins')}
+              <Separator />
+              {renderUserTable(admins, 'Admins')}
+              <Separator />
+              {renderUserTable(normalUsers, 'Usuarios')}
+            </div>
           </ScrollArea>
         )}
       </CardContent>
