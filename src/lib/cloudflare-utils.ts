@@ -246,36 +246,35 @@ export async function installAndRunCloudflaredService(
 ): Promise<void> {
   await logApiCall(userId, 'cloudflared_container_install_run_ssh', `Attempting to install and run cloudflared inside container ${containerId.substring(0,12)} on ${serverDetails.ip_address}.`);
 
-  // 1. Ensure .cloudflared directory exists inside the container
-  await executeSshCommand(serverDetails, `docker exec ${containerId} mkdir -p /root/.cloudflared`);
-  await logApiCall(userId, 'cloudflared_container_mkdir', `Ensured /root/.cloudflared directory exists inside container ${containerId.substring(0,12)}.`);
+  const cloudflaredDir = `/root/.cloudflared`;
+  const credentialsFilePath = `${cloudflaredDir}/${tunnelId}.json`;
+  const configFilePath = `${cloudflaredDir}/config.yml`; // Changed config file path
 
-  // 2. Write credentials file inside the container
+  // 1. Ensure .cloudflared directory exists inside the container
+  await executeSshCommand(serverDetails, `docker exec ${containerId} mkdir -p ${cloudflaredDir}`);
+  await logApiCall(userId, 'cloudflared_container_mkdir', `Ensured ${cloudflaredDir} directory exists inside container ${containerId.substring(0,12)}.`);
+
+  // 2. Write credentials file inside the container using Base64
   const credentialsFileContent = JSON.stringify({ TunnelSecret: tunnelToken, TunnelID: tunnelId });
-  const credentialsFilePath = `/root/.cloudflared/${tunnelId}.json`;
-  // Use `docker exec sh -c "echo '...' > file"` to write content
-  const writeCredentialsCommand = `echo '${credentialsFileContent}' > ${credentialsFilePath}`;
+  const encodedCredentials = Buffer.from(credentialsFileContent).toString('base64');
+  const writeCredentialsCommand = `echo '${encodedCredentials}' | base64 -d > ${credentialsFilePath}`;
   await executeSshCommand(serverDetails, `docker exec ${containerId} sh -c "${writeCredentialsCommand}"`);
   await logApiCall(userId, 'cloudflared_container_credentials_written', `Credentials file written inside container ${containerId.substring(0,12)}.`);
 
-  // 3. Write config.yml file inside the container (for ingress rules)
-  // Note: The ingress rules are already configured via Cloudflare API,
-  // but cloudflared needs a minimal config.yml to know which tunnel to run.
-  // We'll use a simple config that points to the credentials file.
+  // 3. Write config.yml file inside the container using Base64
   const configContent = `
 tunnel: ${tunnelId}
 credentials-file: ${credentialsFilePath}
 `;
-  const configFilePath = `/etc/cloudflared/config.yml`; // Standard path for cloudflared config
-  const writeConfigCommand = `echo '${configContent}' > ${configFilePath}`;
+  const encodedConfig = Buffer.from(configContent).toString('base64');
+  const writeConfigCommand = `echo '${encodedConfig}' | base64 -d > ${configFilePath}`;
   await executeSshCommand(serverDetails, `docker exec ${containerId} sh -c "${writeConfigCommand}"`);
   await logApiCall(userId, 'cloudflared_container_config_written', `Config.yml written inside container ${containerId.substring(0,12)}.`);
 
   // 4. Run cloudflared tunnel in detached mode inside the container
   // We use `nohup` and `&` to run it in the background and prevent it from dying if the SSH session closes.
-  // `docker exec -d` is also an option, but `nohup` inside `docker exec` is more robust for the process itself.
   const runCommand = `nohup cloudflared tunnel run ${tunnelId} --config ${configFilePath} > /dev/null 2>&1 &`;
-  const { stdout, stderr, code } = await executeSshCommand(serverDetails, `docker exec ${containerId} sh -c "${runCommand}"`);
+  const { stdout, stderr, code } = await executeSshCommand(serverDetails, `docker exec ${containerId} bash -c "${runCommand}"`); // Use bash -c for nohup
 
   if (code !== 0) {
     await logApiCall(userId, 'cloudflared_container_run_failed', `Failed to run cloudflared inside container ${containerId.substring(0,12)}. STDERR: ${stderr}`);
@@ -296,15 +295,19 @@ export async function uninstallCloudflaredService(
 ): Promise<void> {
   await logApiCall(userId, 'cloudflared_container_uninstall_ssh', `Attempting to uninstall cloudflared from inside container ${containerId.substring(0,12)} on ${serverDetails.ip_address}.`);
 
+  const cloudflaredDir = `/root/.cloudflared`;
+  const credentialsFilePath = `${cloudflaredDir}/${tunnelId}.json`;
+  const configFilePath = `${cloudflaredDir}/config.yml`;
+
   // 1. Find and kill the cloudflared process inside the container
   await logApiCall(userId, 'cloudflared_container_kill_process', `Killing cloudflared process inside container ${containerId.substring(0,12)}.`);
   // Use `pkill` to gracefully terminate the cloudflared process
   await executeSshCommand(serverDetails, `docker exec ${containerId} pkill cloudflared`).catch(e => console.warn(`[CloudflareUtils] Could not kill cloudflared process cleanly in container ${containerId.substring(0,12)}: ${e.message}`));
 
   // 2. Remove config.yml and credentials file from inside the container
-  await executeSshCommand(serverDetails, `docker exec ${containerId} rm -f /etc/cloudflared/config.yml`).catch(e => console.warn(`[CloudflareUtils] Could not remove config.yml from container ${containerId.substring(0,12)}: ${e.message}`));
-  await executeSshCommand(serverDetails, `docker exec ${containerId} rm -f /root/.cloudflared/${tunnelId}.json`).catch(e => console.warn(`[CloudflareUtils] Could not remove credentials file from container ${containerId.substring(0,12)}: ${e.message}`));
-  await executeSshCommand(serverDetails, `docker exec ${containerId} rm -f /root/.cloudflared/cert.pem`).catch(e => console.warn(`[CloudflareUtils] Could not remove cert.pem from container ${containerId.substring(0,12)}: ${e.message}`)); // Remove cert.pem if it was created
+  await executeSshCommand(serverDetails, `docker exec ${containerId} rm -f ${configFilePath}`).catch(e => console.warn(`[CloudflareUtils] Could not remove config.yml from container ${containerId.substring(0,12)}: ${e.message}`));
+  await executeSshCommand(serverDetails, `docker exec ${containerId} rm -f ${credentialsFilePath}`).catch(e => console.warn(`[CloudflareUtils] Could not remove credentials file from container ${containerId.substring(0,12)}: ${e.message}`));
+  await executeSshCommand(serverDetails, `docker exec ${containerId} rm -f ${cloudflaredDir}/cert.pem`).catch(e => console.warn(`[CloudflareUtils] Could not remove cert.pem from container ${containerId.substring(0,12)}: ${e.message}`)); // Remove cert.pem if it was created
 
   await logApiCall(userId, 'cloudflared_container_files_removed', `Cloudflared config and credentials files removed from container ${containerId.substring(0,12)}.`);
 
