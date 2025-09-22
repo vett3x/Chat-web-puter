@@ -14,6 +14,7 @@ import {
 import { executeSshCommand } from './ssh-utils'; // Import SSH utilities
 
 // Initialize Supabase client with the service role key
+// This allows us to bypass RLS and update the server status from the backend.
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -138,7 +139,7 @@ export async function createAndProvisionCloudflareTunnel({
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Ingress rules configured.\n` });
 
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Installing and running cloudflared client inside container ${containerId.substring(0,12)} via SSH...\n` });
-    await installAndRunCloudflaredService(serverDetails, containerId, tunnelId, tunnelToken, userId); // MODIFIED LINE
+    await installAndRunCloudflaredService(serverDetails, containerId, tunnelId, tunnelToken, fullDomain, containerPort, userId); // MODIFIED LINE
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] cloudflared client installed and running inside container.\n` });
 
 
@@ -183,7 +184,8 @@ export async function createAndProvisionCloudflareTunnel({
     if (serverDetails && tunnelId) { // Only attempt uninstall if serverDetails and tunnelId were available
       try {
         await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Attempting rollback: Uninstalling cloudflared client from container ${containerId.substring(0,12)} via SSH...\n` });
-        await uninstallCloudflaredService(serverDetails, containerId, tunnelId, userId); // MODIFIED LINE
+        // Pass dummy values for fullDomain and containerPort during rollback if not available from tunnel object
+        await uninstallCloudflaredService(serverDetails, containerId, tunnelId, "dummy.domain", 80, userId); // MODIFIED LINE
         await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Rollback: cloudflared client uninstalled from container.\n` });
       } catch (rollbackError) {
         console.error(`[Rollback] Failed to uninstall cloudflared service:`, rollbackError);
@@ -226,7 +228,7 @@ export async function deleteCloudflareTunnelAndCleanup({
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Fetching tunnel details from DB for record ${tunnelRecordId}...\n` });
     const { data: tunnel, error: tunnelError } = await supabaseAdmin
       .from('docker_tunnels')
-      .select('id, tunnel_id, cloudflare_domain_id, full_domain')
+      .select('id, tunnel_id, cloudflare_domain_id, full_domain, container_port') // Select container_port
       .eq('id', tunnelRecordId)
       .eq('user_id', userId)
       .single();
@@ -237,7 +239,7 @@ export async function deleteCloudflareTunnelAndCleanup({
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Tunnel details fetched. Cloudflare Tunnel ID: ${tunnel.tunnel_id}\n` });
 
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Cleaning up cloudflared client from container ${containerId.substring(0,12)} via SSH...\n` });
-    await uninstallCloudflaredService(serverDetails, containerId, tunnel.tunnel_id, userId); // MODIFIED LINE
+    await uninstallCloudflaredService(serverDetails, containerId, tunnel.tunnel_id, tunnel.full_domain, tunnel.container_port, userId); // MODIFIED LINE
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] cloudflared client cleaned up from container.\n` });
 
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Deleting Cloudflare Tunnel ${tunnel.tunnel_id} via API...\n` });

@@ -66,13 +66,6 @@ echo "--- Installing core dependencies (curl, gnupg, lsb-release, apt-utils)..."
 sudo apt-get install -y curl gnupg lsb-release apt-utils || { echo "ERROR: core dependencies installation failed"; exit 1; }
 echo "--- Core dependencies installed. ---"
 
-echo "--- Installing Node.js and npm... ---"
-curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo bash - || { echo "ERROR: Node.js setup script failed"; exit 1; }
-sudo apt-get install -y nodejs || { echo "ERROR: Node.js installation failed"; exit 1; }
-echo "Node.js version: $(node -v)"
-echo "npm version: $(npm -v)"
-echo "--- Node.js and npm installed. ---"
-
 echo "--- Installing cloudflared... ---"
 # Add cloudflare gpg key
 sudo mkdir -p --mode=0755 /usr/share/keyrings || { echo "ERROR: mkdir /usr/share/keyrings failed"; exit 1; }
@@ -89,6 +82,13 @@ echo "--- Verifying cloudflared installation ---"
 which cloudflared || { echo "ERROR: cloudflared binary not found in PATH"; exit 1; }
 cloudflared --version || { echo "ERROR: cloudflared --version command failed"; exit 1; }
 echo "--- cloudflared installed and verified. ---"
+
+echo "--- Installing Node.js and npm... ---"
+curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo bash - || { echo "ERROR: Node.js setup script failed"; exit 1; }
+sudo apt-get install -y nodejs || { echo "ERROR: Node.js installation failed"; exit 1; }
+echo "Node.js version: $(node -v)"
+echo "npm version: $(npm -v)"
+echo "--- Node.js and npm installed. ---"
 
 echo "--- Container dependency installation complete ---"
 `;

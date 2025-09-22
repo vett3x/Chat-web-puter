@@ -242,6 +242,8 @@ export async function installAndRunCloudflaredService(
   containerId: string, // NEW: containerId to exec into
   tunnelId: string,
   tunnelToken: string,
+  fullDomain: string, // NEW: fullDomain for ingress config
+  containerPort: number, // NEW: containerPort for ingress config
   userId?: string,
 ): Promise<void> {
   await logApiCall(userId, 'cloudflared_container_install_run_ssh', `Attempting to install and run cloudflared inside container ${containerId.substring(0,12)} on ${serverDetails.ip_address}.`);
@@ -265,7 +267,11 @@ export async function installAndRunCloudflaredService(
   const configContent = `
 tunnel: ${tunnelId}
 credentials-file: ${credentialsFilePath}
-`; // REMOVED INGRESS SECTION
+ingress:
+  - hostname: ${fullDomain}
+    service: http://localhost:${containerPort}
+  - service: http_status:404
+`; // ADDED INGRESS SECTION
   const encodedConfig = Buffer.from(configContent).toString('base64');
   const writeConfigCommand = `echo '${encodedConfig}' | base64 -d > ${configFilePath}`;
   await executeSshCommand(serverDetails, `docker exec ${containerId} sh -c "${writeConfigCommand}"`);
@@ -291,6 +297,8 @@ export async function uninstallCloudflaredService(
   serverDetails: ServerDetails,
   containerId: string, // NEW: containerId to exec into
   tunnelId: string, // NEW: tunnelId for cleanup and file removal
+  fullDomain: string, // NEW: Added for consistency, not directly used in uninstall logic
+  containerPort: number, // NEW: Added for consistency, not directly used in uninstall logic
   userId?: string,
 ): Promise<void> {
   await logApiCall(userId, 'cloudflared_container_uninstall_ssh', `Attempting to uninstall cloudflared from inside container ${containerId.substring(0,12)} on ${serverDetails.ip_address}.`);
