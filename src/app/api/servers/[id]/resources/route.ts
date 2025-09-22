@@ -94,7 +94,7 @@ export async function GET(
     }));
 
     const cpuCommand = `top -bn1 | grep "Cpu(s)" | sed "s/.*, *\\([0-9.]*\\)%* id.*/\\1/" | awk '{print 100 - $1}'`;
-    const memCommand = `free -h | grep Mem | awk '{print $3" "$2}'`; // Used Total
+    const memCommand = `free -m | grep Mem | awk '{print $3" "$2}'`; // Used Total in MiB
     const diskCommand = `df -h / | grep / | awk '{print $5}'`; // Usage %
 
     const [cpuOutput, memOutput, diskOutput] = await Promise.all([

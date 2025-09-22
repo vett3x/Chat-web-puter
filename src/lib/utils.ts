@@ -29,3 +29,13 @@ export function parseMemoryString(memString: string): number {
     default: return value; // Assume MiB if no unit or unknown
   }
 }
+
+/**
+ * Formats a memory value in MiB to a human-readable string (e.g., "1024 MiB" or "1.0 GiB").
+ * @param mib The memory value in MiB.
+ * @returns Formatted string.
+ */
+export function formatMemory(mib: number): string {
+  if (mib < 1024) return `${mib.toFixed(1)} MiB`;
+  return `${(mib / 1024).toFixed(1)} GiB`;
+}

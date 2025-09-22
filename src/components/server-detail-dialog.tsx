@@ -60,7 +60,7 @@ import {
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { cn, parseMemoryString } from '@/lib/utils'; // Import parseMemoryString
+import { cn, parseMemoryString, formatMemory } from '@/lib/utils'; // Import formatMemory
 import {
   Tooltip,
   TooltipContent,
@@ -583,7 +583,7 @@ function ServerDetailResourcesTab({ serverId }: { serverId: string }) {
                   <div>
                     <div className="flex justify-between text-sm font-medium mb-1">
                       <span>Memoria</span>
-                      <span>{resources.memory_used} / {resources.memory_total}</span>
+                      <span>{formatMemory(resources.memory_used_mib)} / {formatMemory(resources.memory_total_mib)}</span> {/* Usando formatMemory */}
                     </div>
                     <Progress 
                       value={resources.memory_total_mib === 0 ? 0 : (resources.memory_used_mib / resources.memory_total_mib) * 100} 
@@ -630,7 +630,7 @@ function ServerDetailResourcesTab({ serverId }: { serverId: string }) {
                             const totalMiB = props.payload.memory_total_mib;
                             const usedMiB = props.payload.memory_used_mib;
                             if (totalMiB === 0) return [`N/A`, 'Uso'];
-                            return [`${((usedMiB / totalMiB) * 100).toFixed(1)}% (${props.payload.memory_used} / ${props.payload.memory_total})`, 'Uso'];
+                            return [`${((usedMiB / totalMiB) * 100).toFixed(1)}% (${formatMemory(usedMiB)} / ${formatMemory(totalMiB)})`, 'Uso'];
                           }} />
                           <Line 
                             type="monotone" 
