@@ -182,9 +182,11 @@ export async function DELETE(
 ) {
   const serverId = context.params.id;
   const containerId = context.params.containerId;
+  const { searchParams } = new URL(req.url);
+  const tunnelRecordId = searchParams.get('tunnelRecordId'); // Get tunnelRecordId from query params
 
-  if (!serverId || !containerId) {
-    return NextResponse.json({ message: 'ID de servidor o contenedor no proporcionado.' }, { status: 400 });
+  if (!serverId || !containerId || !tunnelRecordId) {
+    return NextResponse.json({ message: 'ID de servidor, contenedor o registro de túnel no proporcionado.' }, { status: 400 });
   }
 
   const { session, userRole, userPermissions } = await getSessionAndRole();
@@ -204,10 +206,11 @@ export async function DELETE(
   const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
   try {
-    // 1. Fetch tunnel details from Supabase to get its ID
+    // 1. Fetch tunnel details from Supabase to get its ID and associated domain
     const { data: tunnelRecord, error: tunnelRecordError } = await supabaseAdmin
       .from('docker_tunnels')
       .select('id, cloudflare_domain_id')
+      .eq('id', tunnelRecordId)
       .eq('server_id', serverId)
       .eq('container_id', containerId)
       .eq('user_id', session.user.id)
@@ -229,6 +232,18 @@ export async function DELETE(
       throw new Error('Dominio de Cloudflare asociado al túnel no encontrado o acceso denegado.');
     }
 
+    // 3. Fetch server details for SSH connection
+    const { data: serverDetails, error: serverDetailsError } = await supabaseAdmin
+      .from('user_servers')
+      .select('ip_address, ssh_port, ssh_username, ssh_password, name')
+      .eq('id', serverId)
+      .eq('user_id', session.user.id)
+      .single();
+
+    if (serverDetailsError || !serverDetails) {
+      throw new Error('Detalles del servidor no encontrados o acceso denegado.');
+    }
+
     // Call the new server action to delete the tunnel and clean up
     await deleteCloudflareTunnelAndCleanup({
       userId: session.user.id,
@@ -236,10 +251,11 @@ export async function DELETE(
       containerId: containerId,
       tunnelRecordId: tunnelRecord.id,
       serverDetails: {
-        ip_address: (await supabaseAdmin.from('user_servers').select('ip_address').eq('id', serverId).single()).data?.ip_address || '',
-        ssh_port: (await supabaseAdmin.from('user_servers').select('ssh_port').eq('id', serverId).single()).data?.ssh_port || 22,
-        ssh_username: (await supabaseAdmin.from('user_servers').select('ssh_username').eq('id', serverId).single()).data?.ssh_username || '',
-        ssh_password: (await supabaseAdmin.from('user_servers').select('ssh_password').eq('id', serverId).single()).data?.ssh_password || '',
+        ip_address: serverDetails.ip_address,
+        ssh_port: serverDetails.ssh_port || 22,
+        ssh_username: serverDetails.ssh_username,
+        ssh_password: serverDetails.ssh_password,
+        name: serverDetails.name,
       },
       cloudflareDomainDetails: cfDomain,
     });

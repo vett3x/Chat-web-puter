@@ -8,6 +8,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Link, Globe, Loader2, RefreshCw, XCircle, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useSession } from '@/components/session-context-provider'; // Import useSession
+import { PERMISSION_KEYS } from '@/lib/constants'; // Import PERMISSION_KEYS
 
 // New interface for Docker Tunnel data fetched for Web Links tab
 interface ServerDockerTunnel {
@@ -24,9 +37,13 @@ interface ServerDetailWebLinksTabProps {
 }
 
 export function ServerDetailWebLinksTab({ serverId }: ServerDetailWebLinksTabProps) {
+  const { userPermissions } = useSession(); // Get user permissions
+  const canManageCloudflareTunnels = userPermissions[PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_TUNNELS];
+
   const [tunnels, setTunnels] = useState<ServerDockerTunnel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isDeletingTunnel, setIsDeletingTunnel] = useState<string | null>(null); // State for deletion loading
 
   const fetchTunnels = useCallback(async () => {
     setIsLoading(true);
@@ -53,6 +70,27 @@ export function ServerDetailWebLinksTab({ serverId }: ServerDetailWebLinksTabPro
       fetchTunnels();
     }
   }, [serverId, fetchTunnels]);
+
+  const handleDeleteTunnel = async (tunnelRecordId: string, containerId: string) => {
+    setIsDeletingTunnel(tunnelRecordId);
+    try {
+      const response = await fetch(`/api/servers/${serverId}/docker/containers/${containerId}/tunnel?tunnelRecordId=${tunnelRecordId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || `HTTP error! status: ${response.status}`);
+      }
+      toast.success(result.message || 'Túnel eliminado correctamente.');
+      fetchTunnels(); // Refresh the list
+    } catch (err: any) {
+      console.error('Error deleting Cloudflare tunnel:', err);
+      toast.error(err.message || 'Error al eliminar el túnel.');
+    } finally {
+      setIsDeletingTunnel(null);
+    }
+  };
 
   return (
     <Card className="h-full flex flex-col">
@@ -118,10 +156,40 @@ export function ServerDetailWebLinksTab({ serverId }: ServerDetailWebLinksTabPro
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
-                      {/* Add actions like delete tunnel here if needed */}
-                      <Button variant="destructive" size="icon" className="h-8 w-8" disabled={true} title="Eliminar túnel">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button 
+                            variant="destructive" 
+                            size="icon" 
+                            className="h-8 w-8" 
+                            disabled={!canManageCloudflareTunnels || isDeletingTunnel === tunnel.id} 
+                            title={!canManageCloudflareTunnels ? "No tienes permiso para eliminar túneles" : "Eliminar túnel"}
+                          >
+                            {isDeletingTunnel === tunnel.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>¿Estás seguro de eliminar este túnel?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta acción eliminará permanentemente el túnel "{tunnel.full_domain}" y su configuración asociada en Cloudflare y en el servidor remoto.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={() => handleDeleteTunnel(tunnel.id, tunnel.container_id)} 
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Eliminar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </TableCell>
                   </TableRow>
                 ))}

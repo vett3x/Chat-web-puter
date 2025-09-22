@@ -143,7 +143,7 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
 
       toast.success('Contenedor y túnel (si aplica) creados exitosamente.');
       onContainerCreated();
-      onOpenChange(false);
+      onOpenChange(false); // Only close on success
       form.reset(INITIAL_CREATE_CONTAINER_DEFAULTS);
       
     } catch (error: any) {
@@ -151,6 +151,7 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
       toast.error(error.message);
     } finally {
       setIsCreatingContainer(false);
+      // Do NOT close dialog here on error
     }
   };
 
@@ -276,7 +277,9 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
             )}
 
             <DialogFooter>
-              <DialogClose asChild><Button type="button" variant="outline" disabled={isCreatingContainer}>Cancelar</Button></DialogClose>
+              <DialogClose asChild>
+                <Button type="button" variant="outline" disabled={isCreatingContainer}>Cancelar</Button>
+              </DialogClose>
               <Button type="submit" disabled={isCreatingContainer || !canManageDockerContainers}>
                 {isCreatingContainer && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Crear Contenedor Next.js
