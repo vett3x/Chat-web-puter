@@ -29,16 +29,26 @@ export async function middleware(req: NextRequest) {
   } = await supabase.auth.getSession();
 
   let userRole: 'user' | 'admin' | 'super_admin' | null = null;
+  let userPermissions: Record<string, boolean> = {}; // Initialize permissions object
+
   if (session?.user?.id) {
     const { data: profile, error } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, permissions') // Select permissions
       .eq('id', session.user.id)
       .single();
     if (profile) {
       userRole = profile.role as 'user' | 'admin' | 'super_admin';
+      userPermissions = profile.permissions || {}; // Assign permissions
     } else if (session.user.email && SUPERUSER_EMAILS.includes(session.user.email)) {
       userRole = 'super_admin'; // Fallback for initial Super Admin
+      // For super_admin fallback, grant all permissions
+      userPermissions = {
+        can_create_server: true,
+        can_manage_docker_containers: true,
+        can_manage_cloudflare_domains: true,
+        can_manage_cloudflare_tunnels: true,
+      };
     }
   }
 

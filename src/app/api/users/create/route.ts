@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
-import { z } from 'zod';
+import * as z from 'zod'; // Importar zod
 import { SUPERUSER_EMAILS } from '@/lib/constants'; // Importación actualizada
 
 // Esquema de validación para añadir un nuevo usuario
@@ -77,24 +77,8 @@ export async function POST(req: NextRequest) {
     }
 
     // The public.profiles table should be automatically populated by the handle_new_user trigger.
-    // The trigger now reads 'role' from raw_user_meta_data.
-    // If the trigger doesn't set the role correctly, we can explicitly update it here.
-    if (user.user?.id) {
-      const { error: updateProfileError } = await supabaseAdmin
-        .from('profiles')
-        .update({ role: newUserData.role })
-        .eq('id', user.user.id);
-
-      if (updateProfileError) {
-        console.error(`Error updating profile role for new user ${user.user.id}:`, updateProfileError);
-        // Log this as a warning, but don't fail the user creation entirely
-        await supabaseAdmin.from('server_events_log').insert({
-          user_id: session.user.id,
-          event_type: 'user_create_warning',
-          description: `Advertencia: Rol no establecido correctamente para el nuevo usuario '${newUserData.email}'. Error: ${updateProfileError.message}`,
-        });
-      }
-    }
+    // The trigger now reads 'role' from raw_user_meta_data and sets default permissions.
+    // No need to explicitly update the role here, as the trigger handles it.
 
     // Log event for successful user creation
     await supabaseAdmin.from('server_events_log').insert({
