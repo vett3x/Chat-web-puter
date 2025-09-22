@@ -6,7 +6,7 @@ import { Client } from 'ssh2';
 import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { z } from 'zod';
-import { SUPERUSER_EMAILS } from '@/components/session-context-provider'; // Import SUPERUSER_EMAILS
+import { SUPERUSER_EMAILS } from '@/lib/constants'; // Importación actualizada
 
 const createContainerSchema = z.object({
   image: z.string().min(1, { message: 'El nombre de la imagen es requerido.' }),

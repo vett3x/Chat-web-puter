@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { Client } from 'ssh2';
 import { parseMemoryString } from '@/lib/utils';
-import { SUPERUSER_EMAILS } from '@/components/session-context-provider'; // Import SUPERUSER_EMAILS
+import { SUPERUSER_EMAILS } from '@/lib/constants'; // Importación actualizada
 
 // Helper function to get the session and user role
 async function getSessionAndRole() {

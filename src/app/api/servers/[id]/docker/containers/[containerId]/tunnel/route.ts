@@ -13,7 +13,7 @@ import {
   deleteCloudflareDnsRecord,
 } from '@/lib/cloudflare-utils';
 import { Client as SshClient } from 'ssh2'; // Import SSH Client
-import { SUPERUSER_EMAILS } from '@/components/session-context-provider'; // Import SUPERUSER_EMAILS
+import { SUPERUSER_EMAILS } from '@/lib/constants'; // Importación actualizada
 
 // Esquema de validación para la creación de túneles
 const createTunnelSchema = z.object({

@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
-import { SUPERUSER_EMAILS } from '@/components/session-context-provider'; // Import SUPERUSER_EMAILS
+import { SUPERUSER_EMAILS } from '@/lib/constants'; // Importación actualizada
 
 async function getSession() {
   const cookieStore = cookies() as any;

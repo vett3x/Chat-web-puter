@@ -5,7 +5,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
-import { SUPERUSER_EMAILS } from '@/components/session-context-provider'; // Import SUPERUSER_EMAILS
+import { SUPERUSER_EMAILS } from '@/lib/constants'; // Importación actualizada
 
 const updateRoleSchema = z.object({
   role: z.enum(['user', 'admin', 'super_admin'], { message: 'Rol inválido.' }),

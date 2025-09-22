@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/integrations/supabase/client';
 import { Session } from '@supabase/supabase-js';
 import { Loader2 } from 'lucide-react';
+import { SUPERUSER_EMAILS } from '@/lib/constants'; // Importación actualizada
 
 type UserRole = 'user' | 'admin' | 'super_admin';
 
@@ -15,9 +16,6 @@ interface SessionContextType {
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
-
-// Define SuperUser emails (for initial assignment and client-side checks)
-export const SUPERUSER_EMAILS = ['martinpensa1@gmail.com']; // Exported
 
 export const SessionContextProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);

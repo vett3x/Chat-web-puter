@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, Users, Trash2, RefreshCw, AlertCircle, Eye, Search } from 'lucide-react';
 import { toast } from 'sonner';
-import { useSession, SUPERUSER_EMAILS } from '@/components/session-context-provider';
+import { useSession } from '@/components/session-context-provider';
+import { SUPERUSER_EMAILS } from '@/lib/constants'; // Importación actualizada
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -65,7 +66,6 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
       setAllUsers(data);
     } catch (err: any) {
       console.error('Error fetching users:', err);
-      setError(err.message || 'Error al cargar la lista de usuarios.');
       toast.error(err.message || 'Error al cargar la lista de usuarios.');
     } finally {
       setIsLoadingUsers(false);

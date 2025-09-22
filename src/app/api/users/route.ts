@@ -4,8 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
-
-const SUPERUSER_EMAILS = ['martinpensa1@gmail.com']; // Define SuperUser emails
+import { SUPERUSER_EMAILS } from '@/lib/constants'; // Importación actualizada
 
 async function getSession() {
   const cookieStore = cookies() as any;
