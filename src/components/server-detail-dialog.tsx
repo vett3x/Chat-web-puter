@@ -12,7 +12,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Server, Dock, HardDrive, Link, Loader2, RefreshCw, XCircle, Play, StopCircle, Trash2, PlusCircle, Terminal, AlertCircle } from 'lucide-react';
+import { Server, Dock, HardDrive, Link, Loader2, RefreshCw, XCircle, Play, StopCircle, Trash2, PlusCircle, Terminal, AlertCircle, Globe } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from './ui/scroll-area';
@@ -39,7 +39,15 @@ import {
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { 
+  Form, 
+  FormControl, 
+  FormField, 
+  FormItem, 
+  FormLabel, 
+  FormMessage,
+  FormDescription, // Import FormDescription here
+} from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { ContainerConsoleDialog } from './container-console-dialog';
 import { Progress } from '@/components/ui/progress'; // Import Progress component
@@ -59,11 +67,19 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface RegisteredServer {
   id: string;
   name?: string;
   ip_address: string;
+}
+
+interface CloudflareDomain {
+  id: string;
+  domain_name: string;
+  zone_id: string;
+  account_id: string;
 }
 
 interface ServerDetailDialogProps {
@@ -80,19 +96,39 @@ const createContainerFormSchema = z.object({
 
 type CreateContainerFormValues = z.infer<typeof createContainerFormSchema>;
 
+const createTunnelFormSchema = z.object({
+  cloudflare_domain_id: z.string().uuid({ message: 'Debe seleccionar un dominio de Cloudflare.' }),
+  container_port: z.coerce.number().int().min(1).max(65535, { message: 'Puerto de contenedor inválido.' }),
+  subdomain: z.string().regex(/^[a-z0-9-]{1,63}$/, { message: 'Subdominio inválido. Solo minúsculas, números y guiones.' }).optional(),
+});
+
+type CreateTunnelFormValues = z.infer<typeof createTunnelFormSchema>;
+
 function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
   const [containers, setContainers] = useState<DockerContainer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
+  const [isCreateContainerDialogOpen, setIsCreateContainerDialogOpen] = useState(false);
+  const [isCreatingContainer, setIsCreatingContainer] = useState(false);
   const [isConsoleOpen, setIsConsoleOpen] = useState(false);
   const [selectedContainer, setSelectedContainer] = useState<DockerContainer | null>(null);
 
-  const form = useForm<CreateContainerFormValues>({
+  // Tunnel creation state
+  const [isCreateTunnelDialogOpen, setIsCreateTunnelDialogOpen] = useState(false);
+  const [isCreatingTunnel, setIsCreatingTunnel] = useState(false);
+  const [cloudflareDomains, setCloudflareDomains] = useState<CloudflareDomain[]>([]);
+  const [isLoadingCloudflareDomains, setIsLoadingCloudflareDomains] = useState(true);
+  const [selectedContainerForTunnel, setSelectedContainerForTunnel] = useState<DockerContainer | null>(null);
+
+  const createContainerForm = useForm<CreateContainerFormValues>({
     resolver: zodResolver(createContainerFormSchema),
     defaultValues: { image: '', name: '', ports: '' },
+  });
+
+  const createTunnelForm = useForm<CreateTunnelFormValues>({
+    resolver: zodResolver(createTunnelFormSchema),
+    defaultValues: { cloudflare_domain_id: '', container_port: 80, subdomain: '' },
   });
 
   const fetchContainers = useCallback(async () => {
@@ -115,11 +151,30 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
     }
   }, [server.id]);
 
+  const fetchCloudflareDomains = useCallback(async () => {
+    setIsLoadingCloudflareDomains(true);
+    try {
+      const response = await fetch('/api/cloudflare/domains', { credentials: 'include' });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+      const data: CloudflareDomain[] = await response.json();
+      setCloudflareDomains(data);
+    } catch (err: any) {
+      console.error('Error fetching Cloudflare domains:', err);
+      toast.error('Error al cargar los dominios de Cloudflare para el túnel.');
+    } finally {
+      setIsLoadingCloudflareDomains(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (server.id) {
       fetchContainers();
+      fetchCloudflareDomains();
     }
-  }, [server.id, fetchContainers]);
+  }, [server.id, fetchContainers, fetchCloudflareDomains]);
 
   const handleContainerAction = async (containerId: string, action: 'start' | 'stop' | 'delete') => {
     setActionLoading(containerId);
@@ -145,7 +200,7 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
   };
 
   const handleCreateContainer = async (values: CreateContainerFormValues) => {
-    setIsCreating(true);
+    setIsCreatingContainer(true);
     try {
       const response = await fetch(`/api/servers/${server.id}/docker/containers/create`, {
         method: 'POST',
@@ -159,19 +214,54 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
       
       toast.success('Contenedor creado exitosamente.');
       await fetchContainers();
-      setIsCreateDialogOpen(false);
-      form.reset();
+      setIsCreateContainerDialogOpen(false);
+      createContainerForm.reset();
       
     } catch (error: any) {
       toast.error(error.message);
     } finally {
-      setIsCreating(false);
+      setIsCreatingContainer(false);
+    }
+  };
+
+  const handleCreateTunnel = async (values: CreateTunnelFormValues) => {
+    if (!selectedContainerForTunnel) return;
+
+    setIsCreatingTunnel(true);
+    try {
+      const response = await fetch(`/api/servers/${server.id}/docker/containers/${selectedContainerForTunnel.ID}/tunnel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || 'Error al crear el túnel.');
+      }
+      
+      toast.success('Túnel de Cloudflare creado y aprovisionamiento iniciado.');
+      // No need to fetch containers, as tunnels are in a separate tab
+      setIsCreateTunnelDialogOpen(false);
+      createTunnelForm.reset();
+      
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setIsCreatingTunnel(false);
     }
   };
 
   const openConsoleFor = (container: DockerContainer) => {
     setSelectedContainer(container);
     setIsConsoleOpen(true);
+  };
+
+  const openCreateTunnelDialogFor = (container: DockerContainer) => {
+    setSelectedContainerForTunnel(container);
+    setIsCreateTunnelDialogOpen(true);
+    // Pre-fill container port if available, or default to 80
+    const defaultPort = container.Ports ? parseInt(container.Ports.split('->')[1]?.split('/')[0] || '80') : 80;
+    createTunnelForm.reset({ container_port: defaultPort, subdomain: '' });
   };
 
   // Filter containers for error count: only count non-running containers that are NOT gracefully exited
@@ -192,7 +282,7 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
                 <AlertCircle className="h-4 w-4" /> {errorContainers.length} Errores
               </span>
             )}
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <Dialog open={isCreateContainerDialogOpen} onOpenChange={setIsCreateContainerDialogOpen}>
               <DialogTrigger asChild>
                 <Button size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Crear Contenedor</Button>
               </DialogTrigger>
@@ -201,15 +291,15 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
                   <DialogTitle>Crear Nuevo Contenedor</DialogTitle>
                   <DialogDescription>Ejecuta un nuevo contenedor Docker en este servidor.</DialogDescription>
                 </DialogHeader>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(handleCreateContainer)} className="space-y-4 py-4">
-                    <FormField control={form.control} name="image" render={({ field }) => (<FormItem><FormLabel>Imagen</FormLabel><FormControl><Input placeholder="ubuntu:latest" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                    <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nombre (Opcional)</FormLabel><FormControl><Input placeholder="mi-contenedor" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                    <FormField control={form.control} name="ports" render={({ field }) => (<FormItem><FormLabel>Puertos (Opcional)</FormLabel><FormControl><Input placeholder="8080:80" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <Form {...createContainerForm}>
+                  <form onSubmit={createContainerForm.handleSubmit(handleCreateContainer)} className="space-y-4 py-4">
+                    <FormField control={createContainerForm.control} name="image" render={({ field }) => (<FormItem><FormLabel>Imagen</FormLabel><FormControl><Input placeholder="ubuntu:latest" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={createContainerForm.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nombre (Opcional)</FormLabel><FormControl><Input placeholder="mi-contenedor" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={createContainerForm.control} name="ports" render={({ field }) => (<FormItem><FormLabel>Puertos (Opcional)</FormLabel><FormControl><Input placeholder="8080:80" {...field} /></FormControl><FormMessage /></FormItem>)} />
                     <DialogFooter>
-                      <DialogClose asChild><Button type="button" variant="outline" disabled={isCreating}>Cancelar</Button></DialogClose>
-                      <Button type="submit" disabled={isCreating}>
-                        {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      <DialogClose asChild><Button type="button" variant="outline" disabled={isCreatingContainer}>Cancelar</Button></DialogClose>
+                      <Button type="submit" disabled={isCreatingContainer}>
+                        {isCreatingContainer && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Crear
                       </Button>
                     </DialogFooter>
@@ -283,6 +373,9 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuItem onClick={() => handleContainerAction(container.ID, 'start')} disabled={isRunning || isActionInProgress}><Play className="mr-2 h-4 w-4" /> Iniciar</DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => handleContainerAction(container.ID, 'stop')} disabled={!isRunning || isActionInProgress}><StopCircle className="mr-2 h-4 w-4" /> Detener</DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => openCreateTunnelDialogFor(container)} disabled={isActionInProgress || isLoadingCloudflareDomains || cloudflareDomains.length === 0}>
+                                    <Globe className="mr-2 h-4 w-4" /> Crear Túnel Cloudflare
+                                  </DropdownMenuItem>
                                   <AlertDialog>
                                     <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={isActionInProgress} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Eliminar</DropdownMenuItem></AlertDialogTrigger>
                                     <AlertDialogContent>
@@ -311,6 +404,95 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
           server={server}
           container={selectedContainer}
         />
+      )}
+
+      {/* Create Cloudflare Tunnel Dialog */}
+      {selectedContainerForTunnel && (
+        <Dialog open={isCreateTunnelDialogOpen} onOpenChange={setIsCreateTunnelDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Crear Túnel Cloudflare para {selectedContainerForTunnel.Names}</DialogTitle>
+              <DialogDescription>
+                Conecta tu contenedor Docker a Internet a través de Cloudflare Tunnel.
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...createTunnelForm}>
+              <form onSubmit={createTunnelForm.handleSubmit(handleCreateTunnel)} className="space-y-4 py-4">
+                <FormField
+                  control={createTunnelForm.control}
+                  name="cloudflare_domain_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Dominio de Cloudflare</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isCreatingTunnel || isLoadingCloudflareDomains}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona un dominio registrado" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {isLoadingCloudflareDomains ? (
+                            <SelectItem value="loading" disabled>Cargando dominios...</SelectItem>
+                          ) : cloudflareDomains.length === 0 ? (
+                            <SelectItem value="no-domains" disabled>No hay dominios registrados</SelectItem>
+                          ) : (
+                            cloudflareDomains.map((domain) => (
+                              <SelectItem key={domain.id} value={domain.id}>
+                                {domain.domain_name} (Zone ID: {domain.zone_id.substring(0, 8)}...)
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={createTunnelForm.control}
+                  name="container_port"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Puerto del Contenedor</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="80" {...field} disabled={isCreatingTunnel} />
+                      </FormControl>
+                      <FormDescription>
+                        El puerto interno del contenedor Docker al que Cloudflare Tunnel debe redirigir.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={createTunnelForm.control}
+                  name="subdomain"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Subdominio (Opcional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="mi-app" {...field} disabled={isCreatingTunnel} />
+                      </FormControl>
+                      <FormDescription>
+                        Si se deja vacío, se generará un subdominio aleatorio de 15 caracteres.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button type="button" variant="outline" disabled={isCreatingTunnel}>Cancelar</Button>
+                  </DialogClose>
+                  <Button type="submit" disabled={isCreatingTunnel || isLoadingCloudflareDomains || cloudflareDomains.length === 0}>
+                    {isCreatingTunnel && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Crear Túnel
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
       )}
     </>
   );
