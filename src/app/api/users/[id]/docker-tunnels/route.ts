@@ -5,7 +5,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
-const SUPERUSER_EMAILS = ['martinpensa1@gmail.com']; // Define SuperUser emails
+const SUPERUSER_EMAILS = ['martinpensa1@gmail.com'];
 
 async function getSession() {
   const cookieStore = cookies() as any;
@@ -25,7 +25,7 @@ async function getSession() {
 
 export async function GET(
   req: NextRequest,
-  context: any // Usamos 'any' para resolver el error de compilación de TypeScript
+  context: { params: { id: string } }
 ) {
   const userIdToFetch = context.params.id;
 
@@ -49,21 +49,46 @@ export async function GET(
   );
 
   try {
-    const { data: servers, error } = await supabaseAdmin
-      .from('user_servers')
-      .select('id, name, ip_address, ssh_port, status, created_at')
+    const { data: tunnels, error } = await supabaseAdmin
+      .from('docker_tunnels')
+      .select(`
+        id,
+        container_id,
+        full_domain,
+        container_port,
+        status,
+        created_at,
+        cloudflare_domains (
+          domain_name
+        ),
+        user_servers (
+          name,
+          ip_address
+        )
+      `)
       .eq('user_id', userIdToFetch)
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error(`Error fetching servers for user ${userIdToFetch}:`, error);
-      throw new Error('Error al cargar los servidores del usuario.');
+      console.error(`Error fetching Docker tunnels for user ${userIdToFetch}:`, error);
+      throw new Error('Error al cargar los túneles Docker del usuario.');
     }
 
-    return NextResponse.json(servers, { status: 200 });
+    const formattedTunnels = tunnels.map(tunnel => ({
+      id: tunnel.id,
+      container_id: tunnel.container_id,
+      full_domain: tunnel.full_domain,
+      container_port: tunnel.container_port,
+      status: tunnel.status,
+      created_at: tunnel.created_at,
+      domain_name: (tunnel.cloudflare_domains as any)?.domain_name || 'N/A',
+      server_name: (tunnel.user_servers as any)?.name || (tunnel.user_servers as any)?.ip_address || 'N/A',
+    }));
+
+    return NextResponse.json(formattedTunnels, { status: 200 });
 
   } catch (error: any) {
-    console.error(`Unhandled error in GET /api/users/${userIdToFetch}/servers:`, error);
+    console.error(`Unhandled error in GET /api/users/${userIdToFetch}/docker-tunnels:`, error);
     return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
   }
 }

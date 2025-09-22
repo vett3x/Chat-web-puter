@@ -5,7 +5,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
-const SUPERUSER_EMAILS = ['martinpensa1@gmail.com']; // Define SuperUser emails
+const SUPERUSER_EMAILS = ['martinpensa1@gmail.com'];
 
 async function getSession() {
   const cookieStore = cookies() as any;
@@ -25,7 +25,7 @@ async function getSession() {
 
 export async function GET(
   req: NextRequest,
-  context: any // Usamos 'any' para resolver el error de compilación de TypeScript
+  context: { params: { id: string } }
 ) {
   const userIdToFetch = context.params.id;
 
@@ -49,21 +49,21 @@ export async function GET(
   );
 
   try {
-    const { data: servers, error } = await supabaseAdmin
-      .from('user_servers')
-      .select('id, name, ip_address, ssh_port, status, created_at')
+    const { data: domains, error } = await supabaseAdmin
+      .from('cloudflare_domains')
+      .select('id, domain_name, zone_id, account_id, created_at')
       .eq('user_id', userIdToFetch)
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error(`Error fetching servers for user ${userIdToFetch}:`, error);
-      throw new Error('Error al cargar los servidores del usuario.');
+      console.error(`Error fetching Cloudflare domains for user ${userIdToFetch}:`, error);
+      throw new Error('Error al cargar los dominios de Cloudflare del usuario.');
     }
 
-    return NextResponse.json(servers, { status: 200 });
+    return NextResponse.json(domains, { status: 200 });
 
   } catch (error: any) {
-    console.error(`Unhandled error in GET /api/users/${userIdToFetch}/servers:`, error);
+    console.error(`Unhandled error in GET /api/users/${userIdToFetch}/cloudflare-domains:`, error);
     return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
   }
 }

@@ -14,7 +14,11 @@ import { Button } from '@/components/ui/button';
 import { User, Server, Cloud, History, MessageSquare, HardDrive } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { UserServersTab } from './user-servers-tab'; // Import the new tab
+import { UserServersTab } from './user-servers-tab';
+import { UserCloudflareTab } from './user-cloudflare-tab'; // Import new tab
+import { UserConversationsTab } from './user-conversations-tab'; // Import new tab
+import { UserResourcesTab } from './user-resources-tab'; // Import new tab
+import { UserActivityTab } from './user-activity-tab'; // Import new tab
 
 interface UserDetailDialogProps {
   open: boolean;
@@ -47,7 +51,7 @@ export function UserDetailDialog({ open, onOpenChange, user }: UserDetailDialogP
         </DialogHeader>
         <div className="flex-1 py-4 overflow-hidden">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-5"> {/* Adjusted grid-cols for future tabs */}
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="servers" className="flex items-center gap-2">
                 <Server className="h-4 w-4" /> Servidores
               </TabsTrigger>
@@ -69,18 +73,17 @@ export function UserDetailDialog({ open, onOpenChange, user }: UserDetailDialogP
                 <TabsContent value="servers" className="h-full">
                   <UserServersTab userId={user.id} />
                 </TabsContent>
-                {/* Future Tabs will go here */}
                 <TabsContent value="cloudflare" className="h-full">
-                  <div className="p-4 text-muted-foreground">Dominios de Cloudflare (en desarrollo)</div>
+                  <UserCloudflareTab userId={user.id} />
                 </TabsContent>
                 <TabsContent value="conversations" className="h-full">
-                  <div className="p-4 text-muted-foreground">Estadísticas de Conversaciones (en desarrollo)</div>
+                  <UserConversationsTab userId={user.id} />
                 </TabsContent>
                 <TabsContent value="resources" className="h-full">
-                  <div className="p-4 text-muted-foreground">Uso de Recursos (en desarrollo)</div>
+                  <UserResourcesTab userId={user.id} />
                 </TabsContent>
                 <TabsContent value="activity" className="h-full">
-                  <div className="p-4 text-muted-foreground">Registro de Actividad (en desarrollo)</div>
+                  <UserActivityTab userId={user.id} />
                 </TabsContent>
               </ScrollArea>
             </div>

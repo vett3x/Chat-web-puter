@@ -5,7 +5,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
-const SUPERUSER_EMAILS = ['martinpensa1@gmail.com']; // Define SuperUser emails
+const SUPERUSER_EMAILS = ['martinpensa1@gmail.com'];
 
 async function getSession() {
   const cookieStore = cookies() as any;
@@ -25,7 +25,7 @@ async function getSession() {
 
 export async function GET(
   req: NextRequest,
-  context: any // Usamos 'any' para resolver el error de compilación de TypeScript
+  context: { params: { id: string } }
 ) {
   const userIdToFetch = context.params.id;
 
@@ -49,21 +49,39 @@ export async function GET(
   );
 
   try {
-    const { data: servers, error } = await supabaseAdmin
-      .from('user_servers')
-      .select('id, name, ip_address, ssh_port, status, created_at')
+    const { data: events, error: fetchError } = await supabaseAdmin
+      .from('server_events_log')
+      .select(`
+        id,
+        event_type,
+        description,
+        created_at,
+        server_id,
+        user_servers (
+          name,
+          ip_address
+        )
+      `)
       .eq('user_id', userIdToFetch)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error(`Error fetching servers for user ${userIdToFetch}:`, error);
-      throw new Error('Error al cargar los servidores del usuario.');
+    if (fetchError) {
+      console.error(`Error fetching server events for user ${userIdToFetch}:`, fetchError);
+      throw new Error('Error al cargar el historial de eventos del usuario.');
     }
 
-    return NextResponse.json(servers, { status: 200 });
+    const formattedEvents = events.map(event => ({
+      id: event.id,
+      event_type: event.event_type,
+      description: event.description,
+      created_at: event.created_at,
+      server_name: event.user_servers ? (event.user_servers as any).name || (event.user_servers as any).ip_address : 'N/A',
+    }));
+
+    return NextResponse.json(formattedEvents, { status: 200 });
 
   } catch (error: any) {
-    console.error(`Unhandled error in GET /api/users/${userIdToFetch}/servers:`, error);
+    console.error(`Unhandled error in GET /api/users/${userIdToFetch}/activity-log:`, error);
     return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
   }
 }
