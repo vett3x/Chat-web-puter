@@ -173,10 +173,14 @@ export async function getCloudflareTunnelToken(
   userId?: string,
 ): Promise<string> {
   const path = `/accounts/${accountId}/tunnels/${tunnelId}/token`;
-  // Call the API, expecting an object with a 'result' field that contains the token string
   const response = await callCloudflareApi<CloudflareTunnelTokenResponse>('GET', path, { apiToken, userId });
-  if (!response || !response.result) {
-    throw new Error('La API de Cloudflare no devolvió un token válido en la respuesta.');
+  
+  // Log the raw response for debugging
+  await logApiCall(userId, 'cloudflare_api_debug', `[getCloudflareTunnelToken] Raw response from Cloudflare API for token: ${JSON.stringify(response)}`);
+
+  if (!response || typeof response.result !== 'string' || response.result.length === 0) {
+    // Provide more context in the error message
+    throw new Error(`La API de Cloudflare no devolvió un token válido en la respuesta. Respuesta recibida: ${JSON.stringify(response)}`);
   }
   return response.result;
 }
