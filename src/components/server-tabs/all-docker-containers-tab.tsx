@@ -125,11 +125,11 @@ export function AllDockerContainersTab() {
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span>{stat['Mem Usage'].split('/')[0].trim()}</span>
+                            <span>{stat['Mem Usage'] ? stat['Mem Usage'].split('/')[0].trim() : 'N/A'}</span>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Uso: {stat['Mem Usage']}</p>
-                            <p>Porcentaje: {stat['Mem %']}</p>
+                            <p>Uso: {stat['Mem Usage'] || 'N/A'}</p>
+                            <p>Porcentaje: {stat['Mem %'] || 'N/A'}</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
