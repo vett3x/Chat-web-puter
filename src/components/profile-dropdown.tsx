@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
-import { Moon, Sun, Settings, LogOut, User as UserIcon, Server, Users } from 'lucide-react'; // Import Users icon
+import { Moon, Sun, Settings, LogOut, User as UserIcon, Server, Users, Crown, Shield } from 'lucide-react'; // Import Crown and Shield icons
 import { useTheme } from 'next-themes';
 import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
@@ -85,7 +85,6 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
     return null; // No mostrar el dropdown si no hay sesión
   }
 
-  const isSuperAdmin = userRole === 'super_admin'; // Helper for conditional rendering
   const isAdmin = userRole === 'admin' || userRole === 'super_admin'; // Helper for admin access
 
   return (
@@ -111,8 +110,13 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
             <span className="text-xs text-muted-foreground truncate">
               {profile?.first_name && profile?.last_name ? `${profile.first_name} ${profile.last_name}` : session.user.email}
             </span>
-            {userRole && (
-              <span className="text-xs font-semibold text-primary-foreground bg-primary/80 px-1.5 py-0.5 rounded-full mt-1 capitalize">
+            {userRole && userRole !== 'user' && ( // Only show role badge if not 'user'
+              <span className={`flex items-center gap-1 text-xs font-semibold px-1.5 py-0.5 rounded-full mt-1 capitalize
+                ${userRole === 'super_admin' ? 'bg-yellow-500 text-yellow-900 dark:bg-yellow-400 dark:text-yellow-950' : ''}
+                ${userRole === 'admin' ? 'bg-purple-500 text-purple-900 dark:bg-purple-400 dark:text-purple-950' : ''}
+              `}>
+                {userRole === 'super_admin' && <Crown className="h-3 w-3 fill-current" />}
+                {userRole === 'admin' && <Shield className="h-3 w-3 fill-current" />}
                 {userRole === 'super_admin' ? 'Super Admin' : userRole}
               </span>
             )}
