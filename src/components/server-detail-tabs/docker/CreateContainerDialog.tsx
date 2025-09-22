@@ -66,6 +66,13 @@ echo "--- Installing core dependencies (curl, gnupg, lsb-release, apt-utils)..."
 sudo apt-get install -y curl gnupg lsb-release apt-utils || { echo "ERROR: core dependencies installation failed"; exit 1; }
 echo "--- Core dependencies installed. ---"
 
+echo "--- Installing Node.js and npm... ---"
+curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo bash - || { echo "ERROR: Node.js setup script failed"; exit 1; }
+sudo apt-get install -y nodejs || { echo "ERROR: Node.js installation failed"; exit 1; }
+echo "Node.js version: $(node -v)"
+echo "npm version: $(npm -v)"
+echo "--- Node.js and npm installed. ---"
+
 echo "--- Installing cloudflared... ---"
 # Add cloudflare gpg key
 sudo mkdir -p --mode=0755 /usr/share/keyrings || { echo "ERROR: mkdir /usr/share/keyrings failed"; exit 1; }
@@ -83,12 +90,18 @@ which cloudflared || { echo "ERROR: cloudflared binary not found in PATH"; exit 
 cloudflared --version || { echo "ERROR: cloudflared --version command failed"; exit 1; }
 echo "--- cloudflared installed and verified. ---"
 
-echo "--- Installing Node.js and npm... ---"
-curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo bash - || { echo "ERROR: Node.js setup script failed"; exit 1; }
-sudo apt-get install -y nodejs || { echo "ERROR: Node.js installation failed"; exit 1; }
-echo "Node.js version: $(node -v)"
-echo "npm version: $(npm -v)"
-echo "--- Node.js and npm installed. ---"
+echo "--- Creating Next.js 'hello-world' app in /app directory... ---"
+# Run as root, so no sudo needed here. Use --yes to skip prompts.
+cd /
+npx --yes create-next-app@latest app --use-npm --example "https://github.com/vercel/next.js/tree/canary/examples/hello-world" || { echo "ERROR: create-next-app failed"; exit 1; }
+echo "--- Next.js app created. ---"
+
+echo "--- Starting Next.js dev server in the background... ---"
+cd /app
+# Run the dev server in the background using nohup and redirect output
+# The __CONTAINER_PORT__ placeholder will be replaced by the backend with the correct port.
+nohup npm run dev -- -p __CONTAINER_PORT__ > /app/dev.log 2>&1 &
+echo "--- Next.js dev server started. Check /app/dev.log for output. ---"
 
 echo "--- Container dependency installation complete ---"
 `;

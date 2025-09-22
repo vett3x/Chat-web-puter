@@ -157,6 +157,7 @@ export async function POST(
 
     // --- Phase 2: Create and run the Docker container ---
     let actualHostPort = host_port;
+    const finalContainerPort = container_port || 3000; // Default to 3000 if not provided
     try {
       if (name) runCommand += ` --name ${name.replace(/[^a-zA-Z0-9_.-]/g, '')}`;
       
@@ -179,7 +180,7 @@ export async function POST(
       }
       // --- FIN LÓGICA DE PUERTO ---
 
-      const finalPorts = `${actualHostPort}:${container_port || 3000}`;
+      const finalPorts = `${actualHostPort}:${finalContainerPort}`;
       runCommand += ` -p ${finalPorts}`;
       
       runCommand += ` --entrypoint ${entrypointExecutable} ${baseImage} ${entrypointArgs}`;
@@ -229,8 +230,11 @@ export async function POST(
         description: `Ejecutando script de instalación de dependencias en el contenedor ${containerId?.substring(0,12)}...`,
       });
 
+      // Replace the placeholder with the actual container port
+      const finalInstallScript = script_install_deps.replace(/__CONTAINER_PORT__/g, String(finalContainerPort));
+
       // Base64 encode the script received from the frontend
-      const encodedScript = Buffer.from(script_install_deps).toString('base64');
+      const encodedScript = Buffer.from(finalInstallScript).toString('base64');
 
       // Execute the encoded script inside the container using bash
       const { stdout: installStdout, stderr: installStderr, code: installCode } = await executeSshCommand(server, `docker exec ${containerId} bash -c "echo '${encodedScript}' | base64 -d | bash"`);
@@ -261,7 +265,7 @@ export async function POST(
 
     // Tunnel creation logic (always for Next.js)
     // This section runs AFTER the dependency installation script has completed.
-    if (cloudflare_domain_id && container_port && actualHostPort && userPermissions[PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_TUNNELS]) {
+    if (cloudflare_domain_id && finalContainerPort && actualHostPort && userPermissions[PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_TUNNELS]) {
       // Fetch Cloudflare domain details
       const { data: cfDomainDetails, error: cfDomainError } = await supabaseAdmin
         .from('cloudflare_domains')
@@ -277,7 +281,7 @@ export async function POST(
           serverId: serverId,
           containerId: containerId!, // containerId is guaranteed to be defined here
           cloudflareDomainId: cloudflare_domain_id,
-          containerPort: container_port,
+          containerPort: finalContainerPort,
           hostPort: actualHostPort, // Pasar el puerto del host a la orquestación
           subdomain: subdomain,
           serverDetails: {
@@ -310,7 +314,7 @@ export async function POST(
       2. Accede al contenedor: docker exec -it ${containerId?.substring(0,12)} /bin/bash
       3. Dentro del contenedor, crea tu app Next.js: npx create-next-app@latest my-next-app --use-npm --example "https://github.com/vercel/next.js/tree/canary/examples/hello-world"
       4. Navega a tu app: cd my-next-app
-      5. Inicia el servidor de desarrollo: npm run dev -- -p ${container_port || 3000}
+      5. Inicia el servidor de desarrollo: npm run dev -- -p ${finalContainerPort}
       6. Si configuraste un túnel Cloudflare, tu app estará accesible en el dominio.`,
     });
 
