@@ -153,7 +153,6 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
       toast.error(error.message);
     } finally {
       setIsCreatingContainer(false);
-      // Do NOT close dialog here on error
     }
   };
 
@@ -182,13 +181,13 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
 
   return (
     <Dialog open={open} onOpenChange={(newOpenState) => {
-      // Prevent closing the dialog while an operation is in progress or if an error is displayed.
-      // The user must explicitly click "Cancel" or the "X" button.
       if (isCreatingContainer && !newOpenState) {
+        toast.info("Por favor, espera a que termine el proceso de creación.");
         return; // Don't close while creating
       }
-      if (statusMessage?.type === 'error' && !newOpenState) {
-        return; // Don't close if there's an error displayed
+      // When closing, reset the status message so it's clean on next open
+      if (!newOpenState) {
+        setStatusMessage(null);
       }
       onOpenChange(newOpenState);
     }}>
@@ -287,7 +286,7 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
               />
             </>
 
-            {isCreatingContainer && statusMessage && (
+            {statusMessage && (
               <div className="space-y-2 p-4 border rounded-md bg-muted/50">
                 <h4 className="font-semibold">Progreso:</h4>
                 {renderStatusStep(1, 'Iniciando proceso...', currentStep, statusMessage.type)}
