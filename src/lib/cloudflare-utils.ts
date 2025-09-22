@@ -173,7 +173,8 @@ export async function createCloudflareTunnel(
   await logApiCall(userId, 'cloudflare_tunnel_create_ssh_mkdir', `Ensured /root/.cloudflared directory exists on ${serverDetails.ip_address}.`);
 
   // Explicitly set TUNNEL_ORIGIN_CERT to empty to prevent it from looking for cert.pem
-  const command = `TUNNEL_ORIGIN_CERT="" cloudflared tunnel create ${tunnelName}`;
+  // Wrapped in bash -c to ensure environment variable is set correctly for the command.
+  const command = `bash -c 'TUNNEL_ORIGIN_CERT="" cloudflared tunnel create ${tunnelName}'`;
   const { stdout, stderr, code } = await executeSshCommand(serverDetails, command);
 
   if (code !== 0) {
