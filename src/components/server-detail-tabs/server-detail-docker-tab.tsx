@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useForm } from 'react-hook-form';
+import { useForm, SubmitHandler } from 'react-hook-form'; // Import SubmitHandler
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import {
@@ -78,8 +78,12 @@ const createContainerFormSchema = z.object({
   image: z.string().min(1, { message: 'La imagen es requerida.' }),
   name: z.string().optional(),
   ports: z.string().optional(), // e.g., "8080:80"
+  framework: z.enum(['nextjs', 'other']).default('other'), // New field
+  cloudflare_domain_id: z.string().uuid({ message: 'ID de dominio de Cloudflare inválido.' }).optional(),
+  container_port: z.coerce.number().int().min(1).max(65535, { message: 'Puerto de contenedor inválido.' }).optional(),
+  subdomain: z.string().regex(/^[a-z0-9-]{1,63}$/, { message: 'Subdominio inválido. Solo minúsculas, números y guiones.' }).optional(),
 });
-type CreateContainerFormValues = z.infer<typeof createContainerFormSchema>;
+type CreateContainerFormValues = z.infer<typeof createContainerFormSchema>; // Infer type directly
 
 const createTunnelFormSchema = z.object({
   cloudflare_domain_id: z.string().min(1, { message: 'El dominio de Cloudflare es requerido.' }),
@@ -116,12 +120,24 @@ export function ServerDetailDockerTab({ server, userRole }: ServerDetailDockerTa
 
   const createContainerForm = useForm<CreateContainerFormValues>({
     resolver: zodResolver(createContainerFormSchema),
-    defaultValues: { image: '', name: '', ports: '' },
+    defaultValues: { 
+      image: '', 
+      name: undefined, // Optional fields should be undefined
+      ports: undefined, // Optional fields should be undefined
+      framework: 'other', // Explicitly set default from schema
+      cloudflare_domain_id: undefined, // Optional fields should be undefined
+      container_port: undefined, // Optional fields should be undefined
+      subdomain: undefined // Optional fields should be undefined
+    },
   });
 
   const createTunnelForm = useForm<CreateTunnelFormValues>({
     resolver: zodResolver(createTunnelFormSchema),
-    defaultValues: { cloudflare_domain_id: '', container_port: 80, subdomain: '' },
+    defaultValues: { 
+      cloudflare_domain_id: '', 
+      container_port: 80, 
+      subdomain: undefined // Optional fields should be undefined
+    },
   });
 
   const fetchContainers = useCallback(async () => {
@@ -192,7 +208,7 @@ export function ServerDetailDockerTab({ server, userRole }: ServerDetailDockerTa
     }
   };
 
-  const handleCreateContainer = async (values: CreateContainerFormValues) => {
+  const handleCreateContainer: SubmitHandler<CreateContainerFormValues> = async (values) => {
     setIsCreatingContainer(true);
     try {
       const response = await fetch(`/api/servers/${server.id}/docker/containers/create`, {
@@ -208,7 +224,7 @@ export function ServerDetailDockerTab({ server, userRole }: ServerDetailDockerTa
       toast.success('Contenedor creado exitosamente.');
       await fetchContainers();
       setIsCreateContainerDialogOpen(false);
-      createContainerForm.reset();
+      createContainerForm.reset(createContainerForm.defaultValues); // Reset with default values
       
     } catch (error: any) {
       toast.error(error.message);
@@ -235,7 +251,7 @@ export function ServerDetailDockerTab({ server, userRole }: ServerDetailDockerTa
       toast.success('Túnel de Cloudflare creado y aprovisionamiento iniciado.');
       // No need to fetch containers, as tunnels are in a separate tab
       setIsCreateTunnelDialogOpen(false);
-      createTunnelForm.reset();
+      createTunnelForm.reset(createTunnelForm.defaultValues); // Reset with default values
       
     } catch (error: any) {
       toast.error(error.message);
@@ -254,7 +270,7 @@ export function ServerDetailDockerTab({ server, userRole }: ServerDetailDockerTa
     setIsCreateTunnelDialogOpen(true);
     // Pre-fill container port if available, or default to 80
     const defaultPort = container.Ports ? parseInt(container.Ports.split('->')[1]?.split('/')[0] || '80') : 80;
-    createTunnelForm.reset({ container_port: defaultPort, subdomain: '' });
+    createTunnelForm.reset({ ...createTunnelForm.defaultValues, container_port: defaultPort });
   };
 
   // Filter containers for error count: only count non-running containers that are NOT gracefully exited
@@ -289,6 +305,102 @@ export function ServerDetailDockerTab({ server, userRole }: ServerDetailDockerTa
                     <FormField control={createContainerForm.control} name="image" render={({ field }) => (<FormItem><FormLabel>Imagen</FormLabel><FormControl><Input placeholder="ubuntu:latest" {...field} /></FormControl><FormMessage /></FormItem>)} />
                     <FormField control={createContainerForm.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nombre (Opcional)</FormLabel><FormControl><Input placeholder="mi-contenedor" {...field} /></FormControl><FormMessage /></FormItem>)} />
                     <FormField control={createContainerForm.control} name="ports" render={({ field }) => (<FormItem><FormLabel>Puertos (Opcional)</FormLabel><FormControl><Input placeholder="8080:80" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                    
+                    <FormField
+                      control={createContainerForm.control}
+                      name="framework"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Framework</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isCreatingContainer}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecciona un framework" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="nextjs">Next.js</SelectItem>
+                              <SelectItem value="other">Otro</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            Selecciona el framework para configurar el entorno del contenedor.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {createContainerForm.watch('framework') === 'nextjs' && (
+                      <>
+                        <FormField
+                          control={createContainerForm.control}
+                          name="cloudflare_domain_id"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Dominio de Cloudflare (para túnel)</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isCreatingContainer || isLoadingCloudflareDomains || cloudflareDomains.length === 0 || !canManageCloudflareTunnels}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Selecciona un dominio registrado" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {isLoadingCloudflareDomains ? (
+                                    <SelectItem value="loading" disabled>Cargando dominios...</SelectItem>
+                                  ) : cloudflareDomains.length === 0 ? (
+                                    <SelectItem value="no-domains" disabled>No hay dominios registrados</SelectItem>
+                                  ) : (
+                                    cloudflareDomains.map((domain) => (
+                                      <SelectItem key={domain.id} value={domain.id}>
+                                        {domain.domain_name} (Zone ID: {domain.zone_id.substring(0, 8)}...)
+                                      </SelectItem>
+                                    ))
+                                  )}
+                                </SelectContent>
+                              </Select>
+                              <FormDescription>
+                                Se usará para crear un túnel Cloudflare automáticamente.
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={createContainerForm.control}
+                          name="container_port"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Puerto Interno del Contenedor (para túnel)</FormLabel>
+                              <FormControl>
+                                <Input type="number" placeholder="3000" {...field} disabled={isCreatingContainer || !canManageCloudflareTunnels} />
+                              </FormControl>
+                              <FormDescription>
+                                El puerto interno del contenedor al que Cloudflare Tunnel debe redirigir (ej. 3000 para Next.js).
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={createContainerForm.control}
+                          name="subdomain"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Subdominio (Opcional, para túnel)</FormLabel>
+                              <FormControl>
+                                <Input placeholder="mi-app-nextjs" {...field} disabled={isCreatingContainer || !canManageCloudflareTunnels} />
+                              </FormControl>
+                              <FormDescription>
+                                Si se deja vacío, se generará un subdominio aleatorio.
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </>
+                    )}
+
                     <DialogFooter>
                       <DialogClose asChild><Button type="button" variant="outline" disabled={isCreatingContainer}>Cancelar</Button></DialogClose>
                       <Button type="submit" disabled={isCreatingContainer || !canManageDockerContainers}>

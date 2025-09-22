@@ -47,6 +47,19 @@ docker-compose --version
 echo "--- Pulling ubuntu:latest Docker image ---"
 docker pull ubuntu:latest
 
+echo "--- Starting Node.js and npm Installation ---"
+# Install Node.js (using NodeSource PPA for latest LTS)
+curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
+apt-get install -y nodejs
+
+# Verify Node.js and npm installations
+echo "--- Node.js Version ---"
+node -v
+echo "--- npm Version ---"
+npm -v
+
+echo "--- Node.js Environment Setup Complete ---"
+
 echo "--- Provisioning Complete ---"
 `;
 

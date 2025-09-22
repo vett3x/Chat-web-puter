@@ -7,11 +7,16 @@ import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { z } from 'zod';
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
+import { createAndProvisionCloudflareTunnel } from '@/lib/tunnel-orchestration'; // Import the new server action
 
 const createContainerSchema = z.object({
   image: z.string().min(1, { message: 'El nombre de la imagen es requerido.' }),
   name: z.string().optional(),
   ports: z.string().optional(),
+  framework: z.enum(['nextjs', 'other']).default('other'), // New field
+  cloudflare_domain_id: z.string().uuid({ message: 'ID de dominio de Cloudflare inválido.' }).optional(),
+  container_port: z.coerce.number().int().min(1).max(65535, { message: 'Puerto de contenedor inválido.' }).optional(),
+  subdomain: z.string().regex(/^[a-z0-9-]{1,63}$/, { message: 'Subdominio inválido. Solo minúsculas, números y guiones.' }).optional(),
 });
 
 // Helper function to get the session and user role
@@ -129,14 +134,31 @@ export async function POST(
   }
 
   const conn = new Client();
+  let containerId: string | undefined; // Declare containerId here
+
   try {
     const body = await req.json();
-    const { image, name, ports } = createContainerSchema.parse(body);
+    const { image, name, ports, framework, cloudflare_domain_id, container_port, subdomain } = createContainerSchema.parse(body);
 
     let runCommand = 'docker run -d';
+    let baseImage = image;
+    let entrypointCommand = 'tail -f /dev/null'; // Default entrypoint to keep container alive
+
+    if (framework === 'nextjs') {
+      baseImage = 'node:lts-alpine'; // Use a Node.js base image
+      // For Next.js, we'll just ensure Node.js is available.
+      // The user will then exec into it to run `create-next-app`.
+      // We can add a command to install create-next-app globally if desired,
+      // but for now, just keeping the container alive with Node.js is sufficient.
+      // The server provisioning script already installs Node.js on the *host*.
+      // For the *container*, we need a Node.js image.
+    } else {
+      // For 'other', use the provided image and default entrypoint
+    }
+
     if (name) runCommand += ` --name ${name.replace(/[^a-zA-Z0-9_.-]/g, '')}`;
     if (ports && /^\d{1,5}:\d{1,5}$/.test(ports)) runCommand += ` -p ${ports}`;
-    runCommand += ` --entrypoint tail ${image} -f /dev/null`;
+    runCommand += ` --entrypoint ${entrypointCommand} ${baseImage}`; // Use the determined baseImage
 
     await new Promise<void>((resolve, reject) => conn.on('ready', resolve).on('error', reject).connect({ host: server.ip_address, port: server.ssh_port || 22, username: server.ssh_username, password: server.ssh_password, readyTimeout: 10000 }));
 
@@ -144,7 +166,7 @@ export async function POST(
     if (runCode !== 0) {
       throw new Error(`Error al crear contenedor: ${runStderr}`);
     }
-    const trimmedId = newContainerId.trim();
+    containerId = newContainerId.trim(); // Assign to outer-scoped containerId
 
     // Poll to verify the container is running
     const startTime = Date.now();
@@ -152,7 +174,7 @@ export async function POST(
     let isVerified = false;
 
     while (Date.now() - startTime < timeout) {
-      const { stdout: inspectOutput, code: inspectCode } = await executeSshCommand(conn, `docker inspect --format '{{.State.Running}}' ${trimmedId}`);
+      const { stdout: inspectOutput, code: inspectCode } = await executeSshCommand(conn, `docker inspect --format '{{.State.Running}}' ${containerId}`);
       if (inspectCode === 0 && inspectOutput.trim() === 'true') {
         isVerified = true;
         break;
@@ -168,7 +190,7 @@ export async function POST(
         user_id: session.user.id,
         server_id: serverId,
         event_type: 'container_create_warning',
-        description: `Contenedor '${name || image}' (ID: ${trimmedId.substring(0,12)}) creado en '${server.name || server.ip_address}', pero no se pudo verificar su estado de ejecución.`,
+        description: `Contenedor '${name || image}' (ID: ${containerId?.substring(0,12)}) creado en '${server.name || server.ip_address}', pero no se pudo verificar su estado de ejecución.`,
       });
       throw new Error('El contenedor fue creado pero no se pudo verificar su estado "running" a tiempo.');
     }
@@ -178,10 +200,58 @@ export async function POST(
       user_id: session.user.id,
       server_id: serverId,
       event_type: 'container_created',
-      description: `Contenedor '${name || image}' (ID: ${trimmedId.substring(0,12)}) creado y en ejecución en '${server.name || server.ip_address}'.`,
+      description: `Contenedor '${name || image}' (ID: ${containerId?.substring(0,12)}) creado y en ejecución en '${server.name || server.ip_address}'.`,
     });
 
-    return NextResponse.json({ message: `Contenedor ${trimmedId.substring(0,12)} creado y en ejecución.` }, { status: 201 });
+    // If Next.js framework and tunnel details are provided, initiate tunnel creation
+    if (framework === 'nextjs' && cloudflare_domain_id && container_port && userPermissions[PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_TUNNELS]) {
+      // Fetch Cloudflare domain details
+      const { data: cfDomainDetails, error: cfDomainError } = await supabaseAdmin
+        .from('cloudflare_domains')
+        .select('domain_name, api_token, zone_id, account_id')
+        .eq('id', cloudflare_domain_id)
+        .eq('user_id', session.user.id)
+        .single();
+
+      if (cfDomainDetails && !cfDomainError) {
+        // Call the new server action to create and provision the tunnel
+        createAndProvisionCloudflareTunnel({
+          userId: session.user.id,
+          serverId: serverId,
+          containerId: containerId,
+          cloudflareDomainId: cloudflare_domain_id,
+          containerPort: container_port,
+          subdomain: subdomain,
+          serverDetails: {
+            ip_address: server.ip_address,
+            ssh_port: server.ssh_port || 22,
+            ssh_username: server.ssh_username,
+            ssh_password: server.ssh_password,
+            name: server.name,
+          },
+          cloudflareDomainDetails: cfDomainDetails,
+        }).catch(tunnelError => {
+          console.error(`Error during automated tunnel creation for container ${containerId}:`, tunnelError);
+          // Log this error, but don't block the container creation response
+          supabaseAdmin.from('server_events_log').insert({
+            user_id: session.user.id,
+            server_id: serverId,
+            event_type: 'tunnel_create_failed',
+            description: `Fallo en la creación automática del túnel para el contenedor ${containerId?.substring(0,12)}. Error: ${tunnelError.message}`,
+          }).then();
+        });
+      } else {
+        console.warn(`[Container Create] Tunnel details provided for Next.js container ${containerId}, but Cloudflare domain details could not be fetched or user lacks permissions. Tunnel not created automatically.`);
+        supabaseAdmin.from('server_events_log').insert({
+          user_id: session.user.id,
+          server_id: serverId,
+          event_type: 'tunnel_create_warning',
+          description: `Advertencia: No se pudo crear el túnel automáticamente para el contenedor ${containerId?.substring(0,12)}. Detalles de dominio de Cloudflare no encontrados o permisos insuficientes.`,
+        }).then();
+      }
+    }
+
+    return NextResponse.json({ message: `Contenedor ${containerId?.substring(0,12)} creado y en ejecución.` }, { status: 201 });
 
   } catch (error: any) {
     conn.end();
