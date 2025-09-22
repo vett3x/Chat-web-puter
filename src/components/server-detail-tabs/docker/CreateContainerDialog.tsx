@@ -25,8 +25,9 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, CheckCircle2, XCircle } from 'lucide-react'; // Import CheckCircle2 and XCircle
+import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { Textarea } from '@/components/ui/textarea'; // Import Textarea
 
 interface CloudflareDomain {
   id: string;
@@ -40,18 +41,74 @@ const createContainerFormSchema = z.object({
   name: z.string().optional(),
   cloudflare_domain_id: z.string().uuid({ message: 'ID de dominio de Cloudflare inválido.' }).optional(),
   container_port: z.coerce.number().int().min(1).max(65535, { message: 'Puerto de contenedor inválido.' }).optional(),
-  host_port: z.coerce.number().int().min(1).max(65535, { message: 'Puerto del host inválido.' }).optional(), // Nuevo campo para el puerto del host
+  host_port: z.coerce.number().int().min(1).max(65535, { message: 'Puerto del host inválido.' }).optional(),
   subdomain: z.string().regex(/^[a-z0-9-]{1,63}$/, { message: 'Subdominio inválido. Solo minúsculas, números y guiones.' }).optional(),
+  script_install_deps: z.string().min(1, { message: 'El script de instalación de dependencias es requerido.' }), // New field for script
 });
 type CreateContainerFormValues = z.infer<typeof createContainerFormSchema>;
 
+const DEFAULT_INSTALL_DEPS_SCRIPT = `
+set -e
+export DEBIAN_FRONTEND=noninteractive
+
+echo "--- Updating apt package list and installing core dependencies (curl, gnupg, lsb-release, sudo)..."
+apt-get update -y
+apt-get install -y curl gnupg lsb-release sudo
+echo "--- Core dependencies installed, including sudo. ---"
+
+echo "--- Installing Node.js and npm... ---"
+curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo bash -
+sudo apt-get install -y nodejs
+echo "Node.js version: $(node -v)"
+echo "npm version: $(npm -v)"
+echo "--- Node.js and npm installed. ---"
+
+echo "--- Installing cloudflared... ---"
+# Add cloudflare gpg key
+sudo mkdir -p --mode=0755 /usr/share/keyrings
+curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
+
+# Add this repo to your apt repositories
+echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' | sudo tee /etc/apt/sources.list.d/cloudflared.list
+
+# install cloudflared
+sudo apt-get update && sudo apt-get install -y cloudflared
+echo "cloudflared version: $(cloudflared --version)"
+echo "--- cloudflared installed. ---"
+
+echo "--- Container dependency installation complete ---"
+`;
+
+const TUNNEL_CREATION_SUMMARY_SCRIPT = `
+# Resumen de la secuencia de creación del túnel Cloudflare (ejecutado en el backend)
+
+# 1. Verificar túneles existentes para el contenedor y puerto.
+# 2. Crear un nuevo túnel Cloudflare a través de la API de Cloudflare.
+#    - Se genera un ID de túnel y un token.
+# 3. Generar un subdominio (si no se proporciona) y construir el dominio completo.
+# 4. Crear un registro DNS CNAME en Cloudflare apuntando el dominio completo al túnel.
+# 5. Guardar los detalles del túnel en la base de datos (tabla 'docker_tunnels').
+# 6. Configurar las reglas de ingreso del túnel a través de la API de Cloudflare:
+#    - Redirige el tráfico del dominio completo a 'http://localhost:[PUERTO_CONTENEDOR]'.
+# 7. Instalar y ejecutar el cliente 'cloudflared' dentro del contenedor Docker:
+#    - Se crea el directorio '/root/.cloudflared'.
+#    - Se escriben los archivos de credenciales y configuración ('config.yml') del túnel.
+#    - Se ejecuta 'cloudflared tunnel run [ID_TUNNEL]' en segundo plano dentro del contenedor.
+# 8. Actualizar el estado del túnel a 'activo' en la base de datos.
+# 9. Registrar el evento de creación del túnel en el historial del servidor.
+
+# En caso de fallo en cualquier paso, se intenta revertir las acciones realizadas (eliminar túnel, registro DNS, etc.).
+`;
+
+
 const INITIAL_CREATE_CONTAINER_DEFAULTS: CreateContainerFormValues = {
-  image: 'ubuntu:latest', // Changed to ubuntu:latest
+  image: 'ubuntu:latest',
   name: '',
   cloudflare_domain_id: undefined,
   container_port: 3000,
-  host_port: undefined, // Por defecto, se generará uno aleatorio
+  host_port: undefined,
   subdomain: undefined,
+  script_install_deps: DEFAULT_INSTALL_DEPS_SCRIPT, // Set default script
 };
 
 interface CreateContainerDialogProps {
@@ -191,7 +248,7 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
       }
       onOpenChange(newOpenState);
     }}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto"> {/* Increased max-width and added scroll */}
         <DialogHeader>
           <DialogTitle>Crear Nuevo Contenedor Next.js</DialogTitle>
           <DialogDescription>Ejecuta un nuevo contenedor Docker preconfigurado para Next.js en este servidor.</DialogDescription>
@@ -285,6 +342,45 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
                 )}
               />
             </>
+
+            {/* New: Editable Script for Dependencies */}
+            <FormField
+              control={form.control}
+              name="script_install_deps"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Script de Instalación de Dependencias del Contenedor</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      className="font-mono text-xs h-64"
+                      disabled={isCreatingContainer || !canManageDockerContainers}
+                      spellCheck="false"
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Este script se ejecuta dentro del contenedor para instalar Node.js, npm y cloudflared.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* New: Read-only Script for Tunnel Creation Summary */}
+            <FormItem>
+              <FormLabel>Secuencia de Creación del Túnel Cloudflare (Resumen)</FormLabel>
+              <FormControl>
+                <Textarea
+                  value={TUNNEL_CREATION_SUMMARY_SCRIPT}
+                  className="font-mono text-xs h-96"
+                  readOnly
+                  spellCheck="false"
+                />
+              </FormControl>
+              <FormDescription>
+                Este es un resumen de los pasos que el backend realiza para crear y aprovisionar el túnel. No es editable.
+              </FormDescription>
+            </FormItem>
 
             {statusMessage && (
               <div className="space-y-2 p-4 border rounded-md bg-muted/50">

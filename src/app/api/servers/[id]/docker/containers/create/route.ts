@@ -17,6 +17,7 @@ const createContainerSchema = z.object({
   container_port: z.coerce.number().int().min(1).max(65535, { message: 'Puerto de contenedor inválido.' }).optional(),
   host_port: z.coerce.number().int().min(1).max(65535, { message: 'Puerto del host inválido.' }).optional(), // Nuevo campo
   subdomain: z.string().regex(/^[a-z0-9-]{1,63}$/, { message: 'Subdominio inválido. Solo minúsculas, números y guiones.' }).optional(),
+  script_install_deps: z.string().min(1, { message: 'El script de instalación de dependencias es requerido.' }), // New: script from frontend
 });
 
 // Helper function to get the session and user role
@@ -121,10 +122,10 @@ export async function POST(
 
   try {
     const body = await req.json();
-    const { image, name, cloudflare_domain_id, container_port, host_port, subdomain } = createContainerSchema.parse(body); // Obtener host_port
+    const { image, name, cloudflare_domain_id, container_port, host_port, subdomain, script_install_deps } = createContainerSchema.parse(body); // Get script_install_deps
 
     let runCommand = 'docker run -d';
-    const baseImage = 'ubuntu:latest'; // Changed to ubuntu:latest
+    const baseImage = 'ubuntu:latest';
     const entrypointExecutable = 'tail';
     const entrypointArgs = '-f /dev/null';
 
@@ -154,7 +155,7 @@ export async function POST(
     }
 
     // --- Phase 2: Create and run the Docker container ---
-    let actualHostPort = host_port; // Declare actualHostPort here
+    let actualHostPort = host_port;
     try {
       if (name) runCommand += ` --name ${name.replace(/[^a-zA-Z0-9_.-]/g, '')}`;
       
@@ -164,9 +165,8 @@ export async function POST(
         let attempts = 0;
         while (!isPortAvailable && attempts < 20) {
           const randomPort = generateRandomPort();
-          // Usamos 'ss' para verificar si el puerto está en uso. Es más moderno que netstat.
           const { stdout: portCheckOutput, code: portCheckCode } = await executeSshCommand(server, `ss -tlpn | grep -q ':${randomPort}'`);
-          if (portCheckCode !== 0) { // El puerto no está en uso si grep no encuentra nada (código de salida 1)
+          if (portCheckCode !== 0) {
             isPortAvailable = true;
             actualHostPort = randomPort;
           }
@@ -178,7 +178,7 @@ export async function POST(
       }
       // --- FIN LÓGICA DE PUERTO ---
 
-      const finalPorts = `${actualHostPort}:${container_port || 3000}`; // Usar el puerto del host y el puerto del contenedor
+      const finalPorts = `${actualHostPort}:${container_port || 3000}`;
       runCommand += ` -p ${finalPorts}`;
       
       runCommand += ` --entrypoint ${entrypointExecutable} ${baseImage} ${entrypointArgs}`;
@@ -220,49 +220,16 @@ export async function POST(
         description: `Contenedor '${name || image}' (ID: ${containerId?.substring(0,12)}) creado y en ejecución en '${server.name || server.ip_address}'. Puertos mapeados: ${finalPorts}.`,
       });
 
-      // --- Instalar Node.js, npm y cloudflared dentro del contenedor ---
+      // --- Instalar Node.js, npm y cloudflared dentro del contenedor usando el script del frontend ---
       await supabaseAdmin.from('server_events_log').insert({
         user_id: session.user.id,
         server_id: serverId,
         event_type: 'container_created',
-        description: `Instalando Node.js, npm y cloudflared en el contenedor ${containerId?.substring(0,12)}...`,
+        description: `Ejecutando script de instalación de dependencias en el contenedor ${containerId?.substring(0,12)}...`,
       });
 
-      // Script para instalar Node.js, npm y cloudflared dentro del contenedor
-      const installContainerDependenciesScript = `
-        set -e
-        export DEBIAN_FRONTEND=noninteractive
-
-        echo "--- Updating apt package list and installing core dependencies (curl, gnupg, lsb-release, sudo)..."
-        apt-get update -y
-        apt-get install -y curl gnupg lsb-release sudo
-        echo "--- Core dependencies installed, including sudo. ---"
-
-        echo "--- Installing Node.js and npm... ---"
-        curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo bash -
-        sudo apt-get install -y nodejs
-        echo "Node.js version: $(node -v)"
-        echo "npm version: $(npm -v)"
-        echo "--- Node.js and npm installed. ---"
-
-        echo "--- Installing cloudflared... ---"
-        # Add cloudflare gpg key
-        sudo mkdir -p --mode=0755 /usr/share/keyrings
-        curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
-
-        # Add this repo to your apt repositories
-        echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' | sudo tee /etc/apt/sources.list.d/cloudflared.list
-
-        # install cloudflared
-        sudo apt-get update && sudo apt-get install -y cloudflared
-        echo "cloudflared version: $(cloudflared --version)"
-        echo "--- cloudflared installed. ---"
-
-        echo "--- Container dependency installation complete ---"
-      `;
-
-      // Base64 encode the script
-      const encodedScript = Buffer.from(installContainerDependenciesScript).toString('base64');
+      // Base64 encode the script received from the frontend
+      const encodedScript = Buffer.from(script_install_deps).toString('base64');
 
       // Execute the encoded script inside the container using bash
       const { stdout: installStdout, stderr: installStderr, code: installCode } = await executeSshCommand(server, `docker exec ${containerId} bash -c "echo '${encodedScript}' | base64 -d | bash"`);
@@ -275,7 +242,7 @@ export async function POST(
         user_id: session.user.id,
         server_id: serverId,
         event_type: 'container_created',
-        description: `Node.js, npm y cloudflared instalados en el contenedor ${containerId?.substring(0,12)}.`,
+        description: `Node.js, npm y cloudflared instalados en el contenedor ${containerId?.substring(0,12)} usando el script proporcionado.`,
       });
       // --- FIN INSTALACIÓN DE DEPENDENCIAS EN CONTENEDOR ---
 
@@ -284,6 +251,7 @@ export async function POST(
     }
 
     // Tunnel creation logic (always for Next.js)
+    // This section runs AFTER the dependency installation script has completed.
     if (cloudflare_domain_id && container_port && actualHostPort && userPermissions[PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_TUNNELS]) {
       // Fetch Cloudflare domain details
       const { data: cfDomainDetails, error: cfDomainError } = await supabaseAdmin
