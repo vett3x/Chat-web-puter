@@ -54,10 +54,10 @@ const DEFAULT_INSTALL_DEPS_SCRIPT = `
 set -e
 export DEBIAN_FRONTEND=noninteractive
 
-echo "--- Updating apt package list and installing core dependencies (curl, gnupg, lsb-release, sudo)..."
+echo "--- Updating apt package list and installing core dependencies (curl, gnupg, lsb-release, sudo, apt-utils)..."
 apt-get update -y
-apt-get install -y curl gnupg lsb-release sudo
-echo "--- Core dependencies installed, including sudo. ---"
+apt-get install -y curl gnupg lsb-release sudo apt-utils
+echo "--- Core dependencies installed, including sudo and apt-utils. ---"
 
 echo "--- Installing Node.js and npm... ---"
 curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo bash -
@@ -75,7 +75,7 @@ curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/
 echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' | sudo tee /etc/apt/sources.list.d/cloudflared.list
 
 # install cloudflared
-sudo apt-get update && sudo apt-get install -y cloudflflared
+sudo apt-get update && sudo apt-get install -y cloudflared
 echo "cloudflared version: $(cloudflared --version)"
 echo "--- cloudflared installed. ---"
 
