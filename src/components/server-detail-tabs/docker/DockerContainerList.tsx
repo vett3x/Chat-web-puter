@@ -27,13 +27,14 @@ import {
 } from "@/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Trash2, AlertCircle, Play, StopCircle, Terminal, Globe, History } from 'lucide-react';
+import { Loader2, Trash2, AlertCircle, Play, StopCircle, Terminal, Globe, History, ScrollText } from 'lucide-react'; // Import ScrollText
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { DockerContainer } from '@/types/docker';
 import { ContainerConsoleDialog } from '@/components/container-console-dialog';
 import { CreateTunnelDialog } from './CreateTunnelDialog';
 import { ContainerLogsDialog } from '@/components/container-logs-dialog';
+import { ContainerHistoryDialog } from '@/components/container-history-dialog'; // Import new dialog
 
 interface DockerContainerListProps {
   containers: DockerContainer[];
@@ -53,6 +54,8 @@ export function DockerContainerList({ containers, server, isLoading, actionLoadi
   const [selectedContainerForTunnel, setSelectedContainerForTunnel] = useState<DockerContainer | null>(null);
   const [isLogsOpen, setIsLogsOpen] = useState(false);
   const [selectedContainerForLogs, setSelectedContainerForLogs] = useState<DockerContainer | null>(null);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false); // State for history dialog
+  const [selectedContainerForHistory, setSelectedContainerForHistory] = useState<DockerContainer | null>(null); // State for history dialog
 
   const openConsoleFor = (container: DockerContainer) => {
     setSelectedContainerForConsole(container);
@@ -67,6 +70,11 @@ export function DockerContainerList({ containers, server, isLoading, actionLoadi
   const openLogsFor = (container: DockerContainer) => {
     setSelectedContainerForLogs(container);
     setIsLogsOpen(true);
+  };
+
+  const openHistoryFor = (container: DockerContainer) => { // Handler for history dialog
+    setSelectedContainerForHistory(container);
+    setIsHistoryOpen(true);
   };
 
   return (
@@ -138,6 +146,9 @@ export function DockerContainerList({ containers, server, isLoading, actionLoadi
                             <DropdownMenuItem onClick={() => openLogsFor(container)} disabled={isActionInProgress || !canManageDockerContainers}>
                               <History className="mr-2 h-4 w-4" /> Ver Logs
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openHistoryFor(container)} disabled={isActionInProgress || !canManageDockerContainers}>
+                              <ScrollText className="mr-2 h-4 w-4" /> Ver Historial
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openCreateTunnelDialogFor(container)} disabled={isActionInProgress || !canManageCloudflareTunnels}>
                               <Globe className="mr-2 h-4 w-4" /> Crear Túnel Cloudflare
                             </DropdownMenuItem>
@@ -173,6 +184,14 @@ export function DockerContainerList({ containers, server, isLoading, actionLoadi
           onOpenChange={setIsLogsOpen}
           server={server}
           container={selectedContainerForLogs}
+        />
+      )}
+      {selectedContainerForHistory && (
+        <ContainerHistoryDialog
+          open={isHistoryOpen}
+          onOpenChange={setIsHistoryOpen}
+          server={server}
+          container={selectedContainerForHistory}
         />
       )}
       <CreateTunnelDialog
