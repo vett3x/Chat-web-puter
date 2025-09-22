@@ -369,7 +369,7 @@ export function ConversationSidebar({
 
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold">Navegación</h2>
-        <div className="flex gap-3"> {/* Changed gap-2 to gap-3 */}
+        <div className="flex gap-2"> {/* Cambiado de gap-3 a gap-2 */}
           <Button
             variant="default"
             size="icon"
