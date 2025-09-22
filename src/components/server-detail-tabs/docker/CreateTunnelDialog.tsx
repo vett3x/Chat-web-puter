@@ -46,7 +46,7 @@ type CreateTunnelFormValues = z.infer<typeof createTunnelFormSchema>;
 const INITIAL_CREATE_TUNNEL_DEFAULTS: CreateTunnelFormValues = {
   cloudflare_domain_id: '',
   container_port: 80,
-  subdomain: undefined,
+  subdomain: '', // Changed from undefined to empty string to fix uncontrolled input error
 };
 
 interface CreateTunnelDialogProps {
