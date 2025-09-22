@@ -30,7 +30,7 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
   console.log(`[WSS] Client connected: ${connectionId}`);
 
   const { query } = parse(req.url || '', true);
-  const { serverId, containerId, userId } = query;
+  const { serverId, containerId, userId, mode } = query; // Add mode
 
   if (typeof serverId !== 'string' || typeof containerId !== 'string' || typeof userId !== 'string') {
     console.error(`[WSS] ${connectionId} ERROR: Missing connection parameters. Query:`, query);
@@ -38,7 +38,7 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
     ws.close();
     return;
   }
-  console.log(`[WSS] ${connectionId} Connection parameters: serverId=${serverId}, containerId=${containerId}, userId=${userId}`);
+  console.log(`[WSS] ${connectionId} Connection parameters: serverId=${serverId}, containerId=${containerId}, userId=${userId}, mode=${mode || 'shell'}`);
 
   try {
     console.log(`[WSS] ${connectionId} Fetching server details from Supabase for serverId: ${serverId}, userId: ${userId}`);
@@ -61,36 +61,59 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
     const ssh = new SshClient();
     ssh.on('ready', () => {
       console.log(`[WSS] ${connectionId} SSH connection successful.`);
-      ws.send('\r\n\x1b[32m[SERVER] Conexión SSH establecida.\x1b[0m\r\n');
       
-      const command = `docker exec -it ${containerId} /bin/bash`;
+      let command: string;
+      let pty: boolean;
+
+      if (mode === 'logs') {
+        command = `docker logs -f --tail="200" ${containerId}`;
+        pty = false; // No pseudo-terminal needed for logs
+        ws.send('\r\n\x1b[32m[SERVER] Conexión SSH establecida. Transmitiendo logs...\x1b[0m\r\n');
+      } else { // Default to shell
+        command = `docker exec -it ${containerId} /bin/bash`;
+        pty = true;
+        ws.send('\r\n\x1b[32m[SERVER] Conexión SSH establecida.\x1b[0m\r\n');
+      }
+      
       console.log(`[WSS] ${connectionId} Executing command: "${command}"`);
-      ssh.exec(command, { pty: true }, (err, stream) => {
+      ssh.exec(command, { pty }, (err, stream) => {
         if (err) {
           console.error(`[WSS] ${connectionId} ERROR: SSH exec error:`, err);
           ws.send(`\r\n\x1b[31m[SERVER] Error al ejecutar comando en SSH: ${err.message}\x1b[0m\r\n`);
           ssh.end();
           return;
         }
-        console.log(`[WSS] ${connectionId} Docker exec stream opened.`);
+        
+        if (mode === 'logs') {
+            console.log(`[WSS] ${connectionId} Docker logs stream opened.`);
+        } else {
+            console.log(`[WSS] ${connectionId} Docker exec stream opened.`);
+        }
 
         activeConnections.set(connectionId, { ws, ssh, stream });
 
-        ws.onmessage = (event) => {
-          // console.log(`[WSS] ${connectionId} Received from client: ${event.data.toString().substring(0, 50)}...`);
-          stream.write(event.data as Buffer);
-        };
+        // Only set onmessage for shell mode
+        if (mode !== 'logs') {
+            ws.onmessage = (event) => {
+              stream.write(event.data as Buffer);
+            };
+        }
+
         stream.on('data', (data: Buffer) => {
-          // console.log(`[WSS] ${connectionId} Sending to client (stdout): ${data.toString().substring(0, 50)}...`);
           ws.send(data);
         });
         stream.on('close', () => {
-          console.log(`[WSS] ${connectionId} Docker exec stream closed.`);
+          if (mode === 'logs') {
+            console.log(`[WSS] ${connectionId} Docker logs stream closed.`);
+          } else {
+            console.log(`[WSS] ${connectionId} Docker exec stream closed.`);
+          }
           ws.close();
         });
         stream.stderr.on('data', (data: Buffer) => {
-          console.error(`[WSS] ${connectionId} STDERR from container: ${data.toString()}`);
-          ws.send(`\r\n\x1b[31m[STDERR] ${data.toString()}\x1b[0m\r\n`);
+          console.error(`[WSS] ${connectionId} STDERR from SSH command: ${data.toString()}`);
+          // Send formatted error to client so they know it's not from the container's app
+          ws.send(`\r\n\x1b[31m[SERVER ERROR] ${data.toString()}\x1b[0m\r\n`);
         });
       });
     }).on('error', (err) => {

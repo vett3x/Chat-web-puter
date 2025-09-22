@@ -27,12 +27,13 @@ import {
 } from "@/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Trash2, AlertCircle, Play, StopCircle, Terminal, Globe } from 'lucide-react';
+import { Loader2, Trash2, AlertCircle, Play, StopCircle, Terminal, Globe, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { DockerContainer } from '@/types/docker';
 import { ContainerConsoleDialog } from '@/components/container-console-dialog';
 import { CreateTunnelDialog } from './CreateTunnelDialog';
+import { ContainerLogsDialog } from '@/components/container-logs-dialog';
 
 interface DockerContainerListProps {
   containers: DockerContainer[];
@@ -50,6 +51,8 @@ export function DockerContainerList({ containers, server, isLoading, actionLoadi
   const [selectedContainerForConsole, setSelectedContainerForConsole] = useState<DockerContainer | null>(null);
   const [isTunnelDialogOpen, setIsTunnelDialogOpen] = useState(false);
   const [selectedContainerForTunnel, setSelectedContainerForTunnel] = useState<DockerContainer | null>(null);
+  const [isLogsOpen, setIsLogsOpen] = useState(false);
+  const [selectedContainerForLogs, setSelectedContainerForLogs] = useState<DockerContainer | null>(null);
 
   const openConsoleFor = (container: DockerContainer) => {
     setSelectedContainerForConsole(container);
@@ -59,6 +62,11 @@ export function DockerContainerList({ containers, server, isLoading, actionLoadi
   const openCreateTunnelDialogFor = (container: DockerContainer) => {
     setSelectedContainerForTunnel(container);
     setIsTunnelDialogOpen(true);
+  };
+
+  const openLogsFor = (container: DockerContainer) => {
+    setSelectedContainerForLogs(container);
+    setIsLogsOpen(true);
   };
 
   return (
@@ -127,6 +135,9 @@ export function DockerContainerList({ containers, server, isLoading, actionLoadi
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => onAction(container.ID, 'start')} disabled={isRunning || isActionInProgress || !canManageDockerContainers}><Play className="mr-2 h-4 w-4" /> Iniciar</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => onAction(container.ID, 'stop')} disabled={!isRunning || isActionInProgress || !canManageDockerContainers}><StopCircle className="mr-2 h-4 w-4" /> Detener</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openLogsFor(container)} disabled={isActionInProgress || !canManageDockerContainers}>
+                              <History className="mr-2 h-4 w-4" /> Ver Logs
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openCreateTunnelDialogFor(container)} disabled={isActionInProgress || !canManageCloudflareTunnels}>
                               <Globe className="mr-2 h-4 w-4" /> Crear Túnel Cloudflare
                             </DropdownMenuItem>
@@ -154,6 +165,14 @@ export function DockerContainerList({ containers, server, isLoading, actionLoadi
           onOpenChange={setIsConsoleOpen}
           server={server}
           container={selectedContainerForConsole}
+        />
+      )}
+      {selectedContainerForLogs && (
+        <ContainerLogsDialog
+          open={isLogsOpen}
+          onOpenChange={setIsLogsOpen}
+          server={server}
+          container={selectedContainerForLogs}
         />
       )}
       <CreateTunnelDialog
