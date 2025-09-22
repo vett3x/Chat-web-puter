@@ -76,11 +76,7 @@ export async function GET(
     .select('ip_address, ssh_port, ssh_username, ssh_password')
     .eq('id', serverId);
 
-  // Admins can only see their own servers
-  if (userRole === 'admin') {
-    query = query.eq('user_id', session.user.id);
-  }
-  // Super Admins can see any server by ID, so no user_id filter for them.
+  // Both Admins and Super Admins can see any server by ID, so no user_id filter for them.
 
   const { data: server, error: fetchError } = await query.single();
 

@@ -76,10 +76,7 @@ export async function GET(req: NextRequest) {
         )
       `);
 
-    // Super Admins see all tunnels, Admins see only their own
-    if (userRole === 'admin') {
-      query = query.eq('user_id', session.user.id);
-    }
+    // Both Admins and Super Admins see all tunnels, so no user_id filter is applied here.
 
     const { data: tunnels, error } = await query.order('created_at', { ascending: false });
 

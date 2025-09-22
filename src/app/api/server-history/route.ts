@@ -74,11 +74,7 @@ export async function GET(req: NextRequest) {
       )
     `);
 
-  // Super Admins see all events, Admins see only their own
-  if (userRole === 'admin') {
-    query = query.eq('user_id', session.user.id);
-  }
-  // If userRole is 'super_admin', no user_id filter is applied, so they see all.
+  // Both Admins and Super Admins see all events, so no user_id filter is applied here.
 
   const { data: events, error: fetchError } = await query.order('created_at', { ascending: false });
 

@@ -74,11 +74,7 @@ export async function GET(req: NextRequest) {
     .from('cloudflare_domains')
     .select('id, domain_name, zone_id, account_id, created_at'); // Select account_id
 
-  // Super Admins see all domains, Admins see only their own
-  if (userRole === 'admin') {
-    query = query.eq('user_id', session.user.id);
-  }
-  // If userRole is 'super_admin', no user_id filter is applied, so they see all.
+  // Both Admins and Super Admins see all domains, so no user_id filter is applied here.
 
   const { data: domains, error } = await query;
 
@@ -193,8 +189,7 @@ export async function DELETE(req: NextRequest) {
   const { count: tunnelsCount, error: tunnelsError } = await supabaseAdmin
     .from('docker_tunnels')
     .select('id', { count: 'exact', head: true })
-    .eq('cloudflare_domain_id', id)
-    .eq('user_id', session.user.id);
+    .eq('cloudflare_domain_id', id); // Removed user_id filter here as Super Admins can delete any tunnel
 
   if (tunnelsError) {
     console.error('Error checking for associated tunnels:', tunnelsError);
@@ -208,8 +203,7 @@ export async function DELETE(req: NextRequest) {
   const { error } = await supabaseAdmin
     .from('cloudflare_domains')
     .delete()
-    .eq('id', id)
-    .eq('user_id', session.user.id); // Still check user_id for safety
+    .eq('id', id); // Removed user_id filter here as Super Admins can delete any domain
 
   if (error) {
     console.error('Error deleting Cloudflare domain from Supabase (admin):', error);
