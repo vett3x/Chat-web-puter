@@ -233,7 +233,7 @@ export async function POST(
         set -e && \\
         export DEBIAN_FRONTEND=noninteractive && \\
         apt-get update -y && \\
-        apt-get install -y curl gnupg lsb-release && \\
+        apt-get install -y curl gnupg lsb-release -y && \\
         
         # Install Node.js and npm
         curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \\
@@ -245,7 +245,8 @@ export async function POST(
         mkdir -p --mode=0755 /usr/share/keyrings && \\
         curl -fsSL https://pkg.cloudflare.com/cloudflare-release.gpg | gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-archive-keyring.gpg && \\
         chmod 644 /usr/share/keyrings/cloudflare-archive-keyring.gpg && \\
-        echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflare.com/cloudflared \\\$(lsb_release -cs) main" | tee /etc/apt/sources.list.d/cloudflared.list > /dev/null && \\
+        DISTRO_CODENAME=$(lsb_release -cs) && \\
+        echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflare.com/cloudflared \${DISTRO_CODENAME} main" | tee /etc/apt/sources.list.d/cloudflared.list > /dev/null && \\
         apt-get update -y && \\
         apt-get install -y cloudflared && \\
         cloudflared --version
