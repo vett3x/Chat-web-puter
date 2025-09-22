@@ -7,6 +7,7 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { provisionServer } from '@/lib/server-provisioning';
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
+import { executeSshCommand } from '@/lib/ssh-utils'; // Import SSH utilities
 
 // Esquema de validación para añadir un servidor
 const serverSchema = z.object({

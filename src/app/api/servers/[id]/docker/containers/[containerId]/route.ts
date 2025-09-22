@@ -2,10 +2,10 @@ export const runtime = 'nodejs'; // Force Node.js runtime
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { Client } from 'ssh2';
 import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
+import { executeSshCommand } from '@/lib/ssh-utils'; // Import SSH utilities
 
 // Helper function to get the session and user role
 async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null; userPermissions: UserPermissions }> {
@@ -72,22 +72,6 @@ async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | '
   return { session, userRole, userPermissions };
 }
 
-// Helper to execute a command and return its output
-function executeSshCommand(conn: Client, command: string): Promise<{ stdout: string; stderr: string; code: number }> {
-  return new Promise((resolve, reject) => {
-    let stdout = '';
-    let stderr = '';
-    conn.exec(command, (err, stream) => {
-      if (err) return reject(err);
-      stream.on('data', (data: Buffer) => { stdout += data.toString(); });
-      stream.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
-      stream.on('close', (code: number) => {
-        resolve({ stdout, stderr, code });
-      });
-    });
-  });
-}
-
 export async function DELETE(
   req: NextRequest,
   context: any // Simplified type to resolve internal Next.js type conflict
@@ -122,11 +106,8 @@ export async function DELETE(
     return NextResponse.json({ message: 'Servidor no encontrado.' }, { status: 404 });
   }
 
-  const conn = new Client();
   try {
-    await new Promise<void>((resolve, reject) => conn.on('ready', resolve).on('error', reject).connect({ host: server.ip_address, port: server.ssh_port || 22, username: server.ssh_username, password: server.ssh_password, readyTimeout: 10000 }));
-
-    const { stderr: rmStderr, code: rmCode } = await executeSshCommand(conn, `docker rm -f ${containerId}`);
+    const { stderr: rmStderr, code: rmCode } = await executeSshCommand(server, `docker rm -f ${containerId}`);
     if (rmCode !== 0 && !rmStderr.includes('No such container')) {
       throw new Error(`Error al eliminar contenedor: ${rmStderr}`);
     }
@@ -137,15 +118,13 @@ export async function DELETE(
     let isGone = false;
 
     while (Date.now() - startTime < timeout) {
-      const { code: inspectCode } = await executeSshCommand(conn, `docker inspect ${containerId}`);
+      const { code: inspectCode } = await executeSshCommand(server, `docker inspect ${containerId}`);
       if (inspectCode !== 0) { // Command fails when container doesn't exist
         isGone = true;
         break;
       }
       await new Promise(res => setTimeout(res, 2000));
     }
-
-    conn.end();
 
     if (!isGone) {
       // Log event for container not deleted in time
@@ -169,7 +148,6 @@ export async function DELETE(
     return NextResponse.json({ message: `Contenedor ${containerId.substring(0,12)} eliminado.` }, { status: 200 });
 
   } catch (error: any) {
-    conn.end();
     // Log event for general error during container deletion
     await supabaseAdmin.from('server_events_log').insert({
       user_id: session.user.id,

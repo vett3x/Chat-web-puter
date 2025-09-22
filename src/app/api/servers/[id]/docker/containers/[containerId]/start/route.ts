@@ -2,10 +2,10 @@ export const runtime = 'nodejs'; // Force Node.js runtime
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { Client } from 'ssh2';
 import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
+import { executeSshCommand } from '@/lib/ssh-utils'; // Import SSH utilities
 
 // Helper function to get the session and user role
 async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null; userPermissions: UserPermissions }> {
@@ -72,21 +72,6 @@ async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | '
   return { session, userRole, userPermissions };
 }
 
-function executeSshCommand(conn: Client, command: string): Promise<{ stdout: string; stderr: string; code: number }> {
-  return new Promise((resolve, reject) => {
-    let stdout = '';
-    let stderr = '';
-    conn.exec(command, (err, stream) => {
-      if (err) return reject(err);
-      stream.on('data', (data: Buffer) => { stdout += data.toString(); });
-      stream.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
-      stream.on('close', (code: number) => {
-        resolve({ stdout, stderr, code });
-      });
-    });
-  });
-}
-
 export async function POST(
   req: NextRequest,
   context: any // Simplified type to resolve internal Next.js type conflict
@@ -121,14 +106,10 @@ export async function POST(
     return NextResponse.json({ message: 'Servidor no encontrado.' }, { status: 404 });
   }
 
-  const conn = new Client();
   try {
-    await new Promise<void>((resolve, reject) => conn.on('ready', resolve).on('error', reject).connect({ host: server.ip_address, port: server.ssh_port || 22, username: server.ssh_username, password: server.ssh_password, readyTimeout: 10000 }));
-
     // The `docker start` command is idempotent. It returns exit code 0
     // if the container is now running or was already running.
-    const { stderr, code } = await executeSshCommand(conn, `docker start ${containerId}`);
-    conn.end();
+    const { stderr, code } = await executeSshCommand(server, `docker start ${containerId}`);
 
     if (code !== 0) {
       // Log event for failed container start
@@ -153,7 +134,6 @@ export async function POST(
     return NextResponse.json({ message: `Contenedor ${containerId.substring(0,12)} iniciado.` }, { status: 200 });
 
   } catch (error: any) {
-    conn.end();
     // Log event for general error during container start
     await supabaseAdmin.from('server_events_log').insert({
       user_id: session.user.id,

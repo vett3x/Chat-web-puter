@@ -1,38 +1,21 @@
 "use server";
 
 import { createClient } from '@supabase/supabase-js';
-import { Client as SshClient } from 'ssh2';
 import {
   generateRandomSubdomain,
-  createCloudflareTunnel,
-  deleteCloudflareTunnel,
+  createCloudflareTunnel, // Now SSH-based
+  deleteCloudflareTunnel, // Now SSH-based
   createCloudflareDnsRecord,
   deleteCloudflareDnsRecord,
-  getCloudflareTunnelToken,
-  configureCloudflareTunnelIngress,
+  configureCloudflareTunnelIngress, // Now SSH-based
 } from '@/lib/cloudflare-utils';
+import { executeSshCommand } from './ssh-utils'; // Import SSH utilities
 
 // Initialize Supabase client with the service role key
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
-
-// Helper to execute an SSH command and return its output
-async function executeSshCommand(conn: SshClient, command: string): Promise<{ stdout: string; stderr: string; code: number }> {
-  return new Promise((resolve, reject) => {
-    let stdout = '';
-    let stderr = '';
-    conn.exec(command, (err, stream) => {
-      if (err) return reject(err);
-      stream.on('data', (data: Buffer) => { stdout += data.toString(); });
-      stream.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
-      stream.on('close', (code: number) => {
-        resolve({ stdout, stderr, code });
-      });
-    });
-  });
-}
 
 interface ServerDetails {
   ip_address: string;
@@ -73,6 +56,7 @@ export async function createAndProvisionCloudflareTunnel({
   let tunnelId: string | undefined;
   let dnsRecordId: string | undefined;
   let newTunnelRecordId: string | undefined;
+  let tunnelSecret: string | undefined;
 
   try {
     const { data: existingTunnels, error: existingTunnelError } = await supabaseAdmin
@@ -97,27 +81,21 @@ export async function createAndProvisionCloudflareTunnel({
 
     const tunnelName = `tunnel-${containerId.substring(0, 12)}`;
 
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Creating Cloudflare Tunnel '${tunnelName}'...\n` });
-    const tunnel = await createCloudflareTunnel(cloudflareDomainDetails.api_token, cloudflareDomainDetails.account_id, tunnelName);
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Creating Cloudflare Tunnel '${tunnelName}' on host via SSH...\n` });
+    const createdTunnel = await createCloudflareTunnel(serverDetails, tunnelName, userId);
     
-    if (!tunnel || !tunnel.id) {
-      throw new Error('La API de Cloudflare no devolvió un túnel válido. Verifica los permisos del API Token.');
+    if (!createdTunnel || !createdTunnel.tunnelId || !createdTunnel.tunnelSecret) {
+      throw new Error('No se pudo crear el túnel o obtener su ID/secreto del servidor remoto.');
     }
-    tunnelId = tunnel.id;
+    tunnelId = createdTunnel.tunnelId;
+    tunnelSecret = createdTunnel.tunnelSecret;
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Cloudflare Tunnel created successfully. ID: ${tunnelId}\n` });
-
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Fetching token for tunnel ${tunnelId}...\n` });
-    const tunnelToken = await getCloudflareTunnelToken(cloudflareDomainDetails.api_token, cloudflareDomainDetails.account_id, tunnelId);
-    if (!tunnelToken) {
-        throw new Error('No se pudo obtener el token para el túnel de Cloudflare.');
-    }
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Token fetched successfully.\n` });
 
     const subdomain = userSubdomain || generateRandomSubdomain();
     const fullDomain = `${subdomain}.${cloudflareDomainDetails.domain_name}`;
     const tunnelCnameTarget = `${tunnelId}.cfargotunnel.com`;
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Creating DNS CNAME record for '${fullDomain}' pointing to '${tunnelCnameTarget}'...\n` });
-    const dnsRecord = await createCloudflareDnsRecord(cloudflareDomainDetails.api_token, cloudflareDomainDetails.zone_id, fullDomain, tunnelCnameTarget);
+    const dnsRecord = await createCloudflareDnsRecord(cloudflareDomainDetails.api_token, cloudflareDomainDetails.zone_id, fullDomain, tunnelCnameTarget, userId);
     dnsRecordId = dnsRecord.id;
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] DNS CNAME record created. ID: ${dnsRecordId}\n` });
 
@@ -134,7 +112,7 @@ export async function createAndProvisionCloudflareTunnel({
         container_port: containerPort,
         host_port: hostPort,
         tunnel_id: tunnelId,
-        tunnel_secret: tunnelToken, // Store the token in the secret field
+        tunnel_secret: tunnelSecret, // Store the token for the credentials file
         status: 'provisioning',
       })
       .select('id')
@@ -146,39 +124,15 @@ export async function createAndProvisionCloudflareTunnel({
     newTunnelRecordId = newTunnel.id;
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Tunnel details stored. DB Record ID: ${newTunnelRecordId}\n` });
 
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Establishing SSH connection to host ${serverDetails.ip_address}...\n` });
-    const conn = new SshClient();
-    await new Promise<void>((resolve, reject) => conn.on('ready', resolve).on('error', reject).connect({
-      host: serverDetails.ip_address,
-      port: serverDetails.ssh_port,
-      username: serverDetails.ssh_username,
-      password: serverDetails.ssh_password,
-      readyTimeout: 20000,
-    }));
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] SSH connection to host successful.\n` });
-
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Installing cloudflared service on host...\n` });
-    const installCommand = `cloudflared service install ${tunnelToken}`;
-    const { stderr: installStderr, code: installCode } = await executeSshCommand(conn, installCommand);
-    if (installCode !== 0) {
-        throw new Error(`Error al instalar el servicio cloudflared: ${installStderr}`);
-    }
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Service installed. Starting service...\n` });
-
-    await executeSshCommand(conn, 'systemctl start cloudflared');
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Service started.\n` });
-
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Configuring ingress rules via API...\n` });
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Configuring ingress rules on host via SSH...\n` });
     await configureCloudflareTunnelIngress(
-        cloudflareDomainDetails.api_token,
-        cloudflareDomainDetails.account_id,
+        serverDetails,
         tunnelId,
         fullDomain,
-        hostPort
+        hostPort,
+        userId
     );
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Ingress rules configured.\n` });
-
-    conn.end();
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Ingress rules configured and cloudflared restarted.\n` });
 
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Updating tunnel status to 'active' in database.\n` });
     await supabaseAdmin.from('docker_tunnels').update({ status: 'active' }).eq('id', newTunnelRecordId);
@@ -199,9 +153,9 @@ export async function createAndProvisionCloudflareTunnel({
 
     if (tunnelId) {
       try {
-        await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Attempting rollback: Deleting Cloudflare Tunnel ${tunnelId}...\n` });
-        await deleteCloudflareTunnel(cloudflareDomainDetails.api_token, cloudflareDomainDetails.account_id, tunnelId);
-        await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Rollback: Cloudflare Tunnel ${tunnelId} deleted.\n` });
+        await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Attempting rollback: Deleting Cloudflare Tunnel ${tunnelId} on host...\n` });
+        await deleteCloudflareTunnel(serverDetails, tunnelId, userId);
+        await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Rollback: Cloudflare Tunnel ${tunnelId} deleted from host.\n` });
       } catch (rollbackError) {
         console.error(`[Rollback] Failed to delete Cloudflare Tunnel ${tunnelId}:`, rollbackError);
         await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Rollback ERROR: Failed to delete Cloudflare Tunnel ${tunnelId}: ${rollbackError}\n` });
@@ -210,7 +164,7 @@ export async function createAndProvisionCloudflareTunnel({
     if (dnsRecordId) {
       try {
         await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Attempting rollback: Deleting Cloudflare DNS record ${dnsRecordId}...\n` });
-        await deleteCloudflareDnsRecord(cloudflareDomainDetails.api_token, cloudflareDomainDetails.zone_id, dnsRecordId);
+        await deleteCloudflareDnsRecord(cloudflareDomainDetails.api_token, cloudflareDomainDetails.zone_id, dnsRecordId, userId);
         await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Rollback: Cloudflare DNS record ${dnsRecordId} deleted.\n` });
       } catch (rollbackError) {
         console.error(`[Rollback] Failed to delete Cloudflare DNS record ${dnsRecordId}:`, rollbackError);
@@ -263,29 +217,9 @@ export async function deleteCloudflareTunnelAndCleanup({
     }
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Tunnel details fetched. Cloudflare Tunnel ID: ${tunnel.tunnel_id}\n` });
 
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Establishing SSH connection to host ${serverDetails.ip_address} for cleanup...\n` });
-    const conn = new SshClient();
-    await new Promise<void>((resolve, reject) => conn.on('ready', resolve).on('error', reject).connect({
-      host: serverDetails.ip_address,
-      port: serverDetails.ssh_port,
-      username: serverDetails.ssh_username,
-      password: serverDetails.ssh_password,
-      readyTimeout: 20000,
-    }));
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] SSH connection to host successful.\n` });
-
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Uninstalling cloudflared service on host...\n` });
-    await executeSshCommand(conn, 'cloudflared service uninstall').catch(e => console.warn(`Could not uninstall service: ${e.message}`));
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Service uninstalled.\n` });
-
-    conn.end();
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] SSH connection to host closed.\n` });
-
-    if (tunnel.tunnel_id) {
-      await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Deleting Cloudflare Tunnel ${tunnel.tunnel_id} via Cloudflare API...\n` });
-      await deleteCloudflareTunnel(cloudflareDomainDetails.api_token, cloudflareDomainDetails.account_id, tunnel.tunnel_id);
-      await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Cloudflare Tunnel ${tunnel.tunnel_id} deleted.\n` });
-    }
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Deleting Cloudflare Tunnel ${tunnel.tunnel_id} on host via SSH...\n` });
+    await deleteCloudflareTunnel(serverDetails, tunnel.tunnel_id, userId);
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Cloudflare Tunnel ${tunnel.tunnel_id} deleted from host.\n` });
 
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Searching for DNS record ID for ${tunnel.full_domain}...\n` });
     const { data: dnsRecords } = await supabaseAdmin
@@ -307,7 +241,7 @@ export async function deleteCloudflareTunnelAndCleanup({
 
     if (dnsRecordId) {
       await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Deleting Cloudflare DNS record ${dnsRecordId}...\n` });
-      await deleteCloudflareDnsRecord(cloudflareDomainDetails.api_token, cloudflareDomainDetails.zone_id, dnsRecordId);
+      await deleteCloudflareDnsRecord(cloudflareDomainDetails.api_token, cloudflareDomainDetails.zone_id, dnsRecordId, userId);
       await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Cloudflare DNS record ${dnsRecordId} deleted.\n` });
     } else {
       await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] WARNING: Could not find DNS record ID for ${tunnel.full_domain}. Skipping DNS record deletion.\n` });

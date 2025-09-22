@@ -2,11 +2,11 @@ export const runtime = 'nodejs'; // Force Node.js runtime
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { Client } from 'ssh2';
 import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import * as z from 'zod';
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
+import { executeSshCommand } from '@/lib/ssh-utils'; // Import SSH utilities
 
 // Definición del esquema para el comando de ejecución
 const execSchema = z.object({
@@ -113,36 +113,13 @@ export async function POST(
       return NextResponse.json({ message: 'Comando inválido.' }, { status: 400 });
     }
 
-    const conn = new Client();
-    const output = await new Promise<string>((resolve, reject) => {
-      conn.on('ready', () => {
-        conn.exec(`docker exec ${containerId} sh -c "${command}"`, (err, stream) => {
-          if (err) {
-            conn.end();
-            return reject(new Error(`SSH exec error: ${err.message}`));
-          }
-          let result = '';
-          stream.on('data', (data: Buffer) => {
-            result += data.toString();
-          }).stderr.on('data', (data: Buffer) => {
-            result += data.toString();
-          }).on('close', () => {
-            conn.end();
-            resolve(result);
-          });
-        });
-      }).on('error', (err) => {
-        reject(new Error(`SSH connection error: ${err.message}`));
-      }).connect({
-        host: server.ip_address,
-        port: server.ssh_port || 22,
-        username: server.ssh_username,
-        password: server.ssh_password,
-        readyTimeout: 10000,
-      });
-    });
+    const { stdout, stderr, code } = await executeSshCommand(server, `docker exec ${containerId} sh -c "${command}"`);
 
-    return NextResponse.json({ output }, { status: 200 });
+    if (code !== 0) {
+      return NextResponse.json({ message: `Error al ejecutar comando: ${stderr || stdout}`, output: stdout, error: stderr }, { status: 500 });
+    }
+
+    return NextResponse.json({ output: stdout }, { status: 200 });
 
   } catch (error: any) {
     if (error instanceof z.ZodError) {

@@ -2,11 +2,11 @@ export const runtime = 'nodejs'; // Force Node.js runtime
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { Client } from 'ssh2';
 import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { DockerContainerStat } from '@/types/docker-stats';
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
+import { executeSshCommand } from '@/lib/ssh-utils'; // Import SSH utilities
 
 // Helper function to get the session and user role
 async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null; userPermissions: UserPermissions }> {
@@ -73,26 +73,6 @@ async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | '
   return { session, userRole, userPermissions };
 }
 
-function executeSshCommand(conn: Client, command: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    conn.exec(command, (err, stream) => {
-      if (err) return reject(err);
-      let output = '';
-      stream.on('data', (data: Buffer) => { output += data.toString(); });
-      stream.on('close', (code: number) => {
-        if (code === 0) {
-          resolve(output.trim());
-        } else {
-          reject(new Error(`Command exited with code ${code}: ${output.trim()}`));
-        }
-      });
-      stream.stderr.on('data', (data: Buffer) => {
-        console.error(`SSH STDERR for command "${command}": ${data.toString().trim()}`);
-      });
-    });
-  });
-}
-
 export async function GET(req: NextRequest) {
   const { session, userRole } = await getSessionAndRole();
   if (!session || !userRole) {
@@ -129,40 +109,37 @@ export async function GET(req: NextRequest) {
 
   const allContainerStats: DockerContainerStat[] = [];
   const fetchPromises = servers.map(async (server) => {
-    const conn = new Client();
     try {
-      await new Promise<void>((resolve, reject) => conn.on('ready', resolve).on('error', reject).connect({
-        host: server.ip_address,
-        port: server.ssh_port || 22,
-        username: server.ssh_username,
-        password: server.ssh_password,
-        readyTimeout: 10000,
-      }));
-
       // 1. Get all containers (running, stopped, exited) using docker ps -a
-      const psOutput = await executeSshCommand(conn, `docker ps -a --format "{{json .}}"`);
+      const { stdout: psOutput, code: psCode, stderr: psStderr } = await executeSshCommand(server, `docker ps -a --format "{{json .}}"`);
+      if (psCode !== 0) {
+        console.warn(`[API] Could not fetch docker ps for server ${server.id}: ${psStderr}`);
+        return; // Skip this server if docker ps fails
+      }
       const psLines = psOutput.split('\n').filter(Boolean);
       const psContainers = psLines.map(line => JSON.parse(line));
 
       // 2. Get stats for currently running containers using docker stats
       let statsMap = new Map<string, any>();
       try {
-        const statsOutput = await executeSshCommand(conn, `docker stats --no-stream --format "{{json .}}"`);
-        const statsLines = statsOutput.split('\n').filter(Boolean);
-        statsLines.forEach(line => {
-          try {
-            const stat = JSON.parse(line);
-            statsMap.set(stat.ID, stat);
-          } catch (e) {
-            console.warn(`[API] Could not parse docker stats line for server ${server.id}: ${line}`);
-          }
-        });
+        const { stdout: statsOutput, code: statsCode, stderr: statsStderr } = await executeSshCommand(server, `docker stats --no-stream --format "{{json .}}"`);
+        if (statsCode === 0) {
+          const statsLines = statsOutput.split('\n').filter(Boolean);
+          statsLines.forEach(line => {
+            try {
+              const stat = JSON.parse(line);
+              statsMap.set(stat.ID, stat);
+            } catch (e) {
+              console.warn(`[API] Could not parse docker stats line for server ${server.id}: ${line}`);
+            }
+          });
+        } else {
+          console.warn(`[API] Could not fetch docker stats for server ${server.id} (might be no running containers): ${statsStderr}`);
+        }
       } catch (statsErr: any) {
         console.warn(`[API] Could not fetch docker stats for server ${server.id} (might be no running containers): ${statsErr.message}`);
         // It's okay if docker stats fails, it just means no running containers to report stats for.
       }
-
-      conn.end();
 
       // 3. Combine data
       psContainers.forEach(psContainer => {
@@ -185,7 +162,6 @@ export async function GET(req: NextRequest) {
       });
 
     } catch (error: any) {
-      conn.end();
       console.error(`Error fetching Docker info from server ${server.id} (${server.ip_address}):`, error.message);
       // Optionally, send a toast or log this error to the client
     }

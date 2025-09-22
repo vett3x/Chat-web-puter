@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { randomBytes } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
+import { executeSshCommand, writeRemoteFile } from './ssh-utils'; // Import SSH utilities
 
 // Initialize Supabase client with the service role key for logging
 const supabaseAdmin = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -141,87 +142,124 @@ async function callCloudflareApi<T>(
   return parsedData.data.result as T;
 }
 
-// --- Tunnel Management ---
+// --- Tunnel Management (Adapted for Legacy Tunnels via SSH) ---
 
-interface CloudflareDashboardTunnel {
-  id: string;
-  name: string;
-  // No secret is returned for dashboard-managed tunnels
+interface ServerDetails {
+  ip_address: string;
+  ssh_port: number;
+  ssh_username: string;
+  ssh_password?: string;
+  name?: string;
 }
 
-// This function now creates a dashboard-managed tunnel
+interface CreatedLegacyTunnel {
+  tunnelId: string;
+  tunnelSecret: string; // This is the token for the credentials file
+}
+
+/**
+ * Creates a legacy Cloudflare tunnel on the remote server via SSH.
+ * It runs 'cloudflared tunnel create' and parses the output for ID and secret.
+ */
 export async function createCloudflareTunnel(
-  apiToken: string,
-  accountId: string,
+  serverDetails: ServerDetails,
   tunnelName: string,
   userId?: string,
-): Promise<CloudflareDashboardTunnel> {
-  const path = `/accounts/${accountId}/tunnels`;
-  const body = { name: tunnelName, config_src: "cloudflare" }; // Use config_src for dashboard tunnels
-  return callCloudflareApi<CloudflareDashboardTunnel>('POST', path, { apiToken, userId }, body);
-}
+): Promise<CreatedLegacyTunnel> {
+  await logApiCall(userId, 'cloudflare_tunnel_create_ssh', `Attempting to create legacy tunnel '${tunnelName}' on ${serverDetails.ip_address} via SSH.`);
 
-// New function to get the tunnel token
-interface CloudflareTunnelTokenResponse {
-  result: string;
-}
+  const command = `cloudflared tunnel create ${tunnelName}`;
+  const { stdout, stderr, code } = await executeSshCommand(serverDetails, command);
 
-export async function getCloudflareTunnelToken(
-  apiToken: string,
-  accountId: string,
-  tunnelId: string,
-  userId?: string,
-): Promise<string> {
-  const path = `/accounts/${accountId}/tunnels/${tunnelId}/token`;
-  const response = await callCloudflareApi<CloudflareTunnelTokenResponse>('GET', path, { apiToken, userId });
-  
-  // Log the raw response for debugging
-  await logApiCall(userId, 'cloudflare_api_debug', `[getCloudflareTunnelToken] Raw response from Cloudflare API for token: ${JSON.stringify(response)}`);
-
-  if (!response || typeof response.result !== 'string' || response.result.length === 0) {
-    // Provide more context in the error message
-    throw new Error(`La API de Cloudflare no devolvió un token válido en la respuesta. Respuesta recibida: ${JSON.stringify(response)}`);
+  if (code !== 0) {
+    await logApiCall(userId, 'cloudflare_tunnel_create_ssh_failed', `Failed to create tunnel '${tunnelName}' on ${serverDetails.ip_address}. STDERR: ${stderr}`);
+    throw new Error(`Error creating Cloudflare tunnel via SSH: ${stderr}`);
   }
-  return response.result;
+
+  const tunnelIdMatch = stdout.match(/Tunnel ID: ([a-f0-9-]+)/);
+  const tunnelSecretMatch = stdout.match(/Tunnel secret: ([a-zA-Z0-9=]+)/);
+
+  if (!tunnelIdMatch || !tunnelSecretMatch) {
+    await logApiCall(userId, 'cloudflare_tunnel_create_ssh_failed', `Failed to parse tunnel ID or secret from cloudflared output. STDOUT: ${stdout}`);
+    throw new Error(`Could not parse tunnel ID or secret from cloudflared output. Output: ${stdout}`);
+  }
+
+  const tunnelId = tunnelIdMatch[1];
+  const tunnelSecret = tunnelSecretMatch[1]; // This is the base64 encoded token
+
+  // Create the credentials file on the remote server
+  const credentialsFileContent = JSON.stringify({ AccountTag: serverDetails.name, TunnelSecret: tunnelSecret, TunnelID: tunnelId }); // AccountTag is not strictly needed but good for context
+  const credentialsFilePath = `/root/.cloudflared/${tunnelId}.json`; // Assuming root user for now
+  await writeRemoteFile(serverDetails, credentialsFilePath, credentialsFileContent, '0600');
+  await logApiCall(userId, 'cloudflare_tunnel_create_ssh_success', `Legacy tunnel '${tunnelName}' (ID: ${tunnelId}) created and credentials file written on ${serverDetails.ip_address}.`);
+
+  return { tunnelId, tunnelSecret };
 }
 
+/**
+ * Configures the ingress rules for a legacy Cloudflare tunnel by writing a config.yml file
+ * and restarting the cloudflared service on the remote server via SSH.
+ */
 export async function configureCloudflareTunnelIngress(
-  apiToken: string,
-  accountId: string,
+  serverDetails: ServerDetails,
   tunnelId: string,
-  hostname: string,
+  fullDomain: string,
   hostPort: number,
   userId?: string,
 ): Promise<void> {
-  const path = `/accounts/${accountId}/tunnels/${tunnelId}/configurations`;
-  const body = {
-    config: {
-      ingress: [
-        {
-          hostname: hostname,
-          service: `http://localhost:${hostPort}`,
-        },
-        {
-          service: 'http_status:404', // Catch-all
-        },
-      ],
-    },
-  };
-  await callCloudflareApi<void>('PUT', path, { apiToken, userId }, body);
+  await logApiCall(userId, 'cloudflare_tunnel_ingress_ssh', `Configuring ingress for tunnel ${tunnelId} on ${serverDetails.ip_address} for domain ${fullDomain} to port ${hostPort}.`);
+
+  const configContent = `
+tunnel: ${tunnelId}
+credentials-file: /root/.cloudflared/${tunnelId}.json
+ingress:
+  - hostname: ${fullDomain}
+    service: http://localhost:${hostPort}
+  - service: http_status:404
+`;
+  const configFilePath = `/etc/cloudflared/config.yml`;
+
+  await writeRemoteFile(serverDetails, configFilePath, configContent, '0644');
+  await logApiCall(userId, 'cloudflare_tunnel_ingress_ssh_config_written', `Config.yml written for tunnel ${tunnelId} on ${serverDetails.ip_address}.`);
+
+  // Restart cloudflared service to apply new config
+  const { stderr, code } = await executeSshCommand(serverDetails, 'systemctl restart cloudflared');
+  if (code !== 0) {
+    await logApiCall(userId, 'cloudflare_tunnel_ingress_ssh_failed', `Failed to restart cloudflared service for tunnel ${tunnelId} on ${serverDetails.ip_address}. STDERR: ${stderr}`);
+    throw new Error(`Error restarting cloudflared service: ${stderr}`);
+  }
+  await logApiCall(userId, 'cloudflare_tunnel_ingress_ssh_success', `Cloudflared service restarted for tunnel ${tunnelId} on ${serverDetails.ip_address}. Ingress configured.`);
 }
 
+/**
+ * Deletes a legacy Cloudflare tunnel on the remote server via SSH.
+ * It stops the service, deletes the tunnel, and removes associated files.
+ */
 export async function deleteCloudflareTunnel(
-  apiToken: string,
-  accountId: string,
+  serverDetails: ServerDetails,
   tunnelId: string,
   userId?: string,
 ): Promise<void> {
-  // The endpoint for dashboard tunnels is different
-  const path = `/accounts/${accountId}/tunnels/${tunnelId}`;
-  await callCloudflareApi<void>('DELETE', path, { apiToken, userId });
+  await logApiCall(userId, 'cloudflare_tunnel_delete_ssh', `Attempting to delete legacy tunnel ${tunnelId} on ${serverDetails.ip_address} via SSH.`);
+
+  // Stop cloudflared service
+  await executeSshCommand(serverDetails, 'systemctl stop cloudflared').catch(e => console.warn(`[CloudflareUtils] Could not stop cloudflared service cleanly for tunnel ${tunnelId}: ${e.message}`));
+
+  // Delete the tunnel
+  const { stderr: deleteStderr, code: deleteCode } = await executeSshCommand(serverDetails, `cloudflared tunnel delete ${tunnelId} -f`);
+  if (deleteCode !== 0 && !deleteStderr.includes('No such tunnel')) { // Allow "No such tunnel" as a non-error
+    await logApiCall(userId, 'cloudflare_tunnel_delete_ssh_failed', `Failed to delete tunnel ${tunnelId} on ${serverDetails.ip_address}. STDERR: ${deleteStderr}`);
+    throw new Error(`Error deleting Cloudflare tunnel via SSH: ${deleteStderr}`);
+  }
+
+  // Remove config.yml and credentials file
+  await executeSshCommand(serverDetails, `rm -f /etc/cloudflared/config.yml`).catch(e => console.warn(`[CloudflareUtils] Could not remove config.yml for tunnel ${tunnelId}: ${e.message}`));
+  await executeSshCommand(serverDetails, `rm -f /root/.cloudflared/${tunnelId}.json`).catch(e => console.warn(`[CloudflareUtils] Could not remove credentials file for tunnel ${tunnelId}: ${e.message}`));
+
+  await logApiCall(userId, 'cloudflare_tunnel_delete_ssh_success', `Legacy tunnel ${tunnelId} deleted and files removed on ${serverDetails.ip_address}.`);
 }
 
-// --- DNS Record Management ---
+// --- DNS Record Management (Remains API-based) ---
 
 interface CloudflareDnsRecord {
   id: string;

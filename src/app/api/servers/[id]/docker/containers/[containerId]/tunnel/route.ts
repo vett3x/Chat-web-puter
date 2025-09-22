@@ -5,16 +5,9 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
-import {
-  generateRandomSubdomain,
-  createCloudflareTunnel,
-  deleteCloudflareTunnel,
-  createCloudflareDnsRecord,
-  deleteCloudflareDnsRecord,
-} from '@/lib/cloudflare-utils';
-import { Client as SshClient } from 'ssh2'; // Import SSH Client
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
 import { createAndProvisionCloudflareTunnel, deleteCloudflareTunnelAndCleanup } from '@/lib/tunnel-orchestration'; // Import new server actions
+import { executeSshCommand } from '@/lib/ssh-utils'; // Import SSH Client
 
 // Esquema de validación para la creación de túneles
 const createTunnelSchema = z.object({
@@ -88,22 +81,6 @@ async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | '
   return { session, userRole, userPermissions };
 }
 
-// Helper to execute an SSH command and return its output
-function executeSshCommand(conn: SshClient, command: string): Promise<{ stdout: string; stderr: string; code: number }> {
-  return new Promise((resolve, reject) => {
-    let stdout = '';
-    let stderr = '';
-    conn.exec(command, (err, stream) => {
-      if (err) return reject(err);
-      stream.on('data', (data: Buffer) => { stdout += data.toString(); });
-      stream.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
-      stream.on('close', (code: number) => {
-        resolve({ stdout, stderr, code });
-      });
-    });
-  });
-}
-
 // POST /api/servers/[id]/docker/containers/[containerId]/tunnel - Crear un nuevo túnel
 export async function POST(
   req: NextRequest,
@@ -160,19 +137,9 @@ export async function POST(
     }
 
     // 3. Dynamically get the host_port for the container
-    const conn = new SshClient();
     let hostPort: number | undefined;
     try {
-      await new Promise<void>((resolve, reject) => conn.on('ready', resolve).on('error', reject).connect({
-        host: server.ip_address,
-        port: server.ssh_port || 22,
-        username: server.ssh_username,
-        password: server.ssh_password,
-        readyTimeout: 10000,
-      }));
-
-      const dockerPortCommand = `docker port ${containerId} ${container_port}`;
-      const { stdout: portOutput, stderr: portStderr, code: portCode } = await executeSshCommand(conn, dockerPortCommand);
+      const { stdout: portOutput, stderr: portStderr, code: portCode } = await executeSshCommand(server, `docker port ${containerId} ${container_port}`);
 
       if (portCode !== 0) {
         throw new Error(`Error al obtener el puerto del host para el contenedor: ${portStderr}`);
@@ -185,8 +152,8 @@ export async function POST(
       }
       hostPort = parseInt(match[1], 10);
 
-    } finally {
-      conn.end();
+    } catch (e: any) {
+      throw new Error(`Error al determinar el puerto del host para el contenedor: ${e.message}`);
     }
 
     if (!hostPort) {
@@ -260,7 +227,7 @@ export async function DELETE(
     // 1. Fetch tunnel details from Supabase to get its ID and associated domain
     const { data: tunnelRecord, error: tunnelRecordError } = await supabaseAdmin
       .from('docker_tunnels')
-      .select('id, cloudflare_domain_id')
+      .select('id, tunnel_id, cloudflare_domain_id, full_domain')
       .eq('id', tunnelRecordId)
       .eq('server_id', serverId)
       .eq('container_id', containerId)

@@ -1,7 +1,7 @@
 "use server";
 
-import { Client } from 'ssh2';
 import { createClient } from '@supabase/supabase-js';
+import { executeSshCommand } from './ssh-utils'; // Import SSH utilities
 
 // Initialize Supabase client with the service role key
 // This allows us to bypass RLS and update the server status from the backend.
@@ -98,59 +98,37 @@ export async function provisionServer(server: {
     .update({ status: 'provisioning', provisioning_log: 'Starting provisioning...\n' })
     .eq('id', id);
 
-  const conn = new Client();
-  
-  conn.on('ready', () => {
-    updateServerLog(id, 'SSH connection successful. Executing install script...\n\n');
+  try {
+    await updateServerLog(id, 'SSH connection successful. Executing install script...\n\n');
     
-    conn.exec(DOCKER_INSTALL_SCRIPT, (err, stream) => {
-      if (err) {
-        console.error(`[Provisioning] SSH exec error for server ${id}:`, err);
-        updateServerLog(id, `\nSSH execution error: ${err.message}\n`);
-        supabaseAdmin
-          .from('user_servers')
-          .update({ status: 'failed' })
-          .eq('id', id)
-          .then();
-        conn.end();
-        return;
-      }
+    const { stdout, stderr, code } = await executeSshCommand(server, DOCKER_INSTALL_SCRIPT);
 
-      stream.on('close', async (code: number) => {
-        if (code === 0) {
-          await updateServerLog(id, '\nScript finished successfully.\n');
-          await supabaseAdmin
-            .from('user_servers')
-            .update({ status: 'ready' })
-            .eq('id', id);
-        } else {
-          await updateServerLog(id, `\nScript exited with error code: ${code}\n`);
-          await supabaseAdmin
-            .from('user_servers')
-            .update({ status: 'failed' })
-            .eq('id', id);
-        }
-        conn.end();
-      }).on('data', (data: Buffer) => {
-        updateServerLog(id, data.toString());
-      }).stderr.on('data', (data: Buffer) => {
-        updateServerLog(id, `STDERR: ${data.toString()}`);
-      });
-    });
-  }).on('error', async (err) => {
-    console.error(`[Provisioning] SSH connection error for server ${id}:`, err);
+    await updateServerLog(id, stdout); // Append stdout to log
+    if (stderr) {
+      await updateServerLog(id, `STDERR: ${stderr}`); // Append stderr to log
+    }
+
+    if (code === 0) {
+      await updateServerLog(id, '\nScript finished successfully.\n');
+      await supabaseAdmin
+        .from('user_servers')
+        .update({ status: 'ready' })
+        .eq('id', id);
+    } else {
+      await updateServerLog(id, `\nScript exited with error code: ${code}\n`);
+      await supabaseAdmin
+        .from('user_servers')
+        .update({ status: 'failed' })
+        .eq('id', id);
+    }
+  } catch (err: any) {
+    console.error(`[Provisioning] SSH connection or execution error for server ${id}:`, err);
     await supabaseAdmin
       .from('user_servers')
       .update({
         status: 'failed',
-        provisioning_log: `SSH connection failed: ${err.message}\nCheck IP address, port, and credentials. Ensure the server is reachable.`,
+        provisioning_log: `SSH connection or execution failed: ${err.message}\nCheck IP address, port, and credentials. Ensure the server is reachable.`,
       })
       .eq('id', id);
-  }).connect({
-    host: ip_address,
-    port: ssh_port,
-    username: ssh_username,
-    password: ssh_password,
-    readyTimeout: 20000 // 20 seconds timeout for connection
-  });
+  }
 }

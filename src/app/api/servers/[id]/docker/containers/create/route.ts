@@ -2,13 +2,13 @@ export const runtime = 'nodejs'; // Force Node.js runtime
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { Client } from 'ssh2';
 import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { z } from 'zod';
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
 import { createAndProvisionCloudflareTunnel } from '@/lib/tunnel-orchestration'; // Import the new server action
 import { generateRandomPort } from '@/lib/utils'; // Importar la nueva función
+import { executeSshCommand } from '@/lib/ssh-utils'; // Import SSH utilities
 
 const createContainerSchema = z.object({
   image: z.string().min(1, { message: 'El nombre de la imagen es requerido.' }),
@@ -84,22 +84,6 @@ async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | '
   return { session, userRole, userPermissions };
 }
 
-// Helper to execute a command and return its output
-function executeSshCommand(conn: Client, command: string): Promise<{ stdout: string; stderr: string; code: number }> {
-  return new Promise((resolve, reject) => {
-    let stdout = '';
-    let stderr = '';
-    conn.exec(command, (err, stream) => {
-      if (err) return reject(err);
-      stream.on('data', (data: Buffer) => { stdout += data.toString(); });
-      stream.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
-      stream.on('close', (code: number) => {
-        resolve({ stdout, stderr, code });
-      });
-    });
-  });
-}
-
 export async function POST(
   req: NextRequest,
   context: any // Simplified type to resolve internal Next.js type conflict
@@ -145,11 +129,8 @@ export async function POST(
     const entrypointArgs = '-f /dev/null';
 
     // --- Phase 1: Handle image check/pull for Next.js framework (always) ---
-    const imageConn = new Client();
     try {
-      await new Promise<void>((resolve, reject) => imageConn.on('ready', resolve).on('error', reject).connect({ host: server.ip_address, port: server.ssh_port || 22, username: server.ssh_username, password: server.ssh_password, readyTimeout: 10000 }));
-      
-      const { code: inspectCode } = await executeSshCommand(imageConn, `docker inspect --type=image ${baseImage}`);
+      const { code: inspectCode } = await executeSshCommand(server, `docker inspect --type=image ${baseImage}`);
       if (inspectCode !== 0) {
         await supabaseAdmin.from('server_events_log').insert({
           user_id: session.user.id,
@@ -157,7 +138,7 @@ export async function POST(
           event_type: 'container_create_warning',
           description: `Imagen '${baseImage}' no encontrada en '${server.name || server.ip_address}'. Intentando descargar...`,
         });
-        const { stderr: pullStderr, code: pullCode } = await executeSshCommand(imageConn, `docker pull ${baseImage}`);
+        const { stderr: pullStderr, code: pullCode } = await executeSshCommand(server, `docker pull ${baseImage}`);
         if (pullCode !== 0) {
           throw new Error(`Error al descargar la imagen '${baseImage}': ${pullStderr}`);
         }
@@ -168,16 +149,13 @@ export async function POST(
           description: `Imagen '${baseImage}' descargada exitosamente en '${server.name || server.ip_address}'.`,
         });
       }
-    } finally {
-      imageConn.end();
+    } catch (e: any) {
+      throw new Error(`Error en la fase de imagen Docker: ${e.message}`);
     }
 
     // --- Phase 2: Create and run the Docker container ---
-    const runConn = new Client();
     let actualHostPort = host_port; // Declare actualHostPort here
     try {
-      await new Promise<void>((resolve, reject) => runConn.on('ready', resolve).on('error', reject).connect({ host: server.ip_address, port: server.ssh_port || 22, username: server.ssh_username, password: server.ssh_password, readyTimeout: 10000 }));
-
       if (name) runCommand += ` --name ${name.replace(/[^a-zA-Z0-9_.-]/g, '')}`;
       
       // --- Lógica para encontrar un puerto disponible ---
@@ -187,7 +165,7 @@ export async function POST(
         while (!isPortAvailable && attempts < 20) {
           const randomPort = generateRandomPort();
           // Usamos 'ss' para verificar si el puerto está en uso. Es más moderno que netstat.
-          const { stdout: portCheckOutput, code: portCheckCode } = await executeSshCommand(runConn, `ss -tlpn | grep -q ':${randomPort}'`);
+          const { stdout: portCheckOutput, code: portCheckCode } = await executeSshCommand(server, `ss -tlpn | grep -q ':${randomPort}'`);
           if (portCheckCode !== 0) { // El puerto no está en uso si grep no encuentra nada (código de salida 1)
             isPortAvailable = true;
             actualHostPort = randomPort;
@@ -205,7 +183,7 @@ export async function POST(
       
       runCommand += ` --entrypoint ${entrypointExecutable} ${baseImage} ${entrypointArgs}`;
 
-      const { stdout: newContainerId, stderr: runStderr, code: runCode } = await executeSshCommand(runConn, runCommand);
+      const { stdout: newContainerId, stderr: runStderr, code: runCode } = await executeSshCommand(server, runCommand);
       if (runCode !== 0) {
         throw new Error(`Error al crear contenedor: ${runStderr}`);
       }
@@ -217,7 +195,7 @@ export async function POST(
       let isVerified = false;
 
       while (Date.now() - startTime < timeout) {
-        const { stdout: inspectOutput, code: inspectCode } = await executeSshCommand(runConn, `docker inspect --format '{{.State.Running}}' ${containerId}`);
+        const { stdout: inspectOutput, code: inspectCode } = await executeSshCommand(server, `docker inspect --format '{{.State.Running}}' ${containerId}`);
         if (inspectCode === 0 && inspectOutput.trim() === 'true') {
           isVerified = true;
           break;
@@ -262,7 +240,7 @@ export async function POST(
         npm -v
       `.replace(/\\(?=\n)/g, '').replace(/\n/g, ' ').trim(); // Eliminar saltos de línea y backslashes de continuación
 
-      const { stderr: nodeInstallStderr, code: nodeInstallCode } = await executeSshCommand(runConn, `docker exec ${containerId} sh -c "${installNodeScript}"`);
+      const { stderr: nodeInstallStderr, code: nodeInstallCode } = await executeSshCommand(server, `docker exec ${containerId} sh -c "${installNodeScript}"`);
       if (nodeInstallCode !== 0) {
         throw new Error(`Error al instalar Node.js/npm en el contenedor: ${nodeInstallStderr}`);
       }
@@ -274,8 +252,8 @@ export async function POST(
       });
       // --- FIN NUEVO ---
 
-    } finally {
-      runConn.end();
+    } catch (e: any) {
+      throw new Error(`Error en la fase de creación/ejecución del contenedor o instalación de Node.js: ${e.message}`);
     }
 
     // Tunnel creation logic (always for Next.js)

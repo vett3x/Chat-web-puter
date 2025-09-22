@@ -2,11 +2,11 @@ export const runtime = 'nodejs'; // Force Node.js runtime
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { Client } from 'ssh2';
 import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { DockerContainer } from '@/types/docker';
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
+import { executeSshCommand } from '@/lib/ssh-utils'; // Import SSH utilities
 
 // Helper function to get the session and user role
 async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null; userPermissions: UserPermissions }> {
@@ -116,47 +116,20 @@ export async function GET(
     return NextResponse.json({ message: 'Servidor no encontrado o acceso denegado.' }, { status: 404 });
   }
 
-  const conn = new Client();
   let containers: DockerContainer[] = [];
 
   try {
-    await new Promise<void>((resolve, reject) => {
-      conn.on('ready', () => {
-        conn.exec('docker ps -a --format "{{json .}}"', (err, stream) => {
-          if (err) {
-            conn.end();
-            return reject(new Error(`SSH exec error: ${err.message}`));
-          }
+    const { stdout, stderr, code } = await executeSshCommand(server, 'docker ps -a --format "{{json .}}"');
 
-          let output = '';
-          stream.on('data', (data: Buffer) => {
-            output += data.toString();
-          }).on('close', (code: number) => {
-            conn.end();
-            if (code === 0) {
-              try {
-                containers = output.trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
-                resolve();
-              } catch (parseError) {
-                reject(new Error(`Error parsing Docker output: ${parseError}`));
-              }
-            } else {
-              reject(new Error(`Docker command exited with code ${code}`));
-            }
-          }).stderr.on('data', (data: Buffer) => {
-            console.error(`STDERR from docker ps: ${data.toString()}`);
-          });
-        });
-      }).on('error', (err) => {
-        reject(new Error(`SSH connection error: ${err.message}`));
-      }).connect({
-        host: server.ip_address,
-        port: server.ssh_port || 22,
-        username: server.ssh_username,
-        password: server.ssh_password,
-        readyTimeout: 10000,
-      });
-    });
+    if (code === 0) {
+      try {
+        containers = stdout.trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
+      } catch (parseError) {
+        throw new Error(`Error parsing Docker output: ${parseError}`);
+      }
+    } else {
+      throw new Error(`Docker command exited with code ${code}: ${stderr}`);
+    }
 
     return NextResponse.json(containers, { status: 200 });
   } catch (error: any) {
