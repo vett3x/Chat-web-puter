@@ -151,23 +151,46 @@ export async function createAndProvisionCloudflareTunnel({
     }));
 
     // Define the service suffix for consistency
-    const serviceSuffix = `tunnel-${tunnelId}`;
-    const fullServiceName = `cloudflared-${serviceSuffix}`; // This is the actual systemd service name
+    const serviceSuffix = `tunnel-${tunnelId}`; // This is the suffix used with --name
+    const fullSystemdServiceName = `cloudflared-${serviceSuffix}.service`; // This is the full systemd service name
 
     // Install cloudflared as a system service for this specific tunnel using --token
-    // The --name argument here is the suffix for the systemd service unit file
     const serviceInstallCommand = `cloudflared service install --token ${tunnelSecret} --hostname ${fullDomain} --url http://localhost:${hostPort} --name ${serviceSuffix}`;
-    const { stderr: installServiceStderr, code: installServiceCode } = await executeSshCommand(conn, serviceInstallCommand);
+    
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Executing service install command: ${serviceInstallCommand}\n` });
+    
+    const { stdout: installStdout, stderr: installServiceStderr, code: installServiceCode } = await executeSshCommand(conn, serviceInstallCommand);
+    
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Service install output - Code: ${installServiceCode}, Stdout: ${installStdout}, Stderr: ${installServiceStderr}\n` });
+
     if (installServiceCode !== 0) {
       throw new Error(`Error al instalar el servicio cloudflared para el túnel: ${installServiceStderr}`);
     }
 
+    // Verify service file existence
+    const checkServiceFileCommand = `ls /etc/systemd/system/${fullSystemdServiceName}`;
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Checking service file: ${checkServiceFileCommand}\n` });
+    const { stdout: checkFileStdout, stderr: checkFileStderr, code: checkFileCode } = await executeSshCommand(conn, checkServiceFileCommand);
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] File Check Code: ${checkFileCode}, Stdout: ${checkFileStdout}, Stderr: ${checkFileStderr}\n` });
+    if (checkFileCode !== 0) {
+        throw new Error(`El archivo de servicio ${fullSystemdServiceName} no se encontró después de la instalación.`);
+    }
+
     // Reload systemd daemon to recognize the new service unit
-    await executeSshCommand(conn, `systemctl daemon-reload`);
+    const daemonReloadCommand = `systemctl daemon-reload`;
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Executing daemon-reload command: ${daemonReloadCommand}\n` });
+    const { stdout: reloadStdout, stderr: reloadStderr, code: reloadCode } = await executeSshCommand(conn, daemonReloadCommand);
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Daemon-reload output - Code: ${reloadCode}, Stdout: ${reloadStdout}, Stderr: ${reloadStderr}\n` });
+    if (reloadCode !== 0) {
+        throw new Error(`Error al recargar el demonio de systemd: ${reloadStderr}`);
+    }
 
     // Start the newly installed service using its full systemd name
-    const startServiceCommand = `systemctl start ${fullServiceName}`;
-    const { stderr: startServiceStderr, code: startServiceCode } = await executeSshCommand(conn, startServiceCommand);
+    const startServiceCommand = `systemctl start ${fullSystemdServiceName}`;
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Executing start service command: ${startServiceCommand}\n` });
+    const { stdout: startStdout, stderr: startServiceStderr, code: startServiceCode } = await executeSshCommand(conn, startServiceCommand);
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Start service output - Code: ${startServiceCode}, Stdout: ${startStdout}, Stderr: ${startServiceStderr}\n` });
+
     if (startServiceCode !== 0) {
       throw new Error(`Error al iniciar el servicio cloudflared para el túnel: ${startServiceStderr}`);
     }
@@ -270,25 +293,32 @@ export async function deleteCloudflareTunnelAndCleanup({
     }));
 
     const serviceSuffix = `tunnel-${tunnel.tunnel_id}`;
-    const fullServiceName = `cloudflared-${serviceSuffix}`;
+    const fullSystemdServiceName = `cloudflared-${serviceSuffix}.service`;
 
     // Stop the specific cloudflared service
-    const stopServiceCommand = `systemctl stop ${fullServiceName}`;
+    const stopServiceCommand = `systemctl stop ${fullSystemdServiceName}`;
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Executing stop service command: ${stopServiceCommand}\n` });
     const { stderr: stopStderr, code: stopCode } = await executeSshCommand(conn, stopServiceCommand);
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Stop service output - Code: ${stopCode}, Stderr: ${stopStderr}\n` });
     if (stopCode !== 0 && !stopStderr.includes('Unit cloudflared-tunnel-') && !stopStderr.includes('not loaded')) {
       console.warn(`[Tunnel Deletion] Warning: Could not stop cloudflared service for tunnel ${tunnel.tunnel_id}: ${stopStderr}`);
     }
 
     // Uninstall the specific cloudflared service
-    const uninstallServiceCommand = `cloudflared service uninstall --name ${serviceSuffix}`;
+    const uninstallServiceCommand = `cloudflared service uninstall --name ${serviceSuffix}`; // --name takes the suffix
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Executing uninstall service command: ${uninstallServiceCommand}\n` });
     const { stderr: uninstallStderr, code: uninstallCode } = await executeSshCommand(conn, uninstallServiceCommand);
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Uninstall service output - Code: ${uninstallCode}, Stderr: ${uninstallStderr}\n` });
     if (uninstallCode !== 0 && !uninstallStderr.includes('No such file or directory')) {
       console.warn(`[Tunnel Deletion] Warning: Could not uninstall cloudflared service for tunnel ${tunnel.tunnel_id}: ${uninstallStderr}`);
     }
 
     // Reload systemd daemon to remove the service unit
-    await executeSshCommand(conn, `systemctl daemon-reload`);
-
+    const daemonReloadCommand = `systemctl daemon-reload`;
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Executing daemon-reload command: ${daemonReloadCommand}\n` });
+    const { stdout: reloadStdout, stderr: reloadStderr, code: reloadCode } = await executeSshCommand(conn, daemonReloadCommand);
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Daemon-reload output - Code: ${reloadCode}, Stdout: ${reloadStdout}, Stderr: ${reloadStderr}\n` });
+    
     // Clean up credentials file (created by Cloudflare API, not cloudflared service install --token)
     const configDir = `~/.cloudflared`;
     await executeSshCommand(conn, `rm -f ${configDir}/${tunnel.tunnel_id}.json`);
