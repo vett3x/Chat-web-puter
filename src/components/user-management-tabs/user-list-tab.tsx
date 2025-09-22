@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useImperativeHandle } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Users, Trash2, RefreshCw, AlertCircle, Eye, Search } from 'lucide-react';
+import { Loader2, Users, Trash2, RefreshCw, AlertCircle, Eye, Search, Crown, Shield } from 'lucide-react'; // Import Crown and Shield
 import { toast } from 'sonner';
 import { useSession } from '@/components/session-context-provider';
 import { SUPERUSER_EMAILS } from '@/lib/constants'; // Importación actualizada
@@ -187,17 +187,14 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
                   </TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
-                    {user.role === 'super_admin' ? (
-                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                        Super Admin
-                      </span>
-                    ) : user.role === 'admin' ? (
-                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                        Admin
-                      </span>
-                    ) : (
-                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-                        Usuario
+                    {user.role !== 'user' && ( // Only show role badge if not 'user'
+                      <span className={`flex items-center gap-1 text-xs font-semibold px-1.5 py-0.5 rounded-full capitalize
+                        ${user.role === 'super_admin' ? 'bg-yellow-500 text-yellow-900 dark:bg-yellow-400 dark:text-yellow-950' : ''}
+                        ${user.role === 'admin' ? 'bg-purple-500 text-purple-900 dark:bg-purple-400 dark:text-purple-950' : ''}
+                      `}>
+                        {user.role === 'super_admin' && <Crown className="h-3 w-3 fill-current" />}
+                        {user.role === 'admin' && <Shield className="h-3 w-3 fill-current" />}
+                        {user.role === 'super_admin' ? 'Super Admin' : user.role}
                       </span>
                     )}
                   </TableCell>
