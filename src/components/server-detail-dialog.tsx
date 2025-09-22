@@ -229,82 +229,77 @@ function ServerDetailDockerTab({ server }: { server: RegisteredServer }) {
             <div className="flex items-center justify-center h-full text-muted-foreground"><p>No se encontraron contenedores Docker en este servidor.</p></div>
           ) : (
             <ScrollArea className="h-full w-full">
-              <Table>
-                <TableHeader><TableRow><TableHead>ID</TableHead><TableHead>Nombre</TableHead><TableHead>Imagen</TableHead><TableHead>Estado</TableHead><TableHead>Puertos</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {containers.map((container) => {
-                    const isRunning = container.Status.includes('Up');
-                    const isGracefullyExited = container.Status.includes('Exited (0)') || container.Status.includes('Exited (137)');
-                    const isErrorState = !isRunning && !isGracefullyExited; // Actual error
-                    const isWarningState = !isRunning && isGracefullyExited; // Stopped by admin/gracefully
+              <TooltipProvider> {/* Moved TooltipProvider here */}
+                <Table>
+                  <TableHeader><TableRow><TableHead>ID</TableHead><TableHead>Nombre</TableHead><TableHead>Imagen</TableHead><TableHead>Estado</TableHead><TableHead>Puertos</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {containers.map((container) => {
+                      const isRunning = container.Status.includes('Up');
+                      const isGracefullyExited = container.Status.includes('Exited (0)') || container.Status.includes('Exited (137)');
+                      const isErrorState = !isRunning && !isGracefullyExited; // Actual error
+                      const isWarningState = !isRunning && isGracefullyExited; // Stopped by admin/gracefully
 
-                    const isActionInProgress = actionLoading === container.ID;
+                      const isActionInProgress = actionLoading === container.ID;
 
-                    return (
-                      <TableRow 
-                        key={container.ID} 
-                        className={cn(
-                          isErrorState && "bg-destructive/10 text-destructive hover:bg-destructive/20",
-                          isWarningState && "bg-warning/10 text-warning hover:bg-warning/20"
-                        )}
-                      >
-                        <TableCell className="font-mono text-xs">{container.ID.substring(0, 12)}</TableCell>
-                        <TableCell>{container.Names}</TableCell>
-                        <TableCell>{container.Image}</TableCell>
-                        <TableCell className="flex items-center gap-1">
-                          {isErrorState && (
-                            <TooltipProvider>
+                      return (
+                        <TableRow 
+                          key={container.ID} 
+                          className={cn(
+                            isErrorState && "bg-destructive/10 text-destructive hover:bg-destructive/20",
+                            isWarningState && "bg-warning/10 text-warning hover:bg-warning/20"
+                          )}
+                        >
+                          <TableCell className="font-mono text-xs">{container.ID.substring(0, 12)}</TableCell>
+                          <TableCell>{container.Names}</TableCell>
+                          <TableCell>{container.Image}</TableCell>
+                          <TableCell className="flex items-center gap-1">
+                            {(isErrorState || isWarningState) && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <AlertCircle className="h-4 w-4" />
+                                  {/* Wrapped AlertCircle in a span */}
+                                  <span>
+                                    {isErrorState ? (
+                                      <AlertCircle className="h-4 w-4" />
+                                    ) : (
+                                      <AlertCircle className="h-4 w-4 text-warning" />
+                                    )}
+                                  </span>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                  <p>Contenedor con problemas</p>
+                                  <p>{isErrorState ? 'Contenedor con problemas' : 'Contenedor detenido'}</p>
                                 </TooltipContent>
                               </Tooltip>
-                            </TooltipProvider>
-                          )}
-                          {isWarningState && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <AlertCircle className="h-4 w-4 text-warning" /> {/* Use AlertCircle for warning too */}
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Contenedor detenido</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          )}
-                          {container.Status}
-                        </TableCell>
-                        <TableCell>{container.Ports || '-'}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button variant="outline" size="icon" onClick={() => openConsoleFor(container)} title="Abrir consola">
-                              <Terminal className="h-4 w-4" />
-                            </Button>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild><Button variant="outline" size="sm" disabled={isActionInProgress}>{isActionInProgress ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Acciones</Button></DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleContainerAction(container.ID, 'start')} disabled={isRunning || isActionInProgress}><Play className="mr-2 h-4 w-4" /> Iniciar</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleContainerAction(container.ID, 'stop')} disabled={!isRunning || isActionInProgress}><StopCircle className="mr-2 h-4 w-4" /> Detener</DropdownMenuItem>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={isActionInProgress} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Eliminar</DropdownMenuItem></AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader><AlertDialogTitle>¿Estás seguro de eliminar este contenedor?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará permanentemente el contenedor "{container.Names}" ({container.ID.substring(0, 12)}).</AlertDialogDescription></AlertDialogHeader>
-                                    <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleContainerAction(container.ID, 'delete')} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+                            )}
+                            {container.Status}
+                          </TableCell>
+                          <TableCell>{container.Ports || '-'}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button variant="outline" size="icon" onClick={() => openConsoleFor(container)} title="Abrir consola">
+                                <Terminal className="h-4 w-4" />
+                              </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild><Button variant="outline" size="sm" disabled={isActionInProgress}>{isActionInProgress ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Acciones</Button></DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleContainerAction(container.ID, 'start')} disabled={isRunning || isActionInProgress}><Play className="mr-2 h-4 w-4" /> Iniciar</DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleContainerAction(container.ID, 'stop')} disabled={!isRunning || isActionInProgress}><StopCircle className="mr-2 h-4 w-4" /> Detener</DropdownMenuItem>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={isActionInProgress} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Eliminar</DropdownMenuItem></AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader><AlertDialogTitle>¿Estás seguro de eliminar este contenedor?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará permanentemente el contenedor "{container.Names}" ({container.ID.substring(0, 12)}).</AlertDialogDescription></AlertDialogHeader>
+                                      <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleContainerAction(container.ID, 'delete')} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TooltipProvider>
             </ScrollArea>
           )}
         </CardContent>
