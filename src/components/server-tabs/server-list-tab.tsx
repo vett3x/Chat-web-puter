@@ -34,6 +34,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useSession } from '@/components/session-context-provider'; // Import useSession
+import { PERMISSION_KEYS } from '@/lib/constants'; // Import PERMISSION_KEYS
 
 const serverFormSchema = z.object({
   ip_address: z.string().ip({ message: 'Dirección IP inválida.' }),
@@ -56,9 +57,10 @@ interface RegisteredServer {
 
 const DEEPCODER_API_BASE_PATH = '/api/servers';
 
-function AddServerForm({ onServerAdded, userRole }: { onServerAdded: () => void; userRole: 'user' | 'admin' | 'super_admin' | null }) {
+function AddServerForm({ onServerAdded }: { onServerAdded: () => void }) {
+  const { userPermissions } = useSession(); // Get user permissions
   const [isAddingServer, setIsAddingServer] = useState(false);
-  const isSuperAdmin = userRole === 'super_admin';
+  const canCreateServer = userPermissions[PERMISSION_KEYS.CAN_CREATE_SERVER];
 
   const form = useForm<ServerFormValues>({
     resolver: zodResolver(serverFormSchema),
@@ -99,7 +101,7 @@ function AddServerForm({ onServerAdded, userRole }: { onServerAdded: () => void;
     }
   };
 
-  if (!isSuperAdmin) {
+  if (!canCreateServer) {
     return (
       <Card>
         <CardHeader>
@@ -108,7 +110,7 @@ function AddServerForm({ onServerAdded, userRole }: { onServerAdded: () => void;
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">Solo los Super Admins pueden añadir nuevos servidores.</p>
+          <p className="text-muted-foreground">No tienes permiso para añadir nuevos servidores.</p>
         </CardContent>
       </Card>
     );
@@ -277,7 +279,7 @@ export function ServerListTab() {
 
   return (
     <div className="space-y-8 h-full overflow-y-auto p-1">
-      <AddServerForm onServerAdded={fetchServers} userRole={userRole} />
+      <AddServerForm onServerAdded={fetchServers} />
       <Separator />
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><Server className="h-6 w-6" /> Servidores Registrados</CardTitle></CardHeader>

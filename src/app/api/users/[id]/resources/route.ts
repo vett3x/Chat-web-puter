@@ -1,15 +1,15 @@
 export const runtime = 'nodejs'; // Force Node.js runtime
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
 import { Client } from 'ssh2';
-import { parseMemoryString } from '@/lib/utils';
-import { SUPERUSER_EMAILS } from '@/lib/constants'; // Importación actualizada
+import { cookies } from 'next/headers';
+import { type CookieOptions, createServerClient } from '@supabase/ssr';
+import { parseMemoryString } from '@/lib/utils'; // Import the utility function
+import { SUPERUSER_EMAILS, UserPermissions } from '@/lib/constants'; // Importación actualizada
 
 // Helper function to get the session and user role
-async function getSessionAndRole() {
+async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null; userPermissions: UserPermissions }> {
   const cookieStore = cookies() as any;
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,19 +27,27 @@ async function getSessionAndRole() {
   const { data: { session } } = await supabase.auth.getSession();
 
   let userRole: 'user' | 'admin' | 'super_admin' | null = null;
+  let userPermissions: UserPermissions = {};
   if (session?.user?.id) {
     const { data: profile, error } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, permissions')
       .eq('id', session.user.id)
       .single();
     if (profile) {
       userRole = profile.role as 'user' | 'admin' | 'super_admin';
+      userPermissions = profile.permissions || {};
     } else if (session.user.email && SUPERUSER_EMAILS.includes(session.user.email)) {
       userRole = 'super_admin'; // Fallback for initial Super Admin
+      userPermissions = {
+        can_create_server: true,
+        can_manage_docker_containers: true,
+        can_manage_cloudflare_domains: true,
+        can_manage_cloudflare_tunnels: true,
+      };
     }
   }
-  return { session, userRole };
+  return { session, userRole, userPermissions };
 }
 
 function executeSshCommand(conn: Client, command: string): Promise<string> {
@@ -56,6 +64,7 @@ function executeSshCommand(conn: Client, command: string): Promise<string> {
         }
       });
       stream.stderr.on('data', (data: Buffer) => {
+        // Log stderr but don't necessarily reject unless it's the only output
         console.error(`SSH STDERR for command "${command}": ${data.toString().trim()}`);
       });
     });
@@ -66,17 +75,17 @@ export async function GET(
   req: NextRequest,
   context: any // Usamos 'any' para resolver el error de compilación de TypeScript
 ) {
-  const userIdToFetch = context.params.id;
+  const serverId = context.params.id;
 
-  if (!userIdToFetch) {
-    return NextResponse.json({ message: 'ID de usuario no proporcionado.' }, { status: 400 });
+  if (!serverId) {
+    return NextResponse.json({ message: 'ID de servidor no proporcionado.' }, { status: 400 });
   }
 
-  const { session, userRole } = await getSessionAndRole();
+  const { session, userRole, userPermissions } = await getSessionAndRole();
   if (!session || !userRole) {
     return NextResponse.json({ message: 'Acceso denegado. No autenticado.' }, { status: 401 });
   }
-  // Allow Admins and Super Admins to view other users' resources
+  // Allow Admins and Super Admins to view resources
   if (userRole !== 'admin' && userRole !== 'super_admin') {
     return NextResponse.json({ message: 'Acceso denegado. Se requiere rol de Admin o Super Admin.' }, { status: 403 });
   }
@@ -91,93 +100,61 @@ export async function GET(
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
+  const { data: server, error: fetchError } = await supabaseAdmin
+    .from('user_servers')
+    .select('ip_address, ssh_port, ssh_username, ssh_password')
+    .eq('id', serverId)
+    // .eq('user_id', session.user.id) // <-- REMOVED THIS LINE
+    .single();
+
+  if (fetchError || !server) {
+    console.error(`Error fetching server ${serverId} for user ${session.user.id}:`, fetchError);
+    return NextResponse.json({ message: 'Servidor no encontrado o acceso denegado.' }, { status: 404 });
+  }
+
+  const conn = new Client();
   try {
-    const { data: servers, error: fetchError } = await supabaseAdmin
-      .from('user_servers')
-      .select('id, name, ip_address, ssh_port, ssh_username, ssh_password')
-      .eq('user_id', userIdToFetch)
-      .eq('status', 'ready'); // Only fetch resources from ready servers
+    await new Promise<void>((resolve, reject) => conn.on('ready', resolve).on('error', reject).connect({
+      host: server.ip_address,
+      port: server.ssh_port || 22,
+      username: server.ssh_username,
+      password: server.ssh_password,
+      readyTimeout: 10000,
+    }));
 
-    if (fetchError) {
-      console.error(`Error fetching servers for user ${userIdToFetch}:`, fetchError);
-      throw new Error('Error al cargar los servidores del usuario.');
-    }
+    const cpuCommand = `top -bn1 | grep "Cpu(s)" | sed "s/.*, *\\([0-9.]*\\)%* id.*/\\1/" | awk '{print 100 - $1}'`;
+    const memCommand = `free -m | grep Mem | awk '{print $3" "$2}'`; // Used Total in MiB
+    const diskCommand = `df -h / | grep / | awk '{print $5}'`; // Usage %
 
-    let totalCpuUsage = 0;
-    let totalMemoryUsedMiB = 0;
-    let totalMemoryTotalMiB = 0;
-    let totalDiskUsagePercent = 0;
-    let activeServersCount = 0;
-    const serverDetails: any[] = [];
+    const [cpuOutput, memOutput, diskOutput] = await Promise.all([
+      executeSshCommand(conn, cpuCommand),
+      executeSshCommand(conn, memCommand),
+      executeSshCommand(conn, diskCommand),
+    ]);
 
-    const resourcePromises = servers.map(async (server) => {
-      const conn = new Client();
-      try {
-        await new Promise<void>((resolve, reject) => conn.on('ready', resolve).on('error', reject).connect({
-          host: server.ip_address,
-          port: server.ssh_port || 22,
-          username: server.ssh_username,
-          password: server.ssh_password,
-          readyTimeout: 10000,
-        }));
+    conn.end();
 
-        const cpuCommand = `top -bn1 | grep "Cpu(s)" | sed "s/.*, *\\([0-9.]*\\)%* id.*/\\1/" | awk '{print 100 - $1}'`;
-        const memCommand = `free -m | grep Mem | awk '{print $3" "$2}'`; // Used Total in MiB
-        const diskCommand = `df -h / | grep / | awk '{print $5}'`; // Usage %
+    const cpu_usage_percent = parseFloat(cpuOutput);
+    const [raw_memory_used_str, raw_memory_total_str] = memOutput.split(' ');
 
-        const [cpuOutput, memOutput, diskOutput] = await Promise.all([
-          executeSshCommand(conn, cpuCommand),
-          executeSshCommand(conn, memCommand),
-          executeSshCommand(conn, diskCommand),
-        ]);
+    const memory_used_mib = parseMemoryString(raw_memory_used_str || '0B');
+    const memory_total_mib = parseMemoryString(raw_memory_total_str || '0B');
 
-        conn.end();
+    const disk_usage_percent = parseFloat(diskOutput.replace('%', ''));
 
-        const cpu_usage_percent = parseFloat(cpuOutput);
-        const [raw_memory_used_str, raw_memory_total_str] = memOutput.split(' ');
-        const memory_used_mib = parseMemoryString(raw_memory_used_str || '0B');
-        const memory_total_mib = parseMemoryString(raw_memory_total_str || '0B');
-        const disk_usage_percent = parseFloat(diskOutput.replace('%', ''));
-
-        if (!isNaN(cpu_usage_percent) && !isNaN(memory_used_mib) && !isNaN(memory_total_mib) && !isNaN(disk_usage_percent)) {
-          totalCpuUsage += cpu_usage_percent;
-          totalMemoryUsedMiB += memory_used_mib;
-          totalMemoryTotalMiB += memory_total_mib;
-          totalDiskUsagePercent += disk_usage_percent; // Summing for average later
-          activeServersCount++;
-
-          serverDetails.push({
-            id: server.id,
-            name: server.name || server.ip_address,
-            cpu_usage_percent,
-            memory_used_mib,
-            memory_total_mib,
-            disk_usage_percent,
-          });
-        }
-
-      } catch (serverError: any) {
-        conn.end();
-        console.warn(`Error fetching resources for server ${server.id} (${server.ip_address}):`, serverError.message);
-        // Do not throw, just log and continue with other servers
-      }
-    });
-
-    await Promise.all(resourcePromises);
-
-    const aggregatedResources = {
-      cpu_usage_percent: activeServersCount > 0 ? totalCpuUsage / activeServersCount : 0,
-      memory_used_mib: totalMemoryUsedMiB,
-      memory_total_mib: totalMemoryTotalMiB,
-      disk_usage_percent: activeServersCount > 0 ? totalDiskUsagePercent / activeServersCount : 0,
+    return NextResponse.json({
+      cpu_usage_percent: isNaN(cpu_usage_percent) ? 0 : cpu_usage_percent,
+      memory_used: raw_memory_used_str || 'N/A', // Keep raw string for display
+      memory_total: raw_memory_total_str || 'N/A', // Keep raw string for display
+      memory_used_mib: memory_used_mib, // New numeric field
+      memory_total_mib: memory_total_mib, // New numeric field
+      disk_usage_percent: isNaN(disk_usage_percent) ? 0 : disk_usage_percent,
       timestamp: new Date().toISOString(),
-      server_details: serverDetails,
-    };
-
-    return NextResponse.json(aggregatedResources, { status: 200 });
+    }, { status: 200 });
 
   } catch (error: any) {
-    console.error(`Unhandled error in GET /api/users/${userIdToFetch}/resources:`, error);
-    return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
+    conn.end();
+    console.error(`Error fetching server resources for server ${serverId}:`, error.message);
+    return NextResponse.json({ message: `Error al obtener recursos del servidor: ${error.message}` }, { status: 500 });
   }
 }

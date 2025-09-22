@@ -5,10 +5,10 @@ import { createClient } from '@supabase/supabase-js';
 import { Client } from 'ssh2';
 import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
-import { SUPERUSER_EMAILS } from '@/lib/constants'; // Importación actualizada
+import { SUPERUSER_EMAILS, UserPermissions } from '@/lib/constants'; // Importación actualizada
 
 // Helper function to get the session and user role
-async function getSessionAndRole() {
+async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null; userPermissions: UserPermissions }> {
   const cookieStore = cookies() as any;
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,19 +26,27 @@ async function getSessionAndRole() {
   const { data: { session } } = await supabase.auth.getSession();
 
   let userRole: 'user' | 'admin' | 'super_admin' | null = null;
+  let userPermissions: UserPermissions = {};
   if (session?.user?.id) {
     const { data: profile, error } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, permissions')
       .eq('id', session.user.id)
       .single();
     if (profile) {
       userRole = profile.role as 'user' | 'admin' | 'super_admin';
+      userPermissions = profile.permissions || {};
     } else if (session.user.email && SUPERUSER_EMAILS.includes(session.user.email)) {
       userRole = 'super_admin'; // Fallback for initial Super Admin
+      userPermissions = {
+        can_create_server: true,
+        can_manage_docker_containers: true,
+        can_manage_cloudflare_domains: true,
+        can_manage_cloudflare_tunnels: true,
+      };
     }
   }
-  return { session, userRole };
+  return { session, userRole, userPermissions };
 }
 
 // Helper to execute a command and return its output
@@ -68,7 +76,7 @@ export async function DELETE(
     return NextResponse.json({ message: 'ID de servidor o contenedor no proporcionado.' }, { status: 400 });
   }
 
-  const { session, userRole } = await getSessionAndRole();
+  const { session, userRole, userPermissions } = await getSessionAndRole();
   if (!session || !userRole) {
     return NextResponse.json({ message: 'Acceso denegado. No autenticado.' }, { status: 401 });
   }

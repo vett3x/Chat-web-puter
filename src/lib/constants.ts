@@ -8,3 +8,5 @@ export const PERMISSION_KEYS = {
   CAN_MANAGE_CLOUDFLARE_TUNNELS: 'can_manage_cloudflare_tunnels',
   // Añadir más permisos aquí en el futuro
 };
+
+export type UserPermissions = Record<string, boolean>;
