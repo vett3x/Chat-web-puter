@@ -246,14 +246,15 @@ export async function POST(
         echo "--- Node.js and npm installed. ---"
 
         echo "--- Installing cloudflared... ---"
+        # Add cloudflare gpg key
         sudo mkdir -p --mode=0755 /usr/share/keyrings
-        curl -fsSL https://pkg.cloudflare.com/cloudflare-release.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-archive-keyring.gpg
-        sudo chmod 644 /usr/share/keyrings/cloudflare-archive-keyring.gpg
-        DISTRO_CODENAME=$(lsb_release -cs)
-        echo "Detected distribution codename: \${DISTRO_CODENAME}"
-        echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflare.com/cloudflared \${DISTRO_CODENAME} main" | sudo tee /etc/apt/sources.list.d/cloudflared.list > /dev/null
-        sudo apt-get update -y
-        sudo apt-get install -y cloudflared
+        curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
+
+        # Add this repo to your apt repositories
+        echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' | sudo tee /etc/apt/sources.list.d/cloudflared.list
+
+        # install cloudflared
+        sudo apt-get update && sudo apt-get install -y cloudflared
         echo "cloudflared version: $(cloudflared --version)"
         echo "--- cloudflared installed. ---"
 
