@@ -156,27 +156,27 @@ export async function createAndProvisionCloudflareTunnel({
     if (cloudflaredCheckCode !== 0) {
       // Install cloudflared
       const installCloudflaredScript = `
-        set -e # Exit immediately if a command exits with a non-zero status.
-        set -x # Print commands and their arguments as they are executed.
+        set -e
+        set -x
 
         echo "--- Starting Cloudflared Installation ---"
 
         echo "Updating package list and installing prerequisites..."
-        sudo apt-get update -y
-        sudo apt-get install -y gnupg ca-certificates curl lsb-release
+        apt-get update -y
+        apt-get install -y gnupg ca-certificates curl lsb-release
 
         echo "Adding Cloudflare GPG key..."
-        # Use --batch and --yes for non-interactive gpg, and ensure output to correct keyring location
-        curl -fsSL https://pkg.cloudflare.com/cloudflare-release.gpg | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/cloudflare-archive-keyring.gpg
+        mkdir -p /usr/share/keyrings
+        curl -fsSL https://pkg.cloudflare.com/cloudflare-release.gpg | gpg --yes --dearmor -o /usr/share/keyrings/cloudflare-archive-keyring.gpg
 
         echo "Adding Cloudflare repository..."
-        echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg arch=$(dpkg --print-architecture)] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/cloudflared.list > /dev/null
+        echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/cloudflared.list > /dev/null
 
         echo "Updating package list again after adding repository..."
-        sudo apt-get update -y
+        apt-get update -y
 
         echo "Installing cloudflared..."
-        sudo apt-get install -y cloudflared
+        apt-get install -y cloudflared
 
         echo "--- Cloudflared Installation Complete ---"
       `;
