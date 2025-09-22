@@ -61,8 +61,8 @@ export async function GET(req: NextRequest) {
       `) as { data: SupabaseUserProfile[] | null, error: any }; // Castear el resultado
 
     if (error) {
-      console.error('Error fetching users from Supabase (admin):', error);
-      throw new Error('Error al cargar los usuarios.');
+      console.error('Supabase query error in GET /api/users:', error); // Registro detallado del error de Supabase
+      throw new Error('Error al cargar los usuarios desde la base de datos.'); // Mensaje de error más específico
     }
 
     // Flatten the data to include email directly
@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(formattedUsers, { status: 200 });
 
   } catch (error: any) {
-    console.error('Error in GET /api/users:', error);
+    console.error('Unhandled error in GET /api/users:', error); // Registro de errores no manejados
     return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
   }
 }
