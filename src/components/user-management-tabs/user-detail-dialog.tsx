@@ -43,9 +43,10 @@ interface UserDetailDialogProps {
     role: UserRole; // Added role to user prop
   };
   currentUserRole: UserRole | null; // Role of the currently logged-in user
+  onRoleUpdated: () => void; // New prop: Callback to refresh user list
 }
 
-export function UserDetailDialog({ open, onOpenChange, user, currentUserRole }: UserDetailDialogProps) {
+export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, onRoleUpdated }: UserDetailDialogProps) {
   const { session } = useSession(); // Use useSession hook
   const [activeTab, setActiveTab] = useState('servers');
   const [selectedRole, setSelectedRole] = useState<UserRole>(user.role);
@@ -61,7 +62,7 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole }: 
 
   const isCurrentUserSuperAdmin = currentUserRole === 'super_admin';
   const isTargetUserSuperAdmin = user.role === 'super_admin';
-  const isChangingOwnRole = user.id === session?.user?.id; // Corrected: Use session from useSession
+  const isChangingOwnRole = user.id === session?.user?.id;
 
   const handleRoleChange = async () => {
     if (!isCurrentUserSuperAdmin || isChangingOwnRole || selectedRole === user.role) {
@@ -84,7 +85,8 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole }: 
       }
 
       toast.success(result.message || `Rol de usuario actualizado a '${selectedRole}'.`);
-      user.role = selectedRole; // Optimistically update the role in the prop
+      // No need to optimistically update user.role here, as onRoleUpdated will trigger a re-fetch
+      onRoleUpdated(); // Notify parent to refresh user list
       onOpenChange(false); // Close dialog after successful update
     } catch (error: any) {
       console.error('Error updating user role:', error);
@@ -148,7 +150,7 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole }: 
                 <History className="h-4 w-4" /> Actividad
               </TabsTrigger>
             </TabsList>
-            <div className="flex-1 overflow-hidden mt-4">
+            <div className="flex-1 py-4 overflow-hidden">
               <ScrollArea className="h-full w-full">
                 <TabsContent value="servers" className="h-full">
                   <UserServersTab userId={user.id} />

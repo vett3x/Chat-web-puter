@@ -324,6 +324,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
           onOpenChange={setIsDetailDialogOpen}
           user={selectedUser}
           currentUserRole={currentUserRole} // Pass current user's role
+          onRoleUpdated={fetchUsers} // Pass fetchUsers as the callback
         />
       )}
     </Card>
