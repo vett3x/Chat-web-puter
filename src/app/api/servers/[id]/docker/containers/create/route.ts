@@ -179,8 +179,27 @@ export async function POST(
 
       if (name) runCommand += ` --name ${name.replace(/[^a-zA-Z0-9_.-]/g, '')}`;
       
-      // Determinar el puerto del host a usar
-      const actualHostPort = host_port || generateRandomPort();
+      // --- NUEVO: Lógica para encontrar un puerto disponible ---
+      let actualHostPort = host_port;
+      if (!actualHostPort) {
+        let isPortAvailable = false;
+        let attempts = 0;
+        while (!isPortAvailable && attempts < 20) {
+          const randomPort = generateRandomPort();
+          // Usamos 'ss' para verificar si el puerto está en uso. Es más moderno que netstat.
+          const { stdout: portCheckOutput, code: portCheckCode } = await executeSshCommand(runConn, `ss -tlpn | grep -q ':${randomPort}'`);
+          if (portCheckCode !== 0) { // El puerto no está en uso si grep no encuentra nada (código de salida 1)
+            isPortAvailable = true;
+            actualHostPort = randomPort;
+          }
+          attempts++;
+        }
+        if (!actualHostPort) {
+          throw new Error('No se pudo encontrar un puerto disponible en el servidor después de 20 intentos.');
+        }
+      }
+      // --- FIN LÓGICA DE PUERTO ---
+
       const finalPorts = `${actualHostPort}:${container_port || 3000}`; // Usar el puerto del host y el puerto del contenedor
       runCommand += ` -p ${finalPorts}`;
       
@@ -277,6 +296,7 @@ export async function POST(
           containerId: containerId!, // containerId is guaranteed to be defined here
           cloudflareDomainId: cloudflare_domain_id,
           containerPort: container_port,
+          hostPort: host_port, // Pasar el puerto del host a la orquestación
           subdomain: subdomain,
           serverDetails: {
             ip_address: server.ip_address,

@@ -54,6 +54,7 @@ export async function createAndProvisionCloudflareTunnel({
   containerId,
   cloudflareDomainId,
   containerPort,
+  hostPort, // Nuevo: puerto del host
   subdomain: userSubdomain,
   serverDetails,
   cloudflareDomainDetails,
@@ -63,6 +64,7 @@ export async function createAndProvisionCloudflareTunnel({
   containerId: string;
   cloudflareDomainId: string;
   containerPort: number;
+  hostPort?: number; // Nuevo: puerto del host
   subdomain?: string;
   serverDetails: ServerDetails;
   cloudflareDomainDetails: CloudflareDomainDetails;
@@ -72,41 +74,15 @@ export async function createAndProvisionCloudflareTunnel({
   let newTunnelRecordId: string | undefined; // To store the ID of the new tunnel record in DB
 
   try {
-    // --- NUEVO: Verificar si ya existe un túnel antes de crear uno nuevo ---
-    const { data: existingTunnels, error: existingTunnelError } = await supabaseAdmin
-      .from('docker_tunnels')
-      .select('id, status, full_domain')
-      .eq('server_id', serverId)
-      .eq('container_id', containerId)
-      .eq('container_port', containerPort)
-      .eq('user_id', userId); // Asegurarse de que sea para el usuario actual
-
-    if (existingTunnelError) {
-      throw new Error(`Error al verificar túneles existentes: ${existingTunnelError.message}`);
-    }
-
-    if (existingTunnels && existingTunnels.length > 0) {
-      const activeOrProvisioningTunnel = existingTunnels.find(t => t.status === 'active' || t.status === 'provisioning');
-      if (activeOrProvisioningTunnel) {
-        throw new Error(`Ya existe un túnel activo o en aprovisionamiento para este contenedor y puerto (${activeOrProvisioningTunnel.full_domain || 'sin dominio'}).`);
-      }
-      // Si solo existen túneles 'failed', permitimos crear uno nuevo, pero es mejor limpiar los fallidos primero.
-      // Por ahora, si existe CUALQUIER túnel para esta combinación, lo prevenimos.
-      throw new Error(`Ya existe un túnel (posiblemente fallido) para este contenedor y puerto. Por favor, elimínalo primero si deseas crear uno nuevo.`);
-    }
-    // --- FIN NUEVA VERIFICACIÓN ---
-
     const subdomain = userSubdomain || generateRandomSubdomain();
     const fullDomain = `${subdomain}.${cloudflareDomainDetails.domain_name}`;
-    const tunnelName = `tunnel-${subdomain}-${containerId.substring(0, 8)}`; // Unique name for Cloudflare
+    const tunnelName = `tunnel-${subdomain}-${containerId.substring(0, 8)}`;
 
-    // 1. Create Cloudflare Tunnel
     const tunnel = await createCloudflareTunnel(cloudflareDomainDetails.api_token, cloudflareDomainDetails.account_id, tunnelName);
     tunnelId = tunnel.id;
     const tunnelSecret = tunnel.secret;
     const tunnelCnameTarget = `${tunnelId}.cfargotunnel.com`;
 
-    // 2. Create DNS CNAME record
     const dnsRecord = await createCloudflareDnsRecord(
       cloudflareDomainDetails.api_token,
       cloudflareDomainDetails.zone_id,
@@ -115,7 +91,6 @@ export async function createAndProvisionCloudflareTunnel({
     );
     dnsRecordId = dnsRecord.id;
 
-    // 3. Store tunnel details in Supabase
     const { data: newTunnel, error: insertError } = await supabaseAdmin
       .from('docker_tunnels')
       .insert({
@@ -126,6 +101,7 @@ export async function createAndProvisionCloudflareTunnel({
         subdomain: subdomain,
         full_domain: fullDomain,
         container_port: containerPort,
+        host_port: hostPort, // Guardar el puerto del host
         tunnel_id: tunnelId,
         tunnel_secret: tunnelSecret,
         status: 'provisioning',
@@ -134,14 +110,10 @@ export async function createAndProvisionCloudflareTunnel({
       .single();
 
     if (insertError) {
-      // Si llegamos aquí, significa que la verificación inicial pudo haber fallado
-      // o hubo una condición de carrera. Registramos el error específico.
-      console.error(`[Tunnel Orchestration] Error inserting tunnel into DB after initial check: ${insertError.message}`);
       throw new Error(`Error al guardar el túnel en la base de datos: ${insertError.message}`);
     }
     newTunnelRecordId = newTunnel.id;
 
-    // 4. SSH to the remote server to install cloudflared and run the tunnel
     const conn = new SshClient();
     await new Promise<void>((resolve, reject) => conn.on('ready', resolve).on('error', reject).connect({
       host: serverDetails.ip_address,
@@ -151,70 +123,59 @@ export async function createAndProvisionCloudflareTunnel({
       readyTimeout: 20000,
     }));
 
-    // Check if cloudflared is already installed
-    const { code: cloudflaredCheckCode } = await executeSshCommand(conn, 'command -v cloudflared');
-    if (cloudflaredCheckCode !== 0) {
-      // Install cloudflared
-      const installCloudflaredScript = `
-        set -e
-        set -x
-        echo "--- Starting Cloudflared Installation ---"
-        apt-get update -y
-        apt-get install -y curl gnupg lsb-release ca-certificates
-        mkdir -p /usr/share/keyrings
-        curl -fsSL https://pkg.cloudflare.com/cloudflare-release.gpg | gpg --dearmor -o /usr/share/keyrings/cloudflare-archive-keyring.gpg
-        chmod 644 /usr/share/keyrings/cloudflare-archive-keyring.gpg
-        echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" > /etc/apt/sources.list.d/cloudflared.list
-        apt-get update -y
-        apt-get install -y cloudflared
-        echo "--- Cloudflared Installation Complete ---"
-      `;
-      const { stderr: installStderr, code: installCode } = await executeSshCommand(conn, installCloudflaredScript);
-      if (installCode !== 0) {
-        throw new Error(`Error al instalar cloudflared en el servidor remoto: ${installStderr}`);
-      }
-    }
-
-    // Create cloudflared config directory and credentials file
     const configDir = `~/.cloudflared`;
     const credsFile = `${configDir}/${tunnelId}.json`;
-    const configToml = `${configDir}/config.yml`;
+    const mainConfigFile = `${configDir}/config.yml`;
+
+    // Check if cloudflared service is installed and running
+    const { code: serviceCheckCode } = await executeSshCommand(conn, 'systemctl is-active --quiet cloudflared');
+    if (serviceCheckCode !== 0) {
+      // Install and setup cloudflared as a service
+      const installScript = `
+        set -e
+        set -x
+        echo "--- Installing Cloudflared as a service ---"
+        apt-get update -y && apt-get install -y curl gnupg lsb-release ca-certificates
+        mkdir -p /usr/share/keyrings
+        curl -fsSL https://pkg.cloudflare.com/cloudflare-release.gpg | gpg --yes --dearmor -o /usr/share/keyrings/cloudflare-archive-keyring.gpg
+        echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/cloudflared.list > /dev/null
+        apt-get update -y && apt-get install -y cloudflared
+        cloudflared service install
+        echo "--- Cloudflared service installed ---"
+      `;
+      const { stderr: installStderr, code: installCode } = await executeSshCommand(conn, installScript);
+      if (installCode !== 0) {
+        throw new Error(`Error al instalar el servicio cloudflared: ${installStderr}`);
+      }
+    }
 
     await executeSshCommand(conn, `mkdir -p ${configDir}`);
     await executeSshCommand(conn, `echo '${JSON.stringify(tunnel)}' > ${credsFile}`);
 
-    // Create config.yml for the tunnel
-    const configContent = `
-tunnel: ${tunnelId}
-credentials-file: ${credsFile}
-metrics: 0.0.0.0:2006
-warp-routing:
-  enabled: true
-ingress:
+    // Append new ingress rule to the main config file
+    const ingressRule = `
+  # BEGIN INGRESS FOR ${tunnelId}
   - hostname: ${fullDomain}
-    service: http://localhost:${containerPort}
+    service: http://localhost:${hostPort}
     originRequest:
       noTLSVerify: true
-  - service: http_status:404
+  # END INGRESS FOR ${tunnelId}
 `;
-    await executeSshCommand(conn, `echo "${configContent.replace(/"/g, '\\"').replace(/\n/g, '\\n')}" > ${configToml}`);
+    await executeSshCommand(conn, `echo "${ingressRule}" | tee -a ${mainConfigFile}`);
 
-    // Run cloudflared as a background process using nohup
-    const runTunnelCommand = `nohup cloudflared tunnel run --config ${configToml} ${tunnelName} > /dev/null 2>&1 &`;
-    const { stderr: runStderr, code: runCode } = await executeSshCommand(conn, runTunnelCommand);
-    if (runCode !== 0) {
-      throw new Error(`Error al iniciar el túnel cloudflared en el servidor remoto: ${runStderr}`);
+    // Restart the service to apply changes
+    const { stderr: restartStderr, code: restartCode } = await executeSshCommand(conn, 'systemctl restart cloudflared');
+    if (restartCode !== 0) {
+      throw new Error(`Error al reiniciar el servicio cloudflared: ${restartStderr}`);
     }
 
     conn.end();
 
-    // 5. Update tunnel status to 'active'
     await supabaseAdmin
       .from('docker_tunnels')
       .update({ status: 'active' })
       .eq('id', newTunnelRecordId);
 
-    // Log event for successful tunnel creation and provisioning
     await supabaseAdmin.from('server_events_log').insert({
       user_id: userId,
       server_id: serverId,
@@ -226,41 +187,21 @@ ingress:
 
   } catch (error: any) {
     console.error('Error creating Cloudflare tunnel and provisioning:', error);
-
-    // Rollback Cloudflare resources if creation failed at an intermediate step
     if (tunnelId) {
-      try {
-        await deleteCloudflareTunnel(cloudflareDomainDetails.api_token, cloudflareDomainDetails.account_id, tunnelId);
-        console.warn(`[Rollback] Cloudflare Tunnel ${tunnelId} deleted.`);
-      } catch (rollbackError) {
-        console.error(`[Rollback] Failed to delete Cloudflare Tunnel ${tunnelId}:`, rollbackError);
-      }
+      try { await deleteCloudflareTunnel(cloudflareDomainDetails.api_token, cloudflareDomainDetails.account_id, tunnelId); } catch (e) { console.error(`[Rollback] Failed to delete CF Tunnel ${tunnelId}`, e); }
     }
     if (dnsRecordId) {
-      try {
-        await deleteCloudflareDnsRecord(cloudflareDomainDetails.api_token, cloudflareDomainDetails.zone_id, dnsRecordId);
-        console.warn(`[Rollback] Cloudflare DNS record ${dnsRecordId} deleted.`);
-      } catch (rollbackError) {
-        console.error(`[Rollback] Failed to delete Cloudflare DNS record ${dnsRecordId}:`, rollbackError);
-      }
+      try { await deleteCloudflareDnsRecord(cloudflareDomainDetails.api_token, cloudflareDomainDetails.zone_id, dnsRecordId); } catch (e) { console.error(`[Rollback] Failed to delete DNS record ${dnsRecordId}`, e); }
     }
-
-    // Update tunnel status to 'failed' if it was inserted
     if (newTunnelRecordId) {
-      await supabaseAdmin
-        .from('docker_tunnels')
-        .update({ status: 'failed' })
-        .eq('id', newTunnelRecordId);
+      await supabaseAdmin.from('docker_tunnels').update({ status: 'failed' }).eq('id', newTunnelRecordId);
     }
-
-    // Log event for failed tunnel creation
     await supabaseAdmin.from('server_events_log').insert({
       user_id: userId,
       server_id: serverId,
       event_type: 'tunnel_create_failed',
-      description: `Fallo al crear túnel para contenedor ${containerId.substring(0, 12)} en servidor ${serverId}. Error: ${error.message}`,
+      description: `Fallo al crear túnel para contenedor ${containerId.substring(0, 12)}. Error: ${error.message}`,
     });
-
     throw new Error(`Error al crear el túnel: ${error.message}`);
   }
 }
@@ -269,7 +210,7 @@ export async function deleteCloudflareTunnelAndCleanup({
   userId,
   serverId,
   containerId,
-  tunnelRecordId, // ID from docker_tunnels table
+  tunnelRecordId,
   serverDetails,
   cloudflareDomainDetails,
 }: {
@@ -281,7 +222,6 @@ export async function deleteCloudflareTunnelAndCleanup({
   cloudflareDomainDetails: CloudflareDomainDetails;
 }) {
   try {
-    // 1. Fetch tunnel details from Supabase
     const { data: tunnel, error: tunnelError } = await supabaseAdmin
       .from('docker_tunnels')
       .select('id, tunnel_id, cloudflare_domain_id, full_domain')
@@ -293,7 +233,6 @@ export async function deleteCloudflareTunnelAndCleanup({
       throw new Error('Túnel no encontrado o acceso denegado.');
     }
 
-    // 2. SSH to the remote server to stop cloudflared and clean up
     const conn = new SshClient();
     await new Promise<void>((resolve, reject) => conn.on('ready', resolve).on('error', reject).connect({
       host: serverDetails.ip_address,
@@ -303,25 +242,24 @@ export async function deleteCloudflareTunnelAndCleanup({
       readyTimeout: 20000,
     }));
 
-    // Stop cloudflared process
-    const stopTunnelCommand = `pkill -f "cloudflared tunnel run --config ~/.cloudflared/config.yml ${tunnel.tunnel_id}" || true`;
-    await executeSshCommand(conn, stopTunnelCommand);
+    // Remove ingress rule from config.yml using sed
+    const mainConfigFile = `~/.cloudflared/config.yml`;
+    const sedCommand = `sed -i '/# BEGIN INGRESS FOR ${tunnel.tunnel_id}/,/# END INGRESS FOR ${tunnel.tunnel_id}/d' ${mainConfigFile}`;
+    await executeSshCommand(conn, sedCommand);
 
-    // Clean up cloudflared config files
-    const configDir = `~/.cloudflared`;
-    await executeSshCommand(conn, `rm -rf ${configDir}/${tunnel.tunnel_id}.json ${configDir}/config.yml`);
+    // Restart service
+    await executeSshCommand(conn, 'systemctl restart cloudflared');
+
+    // Clean up credentials file
+    await executeSshCommand(conn, `rm -f ~/.cloudflared/${tunnel.tunnel_id}.json`);
 
     conn.end();
 
-    // 3. Delete Cloudflare Tunnel
     if (tunnel.tunnel_id) {
       await deleteCloudflareTunnel(cloudflareDomainDetails.api_token, cloudflareDomainDetails.account_id, tunnel.tunnel_id);
     }
 
-    // 4. Delete DNS CNAME record (need to find its ID first)
-    // This is a simplified approach. In a real app, DNS record ID should be stored.
-    // For now, we'll try to find it via a search or skip if not found.
-    const { data: dnsRecords, error: dnsRecordsError } = await supabaseAdmin
+    const { data: dnsRecords } = await supabaseAdmin
       .from('server_events_log')
       .select('description')
       .eq('event_type', 'tunnel_created')
@@ -332,18 +270,13 @@ export async function deleteCloudflareTunnelAndCleanup({
     let dnsRecordId: string | undefined;
     if (dnsRecords && dnsRecords.length > 0) {
       const match = dnsRecords[0].description.match(/DNS Record ID: ([a-f0-9]+)/);
-      if (match) {
-        dnsRecordId = match[1];
-      }
+      if (match) dnsRecordId = match[1];
     }
 
     if (dnsRecordId) {
       await deleteCloudflareDnsRecord(cloudflareDomainDetails.api_token, cloudflareDomainDetails.zone_id, dnsRecordId);
-    } else {
-      console.warn(`[Tunnel Deletion] Could not find DNS record ID for ${tunnel.full_domain}. Skipping DNS record deletion.`);
     }
 
-    // 5. Delete tunnel from Supabase
     const { error: deleteError } = await supabaseAdmin
       .from('docker_tunnels')
       .delete()
@@ -354,7 +287,6 @@ export async function deleteCloudflareTunnelAndCleanup({
       throw new Error(`Error al eliminar el túnel de la base de datos: ${deleteError.message}`);
     }
 
-    // Log event for successful tunnel deletion
     await supabaseAdmin.from('server_events_log').insert({
       user_id: userId,
       server_id: serverId,
@@ -366,15 +298,12 @@ export async function deleteCloudflareTunnelAndCleanup({
 
   } catch (error: any) {
     console.error('Error deleting Cloudflare tunnel and cleaning up:', error);
-
-    // Log event for failed tunnel deletion
     await supabaseAdmin.from('server_events_log').insert({
       user_id: userId,
       server_id: serverId,
       event_type: 'tunnel_delete_failed',
-      description: `Fallo al eliminar túnel para contenedor ${containerId.substring(0, 12)} en servidor ${serverId}. Error: ${error.message}`,
+      description: `Fallo al eliminar túnel para contenedor ${containerId.substring(0, 12)}. Error: ${error.message}`,
     });
-
     throw new Error(`Error al eliminar el túnel: ${error.message}`);
   }
 }
