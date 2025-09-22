@@ -71,8 +71,8 @@ const cloudflareDomainSchema = z.object({
 type CloudflareDomainFormValues = z.infer<typeof cloudflareDomainSchema>;
 
 export function CloudflareTunnelTab() {
-  const { userRole } = useSession(); // Get user role
-  const isSuperAdmin = userRole === 'super_admin';
+  const { userPermissions } = useSession(); // Get user permissions
+  const canManageCloudflareDomains = userPermissions['can_manage_cloudflare_domains'];
 
   const [cloudflareDomains, setCloudflareDomains] = useState<CloudflareDomain[]>([]);
   const [dockerTunnels, setDockerTunnels] = useState<DockerTunnel[]>([]);
@@ -191,8 +191,8 @@ export function CloudflareTunnelTab() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {!isSuperAdmin ? (
-              <p className="text-muted-foreground">Solo los Super Admins pueden añadir nuevos dominios de Cloudflare.</p>
+            {!canManageCloudflareDomains ? (
+              <p className="text-muted-foreground">No tienes permiso para añadir nuevos dominios de Cloudflare.</p>
             ) : (
               <Form {...domainForm}>
                 <form onSubmit={domainForm.handleSubmit(handleAddDomain)} className="space-y-6">
@@ -306,7 +306,7 @@ export function CloudflareTunnelTab() {
                       <TableCell className="text-right">
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="icon" className="h-8 w-8" disabled={!isSuperAdmin}>
+                            <Button variant="destructive" size="icon" className="h-8 w-8" disabled={!canManageCloudflareDomains}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </AlertDialogTrigger>
@@ -395,7 +395,7 @@ export function CloudflareTunnelTab() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="destructive" size="icon" className="h-8 w-8" disabled={!isSuperAdmin}> {/* Disabled for admin */}
+                        <Button variant="destructive" size="icon" className="h-8 w-8" disabled={!canManageCloudflareDomains}> {/* Disabled based on canManageCloudflareDomains */}
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </TableCell>

@@ -359,12 +359,11 @@ function ServerDetailDockerTab({ server, userRole }: { server: RegisteredServer;
                           <TableCell className="font-mono text-xs">{container.ID.substring(0, 12)}</TableCell>
                           <TableCell>{container.Names}</TableCell>
                           <TableCell>{container.Image}</TableCell>
-                          <TableCell> {/* Removed flex items-center from here */}
-                            <div className="flex items-center gap-1"> {/* Added a new div for alignment */}
+                          <TableCell className="align-middle"> {/* Added align-middle here */}
+                            <div className="flex items-center gap-1">
                               {(isErrorState || isWarningState) && (
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    {/* Wrapped AlertCircle in a span */}
                                     <span>
                                       {isErrorState ? (
                                         <AlertCircle className="h-4 w-4" />
@@ -378,7 +377,7 @@ function ServerDetailDockerTab({ server, userRole }: { server: RegisteredServer;
                                   </TooltipContent>
                                 </Tooltip>
                               )}
-                              <span>{container.Status}</span> {/* Wrapped status text in a span */}
+                              <span>{container.Status}</span>
                             </div>
                           </TableCell>
                           <TableCell>{container.Ports || '-'}</TableCell>

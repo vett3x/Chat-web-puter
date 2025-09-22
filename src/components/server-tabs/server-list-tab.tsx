@@ -55,7 +55,7 @@ interface RegisteredServer {
   provisioning_log?: string | null;
 }
 
-const DEEPCODER_API_BASE_PATH = '/api/servers';
+const DEEPCODER_API_BASE_PATH = '/api/servers'; // Variable name remains for consistency
 
 function AddServerForm({ onServerAdded }: { onServerAdded: () => void }) {
   const { userPermissions } = useSession(); // Get user permissions

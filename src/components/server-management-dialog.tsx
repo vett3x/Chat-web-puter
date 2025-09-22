@@ -28,7 +28,7 @@ export function ServerManagementDialog({ open, onOpenChange }: ServerManagementD
             <Server className="h-6 w-6" /> Gestión de Servidores
           </DialogTitle>
           <DialogDescription>
-            Aquí puedes añadir y gestionar los servidores que utilizará DeepCoder para desplegar entornos de desarrollo.
+            Aquí puedes añadir y gestionar los servidores que utilizará DeepAI Coder para desplegar entornos de desarrollo.
             Recuerda que las credenciales SSH se enviarán a tu backend de orquestación para su gestión segura.
           </DialogDescription>
         </DialogHeader>

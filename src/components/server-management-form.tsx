@@ -46,7 +46,7 @@ interface RegisteredServer {
 }
 
 // La URL de la API ahora es interna al mismo origen
-const DEEPCODER_API_BASE_PATH = '/api/servers';
+const DEEPCODER_API_BASE_PATH = '/api/servers'; // Changed comment, variable name remains for consistency
 
 export function ServerManagementForm() {
   const [isAddingServer, setIsAddingServer] = useState(false);
