@@ -82,7 +82,7 @@ export async function createAndProvisionCloudflareTunnel({
     const tunnelName = `tunnel-${containerId.substring(0, 12)}`;
 
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Creating Cloudflare Tunnel '${tunnelName}' on host via SSH...\n` });
-    const createdTunnel = await createCloudflareTunnel(serverDetails, tunnelName, userId);
+    const createdTunnel = await createCloudflareTunnel(serverDetails, tunnelName, cloudflareDomainDetails, userId); // MODIFIED LINE
     
     if (!createdTunnel || !createdTunnel.tunnelId || !createdTunnel.tunnelSecret) {
       throw new Error('No se pudo crear el túnel o obtener su ID/secreto del servidor remoto.');

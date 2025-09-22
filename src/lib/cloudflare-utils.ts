@@ -152,6 +152,13 @@ interface ServerDetails {
   name?: string;
 }
 
+interface CloudflareDomainDetails { // New interface to pass to createCloudflareTunnel
+  domain_name: string;
+  api_token: string;
+  zone_id: string;
+  account_id: string;
+}
+
 interface CreatedLegacyTunnel {
   tunnelId: string;
   tunnelSecret: string; // This is the token for the credentials file
@@ -164,16 +171,31 @@ interface CreatedLegacyTunnel {
 export async function createCloudflareTunnel(
   serverDetails: ServerDetails,
   tunnelName: string,
+  cloudflareDomainDetails: CloudflareDomainDetails, // ADDED THIS PARAMETER
   userId?: string,
 ): Promise<CreatedLegacyTunnel> {
   await logApiCall(userId, 'cloudflare_tunnel_create_ssh', `Attempting to create legacy tunnel '${tunnelName}' on ${serverDetails.ip_address} via SSH.`);
 
-  // Ensure the .cloudflared directory exists for the root user
+  // 1. Ensure the .cloudflared directory exists for the root user
   await executeSshCommand(serverDetails, 'mkdir -p /root/.cloudflared');
   await logApiCall(userId, 'cloudflare_tunnel_create_ssh_mkdir', `Ensured /root/.cloudflared directory exists on ${serverDetails.ip_address}.`);
 
-  // Explicitly set TUNNEL_ORIGIN_CERT to empty and force --config /dev/null
-  const command = `bash -c 'TUNNEL_ORIGIN_CERT="" cloudflared --config /dev/null tunnel create ${tunnelName}'`;
+  // 2. Install origin certificate (cert.pem)
+  // This command requires CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID environment variables
+  const installCertCommand = `bash -c 'CLOUDFLARE_API_TOKEN="${cloudflareDomainDetails.api_token}" CLOUDFLARE_ACCOUNT_ID="${cloudflareDomainDetails.account_id}" cloudflared tunnel origin-cert install'`;
+  await logApiCall(userId, 'cloudflare_origin_cert_install_ssh', `Attempting to install origin certificate on ${serverDetails.ip_address}.`);
+  const { stdout: certStdout, stderr: certStderr, code: certCode } = await executeSshCommand(serverDetails, installCertCommand);
+
+  if (certCode !== 0) {
+    await logApiCall(userId, 'cloudflare_origin_cert_install_ssh_failed', `Failed to install origin certificate on ${serverDetails.ip_address}. STDERR: ${certStderr}`);
+    throw new Error(`Error installing Cloudflare origin certificate via SSH: ${certStderr}`);
+  }
+  await logApiCall(userId, 'cloudflare_origin_cert_install_ssh_success', `Origin certificate installed successfully on ${serverDetails.ip_address}. STDOUT: ${certStdout}`);
+
+
+  // 3. Create the tunnel (cloudflared should now find cert.pem automatically)
+  // Removed TUNNEL_ORIGIN_CERT="" and --config /dev/null
+  const command = `cloudflared tunnel create ${tunnelName}`;
   const { stdout, stderr, code } = await executeSshCommand(serverDetails, command);
 
   if (code !== 0) {
@@ -250,17 +272,17 @@ export async function deleteCloudflareTunnel(
   // Stop cloudflared service
   await executeSshCommand(serverDetails, 'systemctl stop cloudflared').catch(e => console.warn(`[CloudflareUtils] Could not stop cloudflared service cleanly for tunnel ${tunnelId}: ${e.message}`));
 
-  // Delete the tunnel, explicitly setting TUNNEL_ORIGIN_CERT and --config /dev/null
-  const command = `bash -c 'TUNNEL_ORIGIN_CERT="" cloudflared --config /dev/null tunnel delete ${tunnelId} -f'`;
-  const { stderr: deleteStderr, code: deleteCode } = await executeSshCommand(serverDetails, command);
+  // Delete the tunnel (removed --config /dev/null and TUNNEL_ORIGIN_CERT="")
+  const { stderr: deleteStderr, code: deleteCode } = await executeSshCommand(serverDetails, `cloudflared tunnel delete ${tunnelId} -f`);
   if (deleteCode !== 0 && !deleteStderr.includes('No such tunnel')) { // Allow "No such tunnel" as a non-error
     await logApiCall(userId, 'cloudflare_tunnel_delete_ssh_failed', `Failed to delete tunnel ${tunnelId} on ${serverDetails.ip_address}. STDERR: ${deleteStderr}`);
     throw new Error(`Error deleting Cloudflare tunnel via SSH: ${deleteStderr}`);
   }
 
-  // Remove config.yml and credentials file
+  // Remove config.yml, credentials file, and cert.pem
   await executeSshCommand(serverDetails, `rm -f /etc/cloudflared/config.yml`).catch(e => console.warn(`[CloudflareUtils] Could not remove config.yml for tunnel ${tunnelId}: ${e.message}`));
   await executeSshCommand(serverDetails, `rm -f /root/.cloudflared/${tunnelId}.json`).catch(e => console.warn(`[CloudflareUtils] Could not remove credentials file for tunnel ${tunnelId}: ${e.message}`));
+  await executeSshCommand(serverDetails, `rm -f /root/.cloudflared/cert.pem`).catch(e => console.warn(`[CloudflareUtils] Could not remove cert.pem for tunnel ${tunnelId}: ${e.message}`)); // NEW: remove cert.pem
 
   await logApiCall(userId, 'cloudflare_tunnel_delete_ssh_success', `Legacy tunnel ${tunnelId} deleted and files removed on ${serverDetails.ip_address}.`);
 }
