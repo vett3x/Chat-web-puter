@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
-import { Moon, Sun, Settings, LogOut, User as UserIcon, Server } from 'lucide-react'; // Import Server icon
+import { Moon, Sun, Settings, LogOut, User as UserIcon, Server, Users } from 'lucide-react'; // Import Users icon
 import { useTheme } from 'next-themes';
 import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,11 +28,12 @@ interface Profile {
 interface ProfileDropdownProps {
   onOpenProfileSettings: () => void;
   onOpenAppSettings: () => void;
-  onOpenServerManagement: () => void; // New prop
-  isSuperUser: boolean; // New prop
+  onOpenServerManagement: () => void;
+  onOpenUserManagement: () => void; // New prop for user management
+  isSuperUser: boolean;
 }
 
-export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOpenServerManagement, isSuperUser }: ProfileDropdownProps) {
+export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOpenServerManagement, onOpenUserManagement, isSuperUser }: ProfileDropdownProps) {
   const { session } = useSession();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -144,13 +145,21 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
             <span>Configuración</span>
           </div>
         </DropdownMenuItem>
-        {isSuperUser && ( // Conditionally render for SuperUsers
-          <DropdownMenuItem onClick={onOpenServerManagement} className="flex items-center cursor-pointer">
-            <div className="flex items-center">
-              <Server className="mr-2 h-4 w-4" />
-              <span>Gestión de Servidores</span>
-            </div>
-          </DropdownMenuItem>
+        {isSuperUser && (
+          <>
+            <DropdownMenuItem onClick={onOpenServerManagement} className="flex items-center cursor-pointer">
+              <div className="flex items-center">
+                <Server className="mr-2 h-4 w-4" />
+                <span>Gestión de Servidores</span>
+              </div>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onOpenUserManagement} className="flex items-center cursor-pointer">
+              <div className="flex items-center">
+                <Users className="mr-2 h-4 w-4" />
+                <span>Gestión de Usuarios</span>
+              </div>
+            </DropdownMenuItem>
+          </>
         )}
         <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive" onClick={handleSignOut}>
           <div className="flex items-center">

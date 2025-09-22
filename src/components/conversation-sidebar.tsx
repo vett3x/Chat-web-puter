@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, MessageSquare, Loader2, Folder, ChevronRight, ChevronDown, Server } from 'lucide-react';
+import { Plus, MessageSquare, Loader2, Folder, ChevronRight, ChevronDown, Server, Users } from 'lucide-react'; // Import Users icon
 import { Separator } from '@/components/ui/separator';
 import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
@@ -38,6 +38,7 @@ interface ConversationSidebarProps {
   onOpenProfileSettings: () => void;
   onOpenAppSettings: () => void;
   onOpenServerManagement: () => void;
+  onOpenUserManagement: () => void; // New prop for user management
 }
 
 export function ConversationSidebar({
@@ -46,6 +47,7 @@ export function ConversationSidebar({
   onOpenProfileSettings,
   onOpenAppSettings,
   onOpenServerManagement,
+  onOpenUserManagement, // Destructure new prop
 }: ConversationSidebarProps) {
   const { session, isLoading: isSessionLoading, isSuperUser } = useSession();
   const userId = session?.user?.id;
@@ -357,8 +359,9 @@ export function ConversationSidebar({
         <ProfileDropdown
           onOpenProfileSettings={onOpenProfileSettings}
           onOpenAppSettings={onOpenAppSettings}
-          onOpenServerManagement={onOpenServerManagement} // Pass the new prop
-          isSuperUser={isSuperUser} // Pass isSuperUser prop
+          onOpenServerManagement={onOpenServerManagement}
+          onOpenUserManagement={onOpenUserManagement} // Pass the new prop
+          isSuperUser={isSuperUser}
         />
       </div>
 

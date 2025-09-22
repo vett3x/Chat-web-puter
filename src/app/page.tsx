@@ -6,15 +6,17 @@ import { useSession } from "@/components/session-context-provider";
 import { useState, useEffect } from "react";
 import { ProfileSettingsDialog } from "@/components/profile-settings-dialog";
 import { AppSettingsDialog } from "@/components/app-settings-dialog";
-import { ServerManagementDialog } from "@/components/server-management-dialog"; // Import the new dialog
+import { ServerManagementDialog } from "@/components/server-management-dialog";
+import { UserManagementDialog } from "@/components/user-management-dialog"; // Import the new dialog
 
 export default function Home() {
-  const { session, isLoading: isSessionLoading, isSuperUser } = useSession(); // Get isSuperUser
+  const { session, isLoading: isSessionLoading, isSuperUser } = useSession();
   const userId = session?.user?.id;
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [isProfileSettingsOpen, setIsProfileSettingsOpen] = useState(false);
   const [isAppSettingsOpen, setIsAppSettingsOpen] = useState(false);
-  const [isServerManagementOpen, setIsServerManagementOpen] = useState(false); // State for ServerManagementDialog visibility
+  const [isServerManagementOpen, setIsServerManagementOpen] = useState(false);
+  const [isUserManagementOpen, setIsUserManagementOpen] = useState(false); // State for UserManagementDialog visibility
   const [aiResponseSpeed, setAiResponseSpeed] = useState<'slow' | 'normal' | 'fast'>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('aiResponseSpeed') as 'slow' | 'normal' | 'fast') || 'normal';
@@ -52,6 +54,10 @@ export default function Home() {
     setIsServerManagementOpen(true);
   };
 
+  const handleOpenUserManagement = () => { // New handler for user management
+    setIsUserManagementOpen(true);
+  };
+
   const handleAiResponseSpeedChange = (speed: 'slow' | 'normal' | 'fast') => {
     setAiResponseSpeed(speed);
     // Optionally, close the dialog after changing speed
@@ -66,7 +72,8 @@ export default function Home() {
           onSelectConversation={setSelectedConversationId}
           onOpenProfileSettings={handleOpenProfileSettings}
           onOpenAppSettings={handleOpenAppSettings}
-          onOpenServerManagement={handleOpenServerManagement} // Pass the new function
+          onOpenServerManagement={handleOpenServerManagement}
+          onOpenUserManagement={handleOpenUserManagement} // Pass the new function
         />
       </aside>
       <main className="flex-1 flex flex-col min-w-0">
@@ -90,11 +97,17 @@ export default function Home() {
           aiResponseSpeed={aiResponseSpeed}
           onAiResponseSpeedChange={handleAiResponseSpeedChange}
         />
-        {isSuperUser && ( // Only render if user is a SuperUser
-          <ServerManagementDialog
-            open={isServerManagementOpen}
-            onOpenChange={setIsServerManagementOpen}
-          />
+        {isSuperUser && (
+          <>
+            <ServerManagementDialog
+              open={isServerManagementOpen}
+              onOpenChange={setIsServerManagementOpen}
+            />
+            <UserManagementDialog // Render UserManagementDialog conditionally
+              open={isUserManagementOpen}
+              onOpenChange={setIsUserManagementOpen}
+            />
+          </>
         )}
       </main>
     </div>
