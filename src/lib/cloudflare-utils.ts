@@ -250,47 +250,17 @@ export async function installAndRunCloudflaredService(
 ): Promise<void> {
   await logApiCall(userId, 'cloudflared_container_install_run_ssh', `Attempting to install and run cloudflared inside container ${containerId.substring(0,12)} on ${serverDetails.ip_address}.`);
 
-  const cloudflaredDir = `/root/.cloudflared`;
-  const credentialsFilePath = `${cloudflaredDir}/${tunnelId}.json`;
-  const configFilePath = `${cloudflaredDir}/config.yml`; // Changed config file path
-
-  // 1. Ensure .cloudflared directory exists inside the container
-  await executeSshCommand(serverDetails, `docker exec ${containerId} mkdir -p ${cloudflaredDir}`);
-  await logApiCall(userId, 'cloudflared_container_mkdir', `Ensured ${cloudflaredDir} directory exists inside container ${containerId.substring(0,12)}.`);
-
-  // 2. Write credentials file inside the container using Base64
-  const credentialsFileContent = JSON.stringify({ TunnelSecret: tunnelToken, TunnelID: tunnelId });
-  const encodedCredentials = Buffer.from(credentialsFileContent).toString('base64');
-  const writeCredentialsCommand = `echo '${encodedCredentials}' | base64 -d > ${credentialsFilePath}`;
-  await executeSshCommand(serverDetails, `docker exec ${containerId} sh -c "${writeCredentialsCommand}"`);
-  await logApiCall(userId, 'cloudflared_container_credentials_written', `Credentials file written inside container ${containerId.substring(0,12)}.`);
-
-  // 3. Write config.yml file inside the container using Base64
-  const configContent = `
-tunnel: ${tunnelId}
-credentials-file: ${credentialsFilePath}
-ingress:
-  - hostname: ${fullDomain}
-    service: http://localhost:${containerPort}
-    originRequest:
-      noTLSVerify: true
-  - service: http_status:404
-`; // ADDED originRequest with noTLSVerify
-  const encodedConfig = Buffer.from(configContent).toString('base64');
-  const writeConfigCommand = `echo '${encodedConfig}' | base64 -d > ${configFilePath}`;
-  await executeSshCommand(serverDetails, `docker exec ${containerId} sh -c "${writeConfigCommand}"`);
-  await logApiCall(userId, 'cloudflared_container_config_written', `Config.yml written inside container ${containerId.substring(0,12)}.`);
-
-  // 4. Run cloudflared tunnel in detached mode inside the container
-  // We use `nohup` and `&` to run it in the background and prevent it from dying if the SSH session closes.
-  const runCommand = `nohup cloudflared tunnel run ${tunnelId} --config ${configFilePath} > /dev/null 2>&1 &`;
-  const { stdout, stderr, code } = await executeSshCommand(serverDetails, `docker exec ${containerId} bash -c "${runCommand}"`); // Use bash -c for nohup
+  // Use the `cloudflared service install` command with the token.
+  // This command handles creating the necessary configuration files and starting the service.
+  // We run it as root inside the container, so `sudo` is not needed.
+  const installCommand = `cloudflared service install ${tunnelToken}`;
+  const { stdout, stderr, code } = await executeSshCommand(serverDetails, `docker exec ${containerId} bash -c "${installCommand}"`);
 
   if (code !== 0) {
-    await logApiCall(userId, 'cloudflared_container_run_failed', `Failed to run cloudflared inside container ${containerId.substring(0,12)}. STDERR: ${stderr}`);
-    throw new Error(`Error running cloudflared inside container via SSH: ${stderr}`);
+    await logApiCall(userId, 'cloudflared_container_install_failed', `Failed to install cloudflared service inside container ${containerId.substring(0,12)}. STDERR: ${stderr}`);
+    throw new Error(`Error installing cloudflared service inside container via SSH: ${stderr}`);
   }
-  await logApiCall(userId, 'cloudflared_container_run_success', `Cloudflared client running successfully inside container ${containerId.substring(0,12)}. STDOUT: ${stdout}`);
+  await logApiCall(userId, 'cloudflared_container_install_success', `Cloudflared service installed successfully inside container ${containerId.substring(0,12)}. STDOUT: ${stdout}`);
 }
 
 /**
