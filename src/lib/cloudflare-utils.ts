@@ -168,7 +168,12 @@ export async function createCloudflareTunnel(
 ): Promise<CreatedLegacyTunnel> {
   await logApiCall(userId, 'cloudflare_tunnel_create_ssh', `Attempting to create legacy tunnel '${tunnelName}' on ${serverDetails.ip_address} via SSH.`);
 
-  const command = `cloudflared tunnel create ${tunnelName}`;
+  // Ensure the .cloudflared directory exists for the root user
+  await executeSshCommand(serverDetails, 'mkdir -p /root/.cloudflared');
+  await logApiCall(userId, 'cloudflare_tunnel_create_ssh_mkdir', `Ensured /root/.cloudflared directory exists on ${serverDetails.ip_address}.`);
+
+  // Explicitly set TUNNEL_ORIGIN_CERT to empty to prevent it from looking for cert.pem
+  const command = `TUNNEL_ORIGIN_CERT="" cloudflared tunnel create ${tunnelName}`;
   const { stdout, stderr, code } = await executeSshCommand(serverDetails, command);
 
   if (code !== 0) {
