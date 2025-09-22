@@ -126,29 +126,28 @@ export async function POST(
     const { image, name, cloudflare_domain_id, container_port, host_port, subdomain, script_install_deps } = createContainerSchema.parse(body); // Get script_install_deps
 
     let runCommand = 'docker run -d';
-    const baseImage = 'ubuntu:latest';
     const entrypointExecutable = 'tail';
     const entrypointArgs = '-f /dev/null';
 
-    // --- Phase 1: Handle image check/pull for Next.js framework (always) ---
+    // --- Phase 1: Handle image check/pull for the requested image ---
     try {
-      const { code: inspectCode } = await executeSshCommand(server, `docker inspect --type=image ${baseImage}`);
+      const { code: inspectCode } = await executeSshCommand(server, `docker inspect --type=image ${image}`);
       if (inspectCode !== 0) {
         await supabaseAdmin.from('server_events_log').insert({
           user_id: session.user.id,
           server_id: serverId,
           event_type: 'container_create_warning',
-          description: `Imagen '${baseImage}' no encontrada en '${server.name || server.ip_address}'. Intentando descargar...`,
+          description: `Imagen '${image}' no encontrada en '${server.name || server.ip_address}'. Intentando descargar...`,
         });
-        const { stderr: pullStderr, code: pullCode } = await executeSshCommand(server, `docker pull ${baseImage}`);
+        const { stderr: pullStderr, code: pullCode } = await executeSshCommand(server, `docker pull ${image}`);
         if (pullCode !== 0) {
-          throw new Error(`Error al descargar la imagen '${baseImage}': ${pullStderr}`);
+          throw new Error(`Error al descargar la imagen '${image}': ${pullStderr}`);
         }
         await supabaseAdmin.from('server_events_log').insert({
           user_id: session.user.id,
           server_id: serverId,
           event_type: 'container_created', // Log as created for image pull success
-          description: `Imagen '${baseImage}' descargada exitosamente en '${server.name || server.ip_address}'.`,
+          description: `Imagen '${image}' descargada exitosamente en '${server.name || server.ip_address}'.`,
         });
       }
     } catch (e: any) {
@@ -183,7 +182,7 @@ export async function POST(
       const finalPorts = `${actualHostPort}:${finalContainerPort}`;
       runCommand += ` -p ${finalPorts}`;
       
-      runCommand += ` --entrypoint ${entrypointExecutable} ${baseImage} ${entrypointArgs}`;
+      runCommand += ` --entrypoint ${entrypointExecutable} ${image} ${entrypointArgs}`;
 
       const { stdout: newContainerId, stderr: runStderr, code: runCode } = await executeSshCommand(server, runCommand);
       if (runCode !== 0) {

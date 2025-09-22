@@ -24,6 +24,10 @@ echo "--- Installing sudo... ---"
 apt-get install -y sudo || { echo "ERROR: sudo installation failed"; exit 1; }
 echo "--- sudo installed. ---"
 
+echo "--- Installing core dependencies (curl, gnupg, lsb-release, apt-utils, git)..."
+sudo apt-get install -y curl gnupg lsb-release apt-utils git || { echo "ERROR: core dependencies installation failed"; exit 1; }
+echo "--- Core dependencies installed. ---"
+
 echo "--- Verifying Node.js and npm installation... ---"
 echo "Node.js version: $(node -v)"
 echo "npm version: $(npm -v)"
