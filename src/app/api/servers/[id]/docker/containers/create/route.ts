@@ -142,7 +142,8 @@ export async function POST(
 
     let runCommand = 'docker run -d';
     const baseImage = 'node:lts-alpine'; // Hardcoded for Next.js
-    const entrypointCommand = 'tail -f /dev/null';
+    const entrypointExecutable = 'tail'; // The actual executable for the entrypoint
+    const entrypointArgs = '-f /dev/null'; // Arguments for the entrypoint executable
 
     // --- Phase 1: Handle image check/pull for Next.js framework (always) ---
     const imageConn = new Client(); // New Client instance for image operations
@@ -182,7 +183,8 @@ export async function POST(
       const finalPorts = container_port ? `${container_port}:${container_port}` : '3000:3000';
       runCommand += ` -p ${finalPorts}`;
       
-      runCommand += ` --entrypoint ${entrypointCommand} ${baseImage}`;
+      // Correctly pass entrypoint executable and its arguments
+      runCommand += ` --entrypoint ${entrypointExecutable} ${baseImage} ${entrypointArgs}`;
 
       const { stdout: newContainerId, stderr: runStderr, code: runCode } = await executeSshCommand(runConn, runCommand);
       if (runCode !== 0) {
