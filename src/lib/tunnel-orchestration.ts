@@ -150,10 +150,13 @@ export async function createAndProvisionCloudflareTunnel({
       readyTimeout: 20000,
     }));
 
-    const serviceName = `cloudflared-tunnel-${tunnelId}`; // Consistent service name
+    // Define the service suffix for consistency
+    const serviceSuffix = `tunnel-${tunnelId}`;
+    const fullServiceName = `cloudflared-${serviceSuffix}`; // This is the actual systemd service name
 
     // Install cloudflared as a system service for this specific tunnel using --token
-    const serviceInstallCommand = `cloudflared service install --token ${tunnelSecret} --hostname ${fullDomain} --url http://localhost:${hostPort} --name ${serviceName}`;
+    // The --name argument here is the suffix for the systemd service unit file
+    const serviceInstallCommand = `cloudflared service install --token ${tunnelSecret} --hostname ${fullDomain} --url http://localhost:${hostPort} --name ${serviceSuffix}`;
     const { stderr: installServiceStderr, code: installServiceCode } = await executeSshCommand(conn, serviceInstallCommand);
     if (installServiceCode !== 0) {
       throw new Error(`Error al instalar el servicio cloudflared para el túnel: ${installServiceStderr}`);
@@ -162,8 +165,8 @@ export async function createAndProvisionCloudflareTunnel({
     // Reload systemd daemon to recognize the new service unit
     await executeSshCommand(conn, `systemctl daemon-reload`);
 
-    // Start the newly installed service
-    const startServiceCommand = `systemctl start ${serviceName}`;
+    // Start the newly installed service using its full systemd name
+    const startServiceCommand = `systemctl start ${fullServiceName}`;
     const { stderr: startServiceStderr, code: startServiceCode } = await executeSshCommand(conn, startServiceCommand);
     if (startServiceCode !== 0) {
       throw new Error(`Error al iniciar el servicio cloudflared para el túnel: ${startServiceStderr}`);
@@ -266,17 +269,18 @@ export async function deleteCloudflareTunnelAndCleanup({
       readyTimeout: 20000,
     }));
 
-    const serviceName = `cloudflared-tunnel-${tunnel.tunnel_id}`;
+    const serviceSuffix = `tunnel-${tunnel.tunnel_id}`;
+    const fullServiceName = `cloudflared-${serviceSuffix}`;
 
     // Stop the specific cloudflared service
-    const stopServiceCommand = `systemctl stop ${serviceName}`;
+    const stopServiceCommand = `systemctl stop ${fullServiceName}`;
     const { stderr: stopStderr, code: stopCode } = await executeSshCommand(conn, stopServiceCommand);
     if (stopCode !== 0 && !stopStderr.includes('Unit cloudflared-tunnel-') && !stopStderr.includes('not loaded')) {
       console.warn(`[Tunnel Deletion] Warning: Could not stop cloudflared service for tunnel ${tunnel.tunnel_id}: ${stopStderr}`);
     }
 
     // Uninstall the specific cloudflared service
-    const uninstallServiceCommand = `cloudflared service uninstall --name ${serviceName}`;
+    const uninstallServiceCommand = `cloudflared service uninstall --name ${serviceSuffix}`;
     const { stderr: uninstallStderr, code: uninstallCode } = await executeSshCommand(conn, uninstallServiceCommand);
     if (uninstallCode !== 0 && !uninstallStderr.includes('No such file or directory')) {
       console.warn(`[Tunnel Deletion] Warning: Could not uninstall cloudflared service for tunnel ${tunnel.tunnel_id}: ${uninstallStderr}`);
