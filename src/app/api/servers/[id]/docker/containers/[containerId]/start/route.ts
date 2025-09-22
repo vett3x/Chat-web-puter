@@ -56,9 +56,16 @@ export async function POST(
   }
 
   const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  const { data: server, error: fetchError } = await supabaseAdmin.from('user_servers').select('ip_address, ssh_port, ssh_username, ssh_password').eq('id', serverId).single();
+  const { data: server, error: fetchError } = await supabaseAdmin.from('user_servers').select('ip_address, ssh_port, ssh_username, ssh_password, name').eq('id', serverId).single();
 
   if (fetchError || !server) {
+    // Log event for failed container start (server not found)
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: session.user.id,
+      server_id: serverId,
+      event_type: 'container_start_failed',
+      description: `Fallo al iniciar contenedor ${containerId.substring(0,12)}: servidor ID ${serverId} no encontrado o acceso denegado.`,
+    });
     return NextResponse.json({ message: 'Servidor no encontrado.' }, { status: 404 });
   }
 
@@ -72,14 +79,36 @@ export async function POST(
     conn.end();
 
     if (code !== 0) {
+      // Log event for failed container start
+      await supabaseAdmin.from('server_events_log').insert({
+        user_id: session.user.id,
+        server_id: serverId,
+        event_type: 'container_start_failed',
+        description: `Fallo al iniciar contenedor ${containerId.substring(0,12)} en '${server.name || server.ip_address}'. Error: ${stderr}`,
+      });
       // Any non-zero exit code is an error.
       throw new Error(`Error al iniciar contenedor: ${stderr}`);
     }
+
+    // Log event for successful container start
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: session.user.id,
+      server_id: serverId,
+      event_type: 'container_started',
+      description: `Contenedor ${containerId.substring(0,12)} iniciado en '${server.name || server.ip_address}'.`,
+    });
 
     return NextResponse.json({ message: `Contenedor ${containerId.substring(0,12)} iniciado.` }, { status: 200 });
 
   } catch (error: any) {
     conn.end();
+    // Log event for general error during container start
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: session.user.id,
+      server_id: serverId,
+      event_type: 'container_start_failed',
+      description: `Error inesperado al iniciar contenedor ${containerId.substring(0,12)} en '${server.name || server.ip_address}'. Error: ${error.message}`,
+    });
     return NextResponse.json({ message: `Error: ${error.message}` }, { status: 500 });
   }
 }

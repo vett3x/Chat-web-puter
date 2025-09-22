@@ -81,21 +81,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
   }
 
+  // Check for SUPABASE_SERVICE_ROLE_KEY
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('SUPABASE_SERVICE_ROLE_KEY is not set in environment variables.');
+    return NextResponse.json({ message: 'Error de configuración del servidor: Clave de servicio de Supabase no encontrada.' }, { status: 500 });
+  }
+
+  // Use admin client to bypass RLS
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
   try {
     const body = await req.json();
     const newServerData = serverSchema.parse(body);
-
-    // Check for SUPABASE_SERVICE_ROLE_KEY
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      console.error('SUPABASE_SERVICE_ROLE_KEY is not set in environment variables.');
-      return NextResponse.json({ message: 'Error de configuración del servidor: Clave de servicio de Supabase no encontrada.' }, { status: 500 });
-    }
-
-    // Use admin client to bypass RLS
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
 
     const { data: newServer, error } = await supabaseAdmin
       .from('user_servers')
@@ -113,8 +113,22 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       console.error('Error inserting server into Supabase (admin):', error);
+      // Log event for failed server addition
+      await supabaseAdmin.from('server_events_log').insert({
+        user_id: session.user.id,
+        event_type: 'server_add_failed',
+        description: `Fallo al añadir servidor: ${newServerData.name || newServerData.ip_address}. Error: ${error.message}`,
+      });
       return NextResponse.json({ message: 'Error al guardar el servidor.' }, { status: 500 });
     }
+
+    // Log event for successful server addition
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: session.user.id,
+      server_id: newServer.id,
+      event_type: 'server_added',
+      description: `Servidor '${newServer.name || newServer.ip_address}' añadido.`,
+    });
 
     // Start provisioning in the background (don't await)
     provisionServer(newServer);
@@ -128,6 +142,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Error de validación', errors: error.errors }, { status: 400 });
     }
     console.error('Error al añadir servidor:', error);
+    // Log event for general error during server addition
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: session.user.id,
+      event_type: 'server_add_failed',
+      description: `Error inesperado al añadir servidor: ${error.message}`,
+    });
     return NextResponse.json({ message: 'Error interno del servidor.' }, { status: 500 });
   }
 }
@@ -158,6 +178,26 @@ export async function DELETE(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
+  // First, get server details for logging
+  const { data: serverToDelete, error: fetchServerError } = await supabaseAdmin
+    .from('user_servers')
+    .select('name, ip_address')
+    .eq('id', id)
+    .eq('user_id', session.user.id)
+    .single();
+
+  if (fetchServerError || !serverToDelete) {
+    console.error('Error fetching server to delete:', fetchServerError);
+    // Log event for failed server deletion (server not found or access denied)
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: session.user.id,
+      server_id: id,
+      event_type: 'server_delete_failed',
+      description: `Fallo al eliminar servidor con ID ${id}: no encontrado o acceso denegado.`,
+    });
+    return NextResponse.json({ message: 'Servidor no encontrado o acceso denegado.' }, { status: 404 });
+  }
+
   const { error } = await supabaseAdmin
     .from('user_servers')
     .delete()
@@ -166,8 +206,23 @@ export async function DELETE(req: NextRequest) {
 
   if (error) {
     console.error('Error deleting server from Supabase (admin):', error);
+    // Log event for failed server deletion
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: session.user.id,
+      server_id: id,
+      event_type: 'server_delete_failed',
+      description: `Fallo al eliminar servidor '${serverToDelete.name || serverToDelete.ip_address}'. Error: ${error.message}`,
+    });
     return NextResponse.json({ message: 'Error al eliminar el servidor.' }, { status: 500 });
   }
+
+  // Log event for successful server deletion
+  await supabaseAdmin.from('server_events_log').insert({
+    user_id: session.user.id,
+    server_id: id,
+    event_type: 'server_deleted',
+    description: `Servidor '${serverToDelete.name || serverToDelete.ip_address}' eliminado.`,
+  });
 
   return NextResponse.json({ message: 'Servidor eliminado correctamente.' }, { status: 200 });
 }

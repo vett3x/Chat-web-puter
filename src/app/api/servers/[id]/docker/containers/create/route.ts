@@ -63,9 +63,16 @@ export async function POST(
   }
 
   const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  const { data: server, error: fetchError } = await supabaseAdmin.from('user_servers').select('ip_address, ssh_port, ssh_username, ssh_password').eq('id', serverId).single();
+  const { data: server, error: fetchError } = await supabaseAdmin.from('user_servers').select('ip_address, ssh_port, ssh_username, ssh_password, name').eq('id', serverId).single();
 
   if (fetchError || !server) {
+    // Log event for failed container creation (server not found)
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: session.user.id,
+      server_id: serverId,
+      event_type: 'container_create_failed',
+      description: `Fallo al crear contenedor en servidor ID ${serverId}: servidor no encontrado o acceso denegado.`,
+    });
     return NextResponse.json({ message: 'Servidor no encontrado.' }, { status: 404 });
   }
 
@@ -104,17 +111,45 @@ export async function POST(
     conn.end();
 
     if (!isVerified) {
-      // Don't auto-delete, as it might be a slow-starting container. Let the user decide.
+      // Log event for container created but not verified
+      await supabaseAdmin.from('server_events_log').insert({
+        user_id: session.user.id,
+        server_id: serverId,
+        event_type: 'container_create_warning',
+        description: `Contenedor '${name || image}' (ID: ${trimmedId.substring(0,12)}) creado en '${server.name || server.ip_address}', pero no se pudo verificar su estado de ejecución.`,
+      });
       throw new Error('El contenedor fue creado pero no se pudo verificar su estado "running" a tiempo.');
     }
+
+    // Log event for successful container creation
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: session.user.id,
+      server_id: serverId,
+      event_type: 'container_created',
+      description: `Contenedor '${name || image}' (ID: ${trimmedId.substring(0,12)}) creado y en ejecución en '${server.name || server.ip_address}'.`,
+    });
 
     return NextResponse.json({ message: `Contenedor ${trimmedId.substring(0,12)} creado y en ejecución.` }, { status: 201 });
 
   } catch (error: any) {
     conn.end();
     if (error instanceof z.ZodError) {
+      // Log event for validation error
+      await supabaseAdmin.from('server_events_log').insert({
+        user_id: session.user.id,
+        server_id: serverId,
+        event_type: 'container_create_failed',
+        description: `Fallo de validación al crear contenedor en '${server.name || server.ip_address}'. Error: ${error.message}`,
+      });
       return NextResponse.json({ message: 'Error de validación', errors: error.errors }, { status: 400 });
     }
+    // Log event for general error during container creation
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: session.user.id,
+      server_id: serverId,
+      event_type: 'container_create_failed',
+      description: `Error al crear contenedor en '${server.name || server.ip_address}'. Error: ${error.message}`,
+    });
     return NextResponse.json({ message: `Error: ${error.message}` }, { status: 500 });
   }
 }

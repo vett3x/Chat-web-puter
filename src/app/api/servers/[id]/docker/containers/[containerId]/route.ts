@@ -57,9 +57,16 @@ export async function DELETE(
   }
 
   const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  const { data: server, error: fetchError } = await supabaseAdmin.from('user_servers').select('ip_address, ssh_port, ssh_username, ssh_password').eq('id', serverId).single();
+  const { data: server, error: fetchError } = await supabaseAdmin.from('user_servers').select('ip_address, ssh_port, ssh_username, ssh_password, name').eq('id', serverId).single();
 
   if (fetchError || !server) {
+    // Log event for failed container deletion (server not found)
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: session.user.id,
+      server_id: serverId,
+      event_type: 'container_delete_failed',
+      description: `Fallo al eliminar contenedor ${containerId.substring(0,12)}: servidor ID ${serverId} no encontrado o acceso denegado.`,
+    });
     return NextResponse.json({ message: 'Servidor no encontrado.' }, { status: 404 });
   }
 
@@ -89,13 +96,35 @@ export async function DELETE(
     conn.end();
 
     if (!isGone) {
+      // Log event for container not deleted in time
+      await supabaseAdmin.from('server_events_log').insert({
+        user_id: session.user.id,
+        server_id: serverId,
+        event_type: 'container_delete_failed',
+        description: `Contenedor ${containerId.substring(0,12)} en '${server.name || server.ip_address}' no se pudo eliminar a tiempo.`,
+      });
       throw new Error('El contenedor no se pudo eliminar a tiempo.');
     }
+
+    // Log event for successful container deletion
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: session.user.id,
+      server_id: serverId,
+      event_type: 'container_deleted',
+      description: `Contenedor ${containerId.substring(0,12)} eliminado de '${server.name || server.ip_address}'.`,
+    });
 
     return NextResponse.json({ message: `Contenedor ${containerId.substring(0,12)} eliminado.` }, { status: 200 });
 
   } catch (error: any) {
     conn.end();
+    // Log event for general error during container deletion
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: session.user.id,
+      server_id: serverId,
+      event_type: 'container_delete_failed',
+      description: `Error inesperado al eliminar contenedor ${containerId.substring(0,12)} de '${server.name || server.ip_address}'. Error: ${error.message}`,
+    });
     return NextResponse.json({ message: `Error: ${error.message}` }, { status: 500 });
   }
 }

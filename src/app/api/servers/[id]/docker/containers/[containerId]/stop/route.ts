@@ -56,9 +56,16 @@ export async function POST(
   }
 
   const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  const { data: server, error: fetchError } = await supabaseAdmin.from('user_servers').select('ip_address, ssh_port, ssh_username, ssh_password').eq('id', serverId).single();
+  const { data: server, error: fetchError } = await supabaseAdmin.from('user_servers').select('ip_address, ssh_port, ssh_username, ssh_password, name').eq('id', serverId).single();
 
   if (fetchError || !server) {
+    // Log event for failed container stop (server not found)
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: session.user.id,
+      server_id: serverId,
+      event_type: 'container_stop_failed',
+      description: `Fallo al detener contenedor ${containerId.substring(0,12)}: servidor ID ${serverId} no encontrado o acceso denegado.`,
+    });
     return NextResponse.json({ message: 'Servidor no encontrado.' }, { status: 404 });
   }
 
@@ -75,17 +82,46 @@ export async function POST(
     // A non-zero exit code is an error, unless the container doesn't exist.
     if (code !== 0) {
       if (stderr.includes('No such container')) {
+        // Log event for container already stopped/not found
+        await supabaseAdmin.from('server_events_log').insert({
+          user_id: session.user.id,
+          server_id: serverId,
+          event_type: 'container_stopped',
+          description: `Contenedor ${containerId.substring(0,12)} ya estaba detenido o no existe en '${server.name || server.ip_address}'.`,
+        });
         // If it doesn't exist, it's effectively "stopped".
         return NextResponse.json({ message: `Contenedor ${containerId.substring(0,12)} no encontrado, se considera detenido.` }, { status: 200 });
       }
+      // Log event for failed container stop
+      await supabaseAdmin.from('server_events_log').insert({
+        user_id: session.user.id,
+        server_id: serverId,
+        event_type: 'container_stop_failed',
+        description: `Fallo al detener contenedor ${containerId.substring(0,12)} en '${server.name || server.ip_address}'. Error: ${stderr}`,
+      });
       // Any other error is a failure.
       throw new Error(`Error al detener contenedor: ${stderr}`);
     }
+
+    // Log event for successful container stop
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: session.user.id,
+      server_id: serverId,
+      event_type: 'container_stopped',
+      description: `Contenedor ${containerId.substring(0,12)} detenido en '${server.name || server.ip_address}'.`,
+    });
 
     return NextResponse.json({ message: `Contenedor ${containerId.substring(0,12)} detenido.` }, { status: 200 });
 
   } catch (error: any) {
     conn.end();
+    // Log event for general error during container stop
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: session.user.id,
+      server_id: serverId,
+      event_type: 'container_stop_failed',
+      description: `Error inesperado al detener contenedor ${containerId.substring(0,12)} en '${server.name || server.ip_address}'. Error: ${error.message}`,
+    });
     return NextResponse.json({ message: `Error: ${error.message}` }, { status: 500 });
   }
 }
