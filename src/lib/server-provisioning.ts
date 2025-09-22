@@ -48,15 +48,25 @@ echo "--- Pulling ubuntu:latest Docker image ---"
 docker pull ubuntu:latest
 
 echo "--- Starting Cloudflared Installation ---"
-# Add cloudflare gpg key
+# Update package list and install dependencies for cloudflared
+apt-get update -y
+apt-get install -y lsb-release curl gnupg -y
+
+# Add Cloudflare's official GPG key using gpg --dearmor
 mkdir -p --mode=0755 /usr/share/keyrings
-curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
+curl -fsSL https://pkg.cloudflare.com/cloudflare-release.gpg | gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-archive-keyring.gpg
+chmod 644 /usr/share/keyrings/cloudflare-archive-keyring.gpg # Ensure correct permissions
 
-# Add this repo to your apt repositories
-echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' | tee /etc/apt/sources.list.d/cloudflared.list >/dev/null
+# Add the Cloudflare repository to Apt sources
+echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/cloudflared.list > /dev/null
 
-# install cloudflared
-apt-get update -y && apt-get install -y cloudflared
+# Update package list again and install cloudflared
+apt-get update -y
+apt-get install -y cloudflared
+
+# Verify cloudflared installation
+echo "--- Cloudflared Version ---"
+cloudflared --version
 
 echo "--- Cloudflared Installation Complete ---"
 
