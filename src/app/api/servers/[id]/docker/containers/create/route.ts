@@ -141,7 +141,7 @@ export async function POST(
     const { image, name, cloudflare_domain_id, container_port, subdomain } = createContainerSchema.parse(body);
 
     let runCommand = 'docker run -d';
-    const baseImage = 'node:lts-alpine'; // Hardcoded for Next.js
+    const baseImage = 'node:lts'; // Hardcoded for Next.js, changed from node:lts-alpine
     const entrypointExecutable = 'tail'; // The actual executable for the entrypoint
     const entrypointArgs = '-f /dev/null'; // Arguments for the entrypoint executable
 

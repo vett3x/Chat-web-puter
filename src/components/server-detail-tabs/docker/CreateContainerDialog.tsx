@@ -25,7 +25,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle } from 'lucide-react'; // Import CheckCircle2 and XCircle
 import { toast } from 'sonner';
 
 interface CloudflareDomain {
@@ -38,8 +38,6 @@ interface CloudflareDomain {
 const createContainerFormSchema = z.object({
   image: z.string().min(1, { message: 'La imagen es requerida.' }),
   name: z.string().optional(),
-  // Removed 'ports' field as it's not needed for Next.js template
-  // Removed 'framework' field as Next.js is the only template
   cloudflare_domain_id: z.string().uuid({ message: 'ID de dominio de Cloudflare inválido.' }).optional(),
   container_port: z.coerce.number().int().min(1).max(65535, { message: 'Puerto de contenedor inválido.' }).optional(),
   subdomain: z.string().regex(/^[a-z0-9-]{1,63}$/, { message: 'Subdominio inválido. Solo minúsculas, números y guiones.' }).optional(),
@@ -47,12 +45,10 @@ const createContainerFormSchema = z.object({
 type CreateContainerFormValues = z.infer<typeof createContainerFormSchema>;
 
 const INITIAL_CREATE_CONTAINER_DEFAULTS: CreateContainerFormValues = {
-  image: 'node:lts-alpine', // Default for Next.js
-  name: '', // Changed from undefined to ''
-  // ports: undefined, // Removed
-  // framework: 'nextjs', // Removed
+  image: 'node:lts', // Default for Next.js, changed from node:lts-alpine
+  name: '',
   cloudflare_domain_id: undefined,
-  container_port: 3000, // Default for Next.js
+  container_port: 3000,
   subdomain: undefined,
 };
 
@@ -69,6 +65,8 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
   const [isCreatingContainer, setIsCreatingContainer] = useState(false);
   const [cloudflareDomains, setCloudflareDomains] = useState<CloudflareDomain[]>([]);
   const [isLoadingCloudflareDomains, setIsLoadingCloudflareDomains] = useState(true);
+  const [statusMessage, setStatusMessage] = useState<{ message: string; type: 'info' | 'success' | 'error' } | null>(null);
+  const [currentStep, setCurrentStep] = useState(0);
 
   const form = useForm<CreateContainerFormValues>({
     resolver: zodResolver(createContainerFormSchema),
@@ -96,15 +94,14 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
   useEffect(() => {
     if (open) {
       fetchCloudflareDomains();
-      // Set initial defaults when dialog opens
       form.reset(INITIAL_CREATE_CONTAINER_DEFAULTS);
+      setStatusMessage(null);
+      setCurrentStep(0);
     }
   }, [open, fetchCloudflareDomains, form]);
 
-  // Effect to set Cloudflare domain default after domains are loaded
   useEffect(() => {
     if (open && !isLoadingCloudflareDomains && cloudflareDomains.length > 0 && canManageCloudflareTunnels) {
-      // Only set if it's not already set by user interaction or another default
       if (!form.getValues('cloudflare_domain_id')) {
         form.setValue('cloudflare_domain_id', cloudflareDomains[0].id, { shouldValidate: true });
       }
@@ -115,27 +112,69 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
 
   const handleCreateContainer: SubmitHandler<CreateContainerFormValues> = async (values) => {
     setIsCreatingContainer(true);
+    setStatusMessage({ message: 'Iniciando creación del contenedor...', type: 'info' });
+    setCurrentStep(1);
+
     try {
+      // Step 1: Create Container
+      setStatusMessage({ message: 'Verificando imagen Docker y creando contenedor...', type: 'info' });
+      setCurrentStep(2);
       const response = await fetch(`/api/servers/${serverId}/docker/containers/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...values, framework: 'nextjs' }), // Explicitly send framework as nextjs
+        body: JSON.stringify({ ...values, framework: 'nextjs' }),
       });
       const result = await response.json();
       if (!response.ok) {
         throw new Error(result.message || 'Error al crear el contenedor.');
       }
       
-      toast.success('Contenedor creado exitosamente.');
+      setStatusMessage({ message: 'Contenedor creado exitosamente.', type: 'success' });
+      setCurrentStep(3);
+
+      // If tunnel details were provided and user has permissions, the tunnel creation
+      // is initiated on the server-side within the same API call.
+      // We can't get real-time updates for it here without polling, so we'll assume
+      // it's part of the "container created" phase for this UI.
+      if (values.cloudflare_domain_id && values.container_port && canManageCloudflareTunnels) {
+        setStatusMessage({ message: 'Túnel Cloudflare iniciado (ver historial para detalles)...', type: 'info' });
+        setCurrentStep(4);
+      }
+
+      toast.success('Contenedor y túnel (si aplica) creados exitosamente.');
       onContainerCreated();
       onOpenChange(false);
       form.reset(INITIAL_CREATE_CONTAINER_DEFAULTS);
       
     } catch (error: any) {
+      setStatusMessage({ message: `Error: ${error.message}`, type: 'error' });
       toast.error(error.message);
     } finally {
       setIsCreatingContainer(false);
     }
+  };
+
+  const renderStatusStep = (stepNumber: number, message: string, current: number, type: 'info' | 'success' | 'error') => {
+    const isActive = current === stepNumber;
+    const isCompleted = current > stepNumber;
+    const isError = type === 'error' && isActive;
+
+    return (
+      <div className="flex items-center gap-2 text-sm">
+        {isError ? (
+          <XCircle className="h-4 w-4 text-destructive" />
+        ) : isCompleted ? (
+          <CheckCircle2 className="h-4 w-4 text-green-500" />
+        ) : isActive ? (
+          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+        ) : (
+          <div className="h-4 w-4 border rounded-full flex-shrink-0" />
+        )}
+        <span className={isError ? "text-destructive" : isCompleted ? "text-muted-foreground" : ""}>
+          {message}
+        </span>
+      </div>
+    );
   };
 
   return (
@@ -147,11 +186,9 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleCreateContainer)} className="space-y-4 py-4">
-            <FormField control={form.control} name="image" render={({ field }) => (<FormItem><FormLabel>Imagen</FormLabel><FormControl><Input placeholder="node:lts-alpine" {...field} disabled /></FormControl><FormDescription>Imagen base para Next.js (no editable).</FormDescription><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="image" render={({ field }) => (<FormItem><FormLabel>Imagen</FormLabel><FormControl><Input placeholder="node:lts" {...field} disabled /></FormControl><FormDescription>Imagen base para Next.js (no editable).</FormDescription><FormMessage /></FormItem>)} />
             <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nombre (Opcional)</FormLabel><FormControl><Input placeholder="mi-app-nextjs" {...field} /></FormControl><FormMessage /></FormItem>)} />
-            {/* Removed generic 'ports' field */}
             
-            {/* Next.js specific fields, now always visible */}
             <>
               <FormField
                 control={form.control}
@@ -219,6 +256,24 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
                 )}
               />
             </>
+
+            {isCreatingContainer && statusMessage && (
+              <div className="space-y-2 p-4 border rounded-md bg-muted/50">
+                <h4 className="font-semibold">Progreso:</h4>
+                {renderStatusStep(1, 'Iniciando proceso...', currentStep, statusMessage.type)}
+                {renderStatusStep(2, 'Verificando imagen Docker y creando contenedor...', currentStep, statusMessage.type)}
+                {renderStatusStep(3, 'Contenedor creado y en ejecución.', currentStep, statusMessage.type)}
+                {form.getValues('cloudflare_domain_id') && form.getValues('container_port') && canManageCloudflareTunnels && (
+                  renderStatusStep(4, 'Configurando túnel Cloudflare...', currentStep, statusMessage.type)
+                )}
+                {statusMessage.type === 'error' && (
+                  <div className="flex items-center gap-2 text-sm text-destructive">
+                    <XCircle className="h-4 w-4" />
+                    <span>{statusMessage.message}</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             <DialogFooter>
               <DialogClose asChild><Button type="button" variant="outline" disabled={isCreatingContainer}>Cancelar</Button></DialogClose>

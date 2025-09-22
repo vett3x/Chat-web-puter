@@ -159,21 +159,25 @@ export async function createAndProvisionCloudflareTunnel({
         set -e # Exit immediately if a command exits with a non-zero status.
         set -x # Print commands and their arguments as they are executed.
 
-        echo "--- Installing prerequisites for Cloudflared ---"
+        echo "--- Starting Cloudflared Installation ---"
+
+        echo "Updating package list and installing prerequisites..."
         sudo apt-get update -y
-        sudo apt-get install -y gnupg ca-certificates curl lsb-release # Ensure lsb-release is also there for $(lsb_release -cs)
+        sudo apt-get install -y gnupg ca-certificates curl lsb-release
 
-        echo "--- Adding Cloudflare GPG key ---"
-        curl -fsSL https://pkg.cloudflare.com/cloudflare-release.gpg | sudo gpg --yes --dearmor -o /usr/share/keyrings/cloudflare-archive-keyring.gpg
+        echo "Adding Cloudflare GPG key..."
+        curl -fsSL https://pkg.cloudflare.com/cloudflare-release.gpg | sudo gpg --dearmor -o /usr/share/keyrings/cloudflare-archive-keyring.gpg
 
-        echo "--- Adding Cloudflare repository ---"
-        echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/cloudflared.list > /dev/null
+        echo "Adding Cloudflare repository..."
+        echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg arch=$(dpkg --print-architecture)] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/cloudflared.list > /dev/null
 
-        echo "--- Updating package list and installing cloudflared ---"
+        echo "Updating package list again after adding repository..."
         sudo apt-get update -y
+
+        echo "Installing cloudflared..."
         sudo apt-get install -y cloudflared
 
-        echo "--- Cloudflared installation complete ---"
+        echo "--- Cloudflared Installation Complete ---"
       `;
       const { stderr: installStderr, code: installCode } = await executeSshCommand(conn, installCloudflaredScript);
       if (installCode !== 0) {
