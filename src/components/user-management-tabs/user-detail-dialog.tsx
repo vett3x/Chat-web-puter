@@ -11,7 +11,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { User, Server, Cloud, History, MessageSquare, HardDrive, Save, Loader2 } from 'lucide-react';
+import { User, Server, Cloud, History, MessageSquare, HardDrive, Save, Loader2, ShieldCheck } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { UserServersTab } from './user-servers-tab';
@@ -19,6 +19,7 @@ import { UserCloudflareTab } from './user-cloudflare-tab';
 import { UserConversationsTab } from './user-conversations-tab';
 import { UserResourcesTab } from './user-resources-tab';
 import { UserActivityTab } from './user-activity-tab';
+import { UserPermissionsTab } from './user-permissions-tab'; // Import the new tab
 import {
   Select,
   SelectContent,
@@ -142,7 +143,7 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-6"> {/* Increased grid-cols to 6 */}
               <TabsTrigger value="servers" className="flex items-center gap-2">
                 <Server className="h-4 w-4" /> Servidores
               </TabsTrigger>
@@ -157,6 +158,9 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
               </TabsTrigger>
               <TabsTrigger value="activity" className="flex items-center gap-2">
                 <History className="h-4 w-4" /> Actividad
+              </TabsTrigger>
+              <TabsTrigger value="permissions" className="flex items-center gap-2"> {/* New tab */}
+                <ShieldCheck className="h-4 w-4" /> Permisos
               </TabsTrigger>
             </TabsList>
             <div className="flex-1 py-4 overflow-hidden">
@@ -175,6 +179,14 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
                 </TabsContent>
                 <TabsContent value="activity" className="h-full">
                   <UserActivityTab userId={user.id} />
+                </TabsContent>
+                <TabsContent value="permissions" className="h-full"> {/* New tab content */}
+                  <UserPermissionsTab
+                    userId={user.id}
+                    targetUserRole={user.role}
+                    currentUserRole={currentUserRole}
+                    onPermissionsUpdated={onRoleUpdated} // Use the same callback to refresh parent data
+                  />
                 </TabsContent>
               </ScrollArea>
             </div>
