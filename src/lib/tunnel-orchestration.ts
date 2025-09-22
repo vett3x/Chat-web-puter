@@ -158,26 +158,15 @@ export async function createAndProvisionCloudflareTunnel({
       const installCloudflaredScript = `
         set -e
         set -x
-
         echo "--- Starting Cloudflared Installation ---"
-
-        echo "Updating package list and installing prerequisites..."
         apt-get update -y
-        apt-get install -y gnupg ca-certificates curl lsb-release
-
-        echo "Adding Cloudflare GPG key..."
+        apt-get install -y curl gnupg lsb-release ca-certificates
         mkdir -p /usr/share/keyrings
-        curl -fsSL https://pkg.cloudflare.com/cloudflare-release.gpg | gpg --yes --dearmor -o /usr/share/keyrings/cloudflare-archive-keyring.gpg
-
-        echo "Adding Cloudflare repository..."
-        echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/cloudflared.list > /dev/null
-
-        echo "Updating package list again after adding repository..."
+        curl -fsSL https://pkg.cloudflare.com/cloudflare-release.gpg | gpg --dearmor -o /usr/share/keyrings/cloudflare-archive-keyring.gpg
+        chmod 644 /usr/share/keyrings/cloudflare-archive-keyring.gpg
+        echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" > /etc/apt/sources.list.d/cloudflared.list
         apt-get update -y
-
-        echo "Installing cloudflared..."
         apt-get install -y cloudflared
-
         echo "--- Cloudflared Installation Complete ---"
       `;
       const { stderr: installStderr, code: installCode } = await executeSshCommand(conn, installCloudflaredScript);
