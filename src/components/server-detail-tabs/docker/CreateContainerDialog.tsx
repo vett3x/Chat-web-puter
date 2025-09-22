@@ -96,8 +96,12 @@ cd /
 npx --yes create-next-app@latest app --use-npm --example "https://github.com/vercel/next.js/tree/canary/examples/hello-world" || { echo "ERROR: create-next-app failed"; exit 1; }
 echo "--- Next.js app created. ---"
 
-echo "--- Starting Next.js dev server in the background... ---"
+echo "--- Installing Next.js app dependencies... ---"
 cd /app
+npm install || { echo "ERROR: npm install failed"; exit 1; }
+echo "--- Dependencies installed. ---"
+
+echo "--- Starting Next.js dev server in the background... ---"
 # Run the dev server in the background using nohup and redirect output
 # The __CONTAINER_PORT__ placeholder will be replaced by the backend with the correct port.
 nohup npm run dev -- -p __CONTAINER_PORT__ > /app/dev.log 2>&1 &
