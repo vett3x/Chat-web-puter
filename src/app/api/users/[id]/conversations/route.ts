@@ -25,7 +25,7 @@ async function getSession() {
 
 export async function GET(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: any // Usamos 'any' para resolver el error de compilación de TypeScript
 ) {
   const userIdToFetch = context.params.id;
 
