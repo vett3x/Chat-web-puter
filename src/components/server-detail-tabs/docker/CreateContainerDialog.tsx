@@ -54,10 +54,14 @@ const DEFAULT_INSTALL_DEPS_SCRIPT = `
 set -ex # -e: exit on error, -x: print commands and arguments as they are executed
 export DEBIAN_FRONTEND=noninteractive
 
-echo "--- Updating apt package list and installing core dependencies (curl, gnupg, lsb-release, sudo, apt-utils)..."
-sudo apt-get update -y || { echo "ERROR: apt-get update failed"; exit 1; }
-sudo apt-get install -y curl gnupg lsb-release sudo apt-utils || { echo "ERROR: core dependencies installation failed"; exit 1; }
-echo "--- Core dependencies installed, including sudo and apt-utils. ---"
+echo "--- Updating apt package list and installing core dependencies (curl, gnupg, lsb-release, apt-utils)..."
+apt-get update -y || { echo "ERROR: apt-get update failed"; exit 1; }
+apt-get install -y curl gnupg lsb-release apt-utils || { echo "ERROR: core dependencies installation failed"; exit 1; }
+echo "--- Core dependencies installed. ---"
+
+echo "--- Installing sudo... ---"
+apt-get install -y sudo || { echo "ERROR: sudo installation failed"; exit 1; }
+echo "--- sudo installed. ---"
 
 echo "--- Installing Node.js and npm... ---"
 curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo bash - || { echo "ERROR: Node.js setup script failed"; exit 1; }
