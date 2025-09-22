@@ -95,7 +95,7 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
           className="w-full justify-start p-2 h-auto text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
         >
           <Avatar className="h-8 w-8 mr-2">
-            {profile?.avatar_url ? (
+            {profile?.avatar_url && profile.avatar_url !== '' ? ( // Updated condition
               <AvatarImage src={profile.avatar_url} alt="Avatar" />
             ) : (
               <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground">

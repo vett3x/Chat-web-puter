@@ -228,7 +228,7 @@ export function ProfileSettingsDialog({ open, onOpenChange }: ProfileSettingsDia
               <div className="flex flex-col items-center gap-4 mb-6">
                 <div className="relative w-24 h-24">
                   <Avatar className="w-24 h-24">
-                    {avatarPreview ? (
+                    {avatarPreview && avatarPreview !== '' ? ( // Updated condition
                       <AvatarImage src={avatarPreview} alt="Avatar" />
                     ) : (
                       <AvatarFallback className="bg-primary text-primary-foreground text-2xl">

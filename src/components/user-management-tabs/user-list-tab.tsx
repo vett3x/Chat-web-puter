@@ -173,11 +173,11 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
                 <TableRow key={user.id}>
                   <TableCell className="flex items-center gap-2">
                     <Avatar className="h-8 w-8">
-                      {user.avatar_url ? (
+                      {user.avatar_url && user.avatar_url !== '' ? ( // Updated condition
                         <AvatarImage src={user.avatar_url} alt="Avatar" />
                       ) : (
                         <AvatarFallback className="bg-primary text-primary-foreground">
-                          <Bot className="h-4 w-4" /> {/* Changed to Bot icon */}
+                          <Bot className="h-4 w-4" />
                         </AvatarFallback>
                       )}
                     </Avatar>
@@ -188,7 +188,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
                     {user.role !== 'user' && ( // Only show role badge if not 'user'
-                      <span className={`flex items-center gap-1 text-xs font-semibold px-1 py-0.5 rounded-full capitalize
+                      <span className={`flex items-center gap-1 text-xs font-semibold px-1 py-0.5 rounded-full capitalize w-fit
                         ${user.role === 'super_admin' ? 'bg-yellow-500 text-yellow-900 dark:bg-yellow-400 dark:text-yellow-950' : ''}
                         ${user.role === 'admin' ? 'bg-purple-500 text-purple-900 dark:bg-purple-400 dark:text-purple-950' : ''}
                       `}>
