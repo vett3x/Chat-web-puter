@@ -97,17 +97,31 @@ export async function createAndProvisionCloudflareTunnel({
     const fullDomain = `${subdomain}.${cloudflareDomainDetails.domain_name}`;
     const tunnelName = `tunnel-${containerId.substring(0, 12)}`;
 
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Using Account ID: ${cloudflareDomainDetails.account_id}\n` });
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Creating Cloudflare Tunnel '${tunnelName}'...\n` });
     const tunnel = await createCloudflareTunnel(cloudflareDomainDetails.api_token, cloudflareDomainDetails.account_id, tunnelName);
+    
+    if (!tunnel || !tunnel.id || !tunnel.secret) {
+      await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] ERROR: Cloudflare API did not return a valid tunnel object. Check API Token permissions.\n` });
+      throw new Error('La API de Cloudflare no devolvió un túnel válido. Verifica los permisos del API Token.');
+    }
+
     tunnelId = tunnel.id;
     const tunnelSecret = tunnel.secret;
     const tunnelCnameTarget = `${tunnelId}.cfargotunnel.com`;
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Cloudflare Tunnel created. ID: ${tunnelId}\n` });
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Cloudflare Tunnel created successfully. ID: ${tunnelId}\n` });
 
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Using Zone ID: ${cloudflareDomainDetails.zone_id}\n` });
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Creating DNS CNAME record for '${fullDomain}' pointing to '${tunnelCnameTarget}'...\n` });
     const dnsRecord = await createCloudflareDnsRecord(cloudflareDomainDetails.api_token, cloudflareDomainDetails.zone_id, fullDomain, tunnelCnameTarget);
+    
+    if (!dnsRecord || !dnsRecord.id) {
+      await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] ERROR: Cloudflare API did not return a valid DNS record object.\n` });
+      throw new Error('La API de Cloudflare no devolvió un registro DNS válido.');
+    }
+
     dnsRecordId = dnsRecord.id;
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] DNS CNAME record created. ID: ${dnsRecordId}\n` });
+    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] DNS CNAME record created successfully. ID: ${dnsRecordId}\n` });
 
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Storing tunnel details in database...\n` });
     const { data: newTunnel, error: insertError } = await supabaseAdmin
