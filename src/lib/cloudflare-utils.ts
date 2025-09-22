@@ -208,10 +208,8 @@ export async function configureCloudflareTunnelIngressApi(
       ingress: [
         {
           hostname: fullDomain,
-          service: `https://localhost:${containerPort}`, // Changed to HTTPS
-          originRequest: {
-            noTLSVerify: true // ADDED THIS LINE
-          },
+          service: `http://localhost:${containerPort}`, // CHANGED TO HTTP
+          // noTLSVerify: true is not needed if the origin is HTTP
         },
         {
           service: "http_status:404", // Catch-all rule
@@ -267,7 +265,7 @@ export async function installAndRunCloudflaredService(
   const configContent = `
 tunnel: ${tunnelId}
 credentials-file: ${credentialsFilePath}
-`;
+`; // REMOVED INGRESS SECTION
   const encodedConfig = Buffer.from(configContent).toString('base64');
   const writeConfigCommand = `echo '${encodedConfig}' | base64 -d > ${configFilePath}`;
   await executeSshCommand(serverDetails, `docker exec ${containerId} sh -c "${writeConfigCommand}"`);

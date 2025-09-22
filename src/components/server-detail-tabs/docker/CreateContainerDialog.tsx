@@ -75,7 +75,7 @@ curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/
 echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' | sudo tee /etc/apt/sources.list.d/cloudflared.list
 
 # install cloudflared
-sudo apt-get update && sudo apt-get install -y cloudflared
+sudo apt-get update && sudo apt-get install -y cloudflflared
 echo "cloudflared version: $(cloudflared --version)"
 echo "--- cloudflared installed. ---"
 
@@ -93,6 +93,7 @@ const TUNNEL_CREATION_SUMMARY_SCRIPT = `
 # 5. Guardar los detalles del túnel en la base de datos (tabla 'docker_tunnels').
 # 6. Configurar las reglas de ingreso del túnel a través de la API de Cloudflare:
 #    - Redirige el tráfico del dominio completo a 'http://localhost:[PUERTO_CONTENEDOR]'.
+#    - Se mantiene 'noTLSVerify: true' para la conexión interna, por si el origen fuera HTTPS con certificado auto-firmado.
 # 7. Instalar y ejecutar el cliente 'cloudflared' dentro del contenedor Docker:
 #    - Se crea el directorio '/root/.cloudflared'.
 #    - Se escriben los archivos de credenciales y configuración ('config.yml') del túnel.
