@@ -70,10 +70,17 @@ export async function GET(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const { data: domains, error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from('cloudflare_domains')
-    .select('id, domain_name, zone_id, account_id, created_at') // Select account_id
-    .eq('user_id', session.user.id);
+    .select('id, domain_name, zone_id, account_id, created_at'); // Select account_id
+
+  // Super Admins see all domains, Admins see only their own
+  if (userRole === 'admin') {
+    query = query.eq('user_id', session.user.id);
+  }
+  // If userRole is 'super_admin', no user_id filter is applied, so they see all.
+
+  const { data: domains, error } = await query;
 
   if (error) {
     console.error('Error fetching Cloudflare domains from Supabase (admin):', JSON.stringify(error, null, 2));

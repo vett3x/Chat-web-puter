@@ -60,8 +60,7 @@ export async function GET(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // Fetch events and join with user_servers to get server names
-  const { data: events, error: fetchError } = await supabaseAdmin
+  let query = supabaseAdmin
     .from('server_events_log')
     .select(`
       id,
@@ -73,9 +72,15 @@ export async function GET(req: NextRequest) {
         name,
         ip_address
       )
-    `)
-    .eq('user_id', session.user.id)
-    .order('created_at', { ascending: false });
+    `);
+
+  // Super Admins see all events, Admins see only their own
+  if (userRole === 'admin') {
+    query = query.eq('user_id', session.user.id);
+  }
+  // If userRole is 'super_admin', no user_id filter is applied, so they see all.
+
+  const { data: events, error: fetchError } = await query.order('created_at', { ascending: false });
 
   if (fetchError) {
     console.error('Error fetching server events from Supabase (admin):', fetchError);

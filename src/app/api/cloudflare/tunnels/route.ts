@@ -50,7 +50,59 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message: 'Acceso denegado. Se requiere rol de Admin o Super Admin.' }, { status: 403 });
   }
 
-  // Placeholder for fetching actual tunnels
-  // For now, return an empty array
-  return NextResponse.json([], { status: 200 });
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('SUPABASE_SERVICE_ROLE_KEY is not set.');
+    return NextResponse.json({ message: 'Error de configuración del servidor.' }, { status: 500 });
+  }
+
+  const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+
+  try {
+    let query = supabaseAdmin
+      .from('docker_tunnels')
+      .select(`
+        id,
+        container_id,
+        full_domain,
+        container_port,
+        status,
+        created_at,
+        cloudflare_domains (
+          domain_name
+        ),
+        user_servers (
+          name,
+          ip_address
+        )
+      `);
+
+    // Super Admins see all tunnels, Admins see only their own
+    if (userRole === 'admin') {
+      query = query.eq('user_id', session.user.id);
+    }
+
+    const { data: tunnels, error } = await query.order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching Docker tunnels:', error);
+      throw new Error('Error al cargar los túneles Docker.');
+    }
+
+    const formattedTunnels = tunnels.map(tunnel => ({
+      id: tunnel.id,
+      container_id: tunnel.container_id,
+      full_domain: tunnel.full_domain,
+      container_port: tunnel.container_port,
+      status: tunnel.status,
+      created_at: tunnel.created_at,
+      domain_name: (tunnel.cloudflare_domains as any)?.domain_name || 'N/A',
+      server_name: (tunnel.user_servers as any)?.name || (tunnel.user_servers as any)?.ip_address || 'N/A',
+    }));
+
+    return NextResponse.json(formattedTunnels, { status: 200 });
+
+  } catch (error: any) {
+    console.error('Error in GET /api/cloudflare/tunnels:', error);
+    return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
+  }
 }
