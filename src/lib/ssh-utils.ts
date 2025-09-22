@@ -71,7 +71,7 @@ export async function writeRemoteFile(
   serverDetails: ServerDetails,
   filePath: string,
   content: string,
-  mode: string = '0600'
+  mode: string = '0600' // Keep as string for input, convert to number for sftp
 ): Promise<void> {
   const conn = new SshClient();
   try {
@@ -82,14 +82,16 @@ export async function writeRemoteFile(
             conn.end();
             return reject(new Error(`SFTP error: ${err.message}`));
           }
-          const writeStream = sftp.createWriteStream(filePath, { mode });
+          // Convert mode string (e.g., '0600') to an octal number (e.g., 0o600)
+          const numericMode = parseInt(mode, 8);
+          const writeStream = sftp.createWriteStream(filePath, { mode: numericMode });
           writeStream.write(content);
           writeStream.end();
           writeStream.on('finish', () => {
             sftp.end();
             resolve();
           });
-          writeStream.on('error', (writeErr) => {
+          writeStream.on('error', (writeErr: Error) => { // Explicitly type writeErr as Error
             sftp.end();
             reject(new Error(`Error writing file to remote server: ${writeErr.message}`));
           });
