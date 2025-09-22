@@ -11,6 +11,7 @@ import {
 } from '@/lib/cloudflare-utils';
 
 // Initialize Supabase client with the service role key
+// This allows us to bypass RLS and update the server status from the backend.
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -71,6 +72,30 @@ export async function createAndProvisionCloudflareTunnel({
   let newTunnelRecordId: string | undefined; // To store the ID of the new tunnel record in DB
 
   try {
+    // --- NUEVO: Verificar si ya existe un túnel antes de crear uno nuevo ---
+    const { data: existingTunnels, error: existingTunnelError } = await supabaseAdmin
+      .from('docker_tunnels')
+      .select('id, status, full_domain')
+      .eq('server_id', serverId)
+      .eq('container_id', containerId)
+      .eq('container_port', containerPort)
+      .eq('user_id', userId); // Asegurarse de que sea para el usuario actual
+
+    if (existingTunnelError) {
+      throw new Error(`Error al verificar túneles existentes: ${existingTunnelError.message}`);
+    }
+
+    if (existingTunnels && existingTunnels.length > 0) {
+      const activeOrProvisioningTunnel = existingTunnels.find(t => t.status === 'active' || t.status === 'provisioning');
+      if (activeOrProvisioningTunnel) {
+        throw new Error(`Ya existe un túnel activo o en aprovisionamiento para este contenedor y puerto (${activeOrProvisioningTunnel.full_domain || 'sin dominio'}).`);
+      }
+      // Si solo existen túneles 'failed', permitimos crear uno nuevo, pero es mejor limpiar los fallidos primero.
+      // Por ahora, si existe CUALQUIER túnel para esta combinación, lo prevenimos.
+      throw new Error(`Ya existe un túnel (posiblemente fallido) para este contenedor y puerto. Por favor, elimínalo primero si deseas crear uno nuevo.`);
+    }
+    // --- FIN NUEVA VERIFICACIÓN ---
+
     const subdomain = userSubdomain || generateRandomSubdomain();
     const fullDomain = `${subdomain}.${cloudflareDomainDetails.domain_name}`;
     const tunnelName = `tunnel-${subdomain}-${containerId.substring(0, 8)}`; // Unique name for Cloudflare
@@ -83,7 +108,7 @@ export async function createAndProvisionCloudflareTunnel({
 
     // 2. Create DNS CNAME record
     const dnsRecord = await createCloudflareDnsRecord(
-      cloudflareDomainDetails.api_token,
+      cloudflareDomainDetails.api_token, // Corregido: api_token en lugar de apiToken
       cloudflareDomainDetails.zone_id,
       fullDomain,
       tunnelCnameTarget
@@ -109,6 +134,9 @@ export async function createAndProvisionCloudflareTunnel({
       .single();
 
     if (insertError) {
+      // Si llegamos aquí, significa que la verificación inicial pudo haber fallado
+      // o hubo una condición de carrera. Registramos el error específico.
+      console.error(`[Tunnel Orchestration] Error inserting tunnel into DB after initial check: ${insertError.message}`);
       throw new Error(`Error al guardar el túnel en la base de datos: ${insertError.message}`);
     }
     newTunnelRecordId = newTunnel.id;
