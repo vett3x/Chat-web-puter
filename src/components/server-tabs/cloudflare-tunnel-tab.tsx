@@ -15,6 +15,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from '@/components/ui/form';
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
@@ -244,6 +245,9 @@ export function CloudflareTunnelTab() {
                         <FormControl>
                           <Input placeholder="Tu Account ID de Cloudflare" {...field} disabled={isAddingDomain} />
                         </FormControl>
+                        <FormDescription>
+                          Puedes encontrar tu Account ID en la página de resumen de tu dominio en Cloudflare, en la barra lateral derecha.
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
