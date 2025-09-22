@@ -6,8 +6,7 @@ import { Client } from 'ssh2';
 import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { z } from 'zod';
-
-const SUPERUSER_EMAILS = ['martinpensa1@gmail.com'];
+import { SUPERUSER_EMAILS } from '@/components/session-context-provider'; // Import SUPERUSER_EMAILS
 
 const createContainerSchema = z.object({
   image: z.string().min(1, { message: 'El nombre de la imagen es requerido.' }),
@@ -15,20 +14,38 @@ const createContainerSchema = z.object({
   ports: z.string().optional(),
 });
 
-async function getSession() {
+// Helper function to get the session and user role
+async function getSessionAndRole() {
   const cookieStore = cookies() as any;
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) { return cookieStore.get(name)?.value; },
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
         set(name: string, value: string, options: CookieOptions) {},
         remove(name: string, options: CookieOptions) {},
       },
     }
   );
-  return supabase.auth.getSession();
+  const { data: { session } } = await supabase.auth.getSession();
+
+  let userRole: 'user' | 'admin' | 'super_admin' | null = null;
+  if (session?.user?.id) {
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single();
+    if (profile) {
+      userRole = profile.role as 'user' | 'admin' | 'super_admin';
+    } else if (session.user.email && SUPERUSER_EMAILS.includes(session.user.email)) {
+      userRole = 'super_admin'; // Fallback for initial Super Admin
+    }
+  }
+  return { session, userRole };
 }
 
 // Helper to execute a command and return its output
@@ -57,9 +74,13 @@ export async function POST(
     return NextResponse.json({ message: 'ID de servidor no proporcionado.' }, { status: 400 });
   }
 
-  const { data: { session } } = await getSession();
-  if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
-    return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
+  const { session, userRole } = await getSessionAndRole();
+  if (!session || !userRole) {
+    return NextResponse.json({ message: 'Acceso denegado. No autenticado.' }, { status: 401 });
+  }
+  // Only Super Admins can create containers
+  if (userRole !== 'super_admin') {
+    return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden crear contenedores.' }, { status: 403 });
   }
 
   const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);

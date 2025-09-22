@@ -4,8 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
-
-const SUPERUSER_EMAILS = ['martinpensa1@gmail.com']; // Define SuperUser emails
+import { SUPERUSER_EMAILS } from '@/components/session-context-provider'; // Import SUPERUSER_EMAILS
 
 async function getSession() {
   const cookieStore = cookies() as any;
@@ -28,6 +27,7 @@ interface SupabaseUserProfileWithAuth {
   first_name: string | null;
   last_name: string | null;
   auth_users: { email: string | null } | null;
+  role: 'user' | 'admin' | 'super_admin'; // Added role
 }
 
 export async function DELETE(
@@ -41,8 +41,9 @@ export async function DELETE(
   }
 
   const { data: { session } } = await getSession();
+  // Only Super Admins can delete users
   if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
-    return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
+    return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden eliminar usuarios.' }, { status: 403 });
   }
 
   // Prevent SuperUser from deleting themselves
@@ -61,10 +62,10 @@ export async function DELETE(
   );
 
   try {
-    // First, get user details for logging
+    // First, get user details for logging and to check if target is Super Admin
     const { data: userProfile, error: fetchProfileError } = await supabaseAdmin
       .from('profiles')
-      .select('first_name, last_name, auth_users:auth.users(email)')
+      .select('first_name, last_name, role, auth_users:auth.users(email)')
       .eq('id', userIdToDelete)
       .single() as { data: SupabaseUserProfileWithAuth | null, error: any }; // Castear el resultado
 
@@ -81,6 +82,11 @@ export async function DELETE(
         description: `Fallo al eliminar usuario con ID ${userIdToDelete}: no encontrado o acceso denegado.`,
       });
       return NextResponse.json({ message: 'Usuario no encontrado o acceso denegado.' }, { status: 404 });
+    }
+
+    // Prevent Super Admin from deleting another Super Admin
+    if (userProfile.role === 'super_admin') {
+      return NextResponse.json({ message: 'No puedes eliminar a otro Super Admin.' }, { status: 403 });
     }
 
     // Delete the user from auth.users. This should cascade to public.profiles

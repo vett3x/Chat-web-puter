@@ -17,12 +17,20 @@ import { Button } from '@/components/ui/button';
 import { Loader2, UserPlus, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const addUserFormSchema = z.object({
   email: z.string().email({ message: 'Correo electrónico inválido.' }),
   password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
   first_name: z.string().optional(),
   last_name: z.string().optional(),
+  role: z.enum(['user', 'admin']).default('user'),
 });
 
 type AddUserFormValues = z.infer<typeof addUserFormSchema>;
@@ -41,10 +49,11 @@ export function AddUserForm({ onUserAdded }: AddUserFormProps) {
       password: '',
       first_name: '',
       last_name: '',
+      role: 'user', // Explicitly set default role to match the schema's default
     },
   });
 
-  const onSubmit = async (values: AddUserFormValues) => {
+  const onSubmit = async (values: AddUserFormValues) => { // Corrected: values is of type AddUserFormValues
     setIsAddingUser(true);
     try {
       const response = await fetch('/api/users/create', {
@@ -62,7 +71,7 @@ export function AddUserForm({ onUserAdded }: AddUserFormProps) {
       }
 
       toast.success(result.message || 'Usuario añadido correctamente.');
-      form.reset();
+      form.reset({ role: 'user' }); // Reset form including role
       onUserAdded(); // Notify parent to refresh user list
     } catch (error: any) {
       console.error('Error adding user:', error);
@@ -130,6 +139,27 @@ export function AddUserForm({ onUserAdded }: AddUserFormProps) {
                   <FormControl>
                     <Input placeholder="Apellido del usuario" {...field} disabled={isAddingUser} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="role"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Rol</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isAddingUser}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar rol" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="user">Usuario</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

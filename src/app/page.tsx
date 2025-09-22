@@ -10,7 +10,7 @@ import { ServerManagementDialog } from "@/components/server-management-dialog";
 import { UserManagementDialog } from "@/components/user-management-dialog"; // Import the new dialog
 
 export default function Home() {
-  const { session, isLoading: isSessionLoading, isSuperUser } = useSession();
+  const { session, isLoading: isSessionLoading, userRole } = useSession(); // Changed isSuperUser to userRole
   const userId = session?.user?.id;
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [isProfileSettingsOpen, setIsProfileSettingsOpen] = useState(false);
@@ -64,6 +64,8 @@ export default function Home() {
     // setIsAppSettingsOpen(false);
   };
 
+  const isSuperAdmin = userRole === 'super_admin'; // Helper for conditional rendering
+
   return (
     <div className="flex h-screen bg-background">
       <aside className="w-[300px] flex-shrink-0">
@@ -97,13 +99,13 @@ export default function Home() {
           aiResponseSpeed={aiResponseSpeed}
           onAiResponseSpeedChange={handleAiResponseSpeedChange}
         />
-        {isSuperUser && (
+        {isSuperAdmin && ( // Render ServerManagementDialog and UserManagementDialog conditionally based on isSuperAdmin
           <>
             <ServerManagementDialog
               open={isServerManagementOpen}
               onOpenChange={setIsServerManagementOpen}
             />
-            <UserManagementDialog // Render UserManagementDialog conditionally
+            <UserManagementDialog
               open={isUserManagementOpen}
               onOpenChange={setIsUserManagementOpen}
             />

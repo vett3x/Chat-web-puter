@@ -5,9 +5,7 @@ import { z } from 'zod';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
-
-// Define SuperUser emails
-const SUPERUSER_EMAILS = ['martinpensa1@gmail.com'];
+import { SUPERUSER_EMAILS } from '@/components/session-context-provider'; // Import SUPERUSER_EMAILS
 
 // Esquema de validación para añadir un dominio de Cloudflare
 const cloudflareDomainSchema = z.object({
@@ -17,8 +15,8 @@ const cloudflareDomainSchema = z.object({
   account_id: z.string().min(1, { message: 'El Account ID es requerido.' }), // Added account_id
 });
 
-// Helper function to get the session
-async function getSession() {
+// Helper function to get the session and user role
+async function getSessionAndRole() {
   const cookieStore = cookies() as any;
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -28,23 +26,38 @@ async function getSession() {
         get(name: string) {
           return cookieStore.get(name)?.value;
         },
-        set(name: string, value: string, options: CookieOptions) {
-          // In a Route Handler, the cookie store is read-only.
-        },
-        remove(name: string, options: CookieOptions) {
-          // In a Route Handler, the cookie store is read-only.
-        },
+        set(name: string, value: string, options: CookieOptions) {},
+        remove(name: string, options: CookieOptions) {},
       },
     }
   );
-  return supabase.auth.getSession();
+  const { data: { session } } = await supabase.auth.getSession();
+
+  let userRole: 'user' | 'admin' | 'super_admin' | null = null;
+  if (session?.user?.id) {
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single();
+    if (profile) {
+      userRole = profile.role as 'user' | 'admin' | 'super_admin';
+    } else if (session.user.email && SUPERUSER_EMAILS.includes(session.user.email)) {
+      userRole = 'super_admin'; // Fallback for initial Super Admin
+    }
+  }
+  return { session, userRole };
 }
 
 // GET /api/cloudflare/domains - Obtener la lista de dominios de Cloudflare registrados
 export async function GET(req: NextRequest) {
-  const { data: { session } } = await getSession();
-  if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
-    return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
+  const { session, userRole } = await getSessionAndRole();
+  if (!session || !userRole) {
+    return NextResponse.json({ message: 'Acceso denegado. No autenticado.' }, { status: 401 });
+  }
+  // Allow Admins and Super Admins to view Cloudflare domains
+  if (userRole !== 'admin' && userRole !== 'super_admin') {
+    return NextResponse.json({ message: 'Acceso denegado. Se requiere rol de Admin o Super Admin.' }, { status: 403 });
   }
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -72,9 +85,13 @@ export async function GET(req: NextRequest) {
 
 // POST /api/cloudflare/domains - Añadir un nuevo dominio de Cloudflare
 export async function POST(req: NextRequest) {
-  const { data: { session } } = await getSession();
-  if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
-    return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
+  const { session, userRole } = await getSessionAndRole();
+  if (!session || !userRole) {
+    return NextResponse.json({ message: 'Acceso denegado. No autenticado.' }, { status: 401 });
+  }
+  // Only Super Admins can add Cloudflare domains
+  if (userRole !== 'super_admin') {
+    return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden añadir dominios de Cloudflare.' }, { status: 403 });
   }
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -139,9 +156,13 @@ export async function POST(req: NextRequest) {
 
 // DELETE /api/cloudflare/domains - Eliminar un dominio de Cloudflare
 export async function DELETE(req: NextRequest) {
-  const { data: { session } } = await getSession();
-  if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
-    return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
+  const { session, userRole } = await getSessionAndRole();
+  if (!session || !userRole) {
+    return NextResponse.json({ message: 'Acceso denegado. No autenticado.' }, { status: 401 });
+  }
+  // Only Super Admins can delete Cloudflare domains
+  if (userRole !== 'super_admin') {
+    return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden eliminar dominios de Cloudflare.' }, { status: 403 });
   }
 
   const { searchParams } = new URL(req.url);

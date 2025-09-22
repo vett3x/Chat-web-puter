@@ -5,8 +5,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
-
-const SUPERUSER_EMAILS = ['martinpensa1@gmail.com']; // Define SuperUser emails
+import { SUPERUSER_EMAILS } from '@/components/session-context-provider'; // Import SUPERUSER_EMAILS
 
 // Esquema de validación para añadir un nuevo usuario
 const addUserSchema = z.object({
@@ -14,6 +13,7 @@ const addUserSchema = z.object({
   password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
   first_name: z.string().optional(),
   last_name: z.string().optional(),
+  role: z.enum(['user', 'admin']).default('user'), // Allow Super Admin to set 'user' or 'admin' role
 });
 
 async function getSession() {
@@ -34,8 +34,9 @@ async function getSession() {
 
 export async function POST(req: NextRequest) {
   const { data: { session } } = await getSession();
+  // Only Super Admins can create users
   if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
-    return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
+    return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden crear usuarios.' }, { status: 403 });
   }
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest) {
       user_metadata: {
         first_name: newUserData.first_name,
         last_name: newUserData.last_name,
+        role: newUserData.role, // Pass role to user_metadata for trigger
       },
     });
 
@@ -75,13 +77,30 @@ export async function POST(req: NextRequest) {
     }
 
     // The public.profiles table should be automatically populated by the handle_new_user trigger.
-    // We can optionally verify or update it here if needed, but the trigger is designed for this.
+    // The trigger now reads 'role' from raw_user_meta_data.
+    // If the trigger doesn't set the role correctly, we can explicitly update it here.
+    if (user.user?.id) {
+      const { error: updateProfileError } = await supabaseAdmin
+        .from('profiles')
+        .update({ role: newUserData.role })
+        .eq('id', user.user.id);
+
+      if (updateProfileError) {
+        console.error(`Error updating profile role for new user ${user.user.id}:`, updateProfileError);
+        // Log this as a warning, but don't fail the user creation entirely
+        await supabaseAdmin.from('server_events_log').insert({
+          user_id: session.user.id,
+          event_type: 'user_create_warning',
+          description: `Advertencia: Rol no establecido correctamente para el nuevo usuario '${newUserData.email}'. Error: ${updateProfileError.message}`,
+        });
+      }
+    }
 
     // Log event for successful user creation
     await supabaseAdmin.from('server_events_log').insert({
       user_id: session.user.id,
       event_type: 'user_created',
-      description: `Usuario '${newUserData.email}' (ID: ${user.user?.id}) creado por Super Admin '${session.user.email}'.`,
+      description: `Usuario '${newUserData.email}' (ID: ${user.user?.id}) con rol '${newUserData.role}' creado por Super Admin '${session.user.email}'.`,
     });
 
     return NextResponse.json(

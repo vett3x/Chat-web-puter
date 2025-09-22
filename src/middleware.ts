@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { SUPERUSER_EMAILS } from '@/components/session-context-provider'; // Import SUPERUSER_EMAILS
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
@@ -27,6 +28,20 @@ export async function middleware(req: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession();
 
+  let userRole: 'user' | 'admin' | 'super_admin' | null = null;
+  if (session?.user?.id) {
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single();
+    if (profile) {
+      userRole = profile.role as 'user' | 'admin' | 'super_admin';
+    } else if (session.user.email && SUPERUSER_EMAILS.includes(session.user.email)) {
+      userRole = 'super_admin'; // Fallback for initial Super Admin
+    }
+  }
+
   const publicPaths = ['/login']; // Rutas accesibles sin autenticación
 
   if (!session && !publicPaths.includes(req.nextUrl.pathname)) {
@@ -35,6 +50,15 @@ export async function middleware(req: NextRequest) {
     redirectUrl.searchParams.set(`redirectedFrom`, req.nextUrl.pathname);
     return NextResponse.redirect(redirectUrl);
   }
+
+  // Example of role-based redirection (optional, can be expanded)
+  // If a 'user' tries to access an admin-only page, redirect them.
+  // For now, we'll rely on API handlers for fine-grained access control.
+  // if (userRole === 'user' && req.nextUrl.pathname.startsWith('/admin-only-page')) {
+  //   const redirectUrl = req.nextUrl.clone();
+  //   redirectUrl.pathname = '/'; // Redirect to home or a forbidden page
+  //   return NextResponse.redirect(redirectUrl);
+  // }
 
   return res;
 }

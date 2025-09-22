@@ -6,9 +6,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { provisionServer } from '@/lib/server-provisioning';
-
-// Define SuperUser emails (for server-side check)
-const SUPERUSER_EMAILS = ['martinpensa1@gmail.com'];
+import { SUPERUSER_EMAILS } from '@/components/session-context-provider'; // Import SUPERUSER_EMAILS
 
 // Esquema de validación para añadir un servidor
 const serverSchema = z.object({
@@ -19,8 +17,8 @@ const serverSchema = z.object({
   name: z.string().optional(),
 });
 
-// Helper function to get the session
-async function getSession() {
+// Helper function to get the session and user role
+async function getSessionAndRole() {
   const cookieStore = cookies() as any;
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -39,14 +37,33 @@ async function getSession() {
       },
     }
   );
-  return supabase.auth.getSession();
+  const { data: { session } } = await supabase.auth.getSession();
+
+  let userRole: 'user' | 'admin' | 'super_admin' | null = null;
+  if (session?.user?.id) {
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single();
+    if (profile) {
+      userRole = profile.role as 'user' | 'admin' | 'super_admin';
+    } else if (session.user.email && SUPERUSER_EMAILS.includes(session.user.email)) {
+      userRole = 'super_admin'; // Fallback for initial Super Admin
+    }
+  }
+  return { session, userRole };
 }
 
 // GET /api/servers - Obtener la lista de servidores registrados
 export async function GET(req: NextRequest) {
-  const { data: { session } } = await getSession();
-  if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
-    return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
+  const { session, userRole } = await getSessionAndRole();
+  if (!session || !userRole) {
+    return NextResponse.json({ message: 'Acceso denegado. No autenticado.' }, { status: 401 });
+  }
+  // Allow Admins and Super Admins to view servers
+  if (userRole !== 'admin' && userRole !== 'super_admin') {
+    return NextResponse.json({ message: 'Acceso denegado. Se requiere rol de Admin o Super Admin.' }, { status: 403 });
   }
 
   // Check for SUPABASE_SERVICE_ROLE_KEY
@@ -55,7 +72,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message: 'Error de configuración del servidor: Clave de servicio de Supabase no encontrada.' }, { status: 500 });
   }
 
-  // Use admin client to bypass RLS, relying on the superuser check for security
+  // Use admin client to bypass RLS, relying on the role check for security
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -76,9 +93,13 @@ export async function GET(req: NextRequest) {
 
 // POST /api/servers - Añadir un nuevo servidor y empezar el aprovisionamiento
 export async function POST(req: NextRequest) {
-  const { data: { session } } = await getSession();
-  if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
-    return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
+  const { session, userRole } = await getSessionAndRole();
+  if (!session || !userRole) {
+    return NextResponse.json({ message: 'Acceso denegado. No autenticado.' }, { status: 401 });
+  }
+  // Only Super Admins can add servers
+  if (userRole !== 'super_admin') {
+    return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden añadir servidores.' }, { status: 403 });
   }
 
   // Check for SUPABASE_SERVICE_ROLE_KEY
@@ -154,9 +175,13 @@ export async function POST(req: NextRequest) {
 
 // DELETE /api/servers - Eliminar un servidor
 export async function DELETE(req: NextRequest) {
-  const { data: { session } } = await getSession();
-  if (!session || !session.user?.email || !SUPERUSER_EMAILS.includes(session.user.email)) {
-    return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
+  const { session, userRole } = await getSessionAndRole();
+  if (!session || !userRole) {
+    return NextResponse.json({ message: 'Acceso denegado. No autenticado.' }, { status: 401 });
+  }
+  // Only Super Admins can delete servers
+  if (userRole !== 'super_admin') {
+    return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden eliminar servidores.' }, { status: 403 });
   }
 
   const { searchParams } = new URL(req.url);

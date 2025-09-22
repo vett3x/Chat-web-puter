@@ -30,11 +30,10 @@ interface ProfileDropdownProps {
   onOpenAppSettings: () => void;
   onOpenServerManagement: () => void;
   onOpenUserManagement: () => void; // New prop for user management
-  isSuperUser: boolean;
 }
 
-export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOpenServerManagement, onOpenUserManagement, isSuperUser }: ProfileDropdownProps) {
-  const { session } = useSession();
+export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOpenServerManagement, onOpenUserManagement }: ProfileDropdownProps) {
+  const { session, userRole } = useSession(); // Changed isSuperUser to userRole
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -85,6 +84,9 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
   if (!session) {
     return null; // No mostrar el dropdown si no hay sesión
   }
+
+  const isSuperAdmin = userRole === 'super_admin'; // Helper for conditional rendering
+  const isAdmin = userRole === 'admin' || userRole === 'super_admin'; // Helper for admin access
 
   return (
     <DropdownMenu>
@@ -145,21 +147,21 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
             <span>Configuración</span>
           </div>
         </DropdownMenuItem>
-        {isSuperUser && (
-          <>
-            <DropdownMenuItem onClick={onOpenServerManagement} className="flex items-center cursor-pointer">
-              <div className="flex items-center">
-                <Server className="mr-2 h-4 w-4" />
-                <span>Gestión de Servidores</span>
-              </div>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onOpenUserManagement} className="flex items-center cursor-pointer">
-              <div className="flex items-center">
-                <Users className="mr-2 h-4 w-4" />
-                <span>Gestión de Usuarios</span>
-              </div>
-            </DropdownMenuItem>
-          </>
+        {isAdmin && ( // Show Server Management for Admins and Super Admins
+          <DropdownMenuItem onClick={onOpenServerManagement} className="flex items-center cursor-pointer">
+            <div className="flex items-center">
+              <Server className="mr-2 h-4 w-4" />
+              <span>Gestión de Servidores</span>
+            </div>
+          </DropdownMenuItem>
+        )}
+        {isSuperAdmin && ( // Show User Management only for Super Admins
+          <DropdownMenuItem onClick={onOpenUserManagement} className="flex items-center cursor-pointer">
+            <div className="flex items-center">
+              <Users className="mr-2 h-4 w-4" />
+              <span>Gestión de Usuarios</span>
+            </div>
+          </DropdownMenuItem>
         )}
         <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive" onClick={handleSignOut}>
           <div className="flex items-center">

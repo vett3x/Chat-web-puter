@@ -29,6 +29,7 @@ interface SupabaseProfile {
   first_name: string | null;
   last_name: string | null;
   avatar_url: string | null;
+  role: 'user' | 'admin' | 'super_admin'; // Added role
 }
 
 export async function GET(req: NextRequest) {
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest) {
     // 1. Fetch all profiles
     const { data: profiles, error: profilesError } = await supabaseAdmin
       .from('profiles')
-      .select(`id, first_name, last_name, avatar_url`);
+      .select(`id, first_name, last_name, avatar_url, role`); // Select role
 
     if (profilesError) {
       console.error('Supabase query error fetching profiles in GET /api/users:', profilesError);
@@ -70,6 +71,7 @@ export async function GET(req: NextRequest) {
           last_name: profile.last_name,
           avatar_url: profile.avatar_url,
           email: 'N/A (Error al obtener email)',
+          role: profile.role, // Include role even if email fails
         };
       }
 
@@ -79,6 +81,7 @@ export async function GET(req: NextRequest) {
         last_name: profile.last_name,
         avatar_url: profile.avatar_url,
         email: userData.user?.email || 'N/A',
+        role: profile.role, // Include role
       };
     }));
 

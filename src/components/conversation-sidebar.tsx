@@ -49,7 +49,7 @@ export function ConversationSidebar({
   onOpenServerManagement,
   onOpenUserManagement, // Destructure new prop
 }: ConversationSidebarProps) {
-  const { session, isLoading: isSessionLoading, isSuperUser } = useSession();
+  const { session, isLoading: isSessionLoading, userRole } = useSession(); // Changed isSuperUser to userRole
   const userId = session?.user?.id;
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -344,6 +344,9 @@ export function ConversationSidebar({
   const rootFolders = folders.filter(f => f.parent_id === null);
   const generalConversations = conversations.filter(conv => conv.folder_id === null);
 
+  const isSuperAdmin = userRole === 'super_admin'; // Helper for conditional rendering
+  const isAdmin = userRole === 'admin' || userRole === 'super_admin'; // Helper for admin access
+
   if (isSessionLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-4">
@@ -361,7 +364,6 @@ export function ConversationSidebar({
           onOpenAppSettings={onOpenAppSettings}
           onOpenServerManagement={onOpenServerManagement}
           onOpenUserManagement={onOpenUserManagement} // Pass the new prop
-          isSuperUser={isSuperUser}
         />
       </div>
 
@@ -396,7 +398,7 @@ export function ConversationSidebar({
               <Folder className="h-4 w-4" />
             )}
           </Button>
-          {isSuperUser && (
+          {isAdmin && ( // Show Server Management button for Admins and Super Admins
             <Button
               variant="outline"
               size="icon"

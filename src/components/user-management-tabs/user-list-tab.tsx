@@ -28,6 +28,7 @@ interface User {
   first_name: string | null;
   last_name: string | null;
   avatar_url: string | null;
+  role: 'user' | 'admin' | 'super_admin'; // Added role
 }
 
 // Define the interface for the ref handle and export it
@@ -36,7 +37,7 @@ export interface UserListTabRef {
 }
 
 export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
-  const { session, isLoading: isSessionLoading } = useSession();
+  const { session, isLoading: isSessionLoading, userRole: currentUserRole } = useSession(); // Get current user's role
   const currentUserId = session?.user?.id;
   const [users, setUsers] = useState<User[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
@@ -116,6 +117,8 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
     );
   }
 
+  const isCurrentUserSuperAdmin = currentUserRole === 'super_admin';
+
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -155,7 +158,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
               <TableBody>
                 {users.map((user) => {
                   const isCurrentUser = user.id === currentUserId;
-                  const isSuperUser = SUPERUSER_EMAILS.includes(user.email);
+                  const isTargetUserSuperAdmin = user.role === 'super_admin';
 
                   return (
                     <TableRow key={user.id}>
@@ -173,9 +176,13 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
                           <p className="font-medium">{user.first_name || 'N/A'} {user.last_name || ''}</p>
                         </div>
                       </TableCell><TableCell>{user.email}</TableCell><TableCell>
-                        {isSuperUser ? (
+                        {user.role === 'super_admin' ? (
                           <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
                             Super Admin
+                          </span>
+                        ) : user.role === 'admin' ? (
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                            Admin
                           </span>
                         ) : (
                           <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
@@ -199,8 +206,8 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
                                 variant="destructive"
                                 size="icon"
                                 className="h-8 w-8"
-                                disabled={isCurrentUser || isDeleting === user.id}
-                                title={isCurrentUser ? "No puedes eliminar tu propia cuenta" : "Eliminar usuario"}
+                                disabled={isCurrentUser || isTargetUserSuperAdmin || isDeleting === user.id || !isCurrentUserSuperAdmin} // Only Super Admin can delete, and not themselves or other Super Admins
+                                title={isCurrentUser ? "No puedes eliminar tu propia cuenta" : (isTargetUserSuperAdmin ? "No puedes eliminar a otro Super Admin" : (isCurrentUserSuperAdmin ? "Eliminar usuario" : "No tienes permiso para eliminar usuarios"))}
                               >
                                 {isDeleting === user.id ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -239,6 +246,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
           open={isDetailDialogOpen}
           onOpenChange={setIsDetailDialogOpen}
           user={selectedUser}
+          currentUserRole={currentUserRole} // Pass current user's role
         />
       )}
     </Card>
