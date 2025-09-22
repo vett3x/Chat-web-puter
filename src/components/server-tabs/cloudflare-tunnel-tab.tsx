@@ -142,10 +142,18 @@ export function CloudflareTunnelTab() {
   const handleAddDomain = async (values: CloudflareDomainFormValues) => {
     setIsAddingDomain(true);
     try {
+      // Trim whitespace from all fields before sending
+      const trimmedValues = {
+        domain_name: values.domain_name.trim(),
+        api_token: values.api_token.trim(),
+        zone_id: values.zone_id.trim(),
+        account_id: values.account_id.trim(),
+      };
+
       const response = await fetch('/api/cloudflare/domains', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values),
+        body: JSON.stringify(trimmedValues),
         credentials: 'include',
       });
       const result = await response.json();
