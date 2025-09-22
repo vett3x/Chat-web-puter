@@ -209,7 +209,9 @@ export async function configureCloudflareTunnelIngressApi(
         {
           hostname: fullDomain,
           service: `http://localhost:${containerPort}`, // CHANGED TO HTTP
-          // noTLSVerify: true is not needed if the origin is HTTP
+          originRequest: {
+            noTLSVerify: true,
+          },
         },
         {
           service: "http_status:404", // Catch-all rule
@@ -270,8 +272,10 @@ credentials-file: ${credentialsFilePath}
 ingress:
   - hostname: ${fullDomain}
     service: http://localhost:${containerPort}
+    originRequest:
+      noTLSVerify: true
   - service: http_status:404
-`; // ADDED INGRESS SECTION
+`; // ADDED originRequest with noTLSVerify
   const encodedConfig = Buffer.from(configContent).toString('base64');
   const writeConfigCommand = `echo '${encodedConfig}' | base64 -d > ${configFilePath}`;
   await executeSshCommand(serverDetails, `docker exec ${containerId} sh -c "${writeConfigCommand}"`);
