@@ -133,8 +133,7 @@ export async function POST(
     return NextResponse.json({ message: 'Servidor no encontrado.' }, { status: 404 });
   }
 
-  const conn = new Client();
-  let containerId: string | undefined; // Declare containerId here
+  let containerId: string | undefined;
 
   try {
     const body = await req.json();
@@ -142,66 +141,90 @@ export async function POST(
 
     let runCommand = 'docker run -d';
     let baseImage = image;
-    let entrypointCommand = 'tail -f /dev/null'; // Default entrypoint to keep container alive
+    let entrypointCommand = 'tail -f /dev/null';
 
+    // --- Phase 1: Handle image check/pull for Next.js framework ---
     if (framework === 'nextjs') {
-      baseImage = 'node:lts-alpine'; // Use a Node.js base image
-      // For Next.js, we'll just ensure Node.js is available.
-      // The user will then exec into it to run `create-next-app`.
-      // We can add a command to install create-next-app globally if desired,
-      // but for now, just keeping the container alive with Node.js is sufficient.
-      // The server provisioning script already installs Node.js on the *host*.
-      // For the *container*, we need a Node.js image.
-    } else {
-      // For 'other', use the provided image and default entrypoint
-    }
-
-    if (name) runCommand += ` --name ${name.replace(/[^a-zA-Z0-9_.-]/g, '')}`;
-    if (ports && /^\d{1,5}:\d{1,5}$/.test(ports)) runCommand += ` -p ${ports}`;
-    runCommand += ` --entrypoint ${entrypointCommand} ${baseImage}`; // Use the determined baseImage
-
-    await new Promise<void>((resolve, reject) => conn.on('ready', resolve).on('error', reject).connect({ host: server.ip_address, port: server.ssh_port || 22, username: server.ssh_username, password: server.ssh_password, readyTimeout: 10000 }));
-
-    const { stdout: newContainerId, stderr: runStderr, code: runCode } = await executeSshCommand(conn, runCommand);
-    if (runCode !== 0) {
-      throw new Error(`Error al crear contenedor: ${runStderr}`);
-    }
-    containerId = newContainerId.trim(); // Assign to outer-scoped containerId
-
-    // Poll to verify the container is running
-    const startTime = Date.now();
-    const timeout = 15000; // 15 seconds
-    let isVerified = false;
-
-    while (Date.now() - startTime < timeout) {
-      const { stdout: inspectOutput, code: inspectCode } = await executeSshCommand(conn, `docker inspect --format '{{.State.Running}}' ${containerId}`);
-      if (inspectCode === 0 && inspectOutput.trim() === 'true') {
-        isVerified = true;
-        break;
+      baseImage = 'node:lts-alpine';
+      const imageConn = new Client(); // New Client instance for image operations
+      try {
+        await new Promise<void>((resolve, reject) => imageConn.on('ready', resolve).on('error', reject).connect({ host: server.ip_address, port: server.ssh_port || 22, username: server.ssh_username, password: server.ssh_password, readyTimeout: 10000 }));
+        
+        const { code: inspectCode } = await executeSshCommand(imageConn, `docker inspect --type=image ${baseImage}`);
+        if (inspectCode !== 0) {
+          await supabaseAdmin.from('server_events_log').insert({
+            user_id: session.user.id,
+            server_id: serverId,
+            event_type: 'container_create_warning',
+            description: `Imagen '${baseImage}' no encontrada en '${server.name || server.ip_address}'. Intentando descargar...`,
+          });
+          const { stderr: pullStderr, code: pullCode } = await executeSshCommand(imageConn, `docker pull ${baseImage}`);
+          if (pullCode !== 0) {
+            throw new Error(`Error al descargar la imagen '${baseImage}': ${pullStderr}`);
+          }
+          await supabaseAdmin.from('server_events_log').insert({
+            user_id: session.user.id,
+            server_id: serverId,
+            event_type: 'container_created', // Log as created for image pull success
+            description: `Imagen '${baseImage}' descargada exitosamente en '${server.name || server.ip_address}'.`,
+          });
+        }
+      } finally {
+        imageConn.end(); // Ensure connection is closed
       }
-      await new Promise(res => setTimeout(res, 2000)); // Wait 2 seconds before next check
     }
 
-    conn.end();
+    // --- Phase 2: Create and run the Docker container ---
+    const runConn = new Client(); // New Client instance for container run operations
+    try {
+      await new Promise<void>((resolve, reject) => runConn.on('ready', resolve).on('error', reject).connect({ host: server.ip_address, port: server.ssh_port || 22, username: server.ssh_username, password: server.ssh_password, readyTimeout: 10000 }));
 
-    if (!isVerified) {
-      // Log event for container created but not verified
+      if (name) runCommand += ` --name ${name.replace(/[^a-zA-Z0-9_.-]/g, '')}`;
+      const finalPorts = ports || (framework === 'nextjs' && container_port ? `${container_port}:${container_port}` : (framework === 'nextjs' ? '3000:3000' : undefined));
+      if (finalPorts) runCommand += ` -p ${finalPorts}`;
+      
+      runCommand += ` --entrypoint ${entrypointCommand} ${baseImage}`;
+
+      const { stdout: newContainerId, stderr: runStderr, code: runCode } = await executeSshCommand(runConn, runCommand);
+      if (runCode !== 0) {
+        throw new Error(`Error al crear contenedor: ${runStderr}`);
+      }
+      containerId = newContainerId.trim();
+
+      // Poll to verify the container is running
+      const startTime = Date.now();
+      const timeout = 15000;
+      let isVerified = false;
+
+      while (Date.now() - startTime < timeout) {
+        const { stdout: inspectOutput, code: inspectCode } = await executeSshCommand(runConn, `docker inspect --format '{{.State.Running}}' ${containerId}`);
+        if (inspectCode === 0 && inspectOutput.trim() === 'true') {
+          isVerified = true;
+          break;
+        }
+        await new Promise(res => setTimeout(res, 2000));
+      }
+
+      if (!isVerified) {
+        await supabaseAdmin.from('server_events_log').insert({
+          user_id: session.user.id,
+          server_id: serverId,
+          event_type: 'container_create_warning',
+          description: `Contenedor '${name || image}' (ID: ${containerId?.substring(0,12)}) creado en '${server.name || server.ip_address}', pero no se pudo verificar su estado de ejecución.`,
+        });
+        throw new Error('El contenedor fue creado pero no se pudo verificar su estado "running" a tiempo.');
+      }
+
       await supabaseAdmin.from('server_events_log').insert({
         user_id: session.user.id,
         server_id: serverId,
-        event_type: 'container_create_warning',
-        description: `Contenedor '${name || image}' (ID: ${containerId?.substring(0,12)}) creado en '${server.name || server.ip_address}', pero no se pudo verificar su estado de ejecución.`,
+        event_type: 'container_created',
+        description: `Contenedor '${name || image}' (ID: ${containerId?.substring(0,12)}) creado y en ejecución en '${server.name || server.ip_address}'.`,
       });
-      throw new Error('El contenedor fue creado pero no se pudo verificar su estado "running" a tiempo.');
-    }
 
-    // Log event for successful container creation
-    await supabaseAdmin.from('server_events_log').insert({
-      user_id: session.user.id,
-      server_id: serverId,
-      event_type: 'container_created',
-      description: `Contenedor '${name || image}' (ID: ${containerId?.substring(0,12)}) creado y en ejecución en '${server.name || server.ip_address}'.`,
-    });
+    } finally {
+      runConn.end(); // Ensure connection is closed
+    }
 
     // If Next.js framework and tunnel details are provided, initiate tunnel creation
     if (framework === 'nextjs' && cloudflare_domain_id && container_port && userPermissions[PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_TUNNELS]) {
@@ -214,11 +237,10 @@ export async function POST(
         .single();
 
       if (cfDomainDetails && !cfDomainError) {
-        // Call the new server action to create and provision the tunnel
         createAndProvisionCloudflareTunnel({
           userId: session.user.id,
           serverId: serverId,
-          containerId: containerId,
+          containerId: containerId!, // containerId is guaranteed to be defined here if we reach this point without error
           cloudflareDomainId: cloudflare_domain_id,
           containerPort: container_port,
           subdomain: subdomain,
@@ -232,7 +254,6 @@ export async function POST(
           cloudflareDomainDetails: cfDomainDetails,
         }).catch(tunnelError => {
           console.error(`Error during automated tunnel creation for container ${containerId}:`, tunnelError);
-          // Log this error, but don't block the container creation response
           supabaseAdmin.from('server_events_log').insert({
             user_id: session.user.id,
             server_id: serverId,
@@ -251,10 +272,26 @@ export async function POST(
       }
     }
 
+    if (framework === 'nextjs') {
+      await supabaseAdmin.from('server_events_log').insert({
+        user_id: session.user.id,
+        server_id: serverId,
+        event_type: 'container_created',
+        description: `Contenedor Next.js (ID: ${containerId?.substring(0,12)}) creado. Pasos siguientes:
+        1. Conéctate al servidor SSH: ssh ${server.ssh_username}@${server.ip_address} -p ${server.ssh_port || 22}
+        2. Accede al contenedor: docker exec -it ${containerId?.substring(0,12)} /bin/bash
+        3. Dentro del contenedor, crea tu app Next.js: npx create-next-app@latest my-next-app --use-npm --example "https://github.com/vercel/next.js/tree/canary/examples/hello-world"
+        4. Navega a tu app: cd my-next-app
+        5. Inicia el servidor de desarrollo: npm run dev -- -p ${container_port || 3000}
+        6. Si configuraste un túnel Cloudflare, tu app estará accesible en el dominio.`,
+      });
+    }
+
     return NextResponse.json({ message: `Contenedor ${containerId?.substring(0,12)} creado y en ejecución.` }, { status: 201 });
 
   } catch (error: any) {
-    conn.end();
+    // Ensure any SSH connections are closed in case of error
+    // This is handled by the finally blocks for imageConn and runConn
     if (error instanceof z.ZodError) {
       // Log event for validation error
       await supabaseAdmin.from('server_events_log').insert({

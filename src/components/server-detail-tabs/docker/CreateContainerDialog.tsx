@@ -47,10 +47,10 @@ const createContainerFormSchema = z.object({
 type CreateContainerFormValues = z.infer<typeof createContainerFormSchema>;
 
 const INITIAL_CREATE_CONTAINER_DEFAULTS: CreateContainerFormValues = {
-  image: '',
+  image: 'ubuntu:latest', // Default for 'other'
   name: undefined,
   ports: undefined,
-  framework: 'other',
+  framework: 'nextjs', // Default to Next.js
   cloudflare_domain_id: undefined,
   container_port: undefined,
   subdomain: undefined,
@@ -96,8 +96,34 @@ export function CreateContainerDialog({ open, onOpenChange, serverId, onContaine
   useEffect(() => {
     if (open) {
       fetchCloudflareDomains();
+      // Set initial defaults when dialog opens
+      form.reset(INITIAL_CREATE_CONTAINER_DEFAULTS);
     }
-  }, [open, fetchCloudflareDomains]);
+  }, [open, fetchCloudflareDomains, form]);
+
+  // Effect to update defaults when framework changes
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (name === 'framework') {
+        const currentFramework = value.framework;
+        if (currentFramework === 'nextjs') {
+          form.setValue('image', 'node:lts-alpine', { shouldValidate: true });
+          form.setValue('container_port', 3000, { shouldValidate: true });
+          if (cloudflareDomains.length > 0 && canManageCloudflareTunnels) {
+            form.setValue('cloudflare_domain_id', cloudflareDomains[0].id, { shouldValidate: true });
+          } else {
+            form.setValue('cloudflare_domain_id', undefined, { shouldValidate: true });
+          }
+        } else {
+          form.setValue('image', 'ubuntu:latest', { shouldValidate: true });
+          form.setValue('container_port', undefined, { shouldValidate: true });
+          form.setValue('cloudflare_domain_id', undefined, { shouldValidate: true });
+          form.setValue('subdomain', undefined, { shouldValidate: true });
+        }
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form, cloudflareDomains, canManageCloudflareTunnels]);
 
   const handleCreateContainer: SubmitHandler<CreateContainerFormValues> = async (values) => {
     setIsCreatingContainer(true);
