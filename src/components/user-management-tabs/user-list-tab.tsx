@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useImperativeHandle } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Users, Trash2, RefreshCw, AlertCircle, Eye, Search, Crown, Shield } from 'lucide-react'; // Import Crown and Shield
+import { Loader2, Users, Trash2, RefreshCw, AlertCircle, Eye, Search, Crown, Shield, Bot } from 'lucide-react'; // Import Bot icon
 import { toast } from 'sonner';
 import { useSession } from '@/components/session-context-provider';
 import { SUPERUSER_EMAILS } from '@/lib/constants'; // Importación actualizada
@@ -177,7 +177,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
                         <AvatarImage src={user.avatar_url} alt="Avatar" />
                       ) : (
                         <AvatarFallback className="bg-primary text-primary-foreground">
-                          {getInitials(user.first_name, user.last_name, user.email)}
+                          <Bot className="h-4 w-4" /> {/* Changed to Bot icon */}
                         </AvatarFallback>
                       )}
                     </Avatar>
@@ -188,7 +188,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
                     {user.role !== 'user' && ( // Only show role badge if not 'user'
-                      <span className={`flex items-center gap-1 text-xs font-semibold px-1.5 py-0.5 rounded-full capitalize
+                      <span className={`flex items-center gap-1 text-xs font-semibold px-1 py-0.5 rounded-full capitalize
                         ${user.role === 'super_admin' ? 'bg-yellow-500 text-yellow-900 dark:bg-yellow-400 dark:text-yellow-950' : ''}
                         ${user.role === 'admin' ? 'bg-purple-500 text-purple-900 dark:bg-purple-400 dark:text-purple-950' : ''}
                       `}>
