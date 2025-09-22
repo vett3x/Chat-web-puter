@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, Users, Trash2, RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { useSession, SUPERUSER_EMAILS } from '@/components/session-context-provider'; // Import SUPERUSER_EMAILS
+import { useSession, SUPERUSER_EMAILS } from '@/components/session-context-provider';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ScrollArea } from '@/components/ui/scroll-area'; // Import ScrollArea
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface User {
   id: string;
@@ -35,7 +35,7 @@ export function UserListTab() {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState<string | null>(null); // Stores the ID of the user being deleted
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
   const fetchUsers = useCallback(async () => {
     setIsLoadingUsers(true);
@@ -81,7 +81,7 @@ export function UserListTab() {
         throw new Error(result.message || `HTTP error! status: ${response.status}`);
       }
       toast.success(result.message || 'Usuario eliminado correctamente.');
-      fetchUsers(); // Refresh the list
+      fetchUsers();
     } catch (err: any) {
       console.error('Error deleting user:', err);
       toast.error(err.message || 'Error al eliminar el usuario.');
@@ -131,14 +131,14 @@ export function UserListTab() {
                 <TableRow>
                   <TableHead>Usuario</TableHead>
                   <TableHead>Email</TableHead>
-                  <TableHead>Rol</TableHead> {/* Placeholder for roles */}
+                  <TableHead>Rol</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {users.map((user) => {
                   const isCurrentUser = user.id === currentUserId;
-                  const isSuperUser = SUPERUSER_EMAILS.includes(user.email); // Assuming SUPERUSER_EMAILS is accessible or passed
+                  const isSuperUser = SUPERUSER_EMAILS.includes(user.email);
 
                   return (
                     <TableRow key={user.id}>
@@ -155,9 +155,7 @@ export function UserListTab() {
                         <div>
                           <p className="font-medium">{user.first_name || 'N/A'} {user.last_name || ''}</p>
                         </div>
-                      </TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>
+                      </TableCell><TableCell>{user.email}</TableCell><TableCell>
                         {isSuperUser ? (
                           <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
                             Super Admin
@@ -167,8 +165,7 @@ export function UserListTab() {
                             Usuario
                           </span>
                         )}
-                      </TableCell>
-                      <TableCell className="text-right">
+                      </TableCell><TableCell className="text-right">
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button
