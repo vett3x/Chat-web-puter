@@ -89,6 +89,7 @@ export default function Home() {
   const [isDeletingAppId, setIsDeletingAppId] = useState<string | null>(null);
   const [retryState, setRetryState] = useState<RetryState>({ isOpen: false, files: null });
   const appBrowserRef = useRef<{ refresh: () => void }>(null);
+  const [fileTreeRefreshKey, setFileTreeRefreshKey] = useState(0); // Key for forcing FileTree refresh
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -193,21 +194,31 @@ export default function Home() {
       const response = await fetch(`/api/apps/${selectedAppDetails.id}/files`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ files }), // Send all files in one go
+        body: JSON.stringify({ files }),
       });
 
       const result = await response.json();
       if (!response.ok) {
         throw new Error(result.message || 'Error del servidor al guardar los archivos.');
       }
+      toast.success(`Archivos aplicados. Reiniciando servidor...`, { id: toastId });
 
-      toast.success(`¡${files.length} archivo(s) aplicados! Actualizando vista previa...`, { id: toastId });
-      refreshSidebarData();
-      setTimeout(() => appBrowserRef.current?.refresh(), 1000);
+      // Now, restart the server
+      const restartResponse = await fetch(`/api/apps/${selectedAppDetails.id}/restart`, { method: 'POST' });
+      const restartResult = await restartResponse.json();
+      if (!restartResponse.ok) {
+        throw new Error(restartResult.message || 'Error al reiniciar el servidor.');
+      }
+      
+      toast.success(`¡Listo! Actualizando vista previa...`, { id: toastId });
+      
+      // Force refresh of file tree and browser preview
+      setFileTreeRefreshKey(prev => prev + 1);
+      setTimeout(() => appBrowserRef.current?.refresh(), 2000); // Delay to allow server to restart
 
     } catch (error: any) {
-      console.error("Error writing files in batch:", error);
-      toast.error(`Error al aplicar los archivos: ${error.message}`, { id: toastId });
+      console.error("Error writing files or restarting:", error);
+      toast.error(`Error: ${error.message}`, { id: toastId });
       setRetryState({ isOpen: true, files: files });
     }
   };
@@ -275,6 +286,7 @@ export default function Home() {
           moveItem={moveItem}
           onDeleteApp={handleDeleteApp}
           isDeletingAppId={isDeletingAppId}
+          fileTreeRefreshKey={fileTreeRefreshKey}
         />
       </div>
       <div className="flex-1 min-w-0">

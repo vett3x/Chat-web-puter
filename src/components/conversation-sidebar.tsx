@@ -65,6 +65,7 @@ interface ConversationSidebarProps {
   moveItem: (itemId: string, itemType: 'conversation' | 'note' | 'folder', targetFolderId: string | null) => void;
   onDeleteApp: (appId: string) => void;
   isDeletingAppId: string | null;
+  fileTreeRefreshKey: number; // New prop
 }
 
 export function ConversationSidebar({
@@ -88,6 +89,7 @@ export function ConversationSidebar({
   moveItem,
   onDeleteApp,
   isDeletingAppId,
+  fileTreeRefreshKey, // New prop
 }: ConversationSidebarProps) {
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
@@ -187,7 +189,7 @@ export function ConversationSidebar({
                     {isSelected && (
                       <div className="border-l-2 border-sidebar-primary ml-2 pl-2 pt-1">
                         {app.status === 'ready' ? (
-                          <FileTree appId={app.id} onFileSelect={onFileSelect} />
+                          <FileTree key={fileTreeRefreshKey} appId={app.id} onFileSelect={onFileSelect} />
                         ) : (
                           <div className="flex items-center gap-2 text-xs text-muted-foreground p-1">
                             <Loader2 className="h-3 w-3 animate-spin" />

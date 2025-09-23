@@ -32,11 +32,11 @@ export async function POST(req: NextRequest, context: any) {
     const { data: tunnel } = await supabaseAdmin
       .from('docker_tunnels')
       .select('tunnel_id, tunnel_secret, container_port')
-      .eq('app_id', appId)
+      .eq('container_id', app.container_id) // Search by container_id
       .single();
 
     // Comandos para reiniciar los servicios DENTRO del contenedor
-    const killCommands = "pkill -f 'next dev' || true; pkill cloudflared || true";
+    const killCommands = "pkill -f 'npm run dev' || true; pkill cloudflared || true";
     
     const restartAppCommand = `cd /app && nohup npm run dev -- -p ${tunnel?.container_port || 3000} > /app/dev.log 2>&1 &`;
     
