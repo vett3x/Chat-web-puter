@@ -19,7 +19,7 @@ async function ensureServicesAreRunning(server: any, app: any) {
 
   const killAppCommand = "pkill -f 'npm run dev' || true";
   const killTunnelCommand = "pkill cloudflared || true";
-  const restartAppCommand = `nohup npm run dev -- -p ${tunnel?.container_port || 3000} > /app/dev.log 2>&1`;
+  const restartAppCommand = `nohup npm run dev -- --hostname 0.0.0.0 -p ${tunnel?.container_port || 3000} > /app/dev.log 2>&1`;
 
   let backgroundCommandList = [restartAppCommand];
 

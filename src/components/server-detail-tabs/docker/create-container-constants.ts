@@ -64,7 +64,7 @@ echo "--- Dependencies installed. ---"
 echo "--- Starting Next.js dev server in the background... ---"
 # Run the dev server in the background using nohup and redirect output
 # The __CONTAINER_PORT__ placeholder will be replaced by the backend with the correct port.
-nohup npm run dev -- -p __CONTAINER_PORT__ > /app/dev.log 2>&1 &
+nohup npm run dev -- --hostname 0.0.0.0 -p __CONTAINER_PORT__ > /app/dev.log 2>&1 &
 echo "--- Next.js dev server started. Check /app/dev.log for output. ---"
 
 echo "--- Container dependency installation complete ---"
