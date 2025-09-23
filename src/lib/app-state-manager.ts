@@ -58,9 +58,9 @@ export async function getAppAndServerForFileOps(appId: string, userId: string) {
     if (!app.user_servers) {
         throw new Error('La información del servidor para esta aplicación no está disponible.');
     }
-    // Allow file operations on ready, suspended, or even provisioning apps
-    if (app.status === 'hibernated' || app.status === 'failed') {
-        throw new Error(`La aplicación está en estado '${app.status}' y no se pueden modificar sus archivos.`);
+    // Allow file operations only on ready or suspended apps
+    if (app.status !== 'ready' && app.status !== 'suspended') {
+        throw new Error(`La aplicación está en estado '${app.status}' y no se pueden modificar sus archivos. Por favor, espera a que esté lista.`);
     }
 
     return { app, server: app.user_servers as any };
