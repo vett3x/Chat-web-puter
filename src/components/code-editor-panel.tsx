@@ -24,12 +24,15 @@ export function CodeEditorPanel({ appId, file, onClose, onSwitchToPreview }: Cod
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/apps/${appId}/file`, {
+      const response = await fetch(`/api/apps/${appId}/files`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filePath: file.path, content: code }),
+        body: JSON.stringify({ files: [{ filePath: file.path, content: code }] }),
       });
-      if (!response.ok) throw new Error('No se pudo guardar el archivo.');
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.message || 'No se pudo guardar el archivo.');
+      }
       toast.success(`Archivo ${file.path} guardado.`);
     } catch (error: any) {
       toast.error(error.message);
