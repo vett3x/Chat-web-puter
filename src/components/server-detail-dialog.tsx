@@ -11,7 +11,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Server, Dock, HardDrive, Link } from 'lucide-react';
+import { Server, Dock, HardDrive, Link, BarChart as BarChartIcon } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -19,6 +19,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ServerDetailDockerTab } from '@/components/server-detail-tabs/server-detail-docker-tab';
 import { ServerDetailResourcesTab } from '@/components/server-detail-tabs/server-detail-resources-tab';
 import { ServerDetailWebLinksTab } from '@/components/server-detail-tabs/server-detail-web-links-tab';
+import { ServerDetailStatsTab } from '@/components/server-detail-tabs/server-detail-stats-tab'; // Import the new tab
 
 interface RegisteredServer {
   id: string;
@@ -48,7 +49,7 @@ export function ServerDetailDialog({ open, onOpenChange, server, userRole }: Ser
         </DialogHeader>
         <div className="flex-1 py-4 overflow-hidden">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="docker" className="flex items-center gap-2">
                 <Dock className="h-4 w-4" /> Docker
               </TabsTrigger>
@@ -57,6 +58,9 @@ export function ServerDetailDialog({ open, onOpenChange, server, userRole }: Ser
               </TabsTrigger>
               <TabsTrigger value="weblinks" className="flex items-center gap-2">
                 <Link className="h-4 w-4" /> Web
+              </TabsTrigger>
+              <TabsTrigger value="stats" className="flex items-center gap-2">
+                <BarChartIcon className="h-4 w-4" /> Estadísticas
               </TabsTrigger>
             </TabsList>
             <div className="flex-1 overflow-hidden mt-4">
@@ -69,6 +73,9 @@ export function ServerDetailDialog({ open, onOpenChange, server, userRole }: Ser
                 </TabsContent>
                 <TabsContent value="weblinks" className="h-full">
                   <ServerDetailWebLinksTab serverId={server.id} />
+                </TabsContent>
+                <TabsContent value="stats" className="h-full">
+                  <ServerDetailStatsTab serverId={server.id} />
                 </TabsContent>
               </ScrollArea>
             </div>
