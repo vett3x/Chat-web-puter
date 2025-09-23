@@ -31,6 +31,29 @@ export function parseMemoryString(memString: string): number {
 }
 
 /**
+ * Parses a data size string (e.g., "1.23kB", "5.6MiB") into its value in bytes.
+ * Handles binary prefixes (KiB, MiB) and decimal-like prefixes (KB, MB).
+ * @param sizeString The data size string to parse.
+ * @returns The data size value in bytes, or 0 if parsing fails.
+ */
+export function parseDataSizeToBytes(sizeString: string): number {
+  if (!sizeString || typeof sizeString !== 'string') return 0;
+  const match = sizeString.trim().match(/^([0-9.]+)\s*([KMGT]?i?B)?$/i);
+  if (!match) return 0;
+
+  const value = parseFloat(match[1]);
+  const unit = (match[2] || 'B').toUpperCase();
+
+  if (unit.includes('K')) return value * 1024;
+  if (unit.includes('M')) return value * 1024 * 1024;
+  if (unit.includes('G')) return value * 1024 * 1024 * 1024;
+  if (unit.includes('T')) return value * 1024 * 1024 * 1024 * 1024;
+  
+  return value; // Assumes bytes if no unit or unknown
+}
+
+
+/**
  * Formats a memory value in MiB to a human-readable string (e.g., "1024 MiB" or "1.0 GiB").
  * @param mib The memory value in MiB.
  * @returns Formatted string.

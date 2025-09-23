@@ -13,4 +13,7 @@ export interface DockerContainerStat {
   serverId: string;
   serverName: string;
   serverIpAddress: string;
+  // Add calculated fields for real-time network rate
+  netRxRateKbps?: number;
+  netTxRateKbps?: number;
 }

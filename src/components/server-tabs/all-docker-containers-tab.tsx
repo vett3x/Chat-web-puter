@@ -15,6 +15,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from '@/lib/utils';
+import { parseDataSizeToBytes } from '@/lib/utils';
 
 const POLLING_INTERVAL = 5000; // Poll every 5 seconds
 
@@ -22,9 +23,13 @@ export function AllDockerContainersTab() {
   const [containerStats, setContainerStats] = useState<DockerContainerStat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [previousStats, setPreviousStats] = useState<Map<string, { netRxBytes: number; netTxBytes: number; timestamp: number }>>(new Map());
 
   const fetchAllDockerStats = useCallback(async () => {
-    setIsLoading(true);
+    // Don't set loading to true on silent refreshes, only on the first load.
+    if (containerStats.length === 0) {
+      setIsLoading(true);
+    }
     setError(null);
     try {
       const response = await fetch('/api/docker-stats');
@@ -33,7 +38,40 @@ export function AllDockerContainersTab() {
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
       const data: DockerContainerStat[] = await response.json();
-      setContainerStats(data);
+
+      const newPreviousStats = new Map<string, { netRxBytes: number; netTxBytes: number; timestamp: number }>();
+      const now = Date.now();
+
+      const processedData = data.map(stat => {
+        const [rxStr, txStr] = (stat['Net I/O'] || '0B / 0B').split(' / ');
+        const netRxBytes = parseDataSizeToBytes(rxStr);
+        const netTxBytes = parseDataSizeToBytes(txStr);
+
+        let netRxRateKbps = 0;
+        let netTxRateKbps = 0;
+
+        const prev = previousStats.get(stat.ID);
+        if (prev) {
+          const timeDiffSeconds = (now - prev.timestamp) / 1000;
+          if (timeDiffSeconds > 0) {
+            const rxRateBps = (netRxBytes - prev.netRxBytes) / timeDiffSeconds;
+            const txRateBps = (netTxBytes - prev.netTxBytes) / timeDiffSeconds;
+            netRxRateKbps = (rxRateBps * 8) / 1024;
+            netTxRateKbps = (txRateBps * 8) / 1024;
+          }
+        }
+
+        newPreviousStats.set(stat.ID, { netRxBytes, netTxBytes, timestamp: now });
+
+        return {
+          ...stat,
+          netRxRateKbps: netRxRateKbps < 0 ? 0 : netRxRateKbps,
+          netTxRateKbps: netTxRateKbps < 0 ? 0 : netTxRateKbps,
+        };
+      });
+
+      setContainerStats(processedData);
+      setPreviousStats(newPreviousStats);
     } catch (err: any) {
       console.error('Error fetching all Docker stats:', err);
       setError(err.message || 'Error al cargar las estadísticas de Docker.');
@@ -41,13 +79,19 @@ export function AllDockerContainersTab() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [previousStats, containerStats.length]);
 
   useEffect(() => {
     fetchAllDockerStats();
     const interval = setInterval(fetchAllDockerStats, POLLING_INTERVAL);
     return () => clearInterval(interval);
   }, [fetchAllDockerStats]);
+
+  const formatRate = (kbps: number | undefined) => {
+    if (kbps === undefined || kbps < 0) return '0 kbps';
+    if (kbps < 1024) return `${kbps.toFixed(1)} kbps`;
+    return `${(kbps / 1024).toFixed(1)} Mbps`;
+  };
 
   return (
     <Card className="h-full flex flex-col">
@@ -92,13 +136,13 @@ export function AllDockerContainersTab() {
                   <TableHead>Imagen</TableHead>
                   <TableHead>CPU</TableHead>
                   <TableHead>Memoria</TableHead>
-                  <TableHead>Red I/O</TableHead>
+                  <TableHead>Red (RX/TX)</TableHead>
                   <TableHead>Estado</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {containerStats.map((stat) => {
-                  const isRunning = stat.Status.includes('Up'); // Check if status indicates "Up"
+                  const isRunning = stat.Status.includes('Up');
                   return (
                     <TableRow key={`${stat.serverId}-${stat.ID}`} className={cn(
                       !isRunning && "text-muted-foreground opacity-70"
@@ -133,7 +177,18 @@ export function AllDockerContainersTab() {
                           </Tooltip>
                         </TooltipProvider>
                       </TableCell>
-                      <TableCell>{stat['Net I/O']}</TableCell>
+                      <TableCell>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span>{formatRate(stat.netRxRateKbps)} / {formatRate(stat.netTxRateKbps)}</span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Total I/O: {stat['Net I/O']}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
                       <TableCell>
                         {isRunning ? (
                           <span className="text-green-500">Activo</span>
