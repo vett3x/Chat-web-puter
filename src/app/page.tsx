@@ -187,26 +187,40 @@ export default function Home() {
 
   const writeFilesToApp = async (files: { path: string; content: string }[]) => {
     if (!selectedAppDetails?.id || files.length === 0) return;
-    toast.info(`Aplicando ${files.length} archivo(s) al proyecto...`);
-    try {
-      const promises = files.map(file =>
-        fetch(`/api/apps/${selectedAppDetails.id}/file`, {
+
+    const toastId = toast.loading(`Aplicando 0 de ${files.length} archivos...`);
+    let failedFiles: { path: string; content: string }[] = [];
+    let successfulCount = 0;
+
+    for (const file of files) {
+      try {
+        const response = await fetch(`/api/apps/${selectedAppDetails.id}/file`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(file),
-        })
-      );
-      const responses = await Promise.all(promises);
-      const failed = responses.filter(res => !res.ok);
-      if (failed.length > 0) {
-        throw new Error(`${failed.length} archivo(s) no se pudieron guardar.`);
+        });
+
+        if (!response.ok) {
+          const result = await response.json();
+          console.error(`Failed to save ${file.path}:`, result.message);
+          failedFiles.push(file);
+        } else {
+          successfulCount++;
+        }
+        toast.loading(`Aplicando ${successfulCount} de ${files.length} archivos...`, { id: toastId });
+      } catch (networkError) {
+        console.error(`Network error saving ${file.path}:`, networkError);
+        failedFiles.push(file);
       }
-      toast.success('¡Archivos aplicados! Actualizando vista previa...');
+    }
+
+    if (failedFiles.length > 0) {
+      toast.error(`${failedFiles.length} archivo(s) no se pudieron guardar.`, { id: toastId });
+      setRetryState({ isOpen: true, files: failedFiles }); // Retry only failed files
+    } else {
+      toast.success(`¡${successfulCount} archivo(s) aplicados! Actualizando vista previa...`, { id: toastId });
       refreshSidebarData();
       setTimeout(() => appBrowserRef.current?.refresh(), 1000);
-    } catch (error: any) {
-      toast.error(`Error al aplicar archivos: ${error.message}`);
-      setRetryState({ isOpen: true, files }); // Open retry dialog on failure
     }
   };
 
