@@ -39,6 +39,7 @@ export function ChatInterface({
     handleModelChange,
     sendMessage,
     regenerateLastResponse,
+    reapplyFilesFromMessage,
   } = useChat({
     userId,
     conversationId,
@@ -98,6 +99,7 @@ export function ChatInterface({
           isLoading={isLoading}
           aiResponseSpeed={aiResponseSpeed}
           onRegenerate={regenerateLastResponse}
+          onReapplyFiles={reapplyFilesFromMessage}
           appPrompt={appPrompt}
         />
         <ChatInput

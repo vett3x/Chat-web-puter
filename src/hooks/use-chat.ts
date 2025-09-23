@@ -405,6 +405,31 @@ export function useChat({
     }
   }, [isLoading, messages]);
 
+  const reapplyFilesFromMessage = async (message: Message) => {
+    if (!appId) {
+      toast.error("No hay un proyecto seleccionado para aplicar los archivos.");
+      return;
+    }
+
+    const content = message.content;
+    const filesToWrite: { path: string; content: string }[] = [];
+
+    if (Array.isArray(content)) {
+      content.forEach(part => {
+        const renderablePart = part as RenderablePart;
+        if (renderablePart.type === 'code' && renderablePart.filename && renderablePart.code) {
+          filesToWrite.push({ path: renderablePart.filename, content: renderablePart.code });
+        }
+      });
+    }
+
+    if (filesToWrite.length > 0) {
+      await writeFilesToApp(filesToWrite);
+    } else {
+      toast.info("No se encontraron archivos para aplicar en este mensaje.");
+    }
+  };
+
   return {
     messages,
     isLoading,
@@ -413,5 +438,6 @@ export function useChat({
     handleModelChange,
     sendMessage,
     regenerateLastResponse,
+    reapplyFilesFromMessage,
   };
 }

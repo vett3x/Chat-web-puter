@@ -2,7 +2,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Bot, User, Loader2, Clipboard, RefreshCw } from 'lucide-react';
+import { Bot, User, Loader2, Clipboard, RefreshCw, Upload } from 'lucide-react';
 import { MessageContent } from '@/components/message-content';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -30,6 +30,9 @@ interface Message {
   model?: string;
   isNew?: boolean;
   isTyping?: boolean;
+  timestamp: Date; // Added to fix type mismatch
+  conversation_id?: string; // Added for consistency
+  type?: 'text' | 'multimodal'; // Added for consistency
 }
 
 interface ChatMessagesProps {
@@ -37,10 +40,11 @@ interface ChatMessagesProps {
   isLoading: boolean;
   aiResponseSpeed: 'slow' | 'normal' | 'fast';
   onRegenerate: () => void;
+  onReapplyFiles: (message: Message) => void;
   appPrompt?: string | null;
 }
 
-export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerate, appPrompt }: ChatMessagesProps) {
+export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerate, onReapplyFiles, appPrompt }: ChatMessagesProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -88,6 +92,8 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
         ) : (
           messages.map((message, index) => {
             const isLastMessage = index === messages.length - 1;
+            const hasFiles = Array.isArray(message.content) && message.content.some(part => (part as any).type === 'code' && (part as any).filename);
+
             return (
               <div
                 key={message.id}
@@ -120,6 +126,11 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopy(message.content)} title="Copiar">
                         <Clipboard className="h-3.5 w-3.5" />
                       </Button>
+                      {hasFiles && (
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onReapplyFiles(message)} disabled={isLoading} title="Reaplicar archivos">
+                          <Upload className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                       {isLastMessage && (
                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onRegenerate} disabled={isLoading} title="Regenerar">
                           <RefreshCw className="h-3.5 w-3.5" />
