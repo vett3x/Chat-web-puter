@@ -115,9 +115,10 @@ export async function GET(
   }
 
   try {
-    const cpuCommand = `top -bn1 | grep "Cpu(s)" | sed "s/.*, *\\([0-9.]*\\)%* id.*/\\1/" | awk '{print 100 - $1}'`;
-    const memCommand = `free -m | grep Mem | awk '{print $3" "$2}'`; // Used Total in MiB
-    const diskCommand = `df -h / | grep / | awk '{print $5}'`; // Usage %
+    // More robust, locale-independent commands
+    const cpuCommand = `LC_ALL=C top -bn1 | grep "Cpu(s)" | sed "s/.*, *\\([0-9.]*\\)%* id.*/\\1/" | awk '{print 100 - $1}'`;
+    const memCommand = `LC_ALL=C free -m | awk '/^Mem:/{print $3, $2}'`;
+    const diskCommand = `LC_ALL=C df -h / | awk 'NR==2{print $5}'`;
 
     const [cpuOutput, memOutput, diskOutput] = await Promise.all([
       executeSshCommand(server, cpuCommand),
