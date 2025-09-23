@@ -22,10 +22,12 @@ interface Note {
 
 interface NoteEditorPanelProps {
   noteId: string;
-  onNoteUpdated: () => void; // Callback to refresh sidebar
+  onNoteUpdated: () => void;
+  noteFontSize: number;
+  noteAutoSave: boolean;
 }
 
-export function NoteEditorPanel({ noteId, onNoteUpdated }: NoteEditorPanelProps) {
+export function NoteEditorPanel({ noteId, onNoteUpdated, noteFontSize, noteAutoSave }: NoteEditorPanelProps) {
   const { session } = useSession();
   const [note, setNote] = useState<Note | null>(null);
   const [title, setTitle] = useState('');
@@ -59,8 +61,8 @@ export function NoteEditorPanel({ noteId, onNoteUpdated }: NoteEditorPanelProps)
     fetchNote();
   }, [fetchNote]);
 
-  const handleSave = async () => {
-    if (!note) return;
+  const handleSave = useCallback(async () => {
+    if (!note || isSaving) return;
     setIsSaving(true);
     const { error } = await supabase
       .from('notes')
@@ -71,11 +73,30 @@ export function NoteEditorPanel({ noteId, onNoteUpdated }: NoteEditorPanelProps)
       toast.error('Error al guardar la nota.');
     } else {
       toast.success('Nota guardada.');
-      onNoteUpdated(); // Refresh sidebar to show new title
-      fetchNote(); // Re-fetch to update state
+      onNoteUpdated();
+      setNote(prev => prev ? { ...prev, title, content, updated_at: new Date().toISOString() } : null);
     }
     setIsSaving(false);
-  };
+  }, [note, title, content, isSaving, onNoteUpdated]);
+
+  useEffect(() => {
+    if (!noteAutoSave || isSaving || isLoading || !note) {
+      return;
+    }
+
+    const hasChanges = title !== note.title || content !== (note.content || '');
+    if (!hasChanges) {
+      return;
+    }
+
+    const handler = setTimeout(() => {
+      handleSave();
+    }, 2000);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [title, content, note, noteAutoSave, isSaving, isLoading, handleSave]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
@@ -130,7 +151,7 @@ export function NoteEditorPanel({ noteId, onNoteUpdated }: NoteEditorPanelProps)
               placeholder="Escribe tu nota en Markdown..."
               padding={16}
               style={{
-                fontSize: 16,
+                fontSize: noteFontSize,
                 backgroundColor: "hsl(var(--background))",
                 fontFamily: 'var(--font-geist-mono)',
                 height: '100%',

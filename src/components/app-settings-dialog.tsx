@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader2, Save, KeyRound, Trash2, Gauge } from 'lucide-react';
+import { Loader2, Save, KeyRound, Trash2, Gauge, FileText } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -42,6 +42,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 
 // Schemas para los formularios
 const changePasswordSchema = z.object({
@@ -55,10 +56,23 @@ interface AppSettingsDialogProps {
   onOpenChange: (open: boolean) => void;
   aiResponseSpeed: 'slow' | 'normal' | 'fast';
   onAiResponseSpeedChange: (speed: 'slow' | 'normal' | 'fast') => void;
+  noteFontSize: number;
+  onNoteFontSizeChange: (size: number) => void;
+  noteAutoSave: boolean;
+  onNoteAutoSaveChange: (enabled: boolean) => void;
 }
 
-export function AppSettingsDialog({ open, onOpenChange, aiResponseSpeed, onAiResponseSpeedChange }: AppSettingsDialogProps) {
-  const { session, isLoading: isSessionLoading } = useSession(); // Removed isSuperUser
+export function AppSettingsDialog({
+  open,
+  onOpenChange,
+  aiResponseSpeed,
+  onAiResponseSpeedChange,
+  noteFontSize,
+  onNoteFontSizeChange,
+  noteAutoSave,
+  onNoteAutoSaveChange,
+}: AppSettingsDialogProps) {
+  const { session, isLoading: isSessionLoading } = useSession();
   const router = useRouter();
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -70,10 +84,9 @@ export function AppSettingsDialog({ open, onOpenChange, aiResponseSpeed, onAiRes
     },
   });
 
-  // Redirect if not authenticated and dialog is open
   useEffect(() => {
     if (open && !isSessionLoading && !session) {
-      onOpenChange(false); // Close dialog
+      onOpenChange(false);
       router.push('/login');
     }
   }, [session, isSessionLoading, router, open, onOpenChange]);
@@ -105,18 +118,9 @@ export function AppSettingsDialog({ open, onOpenChange, aiResponseSpeed, onAiRes
 
     setIsDeletingAccount(true);
     try {
-      // In a real application, you would typically disable the user or mark them for deletion
-      // and then have an admin process the actual deletion, or use a Supabase Edge Function
-      // with service_role key to delete the user from auth.users.
-      // For this example, we'll simulate a client-side deletion attempt.
-      // NOTE: Supabase client-side `deleteUser` is not directly available or recommended for security.
-      // A server-side function (Edge Function) is required to delete a user from `auth.users`.
-      // Here, we'll just sign out and inform the user.
-
-      // Sign out the user first
       await supabase.auth.signOut();
       toast.success('Tu cuenta ha sido marcada para eliminación. Se cerrará tu sesión.');
-      router.push('/login'); // Redirect to login after "deletion"
+      router.push('/login');
     } catch (error: any) {
       console.error('Error deleting account:', error.message);
       toast.error(`Error al eliminar la cuenta: ${error.message}`);
@@ -126,7 +130,7 @@ export function AppSettingsDialog({ open, onOpenChange, aiResponseSpeed, onAiRes
   };
 
   if (isSessionLoading || !session) {
-    return null; // Don't render dialog content if session is loading or not present
+    return null;
   }
 
   return (
@@ -158,11 +162,7 @@ export function AppSettingsDialog({ open, onOpenChange, aiResponseSpeed, onAiRes
                   )}
                 />
                 <Button type="submit" disabled={isChangingPassword}>
-                  {isChangingPassword ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Save className="mr-2 h-4 w-4" />
-                  )}
+                  {isChangingPassword ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                   Actualizar Contraseña
                 </Button>
               </form>
@@ -176,24 +176,42 @@ export function AppSettingsDialog({ open, onOpenChange, aiResponseSpeed, onAiRes
             <h3 className="text-lg font-semibold flex items-center gap-2 mb-3">
               <Gauge className="h-5 w-5 text-muted-foreground" /> Velocidad de Respuesta de la IA
             </h3>
-            <RadioGroup
-              value={aiResponseSpeed}
-              onValueChange={(value: 'slow' | 'normal' | 'fast') => onAiResponseSpeedChange(value)}
-              className="flex flex-col space-y-2"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="slow" id="speed-slow" />
-                <Label htmlFor="speed-slow">Lenta</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="normal" id="speed-normal" />
-                <Label htmlFor="speed-normal">Normal</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="fast" id="speed-fast" />
-                <Label htmlFor="speed-fast">Rápida</Label>
-              </div>
+            <RadioGroup value={aiResponseSpeed} onValueChange={(value: 'slow' | 'normal' | 'fast') => onAiResponseSpeedChange(value)} className="flex flex-col space-y-2">
+              <div className="flex items-center space-x-2"><RadioGroupItem value="slow" id="speed-slow" /><Label htmlFor="speed-slow">Lenta</Label></div>
+              <div className="flex items-center space-x-2"><RadioGroupItem value="normal" id="speed-normal" /><Label htmlFor="speed-normal">Normal</Label></div>
+              <div className="flex items-center space-x-2"><RadioGroupItem value="fast" id="speed-fast" /><Label htmlFor="speed-fast">Rápida</Label></div>
             </RadioGroup>
+          </div>
+
+          <Separator />
+
+          {/* Note Settings Section */}
+          <div>
+            <h3 className="text-lg font-semibold flex items-center gap-2 mb-3">
+              <FileText className="h-5 w-5 text-muted-foreground" /> Configuración de Notas
+            </h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="note-font-size">Tamaño de Fuente del Editor</Label>
+                <Input
+                  id="note-font-size"
+                  type="number"
+                  value={noteFontSize}
+                  onChange={(e) => onNoteFontSizeChange(Number(e.target.value))}
+                  className="w-20"
+                  min={10}
+                  max={24}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="note-auto-save">Guardado Automático</Label>
+                <Switch
+                  id="note-auto-save"
+                  checked={noteAutoSave}
+                  onCheckedChange={onNoteAutoSaveChange}
+                />
+              </div>
+            </div>
           </div>
 
           <Separator />
@@ -207,37 +225,16 @@ export function AppSettingsDialog({ open, onOpenChange, aiResponseSpeed, onAiRes
               Esta acción es irreversible. Todos tus datos de usuario y conversaciones serán eliminados permanentemente.
             </p>
             <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" disabled={isDeletingAccount}>
-                  {isDeletingAccount ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="mr-2 h-4 w-4" />
-                  )}
-                  Eliminar mi cuenta
-                </Button>
-              </AlertDialogTrigger>
+              <AlertDialogTrigger asChild><Button variant="destructive" disabled={isDeletingAccount}>{isDeletingAccount ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />} Eliminar mi cuenta</Button></AlertDialogTrigger>
               <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta acción no se puede deshacer. Esto eliminará permanentemente tu cuenta y todos tus datos.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                    Sí, eliminar mi cuenta
-                  </AlertDialogAction>
-                </AlertDialogFooter>
+                <AlertDialogHeader><AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. Esto eliminará permanentemente tu cuenta y todos tus datos.</AlertDialogDescription></AlertDialogHeader>
+                <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Sí, eliminar mi cuenta</AlertDialogAction></AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
           </div>
         </div>
         <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Cerrar</Button>
-          </DialogClose>
+          <DialogClose asChild><Button variant="outline">Cerrar</Button></DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>
