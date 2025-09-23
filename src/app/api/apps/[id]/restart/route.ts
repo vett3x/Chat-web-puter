@@ -40,13 +40,15 @@ export async function POST(req: NextRequest, context: any) {
     
     const restartAppCommand = `cd /app && nohup npm run dev -- -p ${tunnel?.container_port || 3000} > /app/dev.log 2>&1 &`;
     
-    let fullCommand = `docker exec ${app.container_id} sh -c "${killCommands} && ${restartAppCommand}"`;
+    let commandsToRunInShell = `${killCommands}; ${restartAppCommand}`;
 
     // Si hay un túnel, también lo reiniciamos
     if (tunnel && tunnel.tunnel_id && tunnel.tunnel_secret) {
       const restartTunnelCommand = `nohup cloudflared tunnel run --token ${tunnel.tunnel_secret} ${tunnel.tunnel_id} > /app/cloudflared.log 2>&1 &`;
-      fullCommand = `docker exec ${app.container_id} sh -c "${killCommands} && ${restartAppCommand} && ${restartTunnelCommand}"`;
+      commandsToRunInShell = `${killCommands}; ${restartAppCommand}; ${restartTunnelCommand}`;
     }
+
+    const fullCommand = `docker exec ${app.container_id} sh -c "${commandsToRunInShell}"`;
 
     const { stderr, code } = await executeSshCommand(server, fullCommand);
 
