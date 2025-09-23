@@ -1,10 +1,12 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Loader2, Folder, Server, Users, Wand2, FileText } from 'lucide-react';
+import { Plus, Loader2, Folder, Server, Users, Wand2, FileText, ShieldAlert } from 'lucide-react';
 import { ProfileDropdown } from './profile-dropdown';
 import { useSession } from './session-context-provider';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface SidebarHeaderProps {
   onNewConversation: () => void;
@@ -35,6 +37,35 @@ export function SidebarHeader({
 }: SidebarHeaderProps) {
   const { userRole } = useSession();
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+  const [hasNewErrorTickets, setHasNewErrorTickets] = useState(false);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const channel = supabase
+      .channel('error-tickets-channel')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'error_tickets' },
+        (payload) => {
+          console.log('New error ticket received:', payload.new);
+          setHasNewErrorTickets(true);
+          toast.warning('Nuevo ticket de error de usuario registrado.', {
+            description: 'Un usuario ha encontrado un error con la IA. Revisa la gestión de usuarios para más detalles.',
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isAdmin]);
+
+  const handleOpenUserManagementAndClearNotification = () => {
+    setHasNewErrorTickets(false);
+    onOpenUserManagement();
+  };
 
   return (
     <>
@@ -114,10 +145,16 @@ export function SidebarHeader({
             <Button
               variant="outline"
               size="icon"
-              onClick={onOpenUserManagement}
-              className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7"
+              onClick={handleOpenUserManagementAndClearNotification}
+              className="relative text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7"
               title="Gestión de Usuarios"
             >
+              {hasNewErrorTickets && (
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                </span>
+              )}
               <Users className="h-3.5 w-3.5" />
             </Button>
           )}

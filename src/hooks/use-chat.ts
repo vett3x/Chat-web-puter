@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useSession } from '@/components/session-context-provider';
 
 // Define types
 interface PuterTextContentPart {
@@ -108,6 +109,7 @@ export function useChat({
   appId,
   onFilesWritten,
 }: UseChatProps) {
+  const { userRole } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isPuterReady, setIsPuterReady] = useState(false);
@@ -244,10 +246,6 @@ export function useChat({
     setMessages(prev => [...prev, { id: tempTypingId, role: 'assistant', content: '', isTyping: true, timestamp: new Date() }]);
 
     try {
-      if (!window.puter || !window.puter.ai) {
-        throw new Error('Puter AI client no está disponible.');
-      }
-
       const puterMessages: PuterMessage[] = history.map(msg => ({
         role: msg.role,
         content: msg.content,
@@ -272,7 +270,7 @@ export function useChat({
       }
 
       const response = await window.puter.ai.chat([systemMessage, ...puterMessages], { model: selectedModel });
-      if (!response || response.error) throw new Error(response?.error?.message || 'Error de la IA.');
+      if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
 
       const assistantMessageContent = response?.message?.content || 'Sin contenido.';
       
@@ -297,7 +295,7 @@ export function useChat({
       setMessages(prev => prev.filter(m => m.id !== tempTypingId));
 
       const assistantMessageData = {
-        content: parts as any, // Cast to any to match DB type, MessageContent will handle it
+        content: parts as any,
         role: 'assistant' as const,
         model: selectedModel,
         type: 'multimodal' as const,
@@ -315,21 +313,29 @@ export function useChat({
       }
 
     } catch (error: any) {
-      console.error("[useChat] Full error object:", error);
-      let errorMessage = 'Ocurrió un error desconocido.';
-      if (error?.message) {
-        errorMessage = error.message;
-      } else if (typeof error === 'string' && error) {
-        errorMessage = error;
-      } else if (typeof error === 'object' && error !== null) {
-        try {
-          errorMessage = JSON.stringify(error);
-        } catch (e) { /* ignore */ }
+      let rawError = error;
+      try {
+        rawError = JSON.parse(error.message);
+      } catch (e) { /* No es un JSON, lo dejamos como está */ }
+
+      let errorMessageForDisplay: string;
+      const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+
+      if (isAdmin) {
+        errorMessageForDisplay = `Error: ${error.message}`;
+      } else {
+        errorMessageForDisplay = 'Error con la IA, se ha enviado un ticket automático.';
+        // Enviar ticket a la API
+        fetch('/api/error-tickets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error_message: rawError, conversation_id: convId }),
+        }).catch(apiError => console.error("Failed to submit error ticket:", apiError));
       }
 
-      toast.error(errorMessage);
+      toast.error(errorMessageForDisplay);
       setMessages(prev => prev.filter(m => m.id !== tempTypingId));
-      setMessages(prev => [...prev, { id: `error-${Date.now()}`, role: 'assistant', content: `Error: ${errorMessage}`, isNew: true, timestamp: new Date() }]);
+      setMessages(prev => [...prev, { id: `error-${Date.now()}`, role: 'assistant', content: errorMessageForDisplay, isNew: true, timestamp: new Date() }]);
     } finally {
       setIsLoading(false);
     }
