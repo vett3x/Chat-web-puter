@@ -10,6 +10,11 @@ import { AppSettingsDialog } from "@/components/app-settings-dialog";
 import { ServerManagementDialog } from "@/components/server-management-dialog";
 import { UserManagementDialog } from "@/components/user-management-dialog";
 import { DeepAiCoderDialog } from "@/components/deep-ai-coder-dialog";
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -127,25 +132,24 @@ export default function Home() {
           {sidebar}
         </div>
         
-        {/* Main content area (flexible) */}
-        <div className="flex flex-1 min-w-0">
-          {/* Chat Panel */}
-          <div className="flex-1 min-w-0">
-            {chat}
-          </div>
-
-          {/* App Preview Panel (conditional) */}
-          {selectedItem?.type === 'app' && (
-            <>
-              <div className="h-full w-px bg-border" />
-              <div className="w-[40%] min-w-[400px] flex-shrink-0">
-                <AppPreviewPanel 
-                  appUrl={selectedAppDetails?.url || null}
-                  appStatus={selectedAppDetails?.status || null}
-                />
-              </div>
-            </>
-          )}
+        {/* Main content area (flexible and resizable) */}
+        <div className="flex-1 min-w-0">
+          <ResizablePanelGroup direction="horizontal">
+            <ResizablePanel defaultSize={selectedItem?.type === 'app' ? 60 : 100} minSize={30}>
+              {chat}
+            </ResizablePanel>
+            {selectedItem?.type === 'app' && (
+              <>
+                <ResizableHandle withHandle />
+                <ResizablePanel defaultSize={40} minSize={20}>
+                  <AppPreviewPanel 
+                    appUrl={selectedAppDetails?.url || null}
+                    appStatus={selectedAppDetails?.status || null}
+                  />
+                </ResizablePanel>
+              </>
+            )}
+          </ResizablePanelGroup>
         </div>
       </div>
     );
