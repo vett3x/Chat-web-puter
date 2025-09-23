@@ -6,13 +6,12 @@ import { useSession } from '@/components/session-context-provider';
 import { Loader2, MessageSquare, ChevronRight, ChevronDown, Wand2, Code, FileText, Folder as FolderIcon } from 'lucide-react';
 import { SidebarHeader } from './sidebar-header';
 import { useSidebarData } from '@/hooks/use-sidebar-data';
-import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
 import { DraggableFolderItem } from './draggable-folder-item';
 import { DraggableConversationCard } from './draggable-conversation-card';
-import { DraggableNoteItem } from './draggable-note-item'; // Import the new component
+import { DraggableNoteItem } from './draggable-note-item';
+import { DraggableAppItem } from './draggable-app-item'; // Import the new component
 import { toast } from 'sonner';
 import { FileTree } from './file-tree';
 
@@ -59,6 +58,7 @@ export function ConversationSidebar({
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
+  const [isDeletingApp, setIsDeletingApp] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState({
     apps: true,
     chats: true,
@@ -84,6 +84,24 @@ export function ConversationSidebar({
     setIsCreatingNote(true);
     await createNote((newItem) => onSelectItem(newItem.id, 'note'));
     setIsCreatingNote(false);
+  };
+
+  const handleDeleteApp = async (appId: string) => {
+    setIsDeletingApp(appId);
+    try {
+      const response = await fetch(`/api/apps/${appId}`, { method: 'DELETE' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message);
+      toast.success(result.message);
+      if (selectedItem?.id === appId) {
+        onSelectItem(null, null);
+      }
+      await fetchData();
+    } catch (error: any) {
+      toast.error(`Error al eliminar el proyecto: ${error.message}`);
+    } finally {
+      setIsDeletingApp(null);
+    }
   };
 
   const handleDragStart = (e: React.DragEvent, id: string, type: 'conversation' | 'note' | 'folder') => {
@@ -142,9 +160,13 @@ export function ConversationSidebar({
             <>
               {renderSection("Proyectos", <Wand2 className="h-4 w-4" />, "apps", apps.map(app => (
                 <div key={app.id}>
-                  <Card className={cn("cursor-pointer hover:bg-sidebar-accent", selectedItem?.type === 'app' && selectedItem.id === app.id && "bg-sidebar-primary text-sidebar-primary-foreground")} onClick={() => onSelectItem(app.id, 'app')}>
-                    <CardContent className="py-1 px-1.5 flex items-center gap-1"><Code className="h-3 w-3 ml-2" /><span className="text-xs truncate">{app.name}</span></CardContent>
-                  </Card>
+                  <DraggableAppItem
+                    app={app}
+                    selected={selectedItem?.type === 'app' && selectedItem.id === app.id}
+                    onSelect={() => onSelectItem(app.id, 'app')}
+                    onDelete={handleDeleteApp}
+                    isDeleting={isDeletingApp === app.id}
+                  />
                   {selectedItem?.type === 'app' && selectedItem.id === app.id && <div className="border-l-2 border-sidebar-primary ml-2"><FileTree appId={app.id} onFileSelect={onFileSelect} /></div>}
                 </div>
               )))}

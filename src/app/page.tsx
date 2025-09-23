@@ -20,7 +20,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import { useSidebarData } from "@/hooks/use-sidebar-data"; // Import the hook
+import { useSidebarData } from "@/hooks/use-sidebar-data";
 
 interface UserApp {
   id: string;
@@ -41,12 +41,12 @@ interface ActiveFile {
   content: string;
 }
 
-type RightPanelView = 'chat' | 'editor' | 'preview' | 'note';
+type RightPanelView = 'editor' | 'preview';
 
 export default function Home() {
   const { session, isLoading: isSessionLoading, userRole } = useSession();
   const userId = session?.user?.id;
-  const { fetchData: refreshSidebarData } = useSidebarData(); // Get the refresh function
+  const { fetchData: refreshSidebarData } = useSidebarData();
 
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   const [selectedAppDetails, setSelectedAppDetails] = useState<UserApp | null>(null);
@@ -64,7 +64,7 @@ export default function Home() {
     return 'normal';
   });
 
-  const [rightPanelView, setRightPanelView] = useState<RightPanelView>('chat');
+  const [rightPanelView, setRightPanelView] = useState<RightPanelView>('preview');
   const [activeFile, setActiveFile] = useState<ActiveFile | null>(null);
   const [isFileLoading, setIsFileLoading] = useState(false);
 
@@ -105,7 +105,7 @@ export default function Home() {
 
   const handleSelectItem = useCallback(async (id: string | null, type: SelectedItem['type'] | null) => {
     setActiveFile(null);
-    setRightPanelView('chat');
+    setRightPanelView('preview');
 
     if (!id || !type) {
       setSelectedItem(null);
@@ -121,17 +121,9 @@ export default function Home() {
       }
       setSelectedAppDetails(data);
       setSelectedItem({ id, type, conversationId: data.conversation_id });
-      setRightPanelView('preview');
-    } else if (type === 'conversation') {
-      setSelectedAppDetails(null);
-      setSelectedItem({ id, type, conversationId: id });
-      setRightPanelView('chat');
-    } else if (type === 'note') {
-      setSelectedAppDetails(null);
-      setSelectedItem({ id, type, conversationId: null });
-      setRightPanelView('note');
     } else {
-      setSelectedItem({ id, type, conversationId: null });
+      setSelectedAppDetails(null);
+      setSelectedItem({ id, type, conversationId: type === 'conversation' ? id : null });
     }
   }, [userId]);
 
@@ -156,6 +148,7 @@ export default function Home() {
   };
 
   const handleAppCreated = (newApp: UserApp) => {
+    refreshSidebarData();
     handleSelectItem(newApp.id, 'app');
   };
 
@@ -171,52 +164,58 @@ export default function Home() {
 
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
 
-  const renderRightPanel = () => {
+  const renderRightPanelContent = () => {
     if (isFileLoading) {
       return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
     }
     if (rightPanelView === 'editor' && activeFile && selectedItem?.type === 'app') {
       return <CodeEditorPanel appId={selectedItem.id} file={activeFile} onClose={() => { setActiveFile(null); setRightPanelView('preview'); }} onSwitchToPreview={() => setRightPanelView('preview')} />;
     }
-    if (rightPanelView === 'preview' && selectedItem?.type === 'app') {
-      return <AppPreviewPanel appUrl={selectedAppDetails?.url || null} appStatus={selectedAppDetails?.status || null} />;
-    }
-    if (rightPanelView === 'note' && selectedItem?.type === 'note') {
-      return <NoteEditorPanel noteId={selectedItem.id} onNoteUpdated={refreshSidebarData} />;
-    }
-    return (
-      <ChatInterface
-        userId={userId}
-        conversationId={selectedItem?.conversationId || null}
-        onNewConversationCreated={handleNewConversationCreated}
-        onConversationTitleUpdate={(id, newTitle) => {}}
-        aiResponseSpeed={aiResponseSpeed}
-      />
-    );
+    return <AppPreviewPanel appUrl={selectedAppDetails?.url || null} appStatus={selectedAppDetails?.status || null} />;
   };
 
   return (
     <div className="h-screen bg-background flex">
-      <div className="w-[320px] flex-shrink-0">
-        <ConversationSidebar
-          selectedItem={selectedItem}
-          onSelectItem={handleSelectItem}
-          onFileSelect={handleFileSelect}
-          onOpenProfileSettings={handleOpenProfileSettings}
-          onOpenAppSettings={handleOpenAppSettings}
-          onOpenServerManagement={handleOpenServerManagement}
-          onOpenUserManagement={handleOpenUserManagement}
-          onOpenDeepAiCoder={handleOpenDeepAiCoder}
-        />
-      </div>
-      
-      <div className="flex-1 min-w-0">
-        <ResizablePanelGroup direction="horizontal">
-          <ResizablePanel defaultSize={100} minSize={30}>
-            {renderRightPanel()}
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      </div>
+      <ResizablePanelGroup direction="horizontal">
+        <ResizablePanel defaultSize={20} minSize={15} maxSize={30}>
+          <ConversationSidebar
+            selectedItem={selectedItem}
+            onSelectItem={handleSelectItem}
+            onFileSelect={handleFileSelect}
+            onOpenProfileSettings={handleOpenProfileSettings}
+            onOpenAppSettings={handleOpenAppSettings}
+            onOpenServerManagement={handleOpenServerManagement}
+            onOpenUserManagement={handleOpenUserManagement}
+            onOpenDeepAiCoder={handleOpenDeepAiCoder}
+          />
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel defaultSize={80} minSize={30}>
+          {selectedItem?.type === 'note' ? (
+            <NoteEditorPanel noteId={selectedItem.id} onNoteUpdated={refreshSidebarData} />
+          ) : (
+            <ResizablePanelGroup direction="horizontal">
+              <ResizablePanel defaultSize={50} minSize={30}>
+                <ChatInterface
+                  userId={userId}
+                  conversationId={selectedItem?.conversationId || null}
+                  onNewConversationCreated={handleNewConversationCreated}
+                  onConversationTitleUpdate={(id, newTitle) => {}}
+                  aiResponseSpeed={aiResponseSpeed}
+                />
+              </ResizablePanel>
+              {selectedItem?.type === 'app' && (
+                <>
+                  <ResizableHandle withHandle />
+                  <ResizablePanel defaultSize={50} minSize={30}>
+                    {renderRightPanelContent()}
+                  </ResizablePanel>
+                </>
+              )}
+            </ResizablePanelGroup>
+          )}
+        </ResizablePanel>
+      </ResizablePanelGroup>
 
       <ProfileSettingsDialog open={isProfileSettingsOpen} onOpenChange={setIsProfileSettingsOpen} />
       <AppSettingsDialog

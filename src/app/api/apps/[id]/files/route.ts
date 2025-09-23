@@ -42,7 +42,7 @@ function buildFileTree(paths: string[]): FileNode[] {
   return root.children || [];
 }
 
-export async function GET(req: NextRequest, context: { params: { id: string } }) {
+export async function GET(req: NextRequest, context: any) {
   const appId = context.params.id;
   const cookieStore = cookies() as any;
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { cookies: { get: (name: string) => cookieStore.get(name)?.value } });

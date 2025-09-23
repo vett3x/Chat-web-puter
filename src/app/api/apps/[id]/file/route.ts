@@ -18,7 +18,7 @@ async function getUserId() {
 }
 
 // GET: Leer contenido de un archivo
-export async function GET(req: NextRequest, context: { params: { id: string } }) {
+export async function GET(req: NextRequest, context: any) {
   const appId = context.params.id;
   const { searchParams } = new URL(req.url);
   const filePath = searchParams.get('path');
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest, context: { params: { id: string } })
 }
 
 // POST: Escribir contenido en un archivo Y respaldarlo en la DB
-export async function POST(req: NextRequest, context: { params: { id: string } }) {
+export async function POST(req: NextRequest, context: any) {
   const appId = context.params.id;
   
   try {
