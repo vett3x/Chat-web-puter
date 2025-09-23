@@ -8,6 +8,7 @@ import { provisionApp } from '@/lib/app-provisioning';
 
 const createAppSchema = z.object({
   name: z.string().min(3, { message: 'El nombre del proyecto debe tener al menos 3 caracteres.' }).max(50),
+  prompt: z.string().min(10, { message: 'La descripción debe tener al menos 10 caracteres.' }),
 });
 
 export async function POST(req: NextRequest) {
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { name } = createAppSchema.parse(body);
+    const { name, prompt } = createAppSchema.parse(body);
 
     // 1. Create a conversation for the app
     const { data: conversation, error: convError } = await supabase
@@ -50,6 +51,7 @@ export async function POST(req: NextRequest) {
         name: name,
         conversation_id: conversation.id,
         status: 'provisioning',
+        prompt: prompt, // Save the prompt
       })
       .select('*')
       .single();
@@ -61,6 +63,7 @@ export async function POST(req: NextRequest) {
       userId: userId,
       appName: newApp.name,
       conversationId: newApp.conversation_id!,
+      prompt: prompt, // Pass the prompt
     });
 
     // 4. Return the newly created app data immediately

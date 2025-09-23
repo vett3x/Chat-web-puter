@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea'; // Importar Textarea
 import { Wand2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -32,12 +33,13 @@ interface DeepAiCoderDialogProps {
 
 export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCoderDialogProps) {
   const [projectName, setProjectName] = useState('');
+  const [projectPrompt, setProjectPrompt] = useState(''); // Nuevo estado para el prompt
   const [isGenerating, setIsGenerating] = useState(false);
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!projectName.trim()) {
-      toast.error('Por favor, dale un nombre a tu proyecto.');
+    if (!projectName.trim() || !projectPrompt.trim()) {
+      toast.error('Por favor, completa el nombre y la descripción del proyecto.');
       return;
     }
     setIsGenerating(true);
@@ -45,7 +47,7 @@ export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCo
       const response = await fetch('/api/apps/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: projectName }),
+        body: JSON.stringify({ name: projectName, prompt: projectPrompt }), // Enviar también el prompt
       });
       const newApp = await response.json();
       if (!response.ok) {
@@ -55,6 +57,7 @@ export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCo
       onAppCreated(newApp);
       onOpenChange(false);
       setProjectName('');
+      setProjectPrompt('');
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -70,21 +73,36 @@ export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCo
             <Wand2 className="h-6 w-6 text-primary-light-purple" /> Nuevo Proyecto DeepAI Coder
           </DialogTitle>
           <DialogDescription>
-            Dale un nombre a tu aplicación. La IA generará el código, lo desplegará en un contenedor Docker y lo pondrá en línea por ti.
+            Describe tu aplicación. La IA generará el código, lo desplegará en un contenedor Docker y lo pondrá en línea por ti.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleGenerate}>
-          <div className="py-4">
-            <Label htmlFor="project-name" className="text-left mb-2 block">
-              Nombre del Proyecto
-            </Label>
-            <Input
-              id="project-name"
-              placeholder="Ej: 'Mi Tienda Gamer'"
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-              disabled={isGenerating}
-            />
+        <form onSubmit={handleGenerate} className="space-y-4">
+          <div className="py-4 space-y-4">
+            <div>
+              <Label htmlFor="project-name" className="text-left mb-2 block">
+                Nombre del Proyecto
+              </Label>
+              <Input
+                id="project-name"
+                placeholder="Ej: 'Mi Tienda Gamer'"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                disabled={isGenerating}
+              />
+            </div>
+            <div>
+              <Label htmlFor="project-prompt" className="text-left mb-2 block">
+                Describe tu aplicación
+              </Label>
+              <Textarea
+                id="project-prompt"
+                placeholder="Ej: 'Una landing page para una tienda de artículos gamer con una sección de productos destacados y un formulario de contacto.'"
+                value={projectPrompt}
+                onChange={(e) => setProjectPrompt(e.target.value)}
+                disabled={isGenerating}
+                rows={4}
+              />
+            </div>
           </div>
           <DialogFooter>
             <DialogClose asChild>

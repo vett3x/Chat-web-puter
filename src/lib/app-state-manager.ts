@@ -53,7 +53,7 @@ export async function getAppAndServerWithStateCheck(appId: string, userId: strin
 
     // 2. Handle different states
     if (app.status === 'hibernated') {
-        await restoreAppFromArchive(app.id, userId, app.name, app.conversation_id!);
+        await restoreAppFromArchive(app.id, userId, app.name, app.conversation_id!, app.prompt || '');
         // Re-fetch app data as it has changed
         const { data: restoredApp, error: restoredAppError } = await supabaseAdmin.from('user_apps').select('*, user_servers(*)').eq('id', appId).single();
         if (restoredAppError || !restoredApp || !restoredApp.user_servers) throw new Error('No se pudo obtener la información del servidor después de la restauración.');
@@ -87,9 +87,9 @@ export async function getAppAndServerWithStateCheck(appId: string, userId: strin
     return { app, server: app.user_servers as any };
 }
 
-async function restoreAppFromArchive(appId: string, userId: string, appName: string, conversationId: string) {
+async function restoreAppFromArchive(appId: string, userId: string, appName: string, conversationId: string, prompt: string) {
     // 1. Re-provision the app (creates container, installs deps, creates tunnel)
-    await provisionApp({ appId, userId, appName, conversationId });
+    await provisionApp({ appId, userId, appName, conversationId, prompt });
 
     // 2. Get the new container and server details
     const { data: appDetails, error: appDetailsError } = await supabaseAdmin.from('user_apps').select('container_id, user_servers(*)').eq('id', appId).single();
