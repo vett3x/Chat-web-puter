@@ -6,12 +6,13 @@ import { useSession } from '@/components/session-context-provider';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Save, Loader2, Eye, Code } from 'lucide-react';
+import { Save, Loader2, Eye, Code, Wand2 } from 'lucide-react';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import CodeEditor from '@uiw/react-textarea-code-editor';
+import { NoteAiChat } from './note-ai-chat'; // Import the new component
 
 interface Note {
   id: string;
@@ -35,6 +36,7 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, noteFontSize, noteAutoS
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [viewMode, setViewMode] = useState<'editor' | 'split' | 'preview'>('editor');
+  const [isAiChatOpen, setIsAiChatOpen] = useState(false); // State for the AI chat
 
   const fetchNote = useCallback(async () => {
     if (!session?.user?.id || !noteId) return;
@@ -107,7 +109,7 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, noteFontSize, noteAutoS
   }
 
   return (
-    <div className="h-full w-full flex flex-col bg-background">
+    <div className="h-full w-full flex flex-col bg-background relative">
       <div className="flex items-center justify-between p-2 border-b bg-muted">
         <Input
           value={title}
@@ -178,6 +180,24 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, noteFontSize, noteAutoS
           </ResizablePanel>
         )}
       </ResizablePanelGroup>
+
+      {/* AI Chat Components */}
+      <Button
+        variant="destructive"
+        size="icon"
+        onClick={() => setIsAiChatOpen(true)}
+        className="absolute bottom-4 right-4 rounded-full h-12 w-12 animate-pulse-red z-10"
+        title="Asistente de Nota"
+      >
+        <Wand2 className="h-6 w-6" />
+      </Button>
+
+      <NoteAiChat
+        isOpen={isAiChatOpen}
+        onClose={() => setIsAiChatOpen(false)}
+        noteTitle={title}
+        noteContent={content}
+      />
     </div>
   );
 }

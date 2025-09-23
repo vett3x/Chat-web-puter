@@ -107,12 +107,21 @@ export default {
             boxShadow: '0 0 0 6px hsl(var(--primary-light-purple) / 0)',
           },
         },
+        'pulse-red': { // New animation for AI button
+          '0%, 100%': {
+            boxShadow: '0 0 0 0 hsl(var(--destructive) / 0.7)',
+          },
+          '50%': {
+            boxShadow: '0 0 0 6px hsl(var(--destructive) / 0)',
+          },
+        },
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
   			'accordion-up': 'accordion-up 0.2s ease-out',
         'pulse-glow': 'pulse-glow 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'pulse-purple': 'pulse-purple 2s cubic-bezier(0.4, 0, 0.6, 1) infinite', // New animation
+        'pulse-purple': 'pulse-purple 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'pulse-red': 'pulse-red 2s cubic-bezier(0.4, 0, 0.6, 1) infinite', // New animation
   		},
       boxShadow: {
         'avatar-user': '0 0 8px 2px hsl(var(--user-avatar-shadow) / 0.5)',
