@@ -16,7 +16,13 @@ interface AppProvisioningData {
   userId: string;
   appName: string;
   conversationId: string;
-  prompt: string; // Added prompt
+  prompt: string;
+}
+
+interface FilePlan {
+  path: string;
+  description: string;
+  dependencies: string[];
 }
 
 async function updateAppStatus(appId: string, status: 'ready' | 'failed', details: object = {}) {
@@ -30,13 +36,11 @@ async function updateAppStatus(appId: string, status: 'ready' | 'failed', detail
 }
 
 async function writeAppFile(server: any, containerId: string, filePath: string, content: string, appId: string, userId: string) {
-  // 1. Write to container for hot-reloading
   const encodedContent = Buffer.from(content).toString('base64');
   const command = `bash -c "mkdir -p /app/$(dirname '${filePath}') && echo '${encodedContent}' | base64 -d > /app/${filePath}"`;
   const { stderr, code } = await executeSshCommand(server, `docker exec ${containerId} ${command}`);
   if (code !== 0) throw new Error(`Error al escribir en el archivo del contenedor: ${stderr}`);
 
-  // 2. Backup to database
   await supabaseAdmin.from('app_file_backups').upsert({
     app_id: appId,
     user_id: userId,
@@ -79,22 +83,46 @@ export async function provisionApp(data: AppProvisioningData) {
     const { stderr: installStderr, code: installCode } = await executeSshCommand(server, `docker exec ${containerId} bash -c "echo '${encodedScript}' | base64 -d | bash"`);
     if (installCode !== 0) throw new Error(`Error al instalar dependencias en el contenedor: ${installStderr}`);
 
-    // --- START: Incremental Code Generation ---
-    // 4. AI Planning: Generate file structure
-    const planningPrompt = `Basado en la siguiente solicitud de usuario, crea una estructura de archivos y carpetas para una aplicación simple de Next.js con TypeScript y Tailwind CSS. Responde ÚNICAMENTE con un array JSON de strings, donde cada string es la ruta completa del archivo (ej: "src/app/page.tsx").\n\nSolicitud: "${prompt}"`;
+    // --- START: CONTEXT-AWARE INCREMENTAL CODE GENERATION ---
+    // 4. AI Planning: Generate a detailed file plan with dependencies
+    const planningPrompt = `
+      Tu tarea es actuar como un arquitecto de software senior. Analiza la solicitud del usuario y crea un plan de archivos detallado para una aplicación Next.js con TypeScript y Tailwind CSS.
+      La salida DEBE ser un único objeto JSON.
+      El JSON debe tener una clave "files", que es un array de objetos.
+      Cada objeto debe tener tres claves: "path" (string), "description" (string), y "dependencies" (un array de strings, donde cada string es la ruta a otro archivo en este plan).
+      Las dependencias deben ser solo los archivos necesarios para que el archivo actual se escriba correctamente. Por ejemplo, un componente puede depender de un archivo de definición de tipos.
+      
+      Solicitud del Usuario: "${prompt}"
+    `;
     const planningResponse = await (global as any).puter.ai.chat([{ role: 'user', content: planningPrompt }], { model: 'claude-opus-4' });
-    const fileList = JSON.parse(planningResponse.message.content);
+    const plan: { files: FilePlan[] } = JSON.parse(planningResponse.message.content);
+    const generatedFilesContent = new Map<string, string>();
 
-    // 5. AI Generation: Generate code for each file
-    for (const filePath of fileList) {
-      const generationPrompt = `Genera el código para el archivo "${filePath}". El objetivo general de la aplicación es: "${prompt}". La estructura de archivos completa es: ${JSON.stringify(fileList)}. Responde ÚNICAMENTE con el código fuente completo para el archivo "${filePath}". No incluyas ninguna explicación ni formato adicional.`;
+    // 5. AI Generation: Generate code for each file using the plan
+    for (const file of plan.files) {
+      let context = `El objetivo general de la aplicación es: "${prompt}".\n\n`;
+      context += `Ahora estás creando el archivo en la ruta: "${file.path}".\n`;
+      context += `El propósito de este archivo es: "${file.description}".\n\n`;
+
+      if (file.dependencies && file.dependencies.length > 0) {
+        context += "Para ayudarte, aquí está el contenido de los archivos de los que depende:\n\n";
+        for (const depPath of file.dependencies) {
+          if (generatedFilesContent.has(depPath)) {
+            context += `--- INICIO DEL ARCHIVO: ${depPath} ---\n`;
+            context += generatedFilesContent.get(depPath);
+            context += `\n--- FIN DEL ARCHIVO: ${depPath} ---\n\n`;
+          }
+        }
+      }
+
+      const generationPrompt = `${context}Ahora, escribe el código fuente completo y listo para producción para "${file.path}". Responde ÚNICAMENTE con el código. No incluyas explicaciones, markdown, ni nada más.`;
       const codeResponse = await (global as any).puter.ai.chat([{ role: 'user', content: generationPrompt }], { model: 'claude-opus-4' });
       const fileContent = codeResponse.message.content;
       
-      // Write file to container and backup
-      await writeAppFile(server, containerId, filePath, fileContent, appId, userId);
+      await writeAppFile(server, containerId, file.path, fileContent, appId, userId);
+      generatedFilesContent.set(file.path, fileContent);
     }
-    // --- END: Incremental Code Generation ---
+    // --- END: CONTEXT-AWARE INCREMENTAL CODE GENERATION ---
 
     // 6. Find an available Cloudflare domain and provision tunnel
     const { data: cfDomain, error: cfDomainError } = await supabaseAdmin
