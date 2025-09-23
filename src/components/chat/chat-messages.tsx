@@ -37,9 +37,10 @@ interface ChatMessagesProps {
   isLoading: boolean;
   aiResponseSpeed: 'slow' | 'normal' | 'fast';
   onRegenerate: () => void;
+  appPrompt?: string | null;
 }
 
-export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerate }: ChatMessagesProps) {
+export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerate, appPrompt }: ChatMessagesProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -68,8 +69,21 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
         {messages.length === 0 && !isLoading ? (
           <div className="text-center text-muted-foreground py-8">
             <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>¡Hola! Soy Claude AI. ¿En qué puedo ayudarte hoy?</p>
-            <p className="text-sm mt-2">Selecciona un modelo y comienza a chatear.</p>
+            {appPrompt ? (
+              <>
+                <p className="font-semibold text-lg text-foreground">¡Todo listo para empezar a construir!</p>
+                <p className="mt-2">Tu proyecto es: <span className="font-medium text-primary">"{appPrompt}"</span></p>
+                <p className="text-sm mt-4">
+                  Puedes empezar pidiendo algo como: <br />
+                  <span className="font-mono bg-muted p-1 rounded-md text-xs">"Crea la página de inicio con una barra de navegación y un pie de página."</span>
+                </p>
+              </>
+            ) : (
+              <>
+                <p>¡Hola! Soy Claude AI. ¿En qué puedo ayudarte hoy?</p>
+                <p className="text-sm mt-2">Selecciona un modelo y comienza a chatear.</p>
+              </>
+            )}
           </div>
         ) : (
           messages.map((message, index) => {

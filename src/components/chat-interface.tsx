@@ -92,6 +92,7 @@ export function ChatInterface({
           isLoading={isLoading}
           aiResponseSpeed={aiResponseSpeed}
           onRegenerate={regenerateLastResponse}
+          appPrompt={appPrompt}
         />
         <ChatInput
           isLoading={isLoading}
