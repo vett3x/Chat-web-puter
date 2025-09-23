@@ -90,6 +90,12 @@ export default function Home() {
     handleSelectItem(conversationId, 'conversation');
   };
 
+  const handleAppCreated = (newApp: UserApp) => {
+    // The sidebar will update automatically via its own hook.
+    // We just need to select the new app.
+    handleSelectItem(newApp.id, 'app');
+  };
+
   const handleOpenProfileSettings = () => setIsProfileSettingsOpen(true);
   const handleOpenAppSettings = () => setIsAppSettingsOpen(true);
   const handleOpenServerManagement = () => setIsServerManagementOpen(true);
@@ -185,6 +191,7 @@ export default function Home() {
       <DeepAiCoderDialog
         open={isDeepAiCoderOpen}
         onOpenChange={setIsDeepAiCoderOpen}
+        onAppCreated={handleAppCreated}
       />
     </div>
   );

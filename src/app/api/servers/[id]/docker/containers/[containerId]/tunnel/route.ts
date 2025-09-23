@@ -161,7 +161,7 @@ export async function POST(
     }
 
     // Call the new server action to create and provision the tunnel
-    const { tunnelId: newTunnelRecordId } = await createAndProvisionCloudflareTunnel({
+    const { tunnelData } = await createAndProvisionCloudflareTunnel({
       userId: session.user.id,
       serverId: serverId,
       containerId: containerId,
@@ -178,6 +178,8 @@ export async function POST(
       },
       cloudflareDomainDetails: fetchedCfDomain,
     });
+
+    const newTunnelRecordId = tunnelData.id;
 
     return NextResponse.json(
       { message: 'Túnel de Cloudflare creado y aprovisionamiento iniciado.', tunnelId: newTunnelRecordId },

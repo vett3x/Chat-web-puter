@@ -118,7 +118,7 @@ export async function createAndProvisionCloudflareTunnel({
         tunnel_secret: tunnelToken, // Store the token for the credentials file
         status: 'provisioning',
       })
-      .select('id')
+      .select('id, full_domain')
       .single();
 
     if (insertError) {
@@ -154,7 +154,7 @@ export async function createAndProvisionCloudflareTunnel({
     });
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Tunnel provisioning complete for '${fullDomain}'.\n` });
 
-    return { message: 'Túnel de Cloudflare creado y aprovisionamiento iniciado.', tunnelId: newTunnelRecordId };
+    return { message: 'Túnel de Cloudflare creado y aprovisionamiento iniciado.', tunnelData: newTunnel };
 
   } catch (error: any) {
     console.error('Error creating Cloudflare tunnel and provisioning:', error);
