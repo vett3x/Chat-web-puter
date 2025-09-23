@@ -27,14 +27,23 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Trash2, AlertCircle, Play, StopCircle, Terminal, Globe, History, ScrollText, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { DockerContainer } from '@/types/docker';
 import { CreateTunnelDialog } from './CreateTunnelDialog';
 import { ContainerHistoryDialog } from '@/components/container-history-dialog';
-import { ContainerLogsDialog } from '@/components/container-logs-dialog';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+
+interface ServerEvent {
+  id: string;
+  event_type: string;
+  description: string;
+  created_at: string;
+}
 
 interface DockerContainerListProps {
   containers: DockerContainer[];
@@ -52,8 +61,9 @@ export function DockerContainerList({ containers, server, isLoading, actionLoadi
   const [selectedContainerForTunnel, setSelectedContainerForTunnel] = useState<DockerContainer | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedContainerForHistory, setSelectedContainerForHistory] = useState<DockerContainer | null>(null);
-  const [isLogsOpen, setIsLogsOpen] = useState(false);
-  const [selectedContainerForLogs, setSelectedContainerForLogs] = useState<DockerContainer | null>(null);
+  const [expandedHistoryContainerId, setExpandedHistoryContainerId] = useState<string | null>(null);
+  const [containerHistoryLog, setContainerHistoryLog] = useState<string>('');
+  const [isHistoryLoading, setIsHistoryLoading] = useState<boolean>(false);
 
   const openCreateTunnelDialogFor = (container: DockerContainer) => {
     setSelectedContainerForTunnel(container);
@@ -65,40 +75,69 @@ export function DockerContainerList({ containers, server, isLoading, actionLoadi
     setIsHistoryOpen(true);
   };
 
-  const openLogsFor = (container: DockerContainer) => {
-    setSelectedContainerForLogs(container);
-    setIsLogsOpen(true);
+  const fetchAndDisplayHistory = async (containerId: string) => {
+    if (expandedHistoryContainerId === containerId) {
+      setExpandedHistoryContainerId(null); // Collapse if already open
+      return;
+    }
+    setExpandedHistoryContainerId(containerId);
+    setIsHistoryLoading(true);
+    setContainerHistoryLog('Cargando historial...');
+    try {
+      const response = await fetch(`/api/servers/${server.id}/docker/containers/${containerId}/history`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+      const events: ServerEvent[] = await response.json();
+      if (events.length === 0) {
+        setContainerHistoryLog('No hay eventos registrados para este contenedor.');
+      } else {
+        const formattedLog = events
+          .map(event => 
+            `[${format(new Date(event.created_at), 'dd/MM/yyyy HH:mm:ss', { locale: es })}] [${event.event_type}]\n${event.description}\n--------------------------------------------------`
+          )
+          .join('\n\n');
+        setContainerHistoryLog(formattedLog);
+      }
+    } catch (err: any) {
+      toast.error(`Error al cargar el historial: ${err.message}`);
+      setContainerHistoryLog(`Error al cargar el historial: ${err.message}`);
+    } finally {
+      setIsHistoryLoading(false);
+    }
   };
 
   return (
     <>
-      <ScrollArea className="h-full w-full">
-        <TooltipProvider>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Imagen</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Puertos</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {containers.map((container) => {
-                const isRunning = container.Status.includes('Up');
-                const isGracefullyExited = container.Status.includes('Exited (0)') || container.Status.includes('Exited (137)');
-                const isErrorState = !isRunning && !isGracefullyExited;
-                const isWarningState = !isRunning && isGracefullyExited;
-                const isActionInProgress = actionLoading === container.ID;
+      <TooltipProvider>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>ID</TableHead>
+              <TableHead>Nombre</TableHead>
+              <TableHead>Imagen</TableHead>
+              <TableHead>Estado</TableHead>
+              <TableHead>Puertos</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {containers.map((container) => {
+              const isRunning = container.Status.includes('Up');
+              const isGracefullyExited = container.Status.includes('Exited (0)') || container.Status.includes('Exited (137)');
+              const isErrorState = !isRunning && !isGracefullyExited;
+              const isWarningState = !isRunning && isGracefullyExited;
+              const isActionInProgress = actionLoading === container.ID;
+              const isHistoryExpanded = expandedHistoryContainerId === container.ID;
 
-                return (
+              return (
+                <React.Fragment key={container.ID}>
                   <TableRow 
-                    key={container.ID} 
                     className={cn(
                       isErrorState && "bg-destructive/10 text-destructive hover:bg-destructive/20",
-                      isWarningState && "bg-warning/10 text-warning hover:bg-warning/20"
+                      isWarningState && "bg-warning/10 text-warning hover:bg-warning/20",
+                      isHistoryExpanded && "border-b-0"
                     )}
                   >
                     <TableCell className="font-mono text-xs">{container.ID.substring(0, 12)}</TableCell>
@@ -128,7 +167,7 @@ export function DockerContainerList({ containers, server, isLoading, actionLoadi
                     <TableCell>{container.Ports || '-'}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Button variant="outline" size="icon" onClick={() => openLogsFor(container)} title="Ver logs" disabled={!canManageDockerContainers}>
+                        <Button variant="outline" size="icon" onClick={() => fetchAndDisplayHistory(container.ID)} title="Ver historial" disabled={!canManageDockerContainers}>
                           <Terminal className="h-4 w-4" />
                         </Button>
                         <DropdownMenu>
@@ -145,7 +184,7 @@ export function DockerContainerList({ containers, server, isLoading, actionLoadi
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => openHistoryFor(container)} disabled={isActionInProgress}>
-                              <ScrollText className="mr-2 h-4 w-4" /> Ver Historial
+                              <ScrollText className="mr-2 h-4 w-4" /> Ver Historial (Legacy)
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openCreateTunnelDialogFor(container)} disabled={isActionInProgress || !canManageCloudflareTunnels}>
                               <Globe className="mr-2 h-4 w-4" /> Crear Túnel Cloudflare
@@ -163,20 +202,35 @@ export function DockerContainerList({ containers, server, isLoading, actionLoadi
                       </div>
                     </TableCell>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TooltipProvider>
-      </ScrollArea>
-      {selectedContainerForLogs && (
-        <ContainerLogsDialog
-          open={isLogsOpen}
-          onOpenChange={setIsLogsOpen}
-          server={server}
-          container={selectedContainerForLogs}
-        />
-      )}
+                  {isHistoryExpanded && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="p-0">
+                        <div className="p-2 bg-[#1E1E1E] rounded-b-md">
+                          {isHistoryLoading ? (
+                            <div className="flex items-center gap-2 p-4 text-white">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Cargando historial...
+                            </div>
+                          ) : (
+                            <SyntaxHighlighter
+                              language="bash"
+                              style={vscDarkPlus}
+                              customStyle={{ margin: 0, padding: '1rem', fontSize: '0.875rem', lineHeight: '1.25rem', maxHeight: '400px', overflowY: 'auto' }}
+                              codeTagProps={{ style: { fontFamily: 'var(--font-geist-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' } }}
+                            >
+                              {containerHistoryLog}
+                            </SyntaxHighlighter>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </TooltipProvider>
       {selectedContainerForHistory && (
         <ContainerHistoryDialog
           open={isHistoryOpen}
