@@ -6,6 +6,7 @@ import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
 import { executeSshCommand } from '@/lib/ssh-utils'; // Import SSH utilities
+import { deleteCloudflareTunnelAndCleanup } from '@/lib/tunnel-orchestration'; // Import tunnel cleanup logic
 
 // Helper function to get the session and user role
 async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null; userPermissions: UserPermissions }> {
@@ -107,6 +108,37 @@ export async function DELETE(
   }
 
   try {
+    // --- START: Tunnel Deletion Logic ---
+    const { data: tunnelRecord } = await supabaseAdmin
+      .from('docker_tunnels')
+      .select('id, cloudflare_domain_id')
+      .eq('container_id', containerId)
+      .eq('server_id', serverId)
+      .eq('user_id', session.user.id)
+      .maybeSingle();
+
+    if (tunnelRecord) {
+      const { data: cfDomain } = await supabaseAdmin
+        .from('cloudflare_domains')
+        .select('domain_name, api_token, zone_id, account_id')
+        .eq('id', tunnelRecord.cloudflare_domain_id)
+        .single();
+
+      if (cfDomain) {
+        await deleteCloudflareTunnelAndCleanup({
+          userId: session.user.id,
+          serverId: serverId,
+          containerId: containerId,
+          tunnelRecordId: tunnelRecord.id,
+          serverDetails: server,
+          cloudflareDomainDetails: cfDomain,
+        });
+      } else {
+        console.warn(`[Container Deletion] Found tunnel record ${tunnelRecord.id} but could not find associated Cloudflare domain ${tunnelRecord.cloudflare_domain_id}. Skipping tunnel deletion.`);
+      }
+    }
+    // --- END: Tunnel Deletion Logic ---
+
     const { stderr: rmStderr, code: rmCode } = await executeSshCommand(server, `docker rm -f ${containerId}`);
     if (rmCode !== 0 && !rmStderr.includes('No such container')) {
       throw new Error(`Error al eliminar contenedor: ${rmStderr}`);
@@ -145,7 +177,7 @@ export async function DELETE(
       description: `Contenedor ${containerId.substring(0,12)} eliminado de '${server.name || server.ip_address}'.`,
     });
 
-    return NextResponse.json({ message: `Contenedor ${containerId.substring(0,12)} eliminado.` }, { status: 200 });
+    return NextResponse.json({ message: `Contenedor ${containerId.substring(0,12)} y túnel asociado eliminados.` }, { status: 200 });
 
   } catch (error: any) {
     // Log event for general error during container deletion
