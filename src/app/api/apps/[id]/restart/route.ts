@@ -36,17 +36,21 @@ export async function POST(req: NextRequest, context: any) {
       .single();
 
     // Comandos para reiniciar los servicios DENTRO del contenedor
-    const killCommands = "pkill -f 'npm run dev' || true; pkill cloudflared || true";
-    
+    // Se ejecutan en secuencia. Si pkill no encuentra un proceso, fallará, pero el siguiente comando se ejecutará igualmente.
+    const killAppCommand = "pkill -f 'npm run dev' || true";
+    const killTunnelCommand = "pkill cloudflared || true";
     const restartAppCommand = `cd /app && nohup npm run dev -- -p ${tunnel?.container_port || 3000} > /app/dev.log 2>&1 &`;
     
-    let commandsToRunInShell = `${killCommands}; ${restartAppCommand}`;
+    let commandsToRun = [killAppCommand, killTunnelCommand, restartAppCommand];
 
     // Si hay un túnel, también lo reiniciamos
     if (tunnel && tunnel.tunnel_id && tunnel.tunnel_secret) {
       const restartTunnelCommand = `nohup cloudflared tunnel run --token ${tunnel.tunnel_secret} ${tunnel.tunnel_id} > /app/cloudflared.log 2>&1 &`;
-      commandsToRunInShell = `${killCommands}; ${restartAppCommand}; ${restartTunnelCommand}`;
+      commandsToRun.push(restartTunnelCommand);
     }
+
+    // Unimos los comandos con ' && ' que es más robusto para sh
+    const commandsToRunInShell = commandsToRun.join(' && ');
 
     const fullCommand = `docker exec ${app.container_id} sh -c "${commandsToRunInShell}"`;
 
@@ -54,8 +58,8 @@ export async function POST(req: NextRequest, context: any) {
 
     if (code !== 0) {
       // A veces pkill devuelve un código de error si no encuentra procesos, lo cual es esperado.
-      // Solo lanzamos un error si stderr contiene algo más que "no process found".
-      if (stderr && !stderr.toLowerCase().includes('no process found')) {
+      // El '|| true' maneja esto, por lo que si aún hay un error, es un problema real.
+      if (stderr) {
         throw new Error(`Error al reiniciar los servicios: ${stderr}`);
       }
     }
