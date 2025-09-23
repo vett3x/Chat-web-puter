@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Save, Loader2 } from 'lucide-react';
-import { BlockNoteView, useBlockNote } from "@blocknote/react";
+import { BlockNoteViewRaw as BlockNoteView } from "@blocknote/react";
 import { BlockNoteEditor } from "@blocknote/core";
 import "@blocknote/core/style.css";
 import { useTheme } from 'next-themes';
