@@ -82,12 +82,28 @@ function parseAiResponseToRenderableParts(content: string): RenderablePart[] {
       const textPart = content.substring(lastIndex, match.index).trim();
       if (textPart) parts.push({ type: 'text', text: textPart });
     }
-    parts.push({
+    
+    const part: RenderablePart = {
       type: 'code',
       language: match[1] || '',
       filename: match[2],
       code: (match[3] || '').trim(),
-    });
+    };
+
+    // Fallback logic: If filename is not in the header, check the first line of the code
+    if (!part.filename && part.code) {
+      const lines = part.code.split('\n');
+      const firstLine = lines[0].trim();
+      // Regex to find a file path in a comment (e.g., // src/app/page.tsx or # /components/Button.tsx)
+      const pathRegex = /^(?:\/\/|#|\/\*|\*)\s*([\w./-]+\.[a-zA-Z]+)\s*\*?\/?$/;
+      const pathMatch = firstLine.match(pathRegex);
+      if (pathMatch && pathMatch[1]) {
+        part.filename = pathMatch[1];
+        part.code = lines.slice(1).join('\n').trim(); // Remove the first line from the code
+      }
+    }
+
+    parts.push(part);
     lastIndex = match.index + match[0].length;
   }
 
