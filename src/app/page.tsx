@@ -222,6 +222,7 @@ export default function Home() {
                 onNewConversationCreated={handleNewConversationCreated}
                 onConversationTitleUpdate={(id, newTitle) => {}}
                 aiResponseSpeed={aiResponseSpeed}
+                isAppProvisioning={selectedAppDetails?.status === 'provisioning'}
               />
             </ResizablePanel>
             {selectedItem?.type === 'app' && (

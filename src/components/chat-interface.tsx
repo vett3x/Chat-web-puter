@@ -12,6 +12,7 @@ interface ChatInterfaceProps {
   onNewConversationCreated: (conversationId: string) => void;
   onConversationTitleUpdate: (conversationId: string, newTitle: string) => void;
   aiResponseSpeed: 'slow' | 'normal' | 'fast';
+  isAppProvisioning?: boolean;
 }
 
 export function ChatInterface({
@@ -20,6 +21,7 @@ export function ChatInterface({
   onNewConversationCreated,
   onConversationTitleUpdate,
   aiResponseSpeed,
+  isAppProvisioning = false,
 }: ChatInterfaceProps) {
   const {
     messages,
@@ -35,6 +37,16 @@ export function ChatInterface({
     onNewConversationCreated,
     onConversationTitleUpdate,
   });
+
+  if (isAppProvisioning) {
+    return (
+      <div className="flex flex-col h-full bg-background items-center justify-center text-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+        <h3 className="text-lg font-semibold">Aprovisionando el entorno...</h3>
+        <p className="text-muted-foreground">El chat estará disponible cuando el proyecto esté listo.</p>
+      </div>
+    );
+  }
 
   if (!isPuterReady) {
     return (
