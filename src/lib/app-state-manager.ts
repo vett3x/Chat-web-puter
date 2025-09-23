@@ -19,16 +19,19 @@ async function ensureServicesAreRunning(server: any, app: any) {
     .single();
 
   // Comandos para reiniciar los servicios DENTRO del contenedor
-  const killCommands = "pkill -f 'npm run dev' || true; pkill cloudflared || true";
-  const restartAppCommand = `cd /app && nohup npm run dev -- -p ${tunnel?.container_port || 3000} > /app/dev.log 2>&1 &`;
-  
-  let fullCommand = `docker exec ${app.container_id} bash -c "${killCommands}; ${restartAppCommand}"`;
+  const killAppCommand = "pkill -f 'npm run dev' || true";
+  const killTunnelCommand = "pkill cloudflared || true";
+  const restartAppCommand = `nohup npm run dev -- -p ${tunnel?.container_port || 3000} > /app/dev.log 2>&1 &`;
 
-  // Si hay un túnel, también lo reiniciamos
+  let backgroundCommands = restartAppCommand;
+
   if (tunnel && tunnel.tunnel_id && tunnel.tunnel_secret) {
     const restartTunnelCommand = `nohup cloudflared tunnel run --token ${tunnel.tunnel_secret} ${tunnel.tunnel_id} > /app/cloudflared.log 2>&1 &`;
-    fullCommand = `docker exec ${app.container_id} bash -c "${killCommands}; ${restartAppCommand}; ${restartTunnelCommand}"`;
+    backgroundCommands += ` ${restartTunnelCommand}`;
   }
+
+  const commandsToRunInShell = `${killAppCommand}; ${killTunnelCommand}; cd /app && (${backgroundCommands})`;
+  const fullCommand = `docker exec ${app.container_id} bash -c "${commandsToRunInShell}"`;
 
   const { stderr, code } = await executeSshCommand(server, fullCommand);
 
