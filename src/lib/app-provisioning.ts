@@ -53,7 +53,7 @@ export async function provisionApp(data: AppProvisioningData) {
 
     await supabaseAdmin.from('user_apps').update({ server_id: server.id, container_id: containerId }).eq('id', appId);
 
-    // FASE 2: Instalación de Dependencias (usando el script completo)
+    // FASE 2: Instalación de Dependencias y App "Hello World" (usando el script completo)
     const finalInstallScript = DEFAULT_INSTALL_DEPS_SCRIPT.replace(/__CONTAINER_PORT__/g, String(containerPort));
     const encodedScript = Buffer.from(finalInstallScript).toString('base64');
     const { stderr: installStderr, code: installCode } = await executeSshCommand(server, `docker exec ${containerId} bash -c "echo '${encodedScript}' | base64 -d | bash"`);
