@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/components/session-context-provider';
 import { toast } from 'sonner';
-import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Save, Loader2, Eye, Code } from 'lucide-react';
@@ -12,6 +11,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/componen
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import CodeEditor from '@uiw/react-textarea-code-editor';
 
 interface Note {
   id: string;
@@ -123,11 +123,22 @@ export function NoteEditorPanel({ noteId, onNoteUpdated }: NoteEditorPanelProps)
       <ResizablePanelGroup direction="horizontal" className="flex-1">
         {viewMode !== 'preview' && (
           <ResizablePanel defaultSize={viewMode === 'editor' ? 100 : 50} minSize={30}>
-            <Textarea
+            <CodeEditor
               value={content}
+              language="markdown"
               onChange={(e) => setContent(e.target.value)}
               placeholder="Escribe tu nota en Markdown..."
-              className="h-full w-full border-none resize-none focus-visible:ring-0 focus-visible:ring-offset-0 p-4 font-mono bg-transparent"
+              padding={16}
+              style={{
+                fontSize: 16,
+                backgroundColor: "hsl(var(--background))",
+                fontFamily: 'var(--font-geist-mono)',
+                height: '100%',
+                overflow: 'auto',
+                outline: 'none',
+                border: 'none',
+              }}
+              className="w-full h-full"
             />
           </ResizablePanel>
         )}
