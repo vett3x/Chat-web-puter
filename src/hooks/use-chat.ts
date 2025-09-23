@@ -57,7 +57,7 @@ interface UseChatProps {
   onConversationTitleUpdate: (conversationId: string, newTitle: string) => void;
   appPrompt?: string | null;
   appId?: string | null;
-  onFilesWritten?: () => void;
+  onWriteFiles: (files: { path: string; content: string }[]) => Promise<void>; // Changed from onFilesWritten
 }
 
 const codeBlockRegex = /```(\w+)?(?::([\w./-]+))?\s*\n([\s\S]*?)\s*```/g;
@@ -107,7 +107,7 @@ export function useChat({
   onConversationTitleUpdate,
   appPrompt,
   appId,
-  onFilesWritten,
+  onWriteFiles, // Changed from onFilesWritten
 }: UseChatProps) {
   const { userRole } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -217,29 +217,6 @@ export function useChat({
     return { id: data.id, timestamp: new Date(data.created_at) };
   };
 
-  const writeFilesToApp = async (files: { path: string; content: string }[]) => {
-    if (!appId || files.length === 0) return;
-    toast.info(`Aplicando ${files.length} archivo(s) al proyecto...`);
-    try {
-      const promises = files.map(file =>
-        fetch(`/api/apps/${appId}/file`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(file),
-        })
-      );
-      const responses = await Promise.all(promises);
-      const failed = responses.filter(res => !res.ok);
-      if (failed.length > 0) {
-        throw new Error(`${failed.length} archivo(s) no se pudieron guardar.`);
-      }
-      toast.success('¡Archivos aplicados! Actualizando vista previa...');
-      onFilesWritten?.();
-    } catch (error: any) {
-      toast.error(`Error al aplicar archivos: ${error.message}`);
-    }
-  };
-
   const getAndStreamAIResponse = async (convId: string, history: Message[]) => {
     setIsLoading(true);
     const tempTypingId = `assistant-typing-${Date.now()}`;
@@ -316,7 +293,7 @@ export function useChat({
       }
 
       if (filesToWrite.length > 0) {
-        await writeFilesToApp(filesToWrite);
+        await onWriteFiles(filesToWrite); // Use the passed-in function
       }
 
     } catch (error: any) {
@@ -424,7 +401,7 @@ export function useChat({
     }
 
     if (filesToWrite.length > 0) {
-      await writeFilesToApp(filesToWrite);
+      await onWriteFiles(filesToWrite); // Use the passed-in function
     } else {
       toast.info("No se encontraron archivos para aplicar en este mensaje.");
     }

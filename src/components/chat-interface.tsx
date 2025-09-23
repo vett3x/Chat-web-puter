@@ -16,7 +16,7 @@ interface ChatInterfaceProps {
   isAppDeleting?: boolean;
   appPrompt?: string | null;
   appId?: string | null;
-  onFilesWritten?: () => void;
+  onWriteFiles: (files: { path: string; content: string }[]) => Promise<void>; // Changed from onFilesWritten
 }
 
 export function ChatInterface({
@@ -29,7 +29,7 @@ export function ChatInterface({
   isAppDeleting = false,
   appPrompt,
   appId,
-  onFilesWritten,
+  onWriteFiles, // Changed from onFilesWritten
 }: ChatInterfaceProps) {
   const {
     messages,
@@ -47,7 +47,7 @@ export function ChatInterface({
     onConversationTitleUpdate,
     appPrompt,
     appId,
-    onFilesWritten,
+    onWriteFiles, // Pass the function down
   });
 
   if (isAppProvisioning) {

@@ -12,6 +12,7 @@ import { AppSettingsDialog } from "@/components/app-settings-dialog";
 import { ServerManagementDialog } from "@/components/server-management-dialog";
 import { UserManagementDialog } from "@/components/user-management-dialog";
 import { DeepAiCoderDialog } from "@/components/deep-ai-coder-dialog";
+import { RetryUploadDialog } from "@/components/retry-upload-dialog"; // Import the new dialog
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -43,6 +44,11 @@ interface ActiveFile {
 }
 
 type RightPanelView = 'editor' | 'preview';
+
+interface RetryState {
+  isOpen: boolean;
+  files: { path: string; content: string }[] | null;
+}
 
 export default function Home() {
   const { session, isLoading: isSessionLoading, userRole } = useSession();
@@ -81,6 +87,7 @@ export default function Home() {
   const [activeFile, setActiveFile] = useState<ActiveFile | null>(null);
   const [isFileLoading, setIsFileLoading] = useState(false);
   const [isDeletingAppId, setIsDeletingAppId] = useState<string | null>(null);
+  const [retryState, setRetryState] = useState<RetryState>({ isOpen: false, files: null });
   const appBrowserRef = useRef<{ refresh: () => void }>(null);
 
   useEffect(() => {
@@ -178,12 +185,36 @@ export default function Home() {
     }
   };
 
-  const handleFilesWritten = () => {
-    refreshSidebarData();
-    // Add a small delay to allow the server to process file changes before refreshing
-    setTimeout(() => {
-      appBrowserRef.current?.refresh();
-    }, 1000);
+  const writeFilesToApp = async (files: { path: string; content: string }[]) => {
+    if (!selectedAppDetails?.id || files.length === 0) return;
+    toast.info(`Aplicando ${files.length} archivo(s) al proyecto...`);
+    try {
+      const promises = files.map(file =>
+        fetch(`/api/apps/${selectedAppDetails.id}/file`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(file),
+        })
+      );
+      const responses = await Promise.all(promises);
+      const failed = responses.filter(res => !res.ok);
+      if (failed.length > 0) {
+        throw new Error(`${failed.length} archivo(s) no se pudieron guardar.`);
+      }
+      toast.success('¡Archivos aplicados! Actualizando vista previa...');
+      refreshSidebarData();
+      setTimeout(() => appBrowserRef.current?.refresh(), 1000);
+    } catch (error: any) {
+      toast.error(`Error al aplicar archivos: ${error.message}`);
+      setRetryState({ isOpen: true, files }); // Open retry dialog on failure
+    }
+  };
+
+  const handleRetryUpload = () => {
+    if (retryState.files) {
+      writeFilesToApp(retryState.files);
+    }
+    setRetryState({ isOpen: false, files: null });
   };
 
   const handleOpenProfileSettings = () => setIsProfileSettingsOpen(true);
@@ -261,7 +292,7 @@ export default function Home() {
                 isAppDeleting={isAppDeleting}
                 appPrompt={selectedAppDetails?.prompt}
                 appId={selectedAppDetails?.id}
-                onFilesWritten={handleFilesWritten}
+                onWriteFiles={writeFilesToApp}
               />
             </ResizablePanel>
             {selectedItem?.type === 'app' && (
@@ -286,6 +317,12 @@ export default function Home() {
       {isAdmin && <ServerManagementDialog open={isServerManagementOpen} onOpenChange={setIsServerManagementOpen} />}
       {isAdmin && <UserManagementDialog open={isUserManagementOpen} onOpenChange={setIsUserManagementOpen} />}
       <DeepAiCoderDialog open={isDeepAiCoderOpen} onOpenChange={setIsDeepAiCoderOpen} onAppCreated={handleAppCreated} />
+      <RetryUploadDialog
+        open={retryState.isOpen}
+        onOpenChange={(open) => setRetryState({ ...retryState, isOpen: open })}
+        onRetry={handleRetryUpload}
+        fileCount={retryState.files?.length || 0}
+      />
     </div>
   );
 }
