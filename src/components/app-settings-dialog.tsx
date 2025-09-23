@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader2, Save, KeyRound, Trash2, Gauge, FileText } from 'lucide-react';
+import { Loader2, Save, KeyRound, Trash2, Gauge } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -42,7 +42,6 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 
 // Schemas para los formularios
 const changePasswordSchema = z.object({
@@ -56,10 +55,6 @@ interface AppSettingsDialogProps {
   onOpenChange: (open: boolean) => void;
   aiResponseSpeed: 'slow' | 'normal' | 'fast';
   onAiResponseSpeedChange: (speed: 'slow' | 'normal' | 'fast') => void;
-  noteFontSize: number;
-  onNoteFontSizeChange: (size: number) => void;
-  noteAutoSave: boolean;
-  onNoteAutoSaveChange: (enabled: boolean) => void;
 }
 
 export function AppSettingsDialog({
@@ -67,10 +62,6 @@ export function AppSettingsDialog({
   onOpenChange,
   aiResponseSpeed,
   onAiResponseSpeedChange,
-  noteFontSize,
-  onNoteFontSizeChange,
-  noteAutoSave,
-  onNoteAutoSaveChange,
 }: AppSettingsDialogProps) {
   const { session, isLoading: isSessionLoading } = useSession();
   const router = useRouter();
@@ -181,37 +172,6 @@ export function AppSettingsDialog({
               <div className="flex items-center space-x-2"><RadioGroupItem value="normal" id="speed-normal" /><Label htmlFor="speed-normal">Normal</Label></div>
               <div className="flex items-center space-x-2"><RadioGroupItem value="fast" id="speed-fast" /><Label htmlFor="speed-fast">Rápida</Label></div>
             </RadioGroup>
-          </div>
-
-          <Separator />
-
-          {/* Note Settings Section */}
-          <div>
-            <h3 className="text-lg font-semibold flex items-center gap-2 mb-3">
-              <FileText className="h-5 w-5 text-muted-foreground" /> Configuración de Notas
-            </h3>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="note-font-size">Tamaño de Fuente del Editor</Label>
-                <Input
-                  id="note-font-size"
-                  type="number"
-                  value={noteFontSize}
-                  onChange={(e) => onNoteFontSizeChange(Number(e.target.value))}
-                  className="w-20"
-                  min={10}
-                  max={24}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="note-auto-save">Guardado Automático</Label>
-                <Switch
-                  id="note-auto-save"
-                  checked={noteAutoSave}
-                  onCheckedChange={onNoteAutoSaveChange}
-                />
-              </div>
-            </div>
           </div>
 
           <Separator />

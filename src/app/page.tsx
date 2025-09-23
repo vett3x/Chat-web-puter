@@ -64,9 +64,6 @@ export default function Home() {
     return 'normal';
   });
 
-  const [noteFontSize, setNoteFontSize] = useState<number>(16);
-  const [noteAutoSave, setNoteAutoSave] = useState<boolean>(true);
-
   const [rightPanelView, setRightPanelView] = useState<RightPanelView>('chat');
   const [activeFile, setActiveFile] = useState<ActiveFile | null>(null);
   const [isFileLoading, setIsFileLoading] = useState(false);
@@ -76,21 +73,6 @@ export default function Home() {
       localStorage.setItem('aiResponseSpeed', aiResponseSpeed);
     }
   }, [aiResponseSpeed]);
-
-  useEffect(() => {
-    const savedFontSize = localStorage.getItem('noteFontSize');
-    if (savedFontSize) setNoteFontSize(Number(savedFontSize));
-    const savedAutoSave = localStorage.getItem('noteAutoSave');
-    if (savedAutoSave) setNoteAutoSave(savedAutoSave === 'true');
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('noteFontSize', String(noteFontSize));
-  }, [noteFontSize]);
-
-  useEffect(() => {
-    localStorage.setItem('noteAutoSave', String(noteAutoSave));
-  }, [noteAutoSave]);
 
   const handleSelectItem = useCallback(async (id: string | null, type: SelectedItem['type'] | null) => {
     setActiveFile(null);
@@ -171,7 +153,7 @@ export default function Home() {
       return <AppPreviewPanel appUrl={selectedAppDetails?.url || null} appStatus={selectedAppDetails?.status || null} />;
     }
     if (rightPanelView === 'note' && selectedItem?.type === 'note') {
-      return <NoteEditorPanel noteId={selectedItem.id} onNoteUpdated={refreshSidebarData} noteFontSize={noteFontSize} noteAutoSave={noteAutoSave} />;
+      return <NoteEditorPanel noteId={selectedItem.id} onNoteUpdated={refreshSidebarData} />;
     }
     return (
       <ChatInterface
@@ -213,10 +195,6 @@ export default function Home() {
         onOpenChange={setIsAppSettingsOpen}
         aiResponseSpeed={aiResponseSpeed}
         onAiResponseSpeedChange={handleAiResponseSpeedChange}
-        noteFontSize={noteFontSize}
-        onNoteFontSizeChange={setNoteFontSize}
-        noteAutoSave={noteAutoSave}
-        onNoteAutoSaveChange={setNoteAutoSave}
       />
       {isAdmin && <ServerManagementDialog open={isServerManagementOpen} onOpenChange={setIsServerManagementOpen} />}
       {isAdmin && <UserManagementDialog open={isUserManagementOpen} onOpenChange={setIsUserManagementOpen} />}
