@@ -15,24 +15,11 @@ import {
 import Image from 'next/image';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import ClaudeAILogo from '@/components/claude-ai-logo';
+import { AI_PROVIDERS } from '@/lib/ai-models'; // Import from new file
 
 interface PuterTextContentPart { type: 'text'; text: string; }
 interface PuterImageContentPart { type: 'image_url'; image_url: { url: string; }; }
 type PuterContentPart = PuterTextContentPart | PuterImageContentPart;
-
-const AI_PROVIDERS = [
-  {
-    company: 'Anthropic',
-    logo: ClaudeAILogo,
-    models: [
-      { value: 'claude-sonnet-4', label: 'Claude Sonnet 4' },
-      { value: 'claude-opus-4', label: 'Claude Opus 4' },
-      { value: 'claude-3-7-sonnet', label: 'Claude 3.7 Sonnet' },
-      { value: 'claude-3-7-opus', label: 'Claude 3.7 Opus' },
-    ],
-  },
-];
 
 interface ChatInputProps {
   isLoading: boolean;

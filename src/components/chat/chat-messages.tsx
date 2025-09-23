@@ -6,6 +6,7 @@ import { Bot, User, Loader2, Clipboard, RefreshCw } from 'lucide-react';
 import { MessageContent } from '@/components/message-content';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { getModelLabel } from '@/lib/ai-models'; // Import the helper function
 
 // Define types
 interface PuterTextContentPart {
@@ -115,7 +116,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
                 </div>
                 {message.role === 'assistant' && !message.isTyping && message.model && (
                   <p className="text-xs text-muted-foreground px-12">
-                    ✓ Generado con {message.model}
+                    ✓ Generado con {getModelLabel(message.model)}
                   </p>
                 )}
               </div>
