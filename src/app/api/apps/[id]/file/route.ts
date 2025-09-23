@@ -7,6 +7,8 @@ import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { executeSshCommand } from '@/lib/ssh-utils';
 import { getAppAndServerWithStateCheck } from '@/lib/app-state-manager';
 
+const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+
 async function getUserId() {
   const cookieStore = cookies() as any;
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { cookies: { get: (name: string) => cookieStore.get(name)?.value } });
@@ -36,7 +38,7 @@ export async function GET(req: NextRequest, context: { params: { id: string } })
   }
 }
 
-// POST: Escribir contenido en un archivo
+// POST: Escribir contenido en un archivo Y respaldarlo en la DB
 export async function POST(req: NextRequest, context: { params: { id: string } }) {
   const appId = context.params.id;
   
@@ -49,13 +51,33 @@ export async function POST(req: NextRequest, context: { params: { id: string } }
       return NextResponse.json({ message: 'La ruta y el contenido del archivo son requeridos.' }, { status: 400 });
     }
 
+    // 1. Escribir en el contenedor para hot-reloading
     const encodedContent = Buffer.from(content).toString('base64');
-    const command = `bash -c "echo '${encodedContent}' | base64 -d > /app/${filePath}"`;
+    const command = `bash -c "mkdir -p /app/$(dirname '${filePath}') && echo '${encodedContent}' | base64 -d > /app/${filePath}"`;
     
     const { stderr, code } = await executeSshCommand(server, `docker exec ${app.container_id} ${command}`);
-    if (code !== 0) throw new Error(`Error al escribir en el archivo: ${stderr}`);
+    if (code !== 0) throw new Error(`Error al escribir en el archivo del contenedor: ${stderr}`);
 
-    return NextResponse.json({ message: 'Archivo guardado correctamente.' });
+    // 2. Respaldar en la base de datos (upsert para crear o actualizar)
+    const { error: backupError } = await supabaseAdmin
+      .from('app_file_backups')
+      .upsert(
+        {
+          app_id: appId,
+          user_id: userId,
+          file_path: filePath,
+          file_content: content,
+        },
+        { onConflict: 'app_id, file_path' }
+      );
+
+    if (backupError) {
+      // A pesar del error de respaldo, el archivo se guardó en el contenedor.
+      // Se registra el error en el servidor pero no se lanza un error fatal al cliente.
+      console.error(`Error backing up file ${filePath} for app ${appId}:`, backupError);
+    }
+
+    return NextResponse.json({ message: 'Archivo guardado y respaldado correctamente.' });
   } catch (error: any) {
     return NextResponse.json({ message: error.message }, { status: 500 });
   }

@@ -60,7 +60,7 @@ export async function GET() {
       }
     }
 
-    // --- HIBERNATION LOGIC ---
+    // --- HIBERNATION (ARCHIVE & DELETE) LOGIC ---
     const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
     const { data: appsToHibernate, error: findHibernateError } = await supabaseAdmin
       .from('user_apps')
@@ -75,6 +75,7 @@ export async function GET() {
         const server = app.user_servers as any;
         if (server && app.container_id) {
           try {
+            // Backup files (this is a safety net, as files are backed up on save)
             const { stdout: filesList } = await executeSshCommand(server, `docker exec ${app.container_id} find /app -type f`);
             const files = filesList.trim().split('\n');
             
@@ -93,11 +94,14 @@ export async function GET() {
               await supabaseAdmin.from('app_file_backups').upsert(backups, { onConflict: 'app_id, file_path' });
             }
 
+            // Delete the container
             await executeSshCommand(server, `docker rm -f ${app.container_id}`);
+            
+            // Update app status to 'hibernated' (archived)
             await supabaseAdmin.from('user_apps').update({ status: 'hibernated', container_id: null, server_id: null }).eq('id', app.id);
             
             hibernatedCount++;
-            console.log(`[CRON LIFECYCLE] Hibernated app ${app.id}`);
+            console.log(`[CRON LIFECYCLE] Archived and deleted container for app ${app.id}`);
           } catch (error: any) {
             console.error(`[CRON LIFECYCLE] Failed to hibernate app ${app.id}:`, error.message);
           }
