@@ -127,7 +127,7 @@ export async function GET(
     ]);
 
     const cpu_usage_percent = parseFloat(cpuOutput.stdout);
-    const [raw_memory_used_str, raw_memory_total_str] = memOutput.stdout.split(' ');
+    const [raw_memory_used_str, raw_memory_total_str] = memOutput.stdout.split(/\s+/);
 
     const memory_used_mib = parseMemoryString(raw_memory_used_str || '0B');
     const memory_total_mib = parseMemoryString(raw_memory_total_str || '0B');
