@@ -1,17 +1,25 @@
 "use client";
 
 import React, { useRef, useEffect, useCallback } from 'react';
-import { useSession } from '@/components/session-context-provider';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { DockerContainer } from '@/types/docker';
+import { useSession } from '@/components/session-context-provider';
 import '@xterm/xterm/css/xterm.css';
 
-interface ContainerLiveLogsViewerProps {
-  isOpen: boolean;
+interface ContainerLogsDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   server: { id: string };
   container: DockerContainer;
 }
 
-export function ContainerLiveLogsViewer({ isOpen, server, container }: ContainerLiveLogsViewerProps) {
+export function ContainerLogsDialog({ open, onOpenChange, server, container }: ContainerLogsDialogProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const { session } = useSession();
   const wsRef = useRef<WebSocket | null>(null);
@@ -36,8 +44,17 @@ export function ContainerLiveLogsViewer({ isOpen, server, container }: Container
 
       ws.onopen = () => term.writeln('\r\n\x1b[32m[CLIENT] Conexión establecida. Mostrando logs...\x1b[0m\r\n');
       ws.onmessage = (event) => term.write(event.data instanceof ArrayBuffer ? new Uint8Array(event.data) : event.data);
-      ws.onerror = () => term.writeln(`\r\n\x1b[31m[CLIENT] Error de Conexión WebSocket.\x1b[0m`);
-      ws.onclose = () => term.writeln(`\r\n\x1b[33m[CLIENT] Desconectado de logs.\x1b[0m`);
+      ws.onerror = (error) => {
+        console.error('[ContainerLogsDialog] WebSocket error:', error);
+        term.writeln(`\r\n\x1b[31m[CLIENT] Error de Conexión WebSocket.\x1b[0m`);
+      };
+      ws.onclose = (event) => {
+        if (!event.wasClean) {
+          term.writeln(`\r\n\x1b[31m[CLIENT] Conexión perdida (código: ${event.code})\x1b[0m`);
+        } else {
+          term.writeln(`\r\n\x1b[33m[CLIENT] Desconectado de logs.\x1b[0m`);
+        }
+      };
 
     } catch (e: any) {
       term.writeln(`\x1b[31m[CLIENT] Error al inicializar el socket: ${e.message}\x1b[0m`);
@@ -45,24 +62,13 @@ export function ContainerLiveLogsViewer({ isOpen, server, container }: Container
   }, [server.id, container.ID, session?.user.id]);
 
   useEffect(() => {
-    if (!isOpen) {
-      // Cleanup when collapsible is closed
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
-      if (termRef.current) {
-        termRef.current.dispose();
-        termRef.current = null;
-      }
-      if (terminalRef.current) {
-        terminalRef.current.innerHTML = '';
-      }
+    if (!open) {
       return;
     }
 
     let term: any = null;
     let fitAddon: any = null;
+    let resizeObserver: ResizeObserver | null = null;
 
     const initTerminal = async () => {
       if (terminalRef.current && !termRef.current) {
@@ -84,14 +90,23 @@ export function ContainerLiveLogsViewer({ isOpen, server, container }: Container
         
         setTimeout(() => fitAddon.fit(), 10);
 
+        resizeObserver = new ResizeObserver(() => {
+          try {
+            fitAddon?.fit();
+          } catch (e) {
+            console.error('[ContainerLogsDialog] ResizeObserver fit error:', e);
+          }
+        });
+        resizeObserver.observe(terminalRef.current);
+
         await initializeSocket(term);
       }
     };
 
     initTerminal();
 
-    // This cleanup runs when the component unmounts (e.g., dialog closes)
     return () => {
+      resizeObserver?.disconnect();
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
@@ -101,11 +116,19 @@ export function ContainerLiveLogsViewer({ isOpen, server, container }: Container
         termRef.current = null;
       }
     };
-  }, [isOpen, initializeSocket]);
+  }, [open, initializeSocket]);
 
   return (
-    <div className="p-2 bg-[#1E1E1E] rounded-b-md">
-      <div ref={terminalRef} style={{ height: '400px', width: '100%' }} />
-    </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[80vw] w-[80vw] h-[80vh] flex flex-col p-4">
+        <DialogHeader className="px-2 pt-2">
+          <DialogTitle>Logs en Vivo: {container.Names} ({container.ID.substring(0, 12)})</DialogTitle>
+          <DialogDescription>
+            Mostrando la salida del contenedor en tiempo real.
+          </DialogDescription>
+        </DialogHeader>
+        <div ref={terminalRef} className="flex-1 w-full h-full bg-black rounded-md p-2" />
+      </DialogContent>
+    </Dialog>
   );
 }

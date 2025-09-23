@@ -41,13 +41,33 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
   console.log(`[WSS] ${connectionId} Connection parameters: serverId=${serverId}, containerId=${containerId}, userId=${userId}, mode=${mode || 'shell'}`);
 
   try {
-    console.log(`[WSS] ${connectionId} Fetching server details from Supabase for serverId: ${serverId}, userId: ${userId}`);
-    const { data: server, error: fetchError } = await supabaseAdmin
+    // 1. Fetch profile of the user trying to connect to determine their role
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single();
+
+    if (profileError || !profile) {
+      console.error(`[WSS] ${connectionId} ERROR: User profile not found for userId: ${userId}`, profileError);
+      ws.send(`\r\n\x1b[31m[SERVER] Error: Perfil de usuario no encontrado.\x1b[0m\r\n`);
+      ws.close();
+      return;
+    }
+    const userRole = profile.role;
+
+    // 2. Build the query for the server
+    let serverQuery = supabaseAdmin
       .from('user_servers')
       .select('ip_address, ssh_port, ssh_username, ssh_password')
-      .eq('id', serverId)
-      .eq('user_id', userId)
-      .single();
+      .eq('id', serverId);
+
+    // 3. If the user is NOT an admin or super_admin, scope the query to their own servers
+    if (userRole !== 'admin' && userRole !== 'super_admin') {
+      serverQuery = serverQuery.eq('user_id', userId);
+    }
+
+    const { data: server, error: fetchError } = await serverQuery.single();
 
     if (fetchError || !server) {
       console.error(`[WSS] ${connectionId} ERROR: Server not found or access denied.`, fetchError);

@@ -27,14 +27,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Trash2, AlertCircle, Play, StopCircle, Terminal, Globe, History, ScrollText, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { DockerContainer } from '@/types/docker';
 import { CreateTunnelDialog } from './CreateTunnelDialog';
 import { ContainerHistoryDialog } from '@/components/container-history-dialog';
-import { ContainerLiveLogsViewer } from './ContainerLiveLogsViewer'; // Import the new component
+import { ContainerLogsDialog } from '@/components/container-logs-dialog';
 
 interface DockerContainerListProps {
   containers: DockerContainer[];
@@ -52,7 +52,8 @@ export function DockerContainerList({ containers, server, isLoading, actionLoadi
   const [selectedContainerForTunnel, setSelectedContainerForTunnel] = useState<DockerContainer | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedContainerForHistory, setSelectedContainerForHistory] = useState<DockerContainer | null>(null);
-  const [expandedLogContainerId, setExpandedLogContainerId] = useState<string | null>(null);
+  const [isLogsOpen, setIsLogsOpen] = useState(false);
+  const [selectedContainerForLogs, setSelectedContainerForLogs] = useState<DockerContainer | null>(null);
 
   const openCreateTunnelDialogFor = (container: DockerContainer) => {
     setSelectedContainerForTunnel(container);
@@ -64,40 +65,40 @@ export function DockerContainerList({ containers, server, isLoading, actionLoadi
     setIsHistoryOpen(true);
   };
 
-  const toggleLogsFor = (containerId: string) => {
-    setExpandedLogContainerId(prevId => (prevId === containerId ? null : containerId));
+  const openLogsFor = (container: DockerContainer) => {
+    setSelectedContainerForLogs(container);
+    setIsLogsOpen(true);
   };
 
   return (
     <>
-      <TooltipProvider>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>ID</TableHead>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Imagen</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Puertos</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {containers.map((container) => {
-              const isRunning = container.Status.includes('Up');
-              const isGracefullyExited = container.Status.includes('Exited (0)') || container.Status.includes('Exited (137)');
-              const isErrorState = !isRunning && !isGracefullyExited;
-              const isWarningState = !isRunning && isGracefullyExited;
-              const isActionInProgress = actionLoading === container.ID;
-              const isLogExpanded = expandedLogContainerId === container.ID;
+      <ScrollArea className="h-full w-full">
+        <TooltipProvider>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID</TableHead>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Imagen</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead>Puertos</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {containers.map((container) => {
+                const isRunning = container.Status.includes('Up');
+                const isGracefullyExited = container.Status.includes('Exited (0)') || container.Status.includes('Exited (137)');
+                const isErrorState = !isRunning && !isGracefullyExited;
+                const isWarningState = !isRunning && isGracefullyExited;
+                const isActionInProgress = actionLoading === container.ID;
 
-              return (
-                <React.Fragment key={container.ID}>
+                return (
                   <TableRow 
+                    key={container.ID} 
                     className={cn(
                       isErrorState && "bg-destructive/10 text-destructive hover:bg-destructive/20",
-                      isWarningState && "bg-warning/10 text-warning hover:bg-warning/20",
-                      isLogExpanded && "border-b-0" // Remove bottom border when log is open
+                      isWarningState && "bg-warning/10 text-warning hover:bg-warning/20"
                     )}
                   >
                     <TableCell className="font-mono text-xs">{container.ID.substring(0, 12)}</TableCell>
@@ -127,7 +128,7 @@ export function DockerContainerList({ containers, server, isLoading, actionLoadi
                     <TableCell>{container.Ports || '-'}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Button variant="outline" size="icon" onClick={() => toggleLogsFor(container.ID)} title="Ver logs" disabled={!canManageDockerContainers}>
+                        <Button variant="outline" size="icon" onClick={() => openLogsFor(container)} title="Ver logs" disabled={!canManageDockerContainers}>
                           <Terminal className="h-4 w-4" />
                         </Button>
                         <DropdownMenu>
@@ -162,23 +163,20 @@ export function DockerContainerList({ containers, server, isLoading, actionLoadi
                       </div>
                     </TableCell>
                   </TableRow>
-                  {isLogExpanded && (
-                    <TableRow>
-                      <TableCell colSpan={6} className="p-0">
-                        <ContainerLiveLogsViewer
-                          isOpen={isLogExpanded}
-                          server={server}
-                          container={container}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </TooltipProvider>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TooltipProvider>
+      </ScrollArea>
+      {selectedContainerForLogs && (
+        <ContainerLogsDialog
+          open={isLogsOpen}
+          onOpenChange={setIsLogsOpen}
+          server={server}
+          container={selectedContainerForLogs}
+        />
+      )}
       {selectedContainerForHistory && (
         <ContainerHistoryDialog
           open={isHistoryOpen}
