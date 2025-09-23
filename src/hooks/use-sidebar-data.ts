@@ -60,49 +60,53 @@ export function useSidebarData() {
     }
 
     setIsLoading(true);
+    try {
+      const [appsRes, convRes, folderRes, notesRes] = await Promise.all([
+        supabase.from('user_apps').select('id, name, status, url, conversation_id').eq('user_id', userId).order('created_at', { ascending: false }),
+        supabase.from('conversations').select('id, title, created_at, folder_id, order_index').eq('user_id', userId).order('order_index', { ascending: true }).order('created_at', { ascending: false }),
+        supabase.from('folders').select('id, name, parent_id, created_at, user_id').eq('user_id', userId).order('created_at', { ascending: false }),
+        supabase.from('notes').select('id, title, folder_id, created_at, updated_at').eq('user_id', userId).order('updated_at', { ascending: false }) // Fetch notes
+      ]);
 
-    const [appsRes, convRes, folderRes, notesRes] = await Promise.all([
-      supabase.from('user_apps').select('id, name, status, url, conversation_id').eq('user_id', userId).order('created_at', { ascending: false }),
-      supabase.from('conversations').select('id, title, created_at, folder_id, order_index').eq('user_id', userId).order('order_index', { ascending: true }).order('created_at', { ascending: false }),
-      supabase.from('folders').select('id, name, parent_id, created_at, user_id').eq('user_id', userId).order('created_at', { ascending: false }),
-      supabase.from('notes').select('id, title, folder_id, created_at, updated_at').eq('user_id', userId).order('updated_at', { ascending: false }) // Fetch notes
-    ]);
+      const { data: appData, error: appError } = appsRes;
+      const { data: convData, error: convError } = convRes;
+      const { data: folderData, error: folderError } = folderRes;
+      const { data: noteData, error: noteError } = notesRes; // Destructure notes response
 
-    const { data: appData, error: appError } = appsRes;
-    const { data: convData, error: convError } = convRes;
-    const { data: folderData, error: folderError } = folderRes;
-    const { data: noteData, error: noteError } = notesRes; // Destructure notes response
+      if (appError) {
+        console.error('Error fetching apps:', appError);
+        toast.error('Error al cargar los proyectos.');
+      } else {
+        setApps(appData || []);
+      }
 
-    if (appError) {
-      console.error('Error fetching apps:', appError);
-      toast.error('Error al cargar los proyectos.');
-    } else {
-      setApps(appData || []);
+      if (convError) {
+        console.error('Error fetching conversations:', convError);
+        toast.error('Error al cargar las conversaciones.');
+      } else {
+        const appConversationIds = new Set((appData || []).map(app => app.conversation_id));
+        setConversations((convData || []).filter(conv => !appConversationIds.has(conv.id)));
+      }
+
+      if (folderError) {
+        console.error('Error fetching folders:', folderError);
+        toast.error('Error al cargar las carpetas.');
+      } else {
+        setFolders(folderData || []);
+      }
+
+      if (noteError) {
+        console.error('Error fetching notes:', noteError);
+        toast.error('Error al cargar las notas.');
+      } else {
+        setNotes(noteData || []);
+      }
+    } catch (error) {
+      console.error("A critical error occurred while fetching sidebar data:", error);
+      toast.error("Ocurrió un error crítico al recargar la barra lateral.");
+    } finally {
+      setIsLoading(false);
     }
-
-    if (convError) {
-      console.error('Error fetching conversations:', convError);
-      toast.error('Error al cargar las conversaciones.');
-    } else {
-      const appConversationIds = new Set((appData || []).map(app => app.conversation_id));
-      setConversations((convData || []).filter(conv => !appConversationIds.has(conv.id)));
-    }
-
-    if (folderError) {
-      console.error('Error fetching folders:', folderError);
-      toast.error('Error al cargar las carpetas.');
-    } else {
-      setFolders(folderData || []);
-    }
-
-    if (noteError) {
-      console.error('Error fetching notes:', noteError);
-      toast.error('Error al cargar las notas.');
-    } else {
-      setNotes(noteData || []);
-    }
-
-    setIsLoading(false);
   }, [userId]);
 
   useEffect(() => {
