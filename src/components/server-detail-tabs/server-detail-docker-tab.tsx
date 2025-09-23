@@ -59,7 +59,7 @@ export function ServerDetailDockerTab({ server, userRole }: ServerDetailDockerTa
     }
   }, [server.id, fetchContainers]);
 
-  const handleContainerAction = async (containerId: string, action: 'start' | 'stop' | 'delete') => {
+  const handleContainerAction = async (containerId: string, action: 'start' | 'stop' | 'delete' | 'restart') => {
     setActionLoading(containerId);
     try {
       let response;
