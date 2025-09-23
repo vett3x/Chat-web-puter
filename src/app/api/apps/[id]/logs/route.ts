@@ -14,7 +14,7 @@ async function getUserId() {
   return session.user.id;
 }
 
-export async function GET(req: NextRequest, context: { params: { id: string } }) {
+export async function GET(req: NextRequest, context: any) {
   const appId = context.params.id;
 
   try {
