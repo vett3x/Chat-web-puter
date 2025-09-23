@@ -56,18 +56,12 @@ interface UseChatProps {
   onConversationTitleUpdate: (conversationId: string, newTitle: string) => void;
 }
 
-// Helper to parse a single string response into multiple parts (text and code)
 const codeBlockRegex = /```(\w+)?(?::([\w./-]+))?\n([\s\S]*?)\n```/g;
 interface ParsedPart {
   type: 'text' | 'code';
   content: string;
 }
-function parseContentIntoParts(content: string | PuterContentPart[]): ParsedPart[] {
-  if (typeof content !== 'string') {
-    // For now, treat multimodal content as a single part
-    return [{ type: 'text', content: JSON.stringify(content) }];
-  }
-
+function parseStringIntoTextAndCode(content: string): ParsedPart[] {
   const parts: ParsedPart[] = [];
   let lastIndex = 0;
   let match;
@@ -220,7 +214,17 @@ export function useChat({
       if (!response || response.error) throw new Error(response?.error?.message || 'Error de la IA.');
 
       const assistantMessageContent = response?.message?.content || 'Sin contenido.';
-      const parts = parseContentIntoParts(assistantMessageContent);
+      
+      let contentToParse: string;
+      if (typeof assistantMessageContent === 'string') {
+        contentToParse = assistantMessageContent;
+      } else if (Array.isArray(assistantMessageContent) && assistantMessageContent[0]?.type === 'text') {
+        contentToParse = assistantMessageContent[0].text;
+      } else {
+        contentToParse = JSON.stringify(assistantMessageContent);
+      }
+
+      const parts = parseStringIntoTextAndCode(contentToParse);
 
       setMessages(prev => prev.filter(m => m.id !== tempTypingId));
 
@@ -238,7 +242,6 @@ export function useChat({
         if (savedData) {
           setMessages(prev => prev.map(msg => msg.id === tempPartId ? { ...msg, id: savedData.id, timestamp: savedData.timestamp } : msg));
         }
-        await new Promise(res => setTimeout(res, 300));
       }
     } catch (error: any) {
       toast.error(error.message);

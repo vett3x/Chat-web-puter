@@ -11,9 +11,9 @@ interface TextAnimatorProps {
 }
 
 const SPEED_DELAYS = {
-  slow: 50,
-  normal: 25,
-  fast: 15,
+  slow: 20,
+  normal: 10,
+  fast: 5,
 };
 
 export function TextAnimator({ text, className, isNew, onAnimationComplete, animationSpeed }: TextAnimatorProps) {

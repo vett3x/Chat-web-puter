@@ -19,9 +19,9 @@ interface CodeBlockProps {
 }
 
 const SPEED_CONFIG = {
-  slow: { targetCharsPerSecond: 500, chunkSize: 10, minDelay: 2 },
-  normal: { targetCharsPerSecond: 1000, chunkSize: 15, minDelay: 1 },
-  fast: { targetCharsPerSecond: 2000, chunkSize: 20, minDelay: 0.5 },
+  slow: { targetCharsPerSecond: 1500, chunkSize: 20, minDelay: 2 },
+  normal: { targetCharsPerSecond: 3000, chunkSize: 30, minDelay: 1 },
+  fast: { targetCharsPerSecond: 5000, chunkSize: 40, minDelay: 0.5 },
 };
 
 export function CodeBlock({ language, code, filename, isNew, onAnimationComplete, animationSpeed }: CodeBlockProps) {
