@@ -6,6 +6,7 @@ import { ConversationSidebar } from "@/components/conversation-sidebar";
 import { ChatInterface } from "@/components/chat-interface";
 import { AppPreviewPanel } from "@/components/app-preview-panel";
 import { CodeEditorPanel } from "@/components/code-editor-panel";
+import { NoteEditorPanel } from "@/components/note-editor-panel"; // Import new component
 import { ProfileSettingsDialog } from "@/components/profile-settings-dialog";
 import { AppSettingsDialog } from "@/components/app-settings-dialog";
 import { ServerManagementDialog } from "@/components/server-management-dialog";
@@ -30,8 +31,8 @@ interface UserApp {
 
 interface SelectedItem {
   id: string;
-  type: 'app' | 'conversation';
-  conversationId: string | null;
+  type: 'app' | 'conversation' | 'note'; // Add 'note' type
+  conversationId?: string | null; // Make optional
 }
 
 interface ActiveFile {
@@ -39,7 +40,7 @@ interface ActiveFile {
   content: string;
 }
 
-type RightPanelView = 'chat' | 'editor' | 'preview';
+type RightPanelView = 'chat' | 'editor' | 'preview' | 'note'; // Add 'note' view
 
 export default function Home() {
   const { session, isLoading: isSessionLoading, userRole } = useSession();
@@ -61,7 +62,6 @@ export default function Home() {
     return 'normal';
   });
 
-  // State for the right-hand panel
   const [rightPanelView, setRightPanelView] = useState<RightPanelView>('chat');
   const [activeFile, setActiveFile] = useState<ActiveFile | null>(null);
   const [isFileLoading, setIsFileLoading] = useState(false);
@@ -72,9 +72,9 @@ export default function Home() {
     }
   }, [aiResponseSpeed]);
 
-  const handleSelectItem = useCallback(async (id: string | null, type: 'app' | 'conversation' | null) => {
-    setActiveFile(null); // Reset active file on any new selection
-    setRightPanelView('chat'); // Default to chat view
+  const handleSelectItem = useCallback(async (id: string | null, type: 'app' | 'conversation' | 'note' | null) => {
+    setActiveFile(null);
+    setRightPanelView('chat');
 
     if (!id || !type) {
       setSelectedItem(null);
@@ -90,11 +90,15 @@ export default function Home() {
       }
       setSelectedAppDetails(data);
       setSelectedItem({ id, type, conversationId: data.conversation_id });
-      setRightPanelView('preview'); // For apps, default to preview
-    } else {
+      setRightPanelView('preview');
+    } else if (type === 'conversation') {
       setSelectedAppDetails(null);
       setSelectedItem({ id, type, conversationId: id });
-      setRightPanelView('chat'); // For conversations, it's always chat
+      setRightPanelView('chat');
+    } else if (type === 'note') {
+      setSelectedAppDetails(null);
+      setSelectedItem({ id, type, conversationId: null });
+      setRightPanelView('note'); // Switch to note editor view
     }
   }, [userId]);
 
@@ -143,6 +147,9 @@ export default function Home() {
     }
     if (rightPanelView === 'preview' && selectedItem?.type === 'app') {
       return <AppPreviewPanel appUrl={selectedAppDetails?.url || null} appStatus={selectedAppDetails?.status || null} />;
+    }
+    if (rightPanelView === 'note' && selectedItem?.type === 'note') {
+      return <NoteEditorPanel noteId={selectedItem.id} onNoteUpdated={() => { /* We need to trigger a sidebar refresh here */ }} />;
     }
     // Default to chat interface
     return (

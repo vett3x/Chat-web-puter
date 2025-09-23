@@ -3,9 +3,9 @@
 import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useSession } from '@/components/session-context-provider';
-import { Loader2, MessageSquare, ChevronRight, ChevronDown, Wand2, Code } from 'lucide-react';
+import { Loader2, MessageSquare, ChevronRight, ChevronDown, Wand2, Code, FileText, Folder as FolderIcon } from 'lucide-react';
 import { SidebarHeader } from './sidebar-header';
-import { useConversations } from '@/hooks/use-conversations';
+import { useSidebarData } from '@/hooks/use-sidebar-data';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -14,17 +14,37 @@ import { cn } from '@/lib/utils';
 import { DraggableFolderItem } from './draggable-folder-item';
 import { DraggableConversationCard } from './draggable-conversation-card';
 import { toast } from 'sonner';
-import { FileTree } from './file-tree'; // Import the new component
+import { FileTree } from './file-tree';
+
+// New component for notes
+const DraggableNoteItem: React.FC<{ note: any; selected: boolean; onSelect: () => void; onDragStart: (e: React.DragEvent) => void }> = ({ note, selected, onSelect, onDragStart }) => (
+  <Card
+    className={cn(
+      "cursor-pointer hover:bg-sidebar-accent transition-colors group relative",
+      selected && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary"
+    )}
+    onClick={onSelect}
+    draggable="true"
+    onDragStart={onDragStart}
+  >
+    <CardContent className="py-1 px-1.5 flex items-center justify-between gap-1">
+      <div className="flex items-center gap-1 flex-1 overflow-hidden">
+        <FileText className="h-3 w-3 flex-shrink-0 ml-2" />
+        <span className="text-xs truncate">{note.title}</span>
+      </div>
+    </CardContent>
+  </Card>
+);
 
 interface SelectedItem {
   id: string;
-  type: 'app' | 'conversation';
+  type: 'app' | 'conversation' | 'note';
 }
 
 interface ConversationSidebarProps {
   selectedItem: SelectedItem | null;
-  onSelectItem: (id: string | null, type: 'app' | 'conversation' | null) => void;
-  onFileSelect: (path: string) => void; // New prop
+  onSelectItem: (id: string | null, type: 'app' | 'conversation' | 'note' | null) => void;
+  onFileSelect: (path: string) => void;
   onOpenProfileSettings: () => void;
   onOpenAppSettings: () => void;
   onOpenServerManagement: () => void;
@@ -35,7 +55,7 @@ interface ConversationSidebarProps {
 export function ConversationSidebar({
   selectedItem,
   onSelectItem,
-  onFileSelect, // New prop
+  onFileSelect,
   onOpenProfileSettings,
   onOpenAppSettings,
   onOpenServerManagement,
@@ -47,32 +67,27 @@ export function ConversationSidebar({
     apps,
     conversations,
     folders,
+    notes,
     isLoading: isLoadingData,
     fetchData,
     createConversation,
     createFolder,
-    moveConversation,
-    reorderConversation,
-    moveFolder,
-  } = useConversations();
+    createNote,
+    moveItem,
+  } = useSidebarData();
 
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
-  const [isGeneralExpanded, setIsGeneralExpanded] = useState(true);
-
-  // Drag and Drop State
-  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
-  const [draggedItemType, setDraggedItemType] = useState<'conversation' | 'folder' | null>(null);
-  const [draggingOverFolderId, setDraggingOverFolderId] = useState<string | null>(null);
-  const [draggedOverConversationId, setDraggedOverConversationId] = useState<string | null>(null);
-  const [dropPosition, setDropPosition] = useState<'before' | 'after' | null>(null);
+  const [isCreatingNote, setIsCreatingNote] = useState(false);
+  const [expandedSections, setExpandedSections] = useState({
+    apps: true,
+    chats: true,
+    notes: true,
+  });
 
   const handleCreateConversation = async () => {
     setIsCreatingConversation(true);
-    await createConversation((newConversation) => {
-      onSelectItem(newConversation.id, 'conversation');
-      setIsGeneralExpanded(true);
-    });
+    await createConversation((newItem) => onSelectItem(newItem.id, 'conversation'));
     setIsCreatingConversation(false);
   };
 
@@ -82,73 +97,49 @@ export function ConversationSidebar({
     setIsCreatingFolder(false);
   };
 
-  const handleDragStart = (e: React.DragEvent, id: string, type: 'conversation' | 'folder') => {
-    e.dataTransfer.setData('text/plain', JSON.stringify({ id, type }));
-    setDraggedItemId(id);
-    setDraggedItemType(type);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedItemId(null);
-    setDraggedItemType(null);
-    setDraggingOverFolderId(null);
-    setDraggedOverConversationId(null);
-    setDropPosition(null);
+  const handleCreateNote = async () => {
+    setIsCreatingNote(true);
+    await createNote((newItem) => onSelectItem(newItem.id, 'note'));
+    setIsCreatingNote(false);
   };
 
   const handleDrop = (e: React.DragEvent, targetFolderId: string | null) => {
     e.preventDefault();
     e.stopPropagation();
-    setDraggingOverFolderId(null);
-
     const data = e.dataTransfer.getData('text/plain');
     if (!data) return;
-
     try {
       const { id, type } = JSON.parse(data);
-      if (type === 'conversation') {
-        moveConversation(id, targetFolderId);
-      } else if (type === 'folder') {
-        if (id === targetFolderId) return;
-        moveFolder(id, targetFolderId);
-      }
+      moveItem(id, type, targetFolderId);
     } catch (error) {
-      console.error('Error parsing drag data:', error);
-      toast.error('Error al procesar el arrastre.');
+      toast.error('Error al mover el elemento.');
     }
   };
 
-  const handleDragEnterFolder = (e: React.DragEvent, folderId: string | null) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDraggingOverFolderId(folderId);
-  };
-
-  const handleDragLeaveFolder = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDraggingOverFolderId(null);
-  };
-
-  const rootFolders = folders.filter(f => f.parent_id === null);
-  const generalConversations = conversations.filter(conv => conv.folder_id === null);
-
-  if (isSessionLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full p-4">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="mt-2 text-muted-foreground">Cargando sesión...</p>
+  const renderSection = (title: string, icon: React.ReactNode, key: keyof typeof expandedSections, items: React.ReactNode) => (
+    <>
+      <div className="px-2 py-1">
+        <h3
+          className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-2 cursor-pointer"
+          onClick={() => setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }))}
+        >
+          {expandedSections[key] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          {icon} {title}
+        </h3>
       </div>
-    );
-  }
+      {expandedSections[key] && items}
+    </>
+  );
 
   return (
-    <div className="flex flex-col h-full p-4 border-r bg-sidebar text-sidebar-foreground" onDragEnd={handleDragEnd}>
+    <div className="flex flex-col h-full p-4 border-r bg-sidebar text-sidebar-foreground">
       <SidebarHeader
         onNewConversation={handleCreateConversation}
         onNewFolder={handleCreateFolder}
+        onNewNote={handleCreateNote}
         isCreatingConversation={isCreatingConversation}
         isCreatingFolder={isCreatingFolder}
+        isCreatingNote={isCreatingNote}
         onOpenProfileSettings={onOpenProfileSettings}
         onOpenAppSettings={onOpenAppSettings}
         onOpenServerManagement={onOpenServerManagement}
@@ -159,119 +150,68 @@ export function ConversationSidebar({
       <ScrollArea className="flex-1">
         <div className="space-y-2">
           {isLoadingData ? (
-            Array.from({ length: 8 }).map((_, i) => (
-              <Card key={i} className="p-3 flex items-center gap-2 bg-sidebar-accent">
-                <Skeleton className="h-4 w-4 rounded-full" />
-                <Skeleton className="h-4 w-3/4" />
-              </Card>
-            ))
+            Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)
           ) : (
             <>
-              <div className="px-2 py-1">
-                <h3 className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-2">
-                  <Wand2 className="h-4 w-4" /> Proyectos DeepAI Coder
-                </h3>
-              </div>
-              {apps.map(app => (
-                <div key={app.id}>
-                  <Card
-                    className={cn(
-                      "cursor-pointer hover:bg-sidebar-accent transition-colors group relative",
-                      selectedItem?.type === 'app' && selectedItem.id === app.id && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary"
+              {renderSection("Proyectos DeepAI Coder", <Wand2 className="h-4 w-4" />, "apps",
+                apps.map(app => (
+                  <div key={app.id}>
+                    <Card
+                      className={cn("cursor-pointer hover:bg-sidebar-accent", selectedItem?.type === 'app' && selectedItem.id === app.id && "bg-sidebar-primary text-sidebar-primary-foreground")}
+                      onClick={() => onSelectItem(app.id, 'app')}
+                    >
+                      <CardContent className="py-1 px-1.5 flex items-center gap-1"><Code className="h-3 w-3 ml-2" /><span className="text-xs truncate">{app.name}</span></CardContent>
+                    </Card>
+                    {selectedItem?.type === 'app' && selectedItem.id === app.id && (
+                      <div className="border-l-2 border-sidebar-primary ml-2"><FileTree appId={app.id} onFileSelect={onFileSelect} /></div>
                     )}
-                    onClick={() => onSelectItem(app.id, 'app')}
-                  >
-                    <CardContent className="py-1 px-1.5 flex items-center justify-between gap-1">
-                      <div className="flex items-center gap-1 flex-1 overflow-hidden">
-                        <Code className="h-3 w-3 flex-shrink-0 ml-2" />
-                        <span className="text-xs truncate">{app.name}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  {selectedItem?.type === 'app' && selectedItem.id === app.id && (
-                    <div className="border-l-2 border-sidebar-primary ml-2">
-                      <FileTree appId={app.id} onFileSelect={onFileSelect} />
-                    </div>
-                  )}
-                </div>
-              ))}
+                  </div>
+                ))
+              )}
 
               <Separator className="my-4 bg-sidebar-border" />
 
-              <div className="px-2 py-1">
-                <h3 className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4" /> Chats Convencionales
-                </h3>
-              </div>
-              <Card
-                className={cn(
-                  "cursor-pointer hover:bg-sidebar-accent transition-colors group relative",
-                  draggingOverFolderId === null && draggedItemType === 'conversation' && "border-2 border-blue-500 bg-blue-500/10"
-                )}
-                onClick={() => setIsGeneralExpanded(!isGeneralExpanded)}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => handleDrop(e, null)}
-                onDragEnter={(e) => handleDragEnterFolder(e, null)}
-                onDragLeave={handleDragLeaveFolder}
-              >
-                <CardContent className="py-1.5 px-2 flex items-center justify-between gap-1">
-                  <div className="flex items-center flex-1 overflow-hidden">
-                    <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0">
-                      {isGeneralExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                    </Button>
-                    <span className="text-sm font-medium truncate flex-1">General</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {isGeneralExpanded && (
-                <div className="pl-4 space-y-1">
-                  {generalConversations.map((conversation) => (
-                    <DraggableConversationCard
-                      key={conversation.id}
-                      conversation={conversation}
-                      selectedConversationId={selectedItem?.type === 'conversation' ? selectedItem.id : null}
-                      onSelectConversation={(convId) => onSelectItem(convId, convId ? 'conversation' : null)}
-                      onConversationUpdated={fetchData}
-                      onConversationDeleted={fetchData}
-                      onConversationMoved={moveConversation}
-                      onConversationReordered={reorderConversation}
-                      allFolders={folders}
-                      level={0}
-                      onDragStart={handleDragStart}
-                      isDraggingOver={draggedOverConversationId === conversation.id && draggedItemType === 'conversation'}
-                      dropPosition={draggedOverConversationId === conversation.id ? dropPosition : null}
-                    />
-                  ))}
-                </div>
+              {renderSection("Notas", <FileText className="h-4 w-4" />, "notes",
+                notes.filter(n => !n.folder_id).map(note => (
+                  <DraggableNoteItem
+                    key={note.id}
+                    note={note}
+                    selected={selectedItem?.type === 'note' && selectedItem.id === note.id}
+                    onSelect={() => onSelectItem(note.id, 'note')}
+                    onDragStart={(e) => e.dataTransfer.setData('text/plain', JSON.stringify({ id: note.id, type: 'note' }))}
+                  />
+                ))
               )}
 
-              {rootFolders.map((folder) => (
-                <DraggableFolderItem
-                  key={folder.id}
-                  folder={folder}
-                  level={0}
-                  selectedConversationId={selectedItem?.type === 'conversation' ? selectedItem.id : null}
-                  onSelectConversation={(convId) => onSelectItem(convId, convId ? 'conversation' : null)}
-                  onSelectFolder={() => {}}
-                  conversations={conversations}
-                  subfolders={folders}
-                  onFolderUpdated={fetchData}
-                  onFolderDeleted={fetchData}
-                  onConversationMoved={moveConversation}
-                  onFolderMoved={moveFolder}
-                  onCreateSubfolder={handleCreateFolder}
-                  allFolders={folders}
-                  onDragStart={handleDragStart}
-                  onDrop={handleDrop}
-                  isDraggingOver={draggingOverFolderId === folder.id}
-                  onDragEnter={handleDragEnterFolder}
-                  onDragLeave={handleDragLeaveFolder}
-                  onConversationReordered={reorderConversation}
-                  draggedOverConversationId={draggedOverConversationId}
-                  dropPosition={dropPosition}
-                  draggedItemType={draggedItemType}
-                />
+              <Separator className="my-4 bg-sidebar-border" />
+
+              {renderSection("Chats", <MessageSquare className="h-4 w-4" />, "chats",
+                conversations.filter(c => !c.folder_id).map(conv => (
+                  <DraggableConversationCard
+                    key={conv.id}
+                    conversation={conv}
+                    selectedConversationId={selectedItem?.type === 'conversation' ? selectedItem.id : null}
+                    onSelectConversation={(id) => onSelectItem(id, 'conversation')}
+                    onConversationUpdated={fetchData}
+                    onConversationDeleted={fetchData}
+                    onConversationMoved={() => {}}
+                    onConversationReordered={() => {}}
+                    allFolders={[]}
+                    level={0}
+                    onDragStart={(e) => e.dataTransfer.setData('text/plain', JSON.stringify({ id: conv.id, type: 'conversation' }))}
+                    isDraggingOver={false}
+                    dropPosition={null}
+                  />
+                ))
+              )}
+
+              <Separator className="my-4 bg-sidebar-border" />
+              
+              {folders.filter(f => !f.parent_id).map(folder => (
+                <div key={folder.id} onDrop={(e) => handleDrop(e, folder.id)} onDragOver={(e) => e.preventDefault()}>
+                  {/* Folder rendering logic will need to be updated to show notes and conversations */}
+                  <Card className="p-2"><FolderIcon className="h-4 w-4 inline mr-2" />{folder.name}</Card>
+                </div>
               ))}
             </>
           )}

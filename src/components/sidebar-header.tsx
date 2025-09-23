@@ -2,15 +2,17 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Loader2, Folder, Server, Users, Wand2 } from 'lucide-react';
+import { Plus, Loader2, Folder, Server, Users, Wand2, FileText } from 'lucide-react';
 import { ProfileDropdown } from './profile-dropdown';
 import { useSession } from './session-context-provider';
 
 interface SidebarHeaderProps {
   onNewConversation: () => void;
   onNewFolder: (parentId?: string | null) => void;
+  onNewNote: () => void; // New prop for creating notes
   isCreatingConversation: boolean;
   isCreatingFolder: boolean;
+  isCreatingNote: boolean; // New prop
   onOpenProfileSettings: () => void;
   onOpenAppSettings: () => void;
   onOpenServerManagement: () => void;
@@ -21,8 +23,10 @@ interface SidebarHeaderProps {
 export function SidebarHeader({
   onNewConversation,
   onNewFolder,
+  onNewNote,
   isCreatingConversation,
   isCreatingFolder,
+  isCreatingNote,
   onOpenProfileSettings,
   onOpenAppSettings,
   onOpenServerManagement,
@@ -65,6 +69,20 @@ export function SidebarHeader({
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
               <Plus className="h-3.5 w-3.5" />
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onNewNote}
+            disabled={isCreatingNote}
+            className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7"
+            title="Nueva nota"
+          >
+            {isCreatingNote ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <FileText className="h-3.5 w-3.5" />
             )}
           </Button>
           <Button
