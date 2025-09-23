@@ -38,6 +38,19 @@ interface DraggableAppItemProps {
 }
 
 export function DraggableAppItem({ app, selected, onSelect, onDelete, isDeleting }: DraggableAppItemProps) {
+  if (isDeleting) {
+    return (
+      <Card className="bg-destructive/10 transition-colors">
+        <CardContent className="py-1 px-1.5 flex items-center justify-between gap-1">
+          <div className="flex items-center gap-2 flex-1 overflow-hidden text-destructive">
+            <Loader2 className="h-4 w-4 ml-2 animate-spin" />
+            <span className="text-xs truncate">Eliminando "{app.name}"...</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card
       className={cn(
@@ -79,7 +92,6 @@ export function DraggableAppItem({ app, selected, onSelect, onDelete, isDeleting
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
                     <AlertDialogAction onClick={() => onDelete(app.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                      {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                       Eliminar
                     </AlertDialogAction>
                   </AlertDialogFooter>
