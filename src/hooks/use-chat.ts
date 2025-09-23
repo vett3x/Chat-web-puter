@@ -315,7 +315,18 @@ export function useChat({
       }
 
     } catch (error: any) {
-      const errorMessage = error?.message || (typeof error === 'string' ? error : 'Ocurrió un error desconocido.');
+      console.error("[useChat] Full error object:", error);
+      let errorMessage = 'Ocurrió un error desconocido.';
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string' && error) {
+        errorMessage = error;
+      } else if (typeof error === 'object' && error !== null) {
+        try {
+          errorMessage = JSON.stringify(error);
+        } catch (e) { /* ignore */ }
+      }
+
       toast.error(errorMessage);
       setMessages(prev => prev.filter(m => m.id !== tempTypingId));
       setMessages(prev => [...prev, { id: `error-${Date.now()}`, role: 'assistant', content: `Error: ${errorMessage}`, isNew: true, timestamp: new Date() }]);
