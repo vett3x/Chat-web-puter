@@ -10,7 +10,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
@@ -23,12 +22,18 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Folder, ChevronRight, ChevronDown, Edit, Save, X, Trash2, Plus, MessageSquare, MoreVertical } from 'lucide-react';
+import { Folder, ChevronRight, ChevronDown, Edit, Save, X, Trash2, Plus, MoreVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from './session-context-provider';
 import { DraggableConversationCard } from './draggable-conversation-card';
+import { DraggableNoteItem } from './draggable-note-item'; // Import the new component
+
+interface Item {
+  id: string;
+  type: 'conversation' | 'note' | 'folder' | 'app';
+}
 
 interface Folder {
   id: string;
@@ -43,56 +48,52 @@ interface Conversation {
   title: string;
   created_at: string;
   folder_id: string | null;
-  order_index: number; // Added for reordering
+  order_index: number;
+}
+
+interface Note {
+  id: string;
+  title: string;
+  folder_id: string | null;
 }
 
 interface DraggableFolderItemProps {
   folder: Folder;
   level: number;
-  selectedConversationId: string | null;
-  onSelectConversation: (conversationId: string | null) => void;
-  onSelectFolder: (folderId: string | null) => void;
-  conversations: Conversation[]; // All conversations, filtered by folder_id inside
-  subfolders: Folder[]; // All folders, filtered by parent_id inside
-  onFolderUpdated: () => void; // Callback to refresh parent list
-  onFolderDeleted: () => void; // Callback to refresh parent list
-  onConversationMoved: (conversationId: string, targetFolderId: string | null) => void; // Centralized callback
-  onFolderMoved: (folderId: string, targetParentId: string | null) => void; // New callback for folder moves
+  selectedItem: Item | null;
+  onSelectItem: (id: string, type: Item['type']) => void;
+  conversations: Conversation[];
+  notes: Note[]; // Add notes prop
+  subfolders: Folder[];
+  onFolderUpdated: () => void;
+  onFolderDeleted: () => void;
+  onItemMoved: (itemId: string, itemType: 'conversation' | 'note' | 'folder', targetFolderId: string | null) => void;
   onCreateSubfolder: (parentId: string) => void;
-  allFolders: Folder[]; // For "move to folder" dropdown
-  onDragStart: (e: React.DragEvent, id: string, type: 'conversation' | 'folder') => void;
+  onDragStart: (e: React.DragEvent, id: string, type: 'conversation' | 'folder' | 'note') => void;
   onDrop: (e: React.DragEvent, targetFolderId: string | null) => void;
   isDraggingOver: boolean;
   onDragEnter: (e: React.DragEvent, folderId: string | null) => void;
   onDragLeave: (e: React.DragEvent, folderId: string | null) => void;
-  onConversationReordered: (draggedId: string, targetId: string, position: 'before' | 'after') => void; // New prop
-  draggedOverConversationId: string | null; // New prop
-  dropPosition: 'before' | 'after' | null; // New prop
-  draggedItemType: 'conversation' | 'folder' | null; // New prop
+  draggedItemType: 'conversation' | 'folder' | 'note' | null;
 }
 
 export function DraggableFolderItem({
   folder,
   level,
-  selectedConversationId,
-  onSelectConversation,
-  onSelectFolder,
+  selectedItem,
+  onSelectItem,
   conversations,
+  notes, // Destructure notes
   subfolders,
   onFolderUpdated,
   onFolderDeleted,
-  onConversationMoved,
-  onFolderMoved,
+  onItemMoved,
   onCreateSubfolder,
-  allFolders,
   onDragStart,
   onDrop,
   isDraggingOver,
   onDragEnter,
   onDragLeave,
-  onConversationReordered, // Destructure new prop
-  draggedOverConversationId,
-  dropPosition,
   draggedItemType,
 }: DraggableFolderItemProps) {
   const { session } = useSession();
@@ -102,10 +103,8 @@ export function DraggableFolderItem({
   const [editingName, setEditingName] = useState(folder.name);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const filteredConversations = conversations
-    .filter(conv => conv.folder_id === folder.id)
-    .sort((a, b) => a.order_index - b.order_index); // Sort by order_index
-
+  const filteredConversations = conversations.filter(conv => conv.folder_id === folder.id).sort((a, b) => a.order_index - b.order_index);
+  const filteredNotes = notes.filter(note => note.folder_id === folder.id); // Filter notes
   const filteredSubfolders = subfolders.filter(sub => sub.parent_id === folder.id);
 
   const handleSaveEdit = async () => {
@@ -117,15 +116,8 @@ export function DraggableFolderItem({
       setIsEditing(false);
       return;
     }
-
-    const { error } = await supabase
-      .from('folders')
-      .update({ name: editingName })
-      .eq('id', folder.id)
-      .eq('user_id', userId);
-
+    const { error } = await supabase.from('folders').update({ name: editingName }).eq('id', folder.id).eq('user_id', userId);
     if (error) {
-      console.error('Error updating folder name:', error);
       toast.error('Error al actualizar el nombre de la carpeta.');
     } else {
       toast.success('Nombre de carpeta actualizado.');
@@ -135,153 +127,70 @@ export function DraggableFolderItem({
   };
 
   const handleDeleteFolder = async () => {
-    if (!userId) {
-      toast.error('Usuario no autenticado.');
-      return;
-    }
-
-    // First, move all conversations from this folder to 'General' (folder_id = null)
-    if (filteredConversations.length > 0) {
-      const { error: updateError } = await supabase
-        .from('conversations')
-        .update({ folder_id: null })
-        .eq('folder_id', folder.id)
-        .eq('user_id', userId);
-
-      if (updateError) {
-        console.error('Error moving conversations from folder:', updateError);
-        toast.error('Error al mover las conversaciones de la carpeta.');
-        setIsDeleting(false);
-        return;
-      }
-    }
-
-    // Check if folder still contains subfolders
+    if (!userId) return;
+    // Move conversations and notes to root
+    await supabase.from('conversations').update({ folder_id: null }).eq('folder_id', folder.id).eq('user_id', userId);
+    await supabase.from('notes').update({ folder_id: null }).eq('folder_id', folder.id).eq('user_id', userId);
     if (filteredSubfolders.length > 0) {
       toast.error('No se puede eliminar una carpeta que contiene subcarpetas. Vacíalas primero.');
       setIsDeleting(false);
       return;
     }
-
-    const { error } = await supabase
-      .from('folders')
-      .delete()
-      .eq('id', folder.id)
-      .eq('user_id', userId);
-
+    const { error } = await supabase.from('folders').delete().eq('id', folder.id).eq('user_id', userId);
     if (error) {
-      console.error('Error deleting folder:', error);
       toast.error('Error al eliminar la carpeta.');
     } else {
-      toast.success('Carpeta eliminada y conversaciones movidas a General.');
-      onFolderDeleted(); // This will trigger a re-fetch of conversations and folders
-      // If the selected conversation was in this folder, deselect it
-      if (selectedConversationId && filteredConversations.some(conv => conv.id === selectedConversationId)) {
-        onSelectConversation(null);
-      }
-      // If the selected folder was this one, deselect it
-      onSelectFolder(null);
+      toast.success('Carpeta eliminada y contenido movido a la raíz.');
+      onFolderDeleted();
     }
     setIsDeleting(false);
   };
 
-  const paddingLeft = `${level * 1.25 + 0.5}rem`; // Indent based on level
-  const MAX_FOLDER_NESTING_LEVEL = 2; // Root is level 0, so 0, 1, 2 are allowed for folders to contain subfolders
+  const paddingLeft = `${level * 1.25 + 0.5}rem`;
+  const MAX_FOLDER_NESTING_LEVEL = 2;
 
   return (
     <div className="space-y-1">
       <Card
-        className={cn(
-          "cursor-pointer hover:bg-sidebar-accent transition-colors group relative",
-          selectedConversationId === null && isExpanded && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary",
-          isDraggingOver && draggedItemType === 'folder' && "border-2 border-blue-500 bg-blue-500/10" // Visual feedback for drag over
-        )}
+        className={cn("cursor-pointer hover:bg-sidebar-accent transition-colors group relative", isDraggingOver && draggedItemType && "border-2 border-blue-500 bg-blue-500/10")}
         style={{ paddingLeft: paddingLeft }}
         draggable="true"
         onDragStart={(e) => onDragStart(e, folder.id, 'folder')}
-        onDragOver={(e) => e.preventDefault()} // Allow drop
+        onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => onDrop(e, folder.id)}
         onDragEnter={(e) => onDragEnter(e, folder.id)}
         onDragLeave={(e) => onDragLeave(e, folder.id)}
       >
-        <CardContent className="py-1.5 px-2 flex items-center justify-between gap-1"> {/* Adjusted padding and gap */}
+        <CardContent className="py-1.5 px-2 flex items-center justify-between gap-1">
           <div className="flex items-center flex-1 overflow-hidden" onClick={() => setIsExpanded(!isExpanded)}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 flex-shrink-0" // Adjusted button size
-              onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
-            >
-              {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />} {/* Adjusted icon size */}
+            <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}>
+              {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
             </Button>
-            <Folder className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" /> {/* Adjusted icon size and margin */}
+            <Folder className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
             {isEditing ? (
-              <Input
-                value={editingName}
-                onChange={(e) => setEditingName(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    handleSaveEdit();
-                  }
-                }}
-                onBlur={handleSaveEdit}
-                className="flex-1 bg-sidebar-background text-sidebar-foreground h-7 text-sm" // Adjusted height and font size
-              />
+              <Input value={editingName} onChange={(e) => setEditingName(e.target.value)} onClick={(e) => e.stopPropagation()} onKeyPress={(e) => e.key === 'Enter' && handleSaveEdit()} onBlur={handleSaveEdit} className="flex-1 bg-sidebar-background text-sidebar-foreground h-7 text-sm" />
             ) : (
-              <span className="text-sm font-medium truncate flex-1" onClick={() => onSelectFolder(folder.id)}>
-                {folder.name}
-              </span>
+              <span className="text-sm font-medium truncate flex-1" onClick={(e) => { e.stopPropagation(); onSelectItem(folder.id, 'folder'); }}>{folder.name}</span>
             )}
           </div>
-          <div className="flex-shrink-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"> {/* Adjusted gap */}
+          <div className="flex-shrink-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
             {isEditing ? (
               <>
-                <Button variant="ghost" size="icon" onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleSaveEdit(); }} className="h-6 w-6"> {/* Adjusted button size */}
-                  <Save className="h-3.5 w-3.5" /> {/* Adjusted icon size */}
-                </Button>
-                <Button variant="ghost" size="icon" onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsEditing(false); setEditingName(folder.name); }} className="h-6 w-6"> {/* Adjusted button size */}
-                  <X className="h-3.5 w-3.5" /> {/* Adjusted icon size */}
-                </Button>
+                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleSaveEdit(); }} className="h-6 w-6"><Save className="h-3.5 w-3.5" /></Button>
+                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setIsEditing(false); setEditingName(folder.name); }} className="h-6 w-6"><X className="h-3.5 w-3.5" /></Button>
               </>
             ) : (
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6"> {/* Adjusted button size */}
-                    <MoreVertical className="h-3.5 w-3.5" /> {/* Adjusted icon size */}
-                  </Button>
-                </DropdownMenuTrigger>
+                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><MoreVertical className="h-3.5 w-3.5" /></Button></DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48 bg-popover text-popover-foreground border-border">
-                  <DropdownMenuItem 
-                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); onCreateSubfolder(folder.id); }}
-                    disabled={level >= MAX_FOLDER_NESTING_LEVEL} // Disable if max level reached
-                    className={level >= MAX_FOLDER_NESTING_LEVEL ? "opacity-50 cursor-not-allowed" : ""}
-                  >
-                    <Plus className="mr-2 h-4 w-4" /> Crear Subcarpeta
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsEditing(true); }}>
-                    <Edit className="mr-2 h-4 w-4" /> Renombrar
-                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCreateSubfolder(folder.id); }} disabled={level >= MAX_FOLDER_NESTING_LEVEL} className={level >= MAX_FOLDER_NESTING_LEVEL ? "opacity-50 cursor-not-allowed" : ""}><Plus className="mr-2 h-4 w-4" /> Crear Subcarpeta</DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}><Edit className="mr-2 h-4 w-4" /> Renombrar</DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <AlertDialog open={isDeleting} onOpenChange={setIsDeleting}>
-                    <AlertDialogTrigger asChild>
-                      <DropdownMenuItem onSelect={(e: Event) => e.preventDefault()} className="text-destructive focus:text-destructive">
-                        <Trash2 className="mr-2 h-4 w-4" /> Eliminar
-                      </DropdownMenuItem>
-                    </AlertDialogTrigger>
+                    <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Eliminar</DropdownMenuItem></AlertDialogTrigger>
                     <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Esta acción no se puede deshacer. Si la carpeta contiene conversaciones, se moverán a "General". Si contiene subcarpetas, deberás vaciarlas primero.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleDeleteFolder(); }}>
-                          Eliminar
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
+                      <AlertDialogHeader><AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. El contenido de la carpeta se moverá a la raíz.</AlertDialogDescription></AlertDialogHeader>
+                      <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={(e) => { e.stopPropagation(); handleDeleteFolder(); }}>Eliminar</AlertDialogAction></AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
                 </DropdownMenuContent>
@@ -294,48 +203,13 @@ export function DraggableFolderItem({
       {isExpanded && (
         <div className="space-y-1">
           {filteredSubfolders.map((subfolder) => (
-            <DraggableFolderItem
-              key={subfolder.id}
-              folder={subfolder}
-              level={level + 1}
-              selectedConversationId={selectedConversationId}
-              onSelectConversation={onSelectConversation}
-              onSelectFolder={onSelectFolder}
-              conversations={conversations}
-              subfolders={subfolders}
-              onFolderUpdated={onFolderUpdated}
-              onFolderDeleted={onFolderDeleted}
-              onConversationMoved={onConversationMoved}
-              onFolderMoved={onFolderMoved}
-              onCreateSubfolder={onCreateSubfolder}
-              allFolders={allFolders}
-              onDragStart={onDragStart}
-              onDrop={onDrop}
-              isDraggingOver={false} // Pass false for nested items
-              onDragEnter={onDragEnter}
-              onDragLeave={onDragLeave}
-              onConversationReordered={onConversationReordered} // Pass to nested folder item
-              draggedOverConversationId={draggedOverConversationId}
-              dropPosition={dropPosition}
-              draggedItemType={draggedItemType}
-            />
+            <DraggableFolderItem key={subfolder.id} folder={subfolder} level={level + 1} selectedItem={selectedItem} onSelectItem={onSelectItem} conversations={conversations} notes={notes} subfolders={subfolders} onFolderUpdated={onFolderUpdated} onFolderDeleted={onFolderDeleted} onItemMoved={onItemMoved} onCreateSubfolder={onCreateSubfolder} onDragStart={onDragStart} onDrop={onDrop} isDraggingOver={false} onDragEnter={onDragEnter} onDragLeave={onDragLeave} draggedItemType={draggedItemType} />
           ))}
           {filteredConversations.map((conversation) => (
-            <DraggableConversationCard
-              key={conversation.id}
-              conversation={conversation}
-              selectedConversationId={selectedConversationId}
-              onSelectConversation={onSelectConversation}
-              onConversationUpdated={onFolderUpdated} // Re-fetch all on update
-              onConversationDeleted={onFolderUpdated} // Re-fetch all on delete
-              onConversationMoved={onConversationMoved}
-              onConversationReordered={onConversationReordered} // Pass to conversation card
-              allFolders={allFolders}
-              level={level + 1}
-              onDragStart={onDragStart}
-              isDraggingOver={draggedOverConversationId === conversation.id && draggedItemType === 'conversation'}
-              dropPosition={draggedOverConversationId === conversation.id ? dropPosition : null}
-            />
+            <DraggableConversationCard key={conversation.id} conversation={conversation} selectedConversationId={selectedItem?.type === 'conversation' ? selectedItem.id : null} onSelectConversation={(id) => onSelectItem(id!, 'conversation')} onConversationUpdated={onFolderUpdated} onConversationDeleted={onFolderUpdated} onConversationMoved={() => {}} onConversationReordered={() => {}} allFolders={[]} level={level + 1} onDragStart={(e) => onDragStart(e, conversation.id, 'conversation')} isDraggingOver={false} dropPosition={null} />
+          ))}
+          {filteredNotes.map((note) => (
+            <DraggableNoteItem key={note.id} note={note} selected={selectedItem?.type === 'note' && selectedItem.id === note.id} onSelect={() => onSelectItem(note.id, 'note')} onDragStart={(e) => onDragStart(e, note.id, 'note')} level={level + 1} />
           ))}
         </div>
       )}

@@ -6,7 +6,7 @@ import { ConversationSidebar } from "@/components/conversation-sidebar";
 import { ChatInterface } from "@/components/chat-interface";
 import { AppPreviewPanel } from "@/components/app-preview-panel";
 import { CodeEditorPanel } from "@/components/code-editor-panel";
-import { NoteEditorPanel } from "@/components/note-editor-panel"; // Import new component
+import { NoteEditorPanel } from "@/components/note-editor-panel";
 import { ProfileSettingsDialog } from "@/components/profile-settings-dialog";
 import { AppSettingsDialog } from "@/components/app-settings-dialog";
 import { ServerManagementDialog } from "@/components/server-management-dialog";
@@ -20,6 +20,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { useSidebarData } from "@/hooks/use-sidebar-data"; // Import the hook
 
 interface UserApp {
   id: string;
@@ -31,8 +32,8 @@ interface UserApp {
 
 interface SelectedItem {
   id: string;
-  type: 'app' | 'conversation' | 'note'; // Add 'note' type
-  conversationId?: string | null; // Make optional
+  type: 'app' | 'conversation' | 'note' | 'folder';
+  conversationId?: string | null;
 }
 
 interface ActiveFile {
@@ -40,11 +41,12 @@ interface ActiveFile {
   content: string;
 }
 
-type RightPanelView = 'chat' | 'editor' | 'preview' | 'note'; // Add 'note' view
+type RightPanelView = 'chat' | 'editor' | 'preview' | 'note';
 
 export default function Home() {
   const { session, isLoading: isSessionLoading, userRole } = useSession();
   const userId = session?.user?.id;
+  const { fetchData: refreshSidebarData } = useSidebarData(); // Get the refresh function
 
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   const [selectedAppDetails, setSelectedAppDetails] = useState<UserApp | null>(null);
@@ -72,7 +74,7 @@ export default function Home() {
     }
   }, [aiResponseSpeed]);
 
-  const handleSelectItem = useCallback(async (id: string | null, type: 'app' | 'conversation' | 'note' | null) => {
+  const handleSelectItem = useCallback(async (id: string | null, type: SelectedItem['type'] | null) => {
     setActiveFile(null);
     setRightPanelView('chat');
 
@@ -98,7 +100,10 @@ export default function Home() {
     } else if (type === 'note') {
       setSelectedAppDetails(null);
       setSelectedItem({ id, type, conversationId: null });
-      setRightPanelView('note'); // Switch to note editor view
+      setRightPanelView('note');
+    } else {
+      // For folders, just select it but don't change the view
+      setSelectedItem({ id, type, conversationId: null });
     }
   }, [userId]);
 
@@ -149,7 +154,7 @@ export default function Home() {
       return <AppPreviewPanel appUrl={selectedAppDetails?.url || null} appStatus={selectedAppDetails?.status || null} />;
     }
     if (rightPanelView === 'note' && selectedItem?.type === 'note') {
-      return <NoteEditorPanel noteId={selectedItem.id} onNoteUpdated={() => { /* We need to trigger a sidebar refresh here */ }} />;
+      return <NoteEditorPanel noteId={selectedItem.id} onNoteUpdated={refreshSidebarData} />;
     }
     // Default to chat interface
     return (
