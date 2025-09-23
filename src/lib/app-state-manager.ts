@@ -48,7 +48,7 @@ async function ensureServicesAreRunning(server: any, app: any) {
 export async function getAppAndServerForFileOps(appId: string, userId: string) {
     const { data: app, error: appError } = await supabaseAdmin
         .from('user_apps')
-        .select('*, user_servers(*)')
+        .select('*, user_servers(id, ip_address, ssh_port, ssh_username, ssh_password)')
         .eq('id', appId)
         .eq('user_id', userId)
         .single();
@@ -71,14 +71,14 @@ export async function getAppAndServerWithStateCheck(appId: string, userId: strin
         .from('user_apps')
         .update({ last_activity_at: new Date().toISOString() })
         .eq('id', appId)
-        .select('*, user_servers(*)')
+        .select('*, user_servers(id, ip_address, ssh_port, ssh_username, ssh_password)')
         .single();
 
     if (appError || !app) throw new Error('Aplicación no encontrada o acceso denegado.');
 
     if (app.status === 'hibernated') {
         await restoreAppFromArchive(app.id, userId, app.name, app.conversation_id!, app.prompt || '');
-        const { data: restoredApp, error: restoredAppError } = await supabaseAdmin.from('user_apps').select('*, user_servers(*)').eq('id', appId).single();
+        const { data: restoredApp, error: restoredAppError } = await supabaseAdmin.from('user_apps').select('*, user_servers(id, ip_address, ssh_port, ssh_username, ssh_password)').eq('id', appId).single();
         if (restoredAppError || !restoredApp || !restoredApp.user_servers) throw new Error('No se pudo obtener la información del servidor después de la restauración.');
         return { app: restoredApp, server: restoredApp.user_servers as any };
     }
@@ -111,7 +111,7 @@ export async function getAppAndServerWithStateCheck(appId: string, userId: strin
 async function restoreAppFromArchive(appId: string, userId: string, appName: string, conversationId: string, prompt: string) {
     await provisionApp({ appId, userId, appName, conversationId, prompt });
 
-    const { data: appDetails, error: appDetailsError } = await supabaseAdmin.from('user_apps').select('container_id, user_servers(*)').eq('id', appId).single();
+    const { data: appDetails, error: appDetailsError } = await supabaseAdmin.from('user_apps').select('container_id, user_servers(id, ip_address, ssh_port, ssh_username, ssh_password)').eq('id', appId).single();
     if (appDetailsError || !appDetails || !appDetails.container_id || !appDetails.user_servers) {
         throw new Error('No se pudieron obtener los detalles del nuevo contenedor después del reaprovisionamiento.');
     }
