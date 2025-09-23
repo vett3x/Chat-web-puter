@@ -5,8 +5,8 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { executeSshCommand } from '@/lib/ssh-utils';
-import { getAppAndServerForFileOps } from '@/lib/app-state-manager'; // Changed import
-import path from 'path';
+import { getAppAndServerForFileOps } from '@/lib/app-state-manager';
+import path from 'path'; // Importar el módulo 'path' de Node.js
 
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
@@ -28,8 +28,17 @@ export async function GET(req: NextRequest, context: any) {
 
   try {
     const userId = await getUserId();
-    const { app, server } = await getAppAndServerForFileOps(appId, userId); // Use new function
-    const command = `cat /app/${filePath}`;
+    const { app, server } = await getAppAndServerForFileOps(appId, userId);
+    
+    // --- INICIO: Verificación de seguridad para la lectura ---
+    const safeBasePath = '/app';
+    const resolvedPath = path.join(safeBasePath, filePath);
+    if (!resolvedPath.startsWith(safeBasePath + path.sep) && resolvedPath !== safeBasePath) {
+        throw new Error(`Acceso denegado: La ruta '${filePath}' está fuera del directorio permitido.`);
+    }
+    // --- FIN: Verificación de seguridad ---
+
+    const command = `cat '${resolvedPath}'`; // Usar la ruta resuelta y segura
     const { stdout, stderr, code } = await executeSshCommand(server, `docker exec ${app.container_id} ${command}`);
     if (code !== 0) throw new Error(`Error al leer el archivo: ${stderr}`);
     
@@ -45,15 +54,21 @@ export async function POST(req: NextRequest, context: any) {
   
   try {
     const userId = await getUserId();
-    const { app, server } = await getAppAndServerForFileOps(appId, userId); // Use new function
+    const { app, server } = await getAppAndServerForFileOps(appId, userId);
     const { filePath, content } = await req.json();
 
     if (!filePath || content === undefined) {
       return NextResponse.json({ message: 'La ruta y el contenido del archivo son requeridos.' }, { status: 400 });
     }
 
-    const fullPathInContainer = path.join('/app', filePath);
-    const directoryInContainer = path.dirname(fullPathInContainer);
+    // --- INICIO: Verificación de seguridad para la escritura ---
+    const safeBasePath = '/app';
+    const resolvedPath = path.join(safeBasePath, filePath);
+    if (!resolvedPath.startsWith(safeBasePath + path.sep) && resolvedPath !== safeBasePath) {
+        throw new Error(`Operación denegada: La ruta '${filePath}' está fuera del directorio permitido.`);
+    }
+    const directoryInContainer = path.dirname(resolvedPath);
+    // --- FIN: Verificación de seguridad ---
 
     // 1. Crear la estructura de directorios de forma robusta
     const mkdirCommand = `mkdir -p '${directoryInContainer}'`;
@@ -64,10 +79,10 @@ export async function POST(req: NextRequest, context: any) {
 
     // 2. Escribir el archivo en el contenedor
     const encodedContent = Buffer.from(content).toString('base64');
-    const writeCommand = `bash -c "echo '${encodedContent}' | base64 -d > '${fullPathInContainer}'"`;
+    const writeCommand = `bash -c "echo '${encodedContent}' | base64 -d > '${resolvedPath}'"`;
     const { stderr: writeErr, code: writeCode } = await executeSshCommand(server, `docker exec ${app.container_id} ${writeCommand}`);
     if (writeCode !== 0) {
-      throw new Error(`Error al escribir en el archivo '${fullPathInContainer}': ${writeErr}`);
+      throw new Error(`Error al escribir en el archivo '${resolvedPath}': ${writeErr}`);
     }
 
     // 3. Respaldar en la base de datos (upsert para crear o actualizar)
