@@ -11,7 +11,7 @@ const createAppSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const cookieStore = cookies();
+  const cookieStore = cookies() as any;
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
