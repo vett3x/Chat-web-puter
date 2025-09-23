@@ -80,7 +80,21 @@ Ahora, por favor responde a la siguiente pregunta del usuario:`;
       }
 
       const assistantResponse = response?.message?.content || 'No se pudo obtener una respuesta.';
-      setMessages([...newMessages, { role: 'assistant', content: assistantResponse }]);
+      
+      let responseText = '';
+      if (typeof assistantResponse === 'string') {
+        responseText = assistantResponse;
+      } else if (Array.isArray(assistantResponse)) {
+        responseText = assistantResponse
+          .filter(part => part.type === 'text' && part.text)
+          .map(part => part.text)
+          .join('\n\n');
+      } else {
+        responseText = 'Respuesta con formato no soportado.';
+        console.warn('Unsupported AI response format:', assistantResponse);
+      }
+
+      setMessages([...newMessages, { role: 'assistant', content: responseText }]);
 
     } catch (error: any) {
       toast.error(error.message);
