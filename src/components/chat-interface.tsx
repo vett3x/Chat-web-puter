@@ -662,7 +662,7 @@ export function ChatInterface({
                 onPaste={handlePaste} // Added onPaste handler
                 placeholder="Pregunta a Claude AI..."
                 disabled={isLoading || !userId}
-                className="flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none max-h-[200px] overflow-y-auto bg-transparent"
+                className="flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none max-h-[200px] overflow-y-auto bg-transparent px-3 py-2"
                 rows={1}
               />
               
