@@ -6,4 +6,6 @@ export interface ServerResources {
   memory_total_mib: number; // New
   disk_usage_percent: number;
   timestamp: string;
+  network_rx_bytes: number;
+  network_tx_bytes: number;
 }

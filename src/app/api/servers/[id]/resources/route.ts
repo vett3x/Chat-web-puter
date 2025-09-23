@@ -119,28 +119,32 @@ export async function GET(
     const cpuCommand = `LC_ALL=C top -bn1 | grep "Cpu(s)" | sed "s/.*, *\\([0-9.]*\\)%* id.*/\\1/" | awk '{print 100 - $1}'`;
     const memCommand = `LC_ALL=C free -m | awk '/^Mem:/{print $3, $2}'`;
     const diskCommand = `LC_ALL=C df -h / | awk 'NR==2{print $5}'`;
+    const networkCommand = `LC_ALL=C cat /proc/net/dev | awk 'NR>2 && $1 !~ /lo/ {rx+=$2; tx+=$10} END {print rx, tx}'`;
 
-    const [cpuOutput, memOutput, diskOutput] = await Promise.all([
+    const [cpuOutput, memOutput, diskOutput, networkOutput] = await Promise.all([
       executeSshCommand(server, cpuCommand),
       executeSshCommand(server, memCommand),
       executeSshCommand(server, diskCommand),
+      executeSshCommand(server, networkCommand),
     ]);
 
     const cpu_usage_percent = parseFloat(cpuOutput.stdout);
     const [raw_memory_used_str, raw_memory_total_str] = memOutput.stdout.split(/\s+/);
+    const disk_usage_percent = parseFloat(diskOutput.stdout.replace('%', ''));
+    const [rxBytes, txBytes] = networkOutput.stdout.split(/\s+/).map(Number);
 
     const memory_used_mib = parseMemoryString(raw_memory_used_str || '0B');
     const memory_total_mib = parseMemoryString(raw_memory_total_str || '0B');
 
-    const disk_usage_percent = parseFloat(diskOutput.stdout.replace('%', ''));
-
     return NextResponse.json({
       cpu_usage_percent: isNaN(cpu_usage_percent) ? 0 : cpu_usage_percent,
-      memory_used: raw_memory_used_str || 'N/A', // Keep raw string for display
-      memory_total: raw_memory_total_str || 'N/A', // Keep raw string for display
-      memory_used_mib: memory_used_mib, // New numeric field
-      memory_total_mib: memory_total_mib, // New numeric field
+      memory_used: raw_memory_used_str || 'N/A',
+      memory_total: raw_memory_total_str || 'N/A',
+      memory_used_mib: memory_used_mib,
+      memory_total_mib: memory_total_mib,
       disk_usage_percent: isNaN(disk_usage_percent) ? 0 : disk_usage_percent,
+      network_rx_bytes: rxBytes || 0,
+      network_tx_bytes: txBytes || 0,
       timestamp: new Date().toISOString(),
     }, { status: 200 });
 

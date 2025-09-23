@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { HardDrive, Loader2, RefreshCw, XCircle } from 'lucide-react';
+import { HardDrive, Loader2, RefreshCw, XCircle, Network } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   LineChart,
@@ -14,6 +14,7 @@ import {
   YAxis,
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
+  Legend,
 } from 'recharts';
 import { parseMemoryString, formatMemory } from '@/lib/utils';
 import { useSession } from '@/components/session-context-provider'; // Import useSession
@@ -24,12 +25,17 @@ interface ServerDetailResourcesTabProps {
   serverId: string;
 }
 
+interface ResourceHistoryPoint extends ServerResources {
+  rxRateKbps?: number;
+  txRateKbps?: number;
+}
+
 const POLLING_INTERVAL = 5000; // Poll every 5 seconds
 const MAX_HISTORY_POINTS = 12; // Keep last 12 points (1 minute of data)
 
 export function ServerDetailResourcesTab({ serverId }: ServerDetailResourcesTabProps) {
   const [resources, setResources] = useState<ServerResources | null>(null);
-  const [resourceHistory, setResourceHistory] = useState<ServerResources[]>([]);
+  const [resourceHistory, setResourceHistory] = useState<ResourceHistoryPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,8 +51,21 @@ export function ServerDetailResourcesTab({ serverId }: ServerDetailResourcesTabP
       const data: ServerResources = await response.json();
       setResources(data);
       setResourceHistory(prev => {
-        const newHistory = [...prev, data];
-        return newHistory.slice(-MAX_HISTORY_POINTS); // Keep only the last N points
+        let rxRateKbps = 0;
+        let txRateKbps = 0;
+        if (prev.length > 0) {
+          const lastPoint = prev[prev.length - 1];
+          const timeDiffSeconds = (new Date(data.timestamp).getTime() - new Date(lastPoint.timestamp).getTime()) / 1000;
+          if (timeDiffSeconds > 0) {
+            const rxRateBps = (data.network_rx_bytes - lastPoint.network_rx_bytes) / timeDiffSeconds;
+            const txRateBps = (data.network_tx_bytes - lastPoint.network_tx_bytes) / timeDiffSeconds;
+            rxRateKbps = (rxRateBps * 8) / 1024; // Convert to kilobits per second
+            txRateKbps = (txRateBps * 8) / 1024;
+          }
+        }
+        const newPoint: ResourceHistoryPoint = { ...data, rxRateKbps, txRateKbps };
+        const newHistory = [...prev, newPoint];
+        return newHistory.slice(-MAX_HISTORY_POINTS);
       });
     } catch (err: any) {
       console.error('Error fetching server resources:', err);
@@ -68,6 +87,15 @@ export function ServerDetailResourcesTab({ serverId }: ServerDetailResourcesTabP
   const formatChartTick = (value: string) => {
     const date = new Date(value);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  };
+
+  const formatBytes = (bytes: number, decimals = 2) => {
+    if (!bytes || bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
   };
 
   return (
@@ -114,6 +142,12 @@ export function ServerDetailResourcesTab({ serverId }: ServerDetailResourcesTabP
                     </div>
                     <Progress value={resources.disk_usage_percent} className="h-2" />
                   </div>
+                  <div>
+                    <div className="flex justify-between text-sm font-medium mb-1">
+                      <span><Network className="inline h-4 w-4 mr-1" /> Red (Total RX / TX)</span>
+                      <span>{formatBytes(resources.network_rx_bytes)} / {formatBytes(resources.network_tx_bytes)}</span>
+                    </div>
+                  </div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-4">Última actualización: {new Date(resources.timestamp).toLocaleTimeString()}</p>
               </div>
@@ -131,13 +165,7 @@ export function ServerDetailResourcesTab({ serverId }: ServerDetailResourcesTabP
                           <XAxis dataKey="timestamp" tickFormatter={formatChartTick} tick={{ fontSize: 10 }} />
                           <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
                           <RechartsTooltip labelFormatter={formatChartTick} formatter={(value: number) => `${value.toFixed(1)}%`} />
-                          <Line 
-                            type="monotone" 
-                            dataKey="cpu_usage_percent" 
-                            stroke="hsl(var(--chart-1))" 
-                            strokeWidth={2} 
-                            dot={false} 
-                          />
+                          <Line type="monotone" dataKey="cpu_usage_percent" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={false} />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
@@ -155,13 +183,7 @@ export function ServerDetailResourcesTab({ serverId }: ServerDetailResourcesTabP
                             if (totalMiB === 0) return [`N/A`, 'Uso'];
                             return [`${((usedMiB / totalMiB) * 100).toFixed(1)}% (${formatMemory(usedMiB)} / ${formatMemory(totalMiB)})`, 'Uso'];
                           }} />
-                          <Line 
-                            type="monotone" 
-                            dataKey={(data: ServerResources) => data.memory_total_mib === 0 ? 0 : (data.memory_used_mib / data.memory_total_mib) * 100} 
-                            stroke="hsl(var(--chart-2))" 
-                            strokeWidth={2} 
-                            dot={false} 
-                          />
+                          <Line type="monotone" dataKey={(data: ServerResources) => data.memory_total_mib === 0 ? 0 : (data.memory_used_mib / data.memory_total_mib) * 100} stroke="hsl(var(--chart-2))" strokeWidth={2} dot={false} />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
@@ -175,6 +197,21 @@ export function ServerDetailResourcesTab({ serverId }: ServerDetailResourcesTabP
                           <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
                           <RechartsTooltip labelFormatter={formatChartTick} formatter={(value: number) => `${value.toFixed(1)}%`} />
                           <Line type="monotone" dataKey="disk_usage_percent" stroke="hsl(var(--chart-3))" strokeWidth={2} dot={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Network Chart */}
+                    <div className="h-[150px] w-full">
+                      <h5 className="text-sm font-medium mb-1">Red (kbps)</h5>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={resourceHistory} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                          <XAxis dataKey="timestamp" tickFormatter={formatChartTick} tick={{ fontSize: 10 }} />
+                          <YAxis tick={{ fontSize: 10 }} />
+                          <RechartsTooltip labelFormatter={formatChartTick} formatter={(value: number, name: string) => [`${value.toFixed(1)} kbps`, name === 'rxRateKbps' ? 'Recepción' : 'Transmisión']} />
+                          <Legend />
+                          <Line type="monotone" dataKey="rxRateKbps" name="Recepción" stroke="hsl(var(--chart-4))" strokeWidth={2} dot={false} />
+                          <Line type="monotone" dataKey="txRateKbps" name="Transmisión" stroke="hsl(var(--chart-5))" strokeWidth={2} dot={false} />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
