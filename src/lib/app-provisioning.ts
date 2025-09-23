@@ -57,7 +57,9 @@ export async function provisionApp(data: AppProvisioningData) {
     const containerPort = 3000;
     const hostPort = generateRandomPort();
     const containerName = `app-${appName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${appId.substring(0, 8)}`;
-    const runCommand = `docker run -d --name ${containerName} -p ${hostPort}:${containerPort} --entrypoint tail node:lts-bookworm -f /dev/null`;
+    
+    // Modificado: El entrypoint ahora inicia un simple servidor Node.js
+    const runCommand = `docker run -d --name ${containerName} -p ${hostPort}:${containerPort} --entrypoint node node:lts-bookworm -e "require('http').createServer((req, res) => res.end('Entorno listo. La generación de código comenzará en el chat.')).listen(${containerPort})"`;
     
     const { stdout: newContainerId, stderr: runStderr, code: runCode } = await executeSshCommand(server, runCommand);
     if (runCode !== 0) throw new Error(`Error al crear el contenedor: ${runStderr}`);
@@ -65,34 +67,7 @@ export async function provisionApp(data: AppProvisioningData) {
 
     await supabaseAdmin.from('user_apps').update({ server_id: server.id, container_id: containerId }).eq('id', appId);
 
-    const finalInstallScript = DEFAULT_INSTALL_DEPS_SCRIPT.replace(/__CONTAINER_PORT__/g, String(containerPort));
-    const encodedScript = Buffer.from(finalInstallScript).toString('base64');
-    const { stderr: installStderr, code: installCode } = await executeSshCommand(server, `docker exec ${containerId} bash -c "echo '${encodedScript}' | base64 -d | bash"`);
-    if (installCode !== 0) throw new Error(`Error al instalar dependencias en el contenedor: ${installStderr}`);
-
-    // FASE 2: Creación de Archivo de Marcador de Posición (Placeholder)
-    console.log(`[Provisioning] Creating placeholder file for app ${appId}...`);
-    const placeholderContent = `
-"use client";
-import React from 'react';
-
-export default function HomePage() {
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">
-      <div className="text-center p-8">
-        <h1 className="text-5xl font-bold mb-4">Proyecto: ${appName}</h1>
-        <p className="text-xl text-gray-400">El entorno está listo. ¡La generación de código comenzará pronto!</p>
-        <p className="mt-8 text-sm text-gray-500">Prompt original:</p>
-        <p className="text-sm text-gray-400 max-w-md mx-auto">${prompt}</p>
-      </div>
-    </div>
-  );
-}
-`;
-    await writeAppFile(server, containerId, "src/app/page.tsx", placeholderContent, appId, userId);
-    console.log(`[Provisioning] Placeholder file created for app ${appId}.`);
-
-    // FASE 3: Despliegue y Finalización
+    // FASE 2: Despliegue y Finalización (sin generación de código)
     const { data: cfDomain, error: cfDomainError } = await supabaseAdmin.from('cloudflare_domains').select('id, domain_name, api_token, zone_id, account_id').limit(1).single();
     if (cfDomainError || !cfDomain) throw new Error('No hay dominios de Cloudflare configurados.');
 
