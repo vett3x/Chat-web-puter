@@ -18,11 +18,11 @@ interface AppBrowserPanelProps {
 
 function SystemLogsPanel({ appId }: { appId: string }) {
   const [logs, setLogs] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Start in loading state
 
   const fetchLogs = useCallback(async () => {
     if (!appId) return;
-    setIsLoading(true);
+    // No setIsLoading(true) here to make refreshes subtle
     try {
       const response = await fetch(`/api/apps/${appId}/logs`);
       const data = await response.json();
@@ -31,12 +31,12 @@ function SystemLogsPanel({ appId }: { appId: string }) {
     } catch (error: any) {
       setLogs(`Error al cargar los logs: ${error.message}`);
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Set to false after the first load
     }
   }, [appId]);
 
   useEffect(() => {
-    fetchLogs();
+    fetchLogs(); // Initial fetch
     const interval = setInterval(fetchLogs, 10000); // Refresh logs every 10 seconds
     return () => clearInterval(interval);
   }, [fetchLogs]);
