@@ -22,16 +22,27 @@ interface Folder {
   user_id: string;
 }
 
+// New type for UserApp
+interface UserApp {
+  id: string;
+  name: string;
+  status: string;
+  url: string | null;
+  conversation_id: string | null;
+}
+
 export function useConversations() {
   const { session, isLoading: isSessionLoading } = useSession();
   const userId = session?.user?.id;
 
+  const [apps, setApps] = useState<UserApp[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     if (!userId) {
+      setApps([]);
       setConversations([]);
       setFolders([]);
       setIsLoading(false);
@@ -39,24 +50,32 @@ export function useConversations() {
     }
 
     setIsLoading(true);
-    const { data: convData, error: convError } = await supabase
-      .from('conversations')
-      .select('id, title, created_at, folder_id, order_index')
-      .eq('user_id', userId)
-      .order('order_index', { ascending: true })
-      .order('created_at', { ascending: false });
 
-    const { data: folderData, error: folderError } = await supabase
-      .from('folders')
-      .select('id, name, parent_id, created_at, user_id')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+    // Fetch all three data types in parallel
+    const [appsRes, convRes, folderRes] = await Promise.all([
+      supabase.from('user_apps').select('id, name, status, url, conversation_id').eq('user_id', userId).order('created_at', { ascending: false }),
+      supabase.from('conversations').select('id, title, created_at, folder_id, order_index').eq('user_id', userId).order('order_index', { ascending: true }).order('created_at', { ascending: false }),
+      supabase.from('folders').select('id, name, parent_id, created_at, user_id').eq('user_id', userId).order('created_at', { ascending: false })
+    ]);
+
+    const { data: appData, error: appError } = appsRes;
+    const { data: convData, error: convError } = convRes;
+    const { data: folderData, error: folderError } = folderRes;
+
+    if (appError) {
+      console.error('Error fetching apps:', appError);
+      toast.error('Error al cargar los proyectos.');
+    } else {
+      setApps(appData || []);
+    }
 
     if (convError) {
       console.error('Error fetching conversations:', convError);
       toast.error('Error al cargar las conversaciones.');
     } else {
-      setConversations(convData || []);
+      // Filter out conversations that are linked to an app
+      const appConversationIds = new Set((appData || []).map(app => app.conversation_id));
+      setConversations((convData || []).filter(conv => !appConversationIds.has(conv.id)));
     }
 
     if (folderError) {
@@ -65,6 +84,7 @@ export function useConversations() {
     } else {
       setFolders(folderData || []);
     }
+
     setIsLoading(false);
   }, [userId]);
 
@@ -72,6 +92,7 @@ export function useConversations() {
     if (userId) {
       fetchData();
     } else if (!isSessionLoading) {
+      setApps([]);
       setConversations([]);
       setFolders([]);
       setIsLoading(false);
@@ -224,6 +245,7 @@ export function useConversations() {
   };
 
   return {
+    apps,
     conversations,
     folders,
     isLoading,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "@/components/session-context-provider";
 import { ConversationSidebar } from "@/components/conversation-sidebar";
 import { ChatInterface } from "@/components/chat-interface";
@@ -15,8 +15,9 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
-// Definir el tipo para una aplicación de usuario
 interface UserApp {
   id: string;
   name: string;
@@ -25,14 +26,19 @@ interface UserApp {
   conversation_id: string | null;
 }
 
+interface SelectedItem {
+  id: string;
+  type: 'app' | 'conversation';
+  conversationId: string | null;
+}
+
 export default function Home() {
   const { session, isLoading: isSessionLoading, userRole } = useSession();
   const userId = session?.user?.id;
 
-  // Estado para la aplicación seleccionada
-  const [selectedApp, setSelectedApp] = useState<UserApp | null>(null);
+  const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
+  const [selectedAppDetails, setSelectedAppDetails] = useState<UserApp | null>(null);
   
-  // Estados para los diálogos
   const [isProfileSettingsOpen, setIsProfileSettingsOpen] = useState(false);
   const [isAppSettingsOpen, setIsAppSettingsOpen] = useState(false);
   const [isServerManagementOpen, setIsServerManagementOpen] = useState(false);
@@ -52,8 +58,36 @@ export default function Home() {
     }
   }, [aiResponseSpeed]);
 
+  const handleSelectItem = useCallback(async (id: string | null, type: 'app' | 'conversation' | null) => {
+    if (!id || !type) {
+      setSelectedItem(null);
+      setSelectedAppDetails(null);
+      return;
+    }
+
+    if (type === 'app') {
+      const { data, error } = await supabase
+        .from('user_apps')
+        .select('*')
+        .eq('id', id)
+        .eq('user_id', userId)
+        .single();
+      
+      if (error) {
+        toast.error('Error al cargar los detalles de la aplicación.');
+        return;
+      }
+      
+      setSelectedAppDetails(data);
+      setSelectedItem({ id, type, conversationId: data.conversation_id });
+    } else {
+      setSelectedAppDetails(null);
+      setSelectedItem({ id, type, conversationId: id });
+    }
+  }, [userId]);
+
   const handleNewConversationCreated = (conversationId: string) => {
-    // This might need adjustment based on the new app flow
+    handleSelectItem(conversationId, 'conversation');
   };
 
   const handleOpenProfileSettings = () => setIsProfileSettingsOpen(true);
@@ -68,38 +102,58 @@ export default function Home() {
 
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
 
+  const renderPanels = () => {
+    const sidebar = (
+      <ConversationSidebar
+        selectedItem={selectedItem}
+        onSelectItem={handleSelectItem}
+        onOpenProfileSettings={handleOpenProfileSettings}
+        onOpenAppSettings={handleOpenAppSettings}
+        onOpenServerManagement={handleOpenServerManagement}
+        onOpenUserManagement={handleOpenUserManagement}
+        onOpenDeepAiCoder={handleOpenDeepAiCoder}
+      />
+    );
+
+    const chat = (
+      <ChatInterface
+        userId={userId}
+        conversationId={selectedItem?.conversationId || null}
+        onNewConversationCreated={handleNewConversationCreated}
+        onConversationTitleUpdate={(id, newTitle) => {}}
+        aiResponseSpeed={aiResponseSpeed}
+      />
+    );
+
+    if (selectedItem?.type === 'app') {
+      return (
+        <ResizablePanelGroup direction="horizontal" className="h-full w-full">
+          <ResizablePanel defaultSize={20} minSize={15} maxSize={25}>{sidebar}</ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel defaultSize={50} minSize={30}>{chat}</ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel defaultSize={30} minSize={20}>
+            <AppPreviewPanel 
+              appUrl={selectedAppDetails?.url || null}
+              appStatus={selectedAppDetails?.status || null}
+            />
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      );
+    }
+
+    return (
+      <ResizablePanelGroup direction="horizontal" className="h-full w-full">
+        <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>{sidebar}</ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel defaultSize={75} minSize={65}>{chat}</ResizablePanel>
+      </ResizablePanelGroup>
+    );
+  };
+
   return (
     <div className="h-screen bg-background">
-      <ResizablePanelGroup direction="horizontal" className="h-full w-full">
-        <ResizablePanel defaultSize={20} minSize={15} maxSize={25}>
-          <ConversationSidebar
-            selectedConversationId={selectedApp?.conversation_id || null}
-            onSelectConversation={(convId) => { /* Logic to find app by convId */ }}
-            onOpenProfileSettings={handleOpenProfileSettings}
-            onOpenAppSettings={handleOpenAppSettings}
-            onOpenServerManagement={handleOpenServerManagement}
-            onOpenUserManagement={handleOpenUserManagement}
-            onOpenDeepAiCoder={handleOpenDeepAiCoder}
-          />
-        </ResizablePanel>
-        <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={50} minSize={30}>
-          <ChatInterface
-            userId={userId}
-            conversationId={selectedApp?.conversation_id || null}
-            onNewConversationCreated={handleNewConversationCreated}
-            onConversationTitleUpdate={(id, newTitle) => {}}
-            aiResponseSpeed={aiResponseSpeed}
-          />
-        </ResizablePanel>
-        <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={30} minSize={20}>
-          <AppPreviewPanel 
-            appUrl={selectedApp?.url || null}
-            appStatus={selectedApp?.status || null}
-          />
-        </ResizablePanel>
-      </ResizablePanelGroup>
+      {renderPanels()}
 
       {/* Dialogs */}
       <ProfileSettingsDialog
