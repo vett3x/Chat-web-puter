@@ -29,20 +29,6 @@ async function updateAppStatus(appId: string, status: 'ready' | 'failed', detail
   }
 }
 
-async function writeAppFile(server: any, containerId: string, filePath: string, content: string, appId: string, userId: string) {
-  const encodedContent = Buffer.from(content).toString('base64');
-  const command = `bash -c "mkdir -p /app/$(dirname '${filePath}') && echo '${encodedContent}' | base64 -d > /app/${filePath}"`;
-  const { stderr, code } = await executeSshCommand(server, `docker exec ${containerId} ${command}`);
-  if (code !== 0) throw new Error(`Error al escribir en el archivo del contenedor: ${stderr}`);
-
-  await supabaseAdmin.from('app_file_backups').upsert({
-    app_id: appId,
-    user_id: userId,
-    file_path: filePath,
-    file_content: content,
-  }, { onConflict: 'app_id, file_path' });
-}
-
 export async function provisionApp(data: AppProvisioningData) {
   const { appId, userId, appName, conversationId, prompt } = data;
   let containerId: string | undefined;
@@ -58,8 +44,8 @@ export async function provisionApp(data: AppProvisioningData) {
     const hostPort = generateRandomPort();
     const containerName = `app-${appName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${appId.substring(0, 8)}`;
     
-    // Modificado: El entrypoint ahora inicia un simple servidor Node.js
-    const runCommand = `docker run -d --name ${containerName} -p ${hostPort}:${containerPort} --entrypoint node node:lts-bookworm -e "require('http').createServer((req, res) => res.end('Entorno listo. La generación de código comenzará en el chat.')).listen(${containerPort})"`;
+    // Se crea un contenedor base que se mantendrá en ejecución para poder instalar dependencias dentro.
+    const runCommand = `docker run -d --name ${containerName} -p ${hostPort}:${containerPort} --entrypoint tail node:lts-bookworm -f /dev/null`;
     
     const { stdout: newContainerId, stderr: runStderr, code: runCode } = await executeSshCommand(server, runCommand);
     if (runCode !== 0) throw new Error(`Error al crear el contenedor: ${runStderr}`);
@@ -67,7 +53,13 @@ export async function provisionApp(data: AppProvisioningData) {
 
     await supabaseAdmin.from('user_apps').update({ server_id: server.id, container_id: containerId }).eq('id', appId);
 
-    // FASE 2: Despliegue y Finalización (sin generación de código)
+    // FASE 2: Instalación de Dependencias (usando el script completo)
+    const finalInstallScript = DEFAULT_INSTALL_DEPS_SCRIPT.replace(/__CONTAINER_PORT__/g, String(containerPort));
+    const encodedScript = Buffer.from(finalInstallScript).toString('base64');
+    const { stderr: installStderr, code: installCode } = await executeSshCommand(server, `docker exec ${containerId} bash -c "echo '${encodedScript}' | base64 -d | bash"`);
+    if (installCode !== 0) throw new Error(`Error al instalar dependencias en el contenedor: ${installStderr}`);
+
+    // FASE 3: Despliegue y Finalización
     const { data: cfDomain, error: cfDomainError } = await supabaseAdmin.from('cloudflare_domains').select('id, domain_name, api_token, zone_id, account_id').limit(1).single();
     if (cfDomainError || !cfDomain) throw new Error('No hay dominios de Cloudflare configurados.');
 
