@@ -16,6 +16,7 @@ import { NoteAiChat, ChatMessage } from './note-ai-chat';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { CodeBlock } from './code-block'; // Import the CodeBlock component
 
 interface Note {
   id: string;
@@ -131,6 +132,31 @@ export function NoteEditorPanel({ noteId, onNoteUpdated }: NoteEditorPanelProps)
     return () => { clearTimeout(handler); };
   }, [title, content, note, noteAutoSave, isSaving, isLoading, handleSave]);
 
+  const markdownComponents = {
+    code({ node, inline, className, children, ...props }: any) {
+      const match = /language-(\w+)/.exec(className || '');
+      const codeString = String(children).replace(/\n$/, '');
+  
+      if (!inline) {
+        return (
+          <CodeBlock
+            language={match ? match[1] : ''}
+            filename={props.title} // Get filename from title attribute like ```js title="hello.js"
+            code={codeString}
+            isNew={false}
+            animationSpeed="normal"
+          />
+        );
+      }
+  
+      return (
+        <code className="bg-muted text-muted-foreground font-mono text-sm px-1 py-0.5 rounded" {...props}>
+          {children}
+        </code>
+      );
+    },
+  };
+
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
@@ -176,7 +202,7 @@ export function NoteEditorPanel({ noteId, onNoteUpdated }: NoteEditorPanelProps)
       <ResizablePanelGroup direction="horizontal" className="flex-1">
         {viewMode !== 'preview' && (<ResizablePanel defaultSize={viewMode === 'editor' ? 100 : 50} minSize={30}><CodeEditor value={content} language="markdown" onChange={(e) => setContent(e.target.value)} placeholder="Escribe tu nota en Markdown..." padding={16} style={{ fontSize: noteFontSize, backgroundColor: "hsl(var(--background))", fontFamily: 'var(--font-geist-mono)', height: '100%', overflow: 'auto', outline: 'none', border: 'none' }} className="w-full h-full" /></ResizablePanel>)}
         {viewMode === 'split' && <ResizableHandle withHandle />}
-        {viewMode !== 'editor' && (<ResizablePanel defaultSize={viewMode === 'preview' ? 100 : 50} minSize={30}><div className="prose dark:prose-invert p-4 h-full overflow-y-auto w-full max-w-none">{content.trim() === '' ? (<div className="flex items-center justify-center h-full text-muted-foreground"><p>La vista previa aparecerá aquí.</p></div>) : (<ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>)}</div></ResizablePanel>)}
+        {viewMode !== 'editor' && (<ResizablePanel defaultSize={viewMode === 'preview' ? 100 : 50} minSize={30}><div className="prose dark:prose-invert p-4 h-full overflow-y-auto w-full max-w-none">{content.trim() === '' ? (<div className="flex items-center justify-center h-full text-muted-foreground"><p>La vista previa aparecerá aquí.</p></div>) : (<ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{content}</ReactMarkdown>)}</div></ResizablePanel>)}
       </ResizablePanelGroup>
       {showAiHint && (<div className="absolute bottom-20 right-4 bg-info text-info-foreground p-2 rounded-md shadow-lg text-sm animate-in fade-in slide-in-from-bottom-2 flex items-center gap-2 z-10"><span>¡Usa la IA para chatear con tu nota!</span><Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setShowAiHint(false)}><X className="h-3 w-3" /></Button></div>)}
       <Button variant="destructive" size="icon" onClick={() => setIsAiChatOpen(prev => !prev)} className="absolute bottom-4 right-4 rounded-full h-12 w-12 animate-pulse-red z-10" title="Asistente de Nota"><Wand2 className="h-6 w-6" /></Button>
