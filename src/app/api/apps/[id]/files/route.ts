@@ -128,10 +128,10 @@ export async function POST(req: NextRequest, context: any) {
       const mkdirCommand = `mkdir -p '${directoryInContainer}'`;
       await executeSshOnExistingConnection(conn, `docker exec ${app.container_id} bash -c "${mkdirCommand}"`);
 
-      // 2. Escribir archivo
+      // 2. Escribir archivo (Método robusto usando pipe)
       const encodedContent = Buffer.from(content).toString('base64');
-      const writeCommand = `bash -c "echo '${encodedContent}' | base64 -d > '${resolvedPath}'"`;
-      await executeSshOnExistingConnection(conn, `docker exec ${app.container_id} ${writeCommand}`);
+      const writeCommand = `echo '${encodedContent}' | docker exec -i ${app.container_id} bash -c "base64 -d > '${resolvedPath}'"`;
+      await executeSshOnExistingConnection(conn, writeCommand);
       
       // 3. Preparar para respaldo en DB
       backups.push({
