@@ -150,7 +150,7 @@ export function ConversationSidebar({
               )))}
               <Separator className="my-4 bg-sidebar-border" />
               {renderSection("Notas", <FileText className="h-4 w-4" />, "notes", notes.filter(n => !n.folder_id).map(note => (
-                <DraggableNoteItem key={note.id} note={note} selected={selectedItem?.type === 'note' && selectedItem.id === note.id} onSelect={() => onSelectItem(note.id, 'note')} onDragStart={(e) => handleDragStart(e, note.id, 'note')} level={0} />
+                <DraggableNoteItem key={note.id} note={note} selected={selectedItem?.type === 'note' && selectedItem.id === note.id} onSelect={() => onSelectItem(note.id, 'note')} onDragStart={(e) => handleDragStart(e, note.id, 'note')} level={0} onNoteUpdated={fetchData} onNoteDeleted={fetchData} />
               )))}
               <Separator className="my-4 bg-sidebar-border" />
               {renderSection("Chats", <MessageSquare className="h-4 w-4" />, "chats", conversations.filter(c => !c.folder_id).map(conv => (

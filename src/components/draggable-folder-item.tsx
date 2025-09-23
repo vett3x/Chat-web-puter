@@ -209,7 +209,7 @@ export function DraggableFolderItem({
             <DraggableConversationCard key={conversation.id} conversation={conversation} selectedConversationId={selectedItem?.type === 'conversation' ? selectedItem.id : null} onSelectConversation={(id) => onSelectItem(id!, 'conversation')} onConversationUpdated={onFolderUpdated} onConversationDeleted={onFolderUpdated} onConversationMoved={() => {}} onConversationReordered={() => {}} allFolders={[]} level={level + 1} onDragStart={(e) => onDragStart(e, conversation.id, 'conversation')} isDraggingOver={false} dropPosition={null} />
           ))}
           {filteredNotes.map((note) => (
-            <DraggableNoteItem key={note.id} note={note} selected={selectedItem?.type === 'note' && selectedItem.id === note.id} onSelect={() => onSelectItem(note.id, 'note')} onDragStart={(e) => onDragStart(e, note.id, 'note')} level={level + 1} />
+            <DraggableNoteItem key={note.id} note={note} selected={selectedItem?.type === 'note' && selectedItem.id === note.id} onSelect={() => onSelectItem(note.id, 'note')} onDragStart={(e) => onDragStart(e, note.id, 'note')} level={level + 1} onNoteUpdated={onFolderUpdated} onNoteDeleted={onFolderDeleted} />
           ))}
         </div>
       )}
