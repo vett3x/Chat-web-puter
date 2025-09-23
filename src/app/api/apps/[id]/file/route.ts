@@ -6,6 +6,7 @@ import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { executeSshCommand } from '@/lib/ssh-utils';
 import { getAppAndServerWithStateCheck } from '@/lib/app-state-manager';
+import path from 'path';
 
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
@@ -51,15 +52,25 @@ export async function POST(req: NextRequest, context: any) {
       return NextResponse.json({ message: 'La ruta y el contenido del archivo son requeridos.' }, { status: 400 });
     }
 
-    // 1. Escribir en el contenedor para hot-reloading
-    const encodedContent = Buffer.from(content).toString('base64');
-    // Comando robusto para crear directorios y luego el archivo
-    const command = `bash -c "mkdir -p /app/$(dirname '${filePath}') && echo '${encodedContent}' | base64 -d > /app/${filePath}"`;
-    
-    const { stderr, code } = await executeSshCommand(server, `docker exec ${app.container_id} ${command}`);
-    if (code !== 0) throw new Error(`Error al escribir en el archivo del contenedor: ${stderr}`);
+    const fullPathInContainer = path.join('/app', filePath);
+    const directoryInContainer = path.dirname(fullPathInContainer);
 
-    // 2. Respaldar en la base de datos (upsert para crear o actualizar)
+    // 1. Crear la estructura de directorios de forma robusta
+    const mkdirCommand = `mkdir -p '${directoryInContainer}'`;
+    const { stderr: mkdirErr, code: mkdirCode } = await executeSshCommand(server, `docker exec ${app.container_id} ${mkdirCommand}`);
+    if (mkdirCode !== 0) {
+      throw new Error(`Error al crear directorio '${directoryInContainer}': ${mkdirErr}`);
+    }
+
+    // 2. Escribir el archivo en el contenedor
+    const encodedContent = Buffer.from(content).toString('base64');
+    const writeCommand = `bash -c "echo '${encodedContent}' | base64 -d > '${fullPathInContainer}'"`;
+    const { stderr: writeErr, code: writeCode } = await executeSshCommand(server, `docker exec ${app.container_id} ${writeCommand}`);
+    if (writeCode !== 0) {
+      throw new Error(`Error al escribir en el archivo '${fullPathInContainer}': ${writeErr}`);
+    }
+
+    // 3. Respaldar en la base de datos (upsert para crear o actualizar)
     const { error: backupError } = await supabaseAdmin
       .from('app_file_backups')
       .upsert(
@@ -73,8 +84,6 @@ export async function POST(req: NextRequest, context: any) {
       );
 
     if (backupError) {
-      // A pesar del error de respaldo, el archivo se guardó en el contenedor.
-      // Se registra el error en el servidor pero no se lanza un error fatal al cliente.
       console.error(`Error backing up file ${filePath} for app ${appId}:`, backupError);
     }
 
