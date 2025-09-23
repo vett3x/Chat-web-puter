@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { executeSshCommand } from '@/lib/ssh-utils';
+import { getAppAndServerWithStateCheck } from '@/lib/app-state-manager';
 
 interface FileNode {
   name: string;
@@ -48,14 +49,8 @@ export async function GET(req: NextRequest, context: { params: { id: string } })
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return NextResponse.json({ message: 'Acceso denegado.' }, { status: 401 });
 
-  const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  const { data: app, error: appError } = await supabaseAdmin.from('user_apps').select('server_id, container_id').eq('id', appId).single();
-  if (appError || !app) return NextResponse.json({ message: 'Aplicación no encontrada.' }, { status: 404 });
-
-  const { data: server, error: serverError } = await supabaseAdmin.from('user_servers').select('ip_address, ssh_port, ssh_username, ssh_password').eq('id', app.server_id).single();
-  if (serverError || !server) return NextResponse.json({ message: 'Servidor no encontrado.' }, { status: 404 });
-
   try {
+    const { app, server } = await getAppAndServerWithStateCheck(appId, session.user.id);
     const command = `find /app -print`; // List all files and directories under /app
     const { stdout, stderr, code } = await executeSshCommand(server, `docker exec ${app.container_id} ${command}`);
     if (code !== 0) throw new Error(`Error al listar archivos: ${stderr}`);

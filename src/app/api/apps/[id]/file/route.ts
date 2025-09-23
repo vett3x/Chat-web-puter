@@ -5,21 +5,14 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { executeSshCommand } from '@/lib/ssh-utils';
+import { getAppAndServerWithStateCheck } from '@/lib/app-state-manager';
 
-async function getAppAndServer(appId: string) {
+async function getUserId() {
   const cookieStore = cookies() as any;
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { cookies: { get: (name: string) => cookieStore.get(name)?.value } });
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Acceso denegado.');
-
-  const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  const { data: app, error: appError } = await supabaseAdmin.from('user_apps').select('server_id, container_id').eq('id', appId).single();
-  if (appError || !app) throw new Error('Aplicación no encontrada.');
-
-  const { data: server, error: serverError } = await supabaseAdmin.from('user_servers').select('ip_address, ssh_port, ssh_username, ssh_password').eq('id', app.server_id).single();
-  if (serverError || !server) throw new Error('Servidor no encontrado.');
-
-  return { app, server };
+  return session.user.id;
 }
 
 // GET: Leer contenido de un archivo
@@ -31,7 +24,8 @@ export async function GET(req: NextRequest, context: { params: { id: string } })
   if (!filePath) return NextResponse.json({ message: 'La ruta del archivo es requerida.' }, { status: 400 });
 
   try {
-    const { app, server } = await getAppAndServer(appId);
+    const userId = await getUserId();
+    const { app, server } = await getAppAndServerWithStateCheck(appId, userId);
     const command = `cat /app/${filePath}`;
     const { stdout, stderr, code } = await executeSshCommand(server, `docker exec ${app.container_id} ${command}`);
     if (code !== 0) throw new Error(`Error al leer el archivo: ${stderr}`);
@@ -47,7 +41,8 @@ export async function POST(req: NextRequest, context: { params: { id: string } }
   const appId = context.params.id;
   
   try {
-    const { app, server } = await getAppAndServer(appId);
+    const userId = await getUserId();
+    const { app, server } = await getAppAndServerWithStateCheck(appId, userId);
     const { filePath, content } = await req.json();
 
     if (!filePath || content === undefined) {
