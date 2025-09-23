@@ -94,6 +94,7 @@ export async function GET(req: NextRequest) {
       .from('docker_tunnels')
       .select(`
         id,
+        server_id,
         container_id,
         full_domain,
         container_port,
@@ -119,6 +120,7 @@ export async function GET(req: NextRequest) {
 
     const formattedTunnels = tunnels.map(tunnel => ({
       id: tunnel.id,
+      server_id: tunnel.server_id,
       container_id: tunnel.container_id,
       full_domain: tunnel.full_domain,
       container_port: tunnel.container_port,

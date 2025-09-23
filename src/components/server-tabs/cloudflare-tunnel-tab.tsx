@@ -49,16 +49,12 @@ interface DockerTunnel {
   id: string;
   server_id: string;
   container_id: string;
-  cloudflare_domain_id: string;
-  subdomain: string;
   full_domain: string;
   container_port: number;
-  host_port?: number;
-  tunnel_id?: string;
-  tunnel_secret?: string; // Storing as plain text as per user's request for now
   status: 'pending' | 'provisioning' | 'active' | 'failed';
-  provisioning_log?: string;
   created_at: string;
+  domain_name: string;
+  server_name: string;
 }
 
 // Esquema de validación para añadir un dominio de Cloudflare
@@ -377,8 +373,8 @@ export function CloudflareTunnelTab() {
                           <Globe className="h-4 w-4" /> {tunnel.full_domain}
                         </a>
                       </TableCell>
-                      <TableCell className="font-mono text-xs">{tunnel.server_id.substring(0, 8)}</TableCell> {/* Placeholder */}
-                      <TableCell className="font-mono text-xs">{tunnel.container_id.substring(0, 8)}</TableCell> {/* Placeholder */}
+                      <TableCell>{tunnel.server_name}</TableCell>
+                      <TableCell className="font-mono text-xs">{tunnel.container_id?.substring(0, 12) || 'N/A'}</TableCell>
                       <TableCell>{tunnel.container_port}</TableCell>
                       <TableCell>
                         <span className={cn(
