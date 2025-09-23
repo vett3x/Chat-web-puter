@@ -244,6 +244,10 @@ export function useChat({
     setMessages(prev => [...prev, { id: tempTypingId, role: 'assistant', content: '', isTyping: true, timestamp: new Date() }]);
 
     try {
+      if (!window.puter || !window.puter.ai) {
+        throw new Error('Puter AI client no está disponible.');
+      }
+
       const puterMessages: PuterMessage[] = history.map(msg => ({
         role: msg.role,
         content: msg.content,
@@ -311,9 +315,10 @@ export function useChat({
       }
 
     } catch (error: any) {
-      toast.error(error.message);
+      const errorMessage = error?.message || (typeof error === 'string' ? error : 'Ocurrió un error desconocido.');
+      toast.error(errorMessage);
       setMessages(prev => prev.filter(m => m.id !== tempTypingId));
-      setMessages(prev => [...prev, { id: `error-${Date.now()}`, role: 'assistant', content: `Error: ${error.message}`, isNew: true, timestamp: new Date() }]);
+      setMessages(prev => [...prev, { id: `error-${Date.now()}`, role: 'assistant', content: `Error: ${errorMessage}`, isNew: true, timestamp: new Date() }]);
     } finally {
       setIsLoading(false);
     }
