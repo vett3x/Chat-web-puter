@@ -113,7 +113,7 @@ export async function POST(
       return NextResponse.json({ message: 'Comando inválido.' }, { status: 400 });
     }
 
-    const { stdout, stderr, code } = await executeSshCommand(server, `docker exec ${containerId} sh -c "${command}"`);
+    const { stdout, stderr, code } = await executeSshCommand(server, `docker exec ${containerId} bash -c "${command}"`);
 
     if (code !== 0) {
       return NextResponse.json({ message: `Error al ejecutar comando: ${stderr || stdout}`, output: stdout, error: stderr }, { status: 500 });

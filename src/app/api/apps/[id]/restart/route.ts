@@ -36,7 +36,6 @@ export async function POST(req: NextRequest, context: any) {
       .single();
 
     // Comandos para reiniciar los servicios DENTRO del contenedor
-    // Se ejecutan en secuencia. Si pkill no encuentra un proceso, fallará, pero el siguiente comando se ejecutará igualmente.
     const killAppCommand = "pkill -f 'npm run dev' || true";
     const killTunnelCommand = "pkill cloudflared || true";
     const restartAppCommand = `cd /app && nohup npm run dev -- -p ${tunnel?.container_port || 3000} > /app/dev.log 2>&1 &`;
@@ -49,10 +48,10 @@ export async function POST(req: NextRequest, context: any) {
       commandsToRun.push(restartTunnelCommand);
     }
 
-    // Unimos los comandos con ' && ' que es más robusto para sh
+    // Unimos los comandos con ' && ' que es robusto para bash
     const commandsToRunInShell = commandsToRun.join(' && ');
 
-    const fullCommand = `docker exec ${app.container_id} sh -c "${commandsToRunInShell}"`;
+    const fullCommand = `docker exec ${app.container_id} bash -c "${commandsToRunInShell}"`;
 
     const { stderr, code } = await executeSshCommand(server, fullCommand);
 
