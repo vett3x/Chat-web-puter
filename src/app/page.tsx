@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession } from "@/components/session-context-provider";
 import { ConversationSidebar } from "@/components/conversation-sidebar";
 import { ChatInterface } from "@/components/chat-interface";
@@ -81,6 +81,7 @@ export default function Home() {
   const [activeFile, setActiveFile] = useState<ActiveFile | null>(null);
   const [isFileLoading, setIsFileLoading] = useState(false);
   const [isDeletingAppId, setIsDeletingAppId] = useState<string | null>(null);
+  const appBrowserRef = useRef<{ refresh: () => void }>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -177,6 +178,14 @@ export default function Home() {
     }
   };
 
+  const handleFilesWritten = () => {
+    refreshSidebarData();
+    // Add a small delay to allow the server to process file changes before refreshing
+    setTimeout(() => {
+      appBrowserRef.current?.refresh();
+    }, 1000);
+  };
+
   const handleOpenProfileSettings = () => setIsProfileSettingsOpen(true);
   const handleOpenAppSettings = () => setIsAppSettingsOpen(true);
   const handleOpenServerManagement = () => setIsServerManagementOpen(true);
@@ -206,7 +215,7 @@ export default function Home() {
     if (rightPanelView === 'editor' && activeFile && selectedItem?.type === 'app') {
       return <CodeEditorPanel appId={selectedItem.id} file={activeFile} onClose={() => { setActiveFile(null); setRightPanelView('preview'); }} onSwitchToPreview={() => setRightPanelView('preview')} />;
     }
-    return <AppBrowserPanel appId={selectedAppDetails?.id || null} appUrl={selectedAppDetails?.url || null} appStatus={selectedAppDetails?.status || null} />;
+    return <AppBrowserPanel ref={appBrowserRef} appId={selectedAppDetails?.id || null} appUrl={selectedAppDetails?.url || null} appStatus={selectedAppDetails?.status || null} />;
   };
 
   return (
@@ -251,6 +260,8 @@ export default function Home() {
                 isAppProvisioning={selectedAppDetails?.status === 'provisioning'}
                 isAppDeleting={isAppDeleting}
                 appPrompt={selectedAppDetails?.prompt}
+                appId={selectedAppDetails?.id}
+                onFilesWritten={handleFilesWritten}
               />
             </ResizablePanel>
             {selectedItem?.type === 'app' && (

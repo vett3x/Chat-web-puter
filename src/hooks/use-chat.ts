@@ -60,12 +60,18 @@ interface UseChatProps {
 }
 
 const codeBlockRegex = /```(\w+)?(?::([\w./-]+))?\s*\n([\s\S]*?)\s*```/g;
-interface ParsedPart {
+
+// This is a more flexible type for our internal rendering logic
+interface RenderablePart {
   type: 'text' | 'code';
-  content: string;
+  text?: string;
+  language?: string;
+  filename?: string;
+  code?: string;
 }
-function parseStringIntoTextAndCode(content: string): ParsedPart[] {
-  const parts: ParsedPart[] = [];
+
+function parseAiResponseToRenderableParts(content: string): RenderablePart[] {
+  const parts: RenderablePart[] = [];
   let lastIndex = 0;
   let match;
   codeBlockRegex.lastIndex = 0;
@@ -73,19 +79,25 @@ function parseStringIntoTextAndCode(content: string): ParsedPart[] {
   while ((match = codeBlockRegex.exec(content)) !== null) {
     if (match.index > lastIndex) {
       const textPart = content.substring(lastIndex, match.index).trim();
-      if (textPart) parts.push({ type: 'text', content: textPart });
+      if (textPart) parts.push({ type: 'text', text: textPart });
     }
-    parts.push({ type: 'code', content: match[0] });
+    parts.push({
+      type: 'code',
+      language: match[1] || '',
+      filename: match[2],
+      code: (match[3] || '').trim(),
+    });
     lastIndex = match.index + match[0].length;
   }
 
   if (lastIndex < content.length) {
     const textPart = content.substring(lastIndex).trim();
-    if (textPart) parts.push({ type: 'text', content: textPart });
+    if (textPart) parts.push({ type: 'text', text: textPart });
   }
 
-  return parts.length > 0 ? parts : [{ type: 'text', content }];
+  return parts.length > 0 ? parts : [{ type: 'text', text: content }];
 }
+
 
 export function useChat({
   userId,
@@ -269,33 +281,29 @@ export function useChat({
         contentToParse = JSON.stringify(assistantMessageContent);
       }
 
-      const parts = parseStringIntoTextAndCode(contentToParse);
+      const parts = parseAiResponseToRenderableParts(contentToParse);
       const filesToWrite: { path: string; content: string }[] = [];
+
+      parts.forEach(part => {
+        if (part.type === 'code' && appId && part.filename && part.code) {
+          filesToWrite.push({ path: part.filename, content: part.code });
+        }
+      });
 
       setMessages(prev => prev.filter(m => m.id !== tempTypingId));
 
-      for (const part of parts) {
-        const assistantMessageData = {
-          content: part.content,
-          role: 'assistant' as const,
-          model: selectedModel,
-          type: 'text' as const,
-        };
-        const tempPartId = `assistant-part-${Date.now()}-${Math.random()}`;
-        setMessages(prev => [...prev, { ...assistantMessageData, id: tempPartId, timestamp: new Date(), isNew: true }]);
-        
-        const savedData = await saveMessageToDB(convId, assistantMessageData);
-        if (savedData) {
-          setMessages(prev => prev.map(msg => msg.id === tempPartId ? { ...msg, id: savedData.id, timestamp: savedData.timestamp } : msg));
-        }
-
-        if (part.type === 'code' && appId) {
-          const fileMatch = part.content.match(/```(?:\w+)?(?::([\w./-]+))?/);
-          const codeContentMatch = part.content.match(/\s*\n([\s\S]*?)\s*```/);
-          if (fileMatch?.[1] && codeContentMatch?.[1]) {
-            filesToWrite.push({ path: fileMatch[1], content: codeContentMatch[1] });
-          }
-        }
+      const assistantMessageData = {
+        content: parts as any, // Cast to any to match DB type, MessageContent will handle it
+        role: 'assistant' as const,
+        model: selectedModel,
+        type: 'multimodal' as const,
+      };
+      const tempId = `assistant-${Date.now()}`;
+      setMessages(prev => [...prev, { ...assistantMessageData, id: tempId, timestamp: new Date(), isNew: true }]);
+      
+      const savedData = await saveMessageToDB(convId, assistantMessageData);
+      if (savedData) {
+        setMessages(prev => prev.map(msg => msg.id === tempId ? { ...msg, id: savedData.id, timestamp: savedData.timestamp } : msg));
       }
 
       if (filesToWrite.length > 0) {

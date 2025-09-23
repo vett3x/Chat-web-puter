@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { Wand2, Loader2, ArrowLeft, ArrowRight, RefreshCw, ExternalLink, Terminal, ChevronDown, ChevronRight, Power } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -69,7 +69,10 @@ function SystemLogsPanel({ appId }: { appId: string }) {
   );
 }
 
-export function AppBrowserPanel({ appId, appUrl, appStatus, isAppDeleting = false }: AppBrowserPanelProps) {
+export const AppBrowserPanel = forwardRef<
+  { refresh: () => void },
+  AppBrowserPanelProps
+>(({ appId, appUrl, appStatus, isAppDeleting = false }, ref) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isRestarting, setIsRestarting] = useState(false);
 
@@ -78,6 +81,10 @@ export function AppBrowserPanel({ appId, appUrl, appStatus, isAppDeleting = fals
       iframeRef.current.src = iframeRef.current.src;
     }
   };
+
+  useImperativeHandle(ref, () => ({
+    refresh: handleRefresh,
+  }));
 
   const handleRestart = async () => {
     if (!appId) return;
@@ -170,4 +177,6 @@ export function AppBrowserPanel({ appId, appUrl, appStatus, isAppDeleting = fals
       </ResizablePanelGroup>
     </div>
   );
-}
+});
+
+AppBrowserPanel.displayName = 'AppBrowserPanel';
