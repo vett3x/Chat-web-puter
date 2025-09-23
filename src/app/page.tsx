@@ -74,6 +74,35 @@ export default function Home() {
     }
   }, [aiResponseSpeed]);
 
+  useEffect(() => {
+    if (selectedAppDetails?.status === 'provisioning' && selectedAppDetails.id) {
+      const channel = supabase
+        .channel(`app-status-updates-${selectedAppDetails.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'user_apps',
+            filter: `id=eq.${selectedAppDetails.id}`,
+          },
+          (payload) => {
+            const updatedApp = payload.new as UserApp;
+            setSelectedAppDetails(updatedApp);
+            if (updatedApp.status !== 'provisioning') {
+              toast.success(`La aplicación "${updatedApp.name}" está lista.`);
+              supabase.removeChannel(channel);
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [selectedAppDetails]);
+
   const handleSelectItem = useCallback(async (id: string | null, type: SelectedItem['type'] | null) => {
     setActiveFile(null);
     setRightPanelView('chat');
