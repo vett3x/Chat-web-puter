@@ -6,7 +6,7 @@ import { useSession } from '@/components/session-context-provider';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Save, Loader2, Eye, Code, Wand2 } from 'lucide-react';
+import { Save, Loader2, Eye, Code, Wand2, X } from 'lucide-react';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -36,7 +36,8 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, noteFontSize, noteAutoS
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [viewMode, setViewMode] = useState<'editor' | 'split' | 'preview'>('editor');
-  const [isAiChatOpen, setIsAiChatOpen] = useState(false); // State for the AI chat
+  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+  const [showAiHint, setShowAiHint] = useState(false);
 
   const fetchNote = useCallback(async () => {
     if (!session?.user?.id || !noteId) return;
@@ -62,6 +63,19 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, noteFontSize, noteAutoS
   useEffect(() => {
     fetchNote();
   }, [fetchNote]);
+
+  // Effect for the first-time AI hint
+  useEffect(() => {
+    const hasSeenHint = localStorage.getItem('hasSeenNoteAiHint');
+    if (!hasSeenHint) {
+      setShowAiHint(true);
+      const timer = setTimeout(() => {
+        setShowAiHint(false);
+      }, 10000); // Hide after 10 seconds
+      localStorage.setItem('hasSeenNoteAiHint', 'true');
+      return () => clearTimeout(timer);
+    }
+  }, [noteId]); // Show hint when a new note is opened
 
   const handleSave = useCallback(async () => {
     if (!note || isSaving) return;
@@ -181,11 +195,21 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, noteFontSize, noteAutoS
         )}
       </ResizablePanelGroup>
 
+      {/* AI Hint for first-time users */}
+      {showAiHint && (
+        <div className="absolute bottom-20 right-4 bg-info text-info-foreground p-2 rounded-md shadow-lg text-sm animate-in fade-in slide-in-from-bottom-2 flex items-center gap-2 z-10">
+          <span>¡Usa la IA para chatear con tu nota!</span>
+          <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setShowAiHint(false)}>
+            <X className="h-3 w-3" />
+          </Button>
+        </div>
+      )}
+
       {/* AI Chat Components */}
       <Button
         variant="destructive"
         size="icon"
-        onClick={() => setIsAiChatOpen(true)}
+        onClick={() => setIsAiChatOpen(prev => !prev)}
         className="absolute bottom-4 right-4 rounded-full h-12 w-12 animate-pulse-red z-10"
         title="Asistente de Nota"
       >

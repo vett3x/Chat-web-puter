@@ -93,7 +93,7 @@ Ahora, por favor responde a la siguiente pregunta del usuario:`;
   if (!isOpen) return null;
 
   return (
-    <Card className="absolute bottom-20 right-4 w-96 h-[500px] z-20 flex flex-col shadow-2xl">
+    <Card className="absolute bottom-20 right-4 w-96 h-[500px] z-20 flex flex-col shadow-2xl animate-in fade-in-0 slide-in-from-bottom-4 slide-in-from-right-4 duration-300">
       <CardHeader className="flex flex-row items-center justify-between p-3 border-b">
         <CardTitle className="text-base font-semibold">Asistente de Nota</CardTitle>
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onClose}>
