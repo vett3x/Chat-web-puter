@@ -173,18 +173,32 @@ export function ConversationSidebar({
         <div className="space-y-2">
           {isLoading ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />) : (
             <>
-              {renderSection("Proyectos", <Wand2 className="h-4 w-4" />, "apps", apps.map(app => (
-                <div key={app.id}>
-                  <DraggableAppItem
-                    app={app}
-                    selected={selectedItem?.type === 'app' && selectedItem.id === app.id}
-                    onSelect={() => onSelectItem(app.id, 'app')}
-                    onDelete={onDeleteApp}
-                    isDeleting={isDeletingAppId === app.id}
-                  />
-                  {selectedItem?.type === 'app' && selectedItem.id === app.id && <div className="border-l-2 border-sidebar-primary ml-2"><FileTree appId={app.id} onFileSelect={onFileSelect} /></div>}
-                </div>
-              )))}
+              {renderSection("Proyectos", <Wand2 className="h-4 w-4" />, "apps", apps.map(app => {
+                const isSelected = selectedItem?.type === 'app' && selectedItem.id === app.id;
+                return (
+                  <div key={app.id}>
+                    <DraggableAppItem
+                      app={app}
+                      selected={isSelected}
+                      onSelect={() => onSelectItem(app.id, 'app')}
+                      onDelete={onDeleteApp}
+                      isDeleting={isDeletingAppId === app.id}
+                    />
+                    {isSelected && (
+                      <div className="border-l-2 border-sidebar-primary ml-2 pl-2 pt-1">
+                        {app.status === 'ready' ? (
+                          <FileTree appId={app.id} onFileSelect={onFileSelect} />
+                        ) : (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground p-1">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            <span>Aprovisionando archivos...</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              }))}
               <Separator className="my-4 bg-sidebar-border" />
               {renderSection("Notas", <FileText className="h-4 w-4" />, "notes", notes.filter(n => !n.folder_id).map(note => (
                 <DraggableNoteItem key={note.id} note={note} selected={selectedItem?.type === 'note' && selectedItem.id === note.id} onSelect={() => onSelectItem(note.id, 'note')} onDragStart={(e) => handleDragStart(e, note.id, 'note')} level={0} onNoteUpdated={refreshData} onNoteDeleted={refreshData} />
