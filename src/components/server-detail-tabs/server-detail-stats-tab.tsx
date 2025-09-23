@@ -23,7 +23,7 @@ interface ServerDetailStatsTabProps {
 }
 
 interface StatPoint {
-  timestamp: string;
+  log_timestamp: string;
   avg_cpu: number;
   avg_memory_mib: number;
   avg_disk_percent: number;
@@ -66,12 +66,12 @@ export function ServerDetailStatsTab({ serverId }: ServerDetailStatsTabProps) {
     return format(new Date(tickItem), 'dd MMM', { locale: es });
   };
 
-  const renderChart = (dataKey: keyof StatPoint, name: string, unit: string, color: string) => (
+  const renderChart = (dataKey: keyof Omit<StatPoint, 'log_timestamp'>, name: string, unit: string, color: string) => (
     <div className="h-[250px] w-full">
       <h5 className="text-md font-semibold mb-2">{name}</h5>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={stats} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-          <XAxis dataKey="timestamp" tickFormatter={formatXAxis} tick={{ fontSize: 12 }} />
+          <XAxis dataKey="log_timestamp" tickFormatter={formatXAxis} tick={{ fontSize: 12 }} />
           <YAxis tick={{ fontSize: 12 }} unit={unit} />
           <Tooltip
             labelFormatter={(label) => format(new Date(label), 'dd MMM yyyy, HH:mm', { locale: es })}
