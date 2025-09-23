@@ -5,6 +5,9 @@ import { getAppAndServerWithStateCheck } from '@/lib/app-state-manager';
 import { executeSshCommand } from '@/lib/ssh-utils';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
 async function getUserId() {
   const cookieStore = cookies() as any;
@@ -25,13 +28,37 @@ export async function POST(req: NextRequest, context: any) {
       throw new Error('La aplicación no tiene un contenedor asociado para reiniciar.');
     }
 
-    const { stderr, code } = await executeSshCommand(server, `docker restart ${app.container_id}`);
+    // Obtener detalles del túnel si existe
+    const { data: tunnel } = await supabaseAdmin
+      .from('docker_tunnels')
+      .select('tunnel_id, tunnel_secret, container_port')
+      .eq('app_id', appId)
+      .single();
 
-    if (code !== 0) {
-      throw new Error(`Error al reiniciar el contenedor: ${stderr}`);
+    // Comandos para reiniciar los servicios DENTRO del contenedor
+    const killCommands = "pkill -f 'next dev' || true; pkill cloudflared || true";
+    
+    const restartAppCommand = `cd /app && nohup npm run dev -- -p ${tunnel?.container_port || 3000} > /app/dev.log 2>&1 &`;
+    
+    let fullCommand = `docker exec ${app.container_id} sh -c "${killCommands} && ${restartAppCommand}"`;
+
+    // Si hay un túnel, también lo reiniciamos
+    if (tunnel && tunnel.tunnel_id && tunnel.tunnel_secret) {
+      const restartTunnelCommand = `nohup cloudflared tunnel run --token ${tunnel.tunnel_secret} ${tunnel.tunnel_id} > /app/cloudflared.log 2>&1 &`;
+      fullCommand = `docker exec ${app.container_id} sh -c "${killCommands} && ${restartAppCommand} && ${restartTunnelCommand}"`;
     }
 
-    return NextResponse.json({ message: 'La aplicación se está reiniciando.' });
+    const { stderr, code } = await executeSshCommand(server, fullCommand);
+
+    if (code !== 0) {
+      // A veces pkill devuelve un código de error si no encuentra procesos, lo cual es esperado.
+      // Solo lanzamos un error si stderr contiene algo más que "no process found".
+      if (stderr && !stderr.toLowerCase().includes('no process found')) {
+        throw new Error(`Error al reiniciar los servicios: ${stderr}`);
+      }
+    }
+
+    return NextResponse.json({ message: 'Los servicios de la aplicación se están reiniciando.' });
   } catch (error: any) {
     console.error(`[API RESTART /apps/${appId}] Error:`, error);
     return NextResponse.json({ message: error.message }, { status: 500 });
