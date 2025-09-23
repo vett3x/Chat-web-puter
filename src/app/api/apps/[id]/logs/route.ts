@@ -25,10 +25,12 @@ export async function GET(req: NextRequest, context: any) {
       return NextResponse.json({ logs: 'La aplicación no tiene un contenedor asociado.' });
     }
 
-    const { stdout, stderr, code } = await executeSshCommand(server, `docker logs --tail 100 ${app.container_id}`);
+    // Changed command to read the Next.js dev server log file
+    const { stdout, stderr, code } = await executeSshCommand(server, `docker exec ${app.container_id} tail -n 100 /app/dev.log`);
     
-    // Es normal que los logs salgan por stderr, así que los combinamos.
-    const logs = `STDOUT:\n${stdout}\n\nSTDERR:\n${stderr}`;
+    // Combine stdout and stderr, as tail might output to either.
+    // If the file doesn't exist yet, stderr will contain an error message which is useful feedback.
+    const logs = stdout || stderr;
 
     return NextResponse.json({ logs });
   } catch (error: any) {
