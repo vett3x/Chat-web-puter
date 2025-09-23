@@ -7,16 +7,18 @@ import { useState, useEffect } from "react";
 import { ProfileSettingsDialog } from "@/components/profile-settings-dialog";
 import { AppSettingsDialog } from "@/components/app-settings-dialog";
 import { ServerManagementDialog } from "@/components/server-management-dialog";
-import { UserManagementDialog } from "@/components/user-management-dialog"; // Import the new dialog
+import { UserManagementDialog } from "@/components/user-management-dialog";
+import { DeepAiCoderDialog } from "@/components/deep-ai-coder-dialog"; // Import the new dialog
 
 export default function Home() {
-  const { session, isLoading: isSessionLoading, userRole } = useSession(); // Changed isSuperUser to userRole
+  const { session, isLoading: isSessionLoading, userRole } = useSession();
   const userId = session?.user?.id;
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [isProfileSettingsOpen, setIsProfileSettingsOpen] = useState(false);
   const [isAppSettingsOpen, setIsAppSettingsOpen] = useState(false);
   const [isServerManagementOpen, setIsServerManagementOpen] = useState(false);
-  const [isUserManagementOpen, setIsUserManagementOpen] = useState(false); // State for UserManagementDialog visibility
+  const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
+  const [isDeepAiCoderOpen, setIsDeepAiCoderOpen] = useState(false); // State for the new dialog
   const [aiResponseSpeed, setAiResponseSpeed] = useState<'slow' | 'normal' | 'fast'>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('aiResponseSpeed') as 'slow' | 'normal' | 'fast') || 'normal';
@@ -24,11 +26,9 @@ export default function Home() {
     return 'normal';
   });
 
-  // When user logs in, if there are no conversations, create a new one automatically
   useEffect(() => {
     if (userId && !isSessionLoading) {
-      // This logic will be handled by ConversationSidebar's initial fetch and create if empty
-      // For now, we just ensure a conversation can be selected or created.
+      // Logic for conversation handling
     }
   }, [userId, isSessionLoading]);
 
@@ -42,30 +42,17 @@ export default function Home() {
     setSelectedConversationId(conversationId);
   };
 
-  const handleOpenProfileSettings = () => {
-    setIsProfileSettingsOpen(true);
-  };
-
-  const handleOpenAppSettings = () => {
-    setIsAppSettingsOpen(true);
-  };
-
-  const handleOpenServerManagement = () => {
-    setIsServerManagementOpen(true);
-  };
-
-  const handleOpenUserManagement = () => { // New handler for user management
-    setIsUserManagementOpen(true);
-  };
+  const handleOpenProfileSettings = () => setIsProfileSettingsOpen(true);
+  const handleOpenAppSettings = () => setIsAppSettingsOpen(true);
+  const handleOpenServerManagement = () => setIsServerManagementOpen(true);
+  const handleOpenUserManagement = () => setIsUserManagementOpen(true);
+  const handleOpenDeepAiCoder = () => setIsDeepAiCoderOpen(true); // Handler for the new dialog
 
   const handleAiResponseSpeedChange = (speed: 'slow' | 'normal' | 'fast') => {
     setAiResponseSpeed(speed);
-    // Optionally, close the dialog after changing speed
-    // setIsAppSettingsOpen(false);
   };
 
-  const isSuperAdmin = userRole === 'super_admin'; // Helper for conditional rendering
-  const isAdmin = userRole === 'admin' || userRole === 'super_admin'; // Helper for admin access
+  const isAdmin = userRole === 'admin' || userRole === 'super_admin';
 
   return (
     <div className="flex h-screen bg-background">
@@ -76,7 +63,8 @@ export default function Home() {
           onOpenProfileSettings={handleOpenProfileSettings}
           onOpenAppSettings={handleOpenAppSettings}
           onOpenServerManagement={handleOpenServerManagement}
-          onOpenUserManagement={handleOpenUserManagement} // Pass the new function
+          onOpenUserManagement={handleOpenUserManagement}
+          onOpenDeepAiCoder={handleOpenDeepAiCoder} // Pass the new handler
         />
       </aside>
       <main className="flex-1 flex flex-col min-w-0">
@@ -86,7 +74,6 @@ export default function Home() {
           onNewConversationCreated={handleNewConversationCreated}
           onConversationTitleUpdate={(id, newTitle) => {
             // This prop will be used to update the title in the sidebar if the chat interface changes it
-            // For now, the sidebar manages its own titles.
           }}
           aiResponseSpeed={aiResponseSpeed}
         />
@@ -100,18 +87,22 @@ export default function Home() {
           aiResponseSpeed={aiResponseSpeed}
           onAiResponseSpeedChange={handleAiResponseSpeedChange}
         />
-        {isAdmin && ( // Render ServerManagementDialog for Admins and Super Admins
+        {isAdmin && (
           <ServerManagementDialog
             open={isServerManagementOpen}
             onOpenChange={setIsServerManagementOpen}
           />
         )}
-        {isAdmin && ( // Render UserManagementDialog for Admins and Super Admins
+        {isAdmin && (
           <UserManagementDialog
             open={isUserManagementOpen}
             onOpenChange={setIsUserManagementOpen}
           />
         )}
+        <DeepAiCoderDialog
+          open={isDeepAiCoderOpen}
+          onOpenChange={setIsDeepAiCoderOpen}
+        />
       </main>
     </div>
   );

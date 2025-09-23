@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, MessageSquare, Loader2, Folder, ChevronRight, ChevronDown, Server, Users } from 'lucide-react'; // Import Users icon
+import { Plus, MessageSquare, Loader2, Folder, ChevronRight, ChevronDown, Server, Users, Wand2 } from 'lucide-react'; // Import Wand2 icon
 import { Separator } from '@/components/ui/separator';
 import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
@@ -38,7 +38,8 @@ interface ConversationSidebarProps {
   onOpenProfileSettings: () => void;
   onOpenAppSettings: () => void;
   onOpenServerManagement: () => void;
-  onOpenUserManagement: () => void; // New prop for user management
+  onOpenUserManagement: () => void;
+  onOpenDeepAiCoder: () => void; // New prop
 }
 
 export function ConversationSidebar({
@@ -47,9 +48,10 @@ export function ConversationSidebar({
   onOpenProfileSettings,
   onOpenAppSettings,
   onOpenServerManagement,
-  onOpenUserManagement, // Destructure new prop
+  onOpenUserManagement,
+  onOpenDeepAiCoder, // Destructure new prop
 }: ConversationSidebarProps) {
-  const { session, isLoading: isSessionLoading, userRole } = useSession(); // Changed isSuperUser to userRole
+  const { session, isLoading: isSessionLoading, userRole } = useSession();
   const userId = session?.user?.id;
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -344,8 +346,8 @@ export function ConversationSidebar({
   const rootFolders = folders.filter(f => f.parent_id === null);
   const generalConversations = conversations.filter(conv => conv.folder_id === null);
 
-  const isSuperAdmin = userRole === 'super_admin'; // Helper for conditional rendering
-  const isAdmin = userRole === 'admin' || userRole === 'super_admin'; // Helper for admin access
+  const isSuperAdmin = userRole === 'super_admin';
+  const isAdmin = userRole === 'admin' || userRole === 'super_admin';
 
   if (isSessionLoading) {
     return (
@@ -363,7 +365,7 @@ export function ConversationSidebar({
           onOpenProfileSettings={onOpenProfileSettings}
           onOpenAppSettings={onOpenAppSettings}
           onOpenServerManagement={onOpenServerManagement}
-          onOpenUserManagement={onOpenUserManagement} // Pass the new prop
+          onOpenUserManagement={onOpenUserManagement}
         />
       </div>
 
@@ -373,15 +375,24 @@ export function ConversationSidebar({
           <Button
             variant="default"
             size="icon"
+            onClick={onOpenDeepAiCoder}
+            className="bg-primary-light-purple hover:bg-primary-light-purple/90 text-white animate-pulse-purple rounded-full h-7 w-7"
+            title="DeepAI Coder"
+          >
+            <Wand2 className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="default"
+            size="icon"
             onClick={createNewConversation}
             disabled={isCreatingConversation}
-            className="bg-green-500 hover:bg-green-600 text-white animate-pulse-glow rounded-full h-7 w-7" // Reduced size
+            className="bg-green-500 hover:bg-green-600 text-white animate-pulse-glow rounded-full h-7 w-7"
             title="Nueva conversación"
           >
             {isCreatingConversation ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> /* Reduced icon size */
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              <Plus className="h-3.5 w-3.5" /> /* Reduced icon size */
+              <Plus className="h-3.5 w-3.5" />
             )}
           </Button>
           <Button
@@ -389,35 +400,35 @@ export function ConversationSidebar({
             size="icon"
             onClick={() => createNewFolder()}
             disabled={isCreatingFolder}
-            className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7" // Reduced size
+            className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7"
             title="Nueva carpeta"
           >
             {isCreatingFolder ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> /* Reduced icon size */
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              <Folder className="h-3.5 w-3.5" /> /* Reduced icon size */
+              <Folder className="h-3.5 w-3.5" />
             )}
           </Button>
-          {isAdmin && ( // Show Server Management button for Admins and Super Admins
+          {isAdmin && (
             <Button
               variant="outline"
               size="icon"
               onClick={onOpenServerManagement}
-              className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7" // Reduced size
+              className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7"
               title="Gestión de Servidores"
             >
-              <Server className="h-3.5 w-3.5" /> {/* Reduced icon size */}
+              <Server className="h-3.5 w-3.5" />
             </Button>
           )}
-          {isAdmin && ( // New: Show User Management button for Admins and Super Admins
+          {isAdmin && (
             <Button
               variant="outline"
               size="icon"
               onClick={onOpenUserManagement}
-              className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7" // Reduced size
+              className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7"
               title="Gestión de Usuarios"
             >
-              <Users className="h-3.5 w-3.5" /> {/* Reduced icon size */}
+              <Users className="h-3.5 w-3.5" />
             </Button>
           )}
         </div>

@@ -24,6 +24,7 @@ export default {
   				DEFAULT: 'hsl(var(--primary))',
   				foreground: 'hsl(var(--primary-foreground))'
   			},
+        'primary-light-purple': 'hsl(var(--primary-light-purple))', // New color
   			secondary: {
   				DEFAULT: 'hsl(var(--secondary))',
   				foreground: 'hsl(var(--secondary-foreground))'
@@ -98,11 +99,20 @@ export default {
           '50%': { boxShadow: '0 0 8px 3px rgba(34, 197, 94, 0.5)' }, /* Pico del brillo, más sutil */
           '100%': { boxShadow: '0 0 0 0px rgba(34, 197, 94, 0)' }, /* Se desvanece completamente */
         },
+        'pulse-purple': { // New animation
+          '0%, 100%': {
+            boxShadow: '0 0 0 0 hsl(var(--primary-light-purple) / 0.7)',
+          },
+          '50%': {
+            boxShadow: '0 0 0 6px hsl(var(--primary-light-purple) / 0)',
+          },
+        },
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
   			'accordion-up': 'accordion-up 0.2s ease-out',
         'pulse-glow': 'pulse-glow 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'pulse-purple': 'pulse-purple 2s cubic-bezier(0.4, 0, 0.6, 1) infinite', // New animation
   		},
       boxShadow: {
         'avatar-user': '0 0 8px 2px hsl(var(--user-avatar-shadow) / 0.5)',

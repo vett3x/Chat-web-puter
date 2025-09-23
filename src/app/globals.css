@@ -23,6 +23,8 @@
 
     --primary-foreground: 0 0% 98%;
 
+    --primary-light-purple: 259 92% 69%; /* New color variable */
+
     --secondary: 0 0% 96.1%;
 
     --secondary-foreground: 0 0% 9%;
@@ -102,6 +104,8 @@
     --primary: 220 10% 15%; /* Darker gray for primary buttons */
 
     --primary-foreground: 0 0% 98%; /* White text on primary */
+
+    --primary-light-purple: 259 92% 69%; /* New color variable */
 
     --secondary: 220 10% 10%; /* Dark gray for secondary elements */
 
