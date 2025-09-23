@@ -111,6 +111,7 @@ export async function POST(req: NextRequest, context: any) {
     });
 
     const backups = [];
+    const logEntries = [];
 
     for (const file of files) {
       const { filePath, content } = file;
@@ -140,17 +141,21 @@ export async function POST(req: NextRequest, context: any) {
         file_path: filePath,
         file_content: content,
       });
+
+      // 4. Preparar entrada de log
+      logEntries.push({
+        user_id: userId,
+        server_id: server.id,
+        event_type: 'file_written',
+        description: `Archivo '${filePath}' escrito en el contenedor ${app.container_id.substring(0, 12)}.`,
+      });
     }
 
-    // 4. Respaldar en la base de datos (upsert masivo)
-    if (backups.length > 0) {
-      const { error: backupError } = await supabaseAdmin
-        .from('app_file_backups')
-        .upsert(backups, { onConflict: 'app_id, file_path' });
-      if (backupError) {
-        console.error(`Error backing up files for app ${appId}:`, backupError);
-      }
-    }
+    // 5. Insertar logs y respaldos en paralelo
+    await Promise.all([
+      supabaseAdmin.from('app_file_backups').upsert(backups, { onConflict: 'app_id, file_path' }),
+      supabaseAdmin.from('server_events_log').insert(logEntries)
+    ]);
 
     return NextResponse.json({ message: 'Archivos guardados y respaldados correctamente.' });
   } catch (error: any) {

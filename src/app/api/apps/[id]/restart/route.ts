@@ -55,6 +55,14 @@ export async function POST(req: NextRequest, context: any) {
       throw new Error(`Error al reiniciar los servicios: ${stderr}`);
     }
 
+    // Log the restart event
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: userId,
+      server_id: server.id,
+      event_type: 'app_restarted',
+      description: `Servicios reiniciados para el contenedor ${app.container_id.substring(0, 12)}.`,
+    });
+
     return NextResponse.json({ message: 'Los servicios de la aplicación se están reiniciando.' });
   } catch (error: any) {
     console.error(`[API RESTART /apps/${appId}] Error:`, error);

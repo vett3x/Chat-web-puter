@@ -1,19 +1,68 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
-import { Wand2, Loader2, ArrowLeft, ArrowRight, RefreshCw, ExternalLink, Terminal, Power, Server, Cloud } from 'lucide-react';
+import { Wand2, Loader2, ArrowLeft, ArrowRight, RefreshCw, ExternalLink, Terminal, Power, Server, Cloud, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { toast } from 'sonner';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface AppBrowserPanelProps {
   appId: string | null;
   appUrl: string | null;
   appStatus: string | null;
   isAppDeleting?: boolean;
+}
+
+interface ServerEvent {
+  id: string;
+  event_type: string;
+  description: string;
+  created_at: string;
+}
+
+function SystemActivityPanel({ appId }: { appId: string }) {
+  const [events, setEvents] = useState<ServerEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchActivity = useCallback(async () => {
+    if (!appId) return;
+    try {
+      const response = await fetch(`/api/apps/${appId}/activity`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
+      setEvents(data);
+    } catch (error: any) {
+      setEvents([{ id: 'error', event_type: 'error', description: `Error al cargar la actividad: ${error.message}`, created_at: new Date().toISOString() }]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [appId]);
+
+  useEffect(() => {
+    fetchActivity();
+    const interval = setInterval(fetchActivity, 10000);
+    return () => clearInterval(interval);
+  }, [fetchActivity]);
+
+  return (
+    <div className="h-full overflow-auto bg-[#1E1E1E] p-4 text-white font-mono text-xs">
+      {isLoading ? (
+        <div className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Cargando actividad...</div>
+      ) : (
+        events.map(event => (
+          <div key={event.id} className="flex gap-4">
+            <span className="text-gray-500">{format(new Date(event.created_at), 'HH:mm:ss', { locale: es })}</span>
+            <span className="flex-1">{event.description}</span>
+          </div>
+        ))
+      )}
+    </div>
+  );
 }
 
 function SystemLogsPanel({ appId }: { appId: string }) {
@@ -58,7 +107,8 @@ function SystemLogsPanel({ appId }: { appId: string }) {
   return (
     <Tabs defaultValue="nextjs" className="flex flex-col h-full">
       <div className="flex items-center justify-between p-2 border-t bg-muted">
-        <TabsList className="grid grid-cols-2 w-[300px]">
+        <TabsList className="grid grid-cols-3 w-[450px]">
+          <TabsTrigger value="activity" className="flex items-center gap-2"><History className="h-4 w-4" /> Actividad del Sistema</TabsTrigger>
           <TabsTrigger value="nextjs" className="flex items-center gap-2"><Server className="h-4 w-4" /> Logs de Next.js</TabsTrigger>
           <TabsTrigger value="cloudflared" className="flex items-center gap-2"><Cloud className="h-4 w-4" /> Logs del Túnel</TabsTrigger>
         </TabsList>
@@ -66,6 +116,9 @@ function SystemLogsPanel({ appId }: { appId: string }) {
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
         </Button>
       </div>
+      <TabsContent value="activity" className="flex-1 overflow-hidden">
+        <SystemActivityPanel appId={appId} />
+      </TabsContent>
       <TabsContent value="nextjs" className="flex-1 overflow-hidden">
         {renderLogContent(logs.nextjs)}
       </TabsContent>
