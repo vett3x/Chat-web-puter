@@ -13,6 +13,7 @@ interface AppBrowserPanelProps {
   appId: string | null;
   appUrl: string | null;
   appStatus: string | null;
+  isAppDeleting?: boolean;
 }
 
 function SystemLogsPanel({ appId }: { appId: string }) {
@@ -68,7 +69,7 @@ function SystemLogsPanel({ appId }: { appId: string }) {
   );
 }
 
-export function AppBrowserPanel({ appId, appUrl, appStatus }: AppBrowserPanelProps) {
+export function AppBrowserPanel({ appId, appUrl, appStatus, isAppDeleting = false }: AppBrowserPanelProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isRestarting, setIsRestarting] = useState(false);
 
@@ -95,6 +96,16 @@ export function AppBrowserPanel({ appId, appUrl, appStatus }: AppBrowserPanelPro
   };
 
   const renderContent = () => {
+    if (isAppDeleting) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-4">
+          <Loader2 className="h-12 w-12 animate-spin text-destructive mb-4" />
+          <h3 className="text-lg font-semibold">Eliminando Proyecto</h3>
+          <p>Por favor, espera mientras se eliminan todos los recursos asociados...</p>
+        </div>
+      );
+    }
+
     if (appStatus === 'provisioning') {
       return (
         <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-4">

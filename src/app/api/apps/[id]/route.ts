@@ -59,7 +59,20 @@ export async function DELETE(req: NextRequest, context: any) {
       await executeSshCommand(server, `docker rm -f ${app.container_id}`);
     }
 
-    // 4. Delete the app record from the database (should cascade to backups)
+    // 4. Delete the associated conversation
+    if (app.conversation_id) {
+      const { error: deleteConvError } = await supabaseAdmin
+        .from('conversations')
+        .delete()
+        .eq('id', app.conversation_id);
+
+      if (deleteConvError) {
+        // Log the error but don't block the rest of the deletion process
+        console.error(`[API DELETE /apps/${appId}] Failed to delete conversation ${app.conversation_id}:`, deleteConvError);
+      }
+    }
+
+    // 5. Delete the app record from the database (should cascade to backups)
     const { error: deleteAppError } = await supabaseAdmin
       .from('user_apps')
       .delete()

@@ -13,7 +13,6 @@ import { DraggableAppItem } from './draggable-app-item';
 import { toast } from 'sonner';
 import { FileTree } from './file-tree';
 
-// Types from useSidebarData hook
 interface Conversation {
   id: string;
   title: string;
@@ -64,6 +63,8 @@ interface ConversationSidebarProps {
   createFolder: (parentId?: string | null) => void;
   createNote: (onSuccess: (newItem: Note) => void) => void;
   moveItem: (itemId: string, itemType: 'conversation' | 'note' | 'folder', targetFolderId: string | null) => void;
+  onDeleteApp: (appId: string) => void;
+  isDeletingAppId: string | null;
 }
 
 export function ConversationSidebar({
@@ -85,11 +86,12 @@ export function ConversationSidebar({
   createFolder,
   createNote,
   moveItem,
+  onDeleteApp,
+  isDeletingAppId,
 }: ConversationSidebarProps) {
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
-  const [isDeletingApp, setIsDeletingApp] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState({
     apps: true,
     chats: true,
@@ -115,24 +117,6 @@ export function ConversationSidebar({
     setIsCreatingNote(true);
     await createNote((newItem) => onSelectItem(newItem.id, 'note'));
     setIsCreatingNote(false);
-  };
-
-  const handleDeleteApp = async (appId: string) => {
-    setIsDeletingApp(appId);
-    try {
-      const response = await fetch(`/api/apps/${appId}`, { method: 'DELETE' });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message);
-      toast.success(result.message);
-      if (selectedItem?.id === appId) {
-        onSelectItem(null, null);
-      }
-      await refreshData();
-    } catch (error: any) {
-      toast.error(`Error al eliminar el proyecto: ${error.message}`);
-    } finally {
-      setIsDeletingApp(null);
-    }
   };
 
   const handleDragStart = (e: React.DragEvent, id: string, type: 'conversation' | 'note' | 'folder') => {
@@ -195,8 +179,8 @@ export function ConversationSidebar({
                     app={app}
                     selected={selectedItem?.type === 'app' && selectedItem.id === app.id}
                     onSelect={() => onSelectItem(app.id, 'app')}
-                    onDelete={handleDeleteApp}
-                    isDeleting={isDeletingApp === app.id}
+                    onDelete={onDeleteApp}
+                    isDeleting={isDeletingAppId === app.id}
                   />
                   {selectedItem?.type === 'app' && selectedItem.id === app.id && <div className="border-l-2 border-sidebar-primary ml-2"><FileTree appId={app.id} onFileSelect={onFileSelect} /></div>}
                 </div>

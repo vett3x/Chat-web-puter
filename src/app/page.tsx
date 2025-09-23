@@ -47,7 +47,6 @@ export default function Home() {
   const { session, isLoading: isSessionLoading, userRole } = useSession();
   const userId = session?.user?.id;
   
-  // Centralize sidebar data management here
   const {
     apps,
     conversations,
@@ -80,6 +79,7 @@ export default function Home() {
   const [rightPanelView, setRightPanelView] = useState<RightPanelView>('preview');
   const [activeFile, setActiveFile] = useState<ActiveFile | null>(null);
   const [isFileLoading, setIsFileLoading] = useState(false);
+  const [isDeletingAppId, setIsDeletingAppId] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -87,10 +87,8 @@ export default function Home() {
     }
   }, [aiResponseSpeed]);
 
-  // NEW: Polling logic for provisioning status
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
-
     const checkAppStatus = async () => {
       if (!selectedAppDetails?.id) return;
       const { data: updatedApp } = await supabase.from('user_apps').select('*').eq('id', selectedAppDetails.id).single();
@@ -98,18 +96,16 @@ export default function Home() {
         setSelectedAppDetails(updatedApp);
         if (updatedApp.status === 'ready') {
           toast.success(`La aplicación "${updatedApp.name}" está lista.`);
-          refreshSidebarData(); // Refresh sidebar to show file tree etc.
+          refreshSidebarData();
         } else {
           toast.error(`Falló el aprovisionamiento de "${updatedApp.name}".`);
         }
         if (intervalId) clearInterval(intervalId);
       }
     };
-
     if (selectedAppDetails?.status === 'provisioning') {
-      intervalId = setInterval(checkAppStatus, 5000); // Poll every 5 seconds
+      intervalId = setInterval(checkAppStatus, 5000);
     }
-
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
@@ -118,13 +114,11 @@ export default function Home() {
   const handleSelectItem = useCallback(async (id: string | null, type: SelectedItem['type'] | null) => {
     setActiveFile(null);
     setRightPanelView('preview');
-
     if (!id || !type) {
       setSelectedItem(null);
       setSelectedAppDetails(null);
       return;
     }
-
     if (type === 'app') {
       const { data, error } = await supabase.from('user_apps').select('*').eq('id', id).eq('user_id', userId).single();
       if (error) {
@@ -164,6 +158,24 @@ export default function Home() {
     handleSelectItem(newApp.id, 'app');
   };
 
+  const handleDeleteApp = async (appId: string) => {
+    setIsDeletingAppId(appId);
+    try {
+      const response = await fetch(`/api/apps/${appId}`, { method: 'DELETE' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message);
+      toast.success(result.message);
+      if (selectedItem?.id === appId) {
+        handleSelectItem(null, null);
+      }
+      await refreshSidebarData();
+    } catch (error: any) {
+      toast.error(`Error al eliminar el proyecto: ${error.message}`);
+    } finally {
+      setIsDeletingAppId(null);
+    }
+  };
+
   const handleOpenProfileSettings = () => setIsProfileSettingsOpen(true);
   const handleOpenAppSettings = () => setIsAppSettingsOpen(true);
   const handleOpenServerManagement = () => setIsServerManagementOpen(true);
@@ -175,8 +187,18 @@ export default function Home() {
   };
 
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+  const isAppDeleting = selectedItem?.type === 'app' && selectedItem.id === isDeletingAppId;
 
   const renderRightPanelContent = () => {
+    if (isAppDeleting) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-4">
+          <Loader2 className="h-12 w-12 animate-spin text-destructive mb-4" />
+          <h3 className="text-lg font-semibold">Eliminando Proyecto</h3>
+          <p>Por favor, espera mientras se eliminan todos los recursos asociados...</p>
+        </div>
+      );
+    }
     if (isFileLoading) {
       return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
     }
@@ -208,6 +230,8 @@ export default function Home() {
           createFolder={createFolder}
           createNote={createNote as any}
           moveItem={moveItem}
+          onDeleteApp={handleDeleteApp}
+          isDeletingAppId={isDeletingAppId}
         />
       </div>
       <div className="flex-1 min-w-0">
@@ -223,6 +247,7 @@ export default function Home() {
                 onConversationTitleUpdate={(id, newTitle) => {}}
                 aiResponseSpeed={aiResponseSpeed}
                 isAppProvisioning={selectedAppDetails?.status === 'provisioning'}
+                isAppDeleting={isAppDeleting}
               />
             </ResizablePanel>
             {selectedItem?.type === 'app' && (

@@ -13,6 +13,7 @@ interface ChatInterfaceProps {
   onConversationTitleUpdate: (conversationId: string, newTitle: string) => void;
   aiResponseSpeed: 'slow' | 'normal' | 'fast';
   isAppProvisioning?: boolean;
+  isAppDeleting?: boolean;
 }
 
 export function ChatInterface({
@@ -22,6 +23,7 @@ export function ChatInterface({
   onConversationTitleUpdate,
   aiResponseSpeed,
   isAppProvisioning = false,
+  isAppDeleting = false,
 }: ChatInterfaceProps) {
   const {
     messages,
@@ -44,6 +46,16 @@ export function ChatInterface({
         <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
         <h3 className="text-lg font-semibold">Aprovisionando el entorno...</h3>
         <p className="text-muted-foreground">El chat estará disponible cuando el proyecto esté listo.</p>
+      </div>
+    );
+  }
+
+  if (isAppDeleting) {
+    return (
+      <div className="flex flex-col h-full bg-background items-center justify-center text-center">
+        <Loader2 className="h-8 w-8 animate-spin text-destructive mb-4" />
+        <h3 className="text-lg font-semibold">Eliminando proyecto...</h3>
+        <p className="text-muted-foreground">El chat se desactivará mientras se eliminan los recursos.</p>
       </div>
     );
   }
