@@ -242,9 +242,18 @@ export async function deleteCloudflareTunnelAndCleanup({
     await uninstallCloudflaredService(serverDetails, containerId, tunnel.tunnel_id, tunnel.full_domain, tunnel.container_port, userId); // MODIFIED LINE
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] cloudflared client cleaned up from container.\n` });
 
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Deleting Cloudflare Tunnel ${tunnel.tunnel_id} via API...\n` });
-    await deleteCloudflareTunnelApi(cloudflareDomainDetails.api_token, cloudflareDomainDetails.account_id, tunnel.tunnel_id, userId);
-    await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Cloudflare Tunnel ${tunnel.tunnel_id} deleted via API.\n` });
+    try {
+      await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Deleting Cloudflare Tunnel ${tunnel.tunnel_id} via API...\n` });
+      await deleteCloudflareTunnelApi(cloudflareDomainDetails.api_token, cloudflareDomainDetails.account_id, tunnel.tunnel_id, userId);
+      await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Cloudflare Tunnel ${tunnel.tunnel_id} deleted via API.\n` });
+    } catch (apiError: any) {
+      if (apiError.message.includes('Tunnel not found') || apiError.message.includes('(Code: 1003)')) {
+        console.warn(`[Tunnel Deletion] Tunnel ${tunnel.tunnel_id} already deleted on Cloudflare. Proceeding with cleanup.`);
+        await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] WARNING: Tunnel ${tunnel.tunnel_id} not found on Cloudflare. Assuming it was already deleted.\n` });
+      } else {
+        throw apiError;
+      }
+    }
 
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Searching for DNS record ID for ${tunnel.full_domain}...\n` });
     const { data: dnsRecords } = await supabaseAdmin
@@ -265,9 +274,18 @@ export async function deleteCloudflareTunnelAndCleanup({
     }
 
     if (dnsRecordId) {
-      await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Deleting Cloudflare DNS record ${dnsRecordId}...\n` });
-      await deleteCloudflareDnsRecord(cloudflareDomainDetails.api_token, cloudflareDomainDetails.zone_id, dnsRecordId, userId);
-      await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Cloudflare DNS record ${dnsRecordId} deleted.\n` });
+      try {
+        await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Deleting Cloudflare DNS record ${dnsRecordId}...\n` });
+        await deleteCloudflareDnsRecord(cloudflareDomainDetails.api_token, cloudflareDomainDetails.zone_id, dnsRecordId, userId);
+        await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Cloudflare DNS record ${dnsRecordId} deleted.\n` });
+      } catch (apiError: any) {
+        if (apiError.message.includes('(Code: 81044)')) {
+          console.warn(`[Tunnel Deletion] DNS Record ${dnsRecordId} already deleted on Cloudflare. Proceeding with cleanup.`);
+          await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] WARNING: DNS Record ${dnsRecordId} not found on Cloudflare. Assuming it was already deleted.\n` });
+        } else {
+          throw apiError;
+        }
+      }
     } else {
       await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] WARNING: Could not find DNS record ID for ${tunnel.full_domain}. Skipping DNS record deletion.\n` });
     }
