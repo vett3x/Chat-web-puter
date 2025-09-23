@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { executeSshCommand } from '@/lib/ssh-utils';
-import { getAppAndServerWithStateCheck } from '@/lib/app-state-manager';
+import { getAppAndServerForFileOps } from '@/lib/app-state-manager'; // Changed import
 
 interface FileNode {
   name: string;
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest, context: any) {
   if (!session) return NextResponse.json({ message: 'Acceso denegado.' }, { status: 401 });
 
   try {
-    const { app, server } = await getAppAndServerWithStateCheck(appId, session.user.id);
+    const { app, server } = await getAppAndServerForFileOps(appId, session.user.id); // Use new function
     const command = `find /app -print`; // List all files and directories under /app
     const { stdout, stderr, code } = await executeSshCommand(server, `docker exec ${app.container_id} ${command}`);
     if (code !== 0) throw new Error(`Error al listar archivos: ${stderr}`);

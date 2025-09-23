@@ -1,7 +1,7 @@
 export const runtime = 'nodejs';
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { getAppAndServerWithStateCheck } from '@/lib/app-state-manager';
+import { getAppAndServerForFileOps } from '@/lib/app-state-manager'; // Changed import
 import { executeSshCommand } from '@/lib/ssh-utils';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest, context: any) {
 
   try {
     const userId = await getUserId();
-    const { app, server } = await getAppAndServerWithStateCheck(appId, userId);
+    const { app, server } = await getAppAndServerForFileOps(appId, userId); // Use new function
 
     if (!app.container_id) {
       return NextResponse.json({ logs: 'La aplicación no tiene un contenedor asociado.' });

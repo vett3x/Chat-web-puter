@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { executeSshCommand } from '@/lib/ssh-utils';
-import { getAppAndServerWithStateCheck } from '@/lib/app-state-manager';
+import { getAppAndServerForFileOps } from '@/lib/app-state-manager'; // Changed import
 import path from 'path';
 
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest, context: any) {
 
   try {
     const userId = await getUserId();
-    const { app, server } = await getAppAndServerWithStateCheck(appId, userId);
+    const { app, server } = await getAppAndServerForFileOps(appId, userId); // Use new function
     const command = `cat /app/${filePath}`;
     const { stdout, stderr, code } = await executeSshCommand(server, `docker exec ${app.container_id} ${command}`);
     if (code !== 0) throw new Error(`Error al leer el archivo: ${stderr}`);
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest, context: any) {
   
   try {
     const userId = await getUserId();
-    const { app, server } = await getAppAndServerWithStateCheck(appId, userId);
+    const { app, server } = await getAppAndServerForFileOps(appId, userId); // Use new function
     const { filePath, content } = await req.json();
 
     if (!filePath || content === undefined) {
