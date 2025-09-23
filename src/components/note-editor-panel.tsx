@@ -31,22 +31,11 @@ export function NoteEditorPanel({ noteId, onNoteUpdated }: NoteEditorPanelProps)
   const [title, setTitle] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [isContentLoaded, setIsContentLoaded] = useState(false);
-
-  // Creates a new editor instance.
-  const editor: BlockNoteEditor | null = useMemo(() => {
-    if (isContentLoaded) {
-      return BlockNoteEditor.create({
-        initialContent: note?.content ? JSON.parse(note.content) : undefined,
-      });
-    }
-    return null;
-  }, [isContentLoaded, note?.content]);
+  const [editor, setEditor] = useState<BlockNoteEditor | null>(null);
 
   const fetchNote = useCallback(async () => {
     if (!session?.user?.id || !noteId) return;
     setIsLoading(true);
-    setIsContentLoaded(false);
     const { data, error } = await supabase
       .from('notes')
       .select('id, title, content, updated_at')
@@ -60,14 +49,25 @@ export function NoteEditorPanel({ noteId, onNoteUpdated }: NoteEditorPanelProps)
     } else {
       setNote(data);
       setTitle(data.title);
-      setIsContentLoaded(true);
+      // Initialize editor here after fetching data
+      if (editor) {
+        editor.replaceBlocks(editor.topLevelBlocks, data.content ? JSON.parse(data.content) : []);
+      } else {
+        setEditor(BlockNoteEditor.create({
+          initialContent: data.content ? JSON.parse(data.content) : undefined,
+        }));
+      }
     }
     setIsLoading(false);
-  }, [noteId, session?.user?.id]);
+  }, [noteId, session?.user?.id, editor]);
 
   useEffect(() => {
     fetchNote();
-  }, [fetchNote]);
+    // Cleanup the editor instance when the component unmounts or noteId changes
+    return () => {
+      setEditor(null);
+    };
+  }, [noteId]); // Rerun only when noteId changes
 
   const handleSave = async () => {
     if (!note || !editor) return;
@@ -85,7 +85,7 @@ export function NoteEditorPanel({ noteId, onNoteUpdated }: NoteEditorPanelProps)
     } else {
       toast.success('Nota guardada.');
       onNoteUpdated();
-      fetchNote();
+      // No need to call fetchNote here, as the local state is up-to-date
     }
     setIsSaving(false);
   };
@@ -113,6 +113,7 @@ export function NoteEditorPanel({ noteId, onNoteUpdated }: NoteEditorPanelProps)
       <div className="flex-1 overflow-y-auto">
         <BlockNoteView 
           editor={editor} 
+          theme={theme === 'dark' ? 'dark' : 'light'}
           className="h-full"
         />
       </div>
