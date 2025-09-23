@@ -46,7 +46,20 @@ type RightPanelView = 'editor' | 'preview';
 export default function Home() {
   const { session, isLoading: isSessionLoading, userRole } = useSession();
   const userId = session?.user?.id;
-  const { fetchData: refreshSidebarData } = useSidebarData();
+  
+  // Centralize sidebar data management here
+  const {
+    apps,
+    conversations,
+    folders,
+    notes,
+    isLoading: isLoadingData,
+    fetchData: refreshSidebarData,
+    createConversation,
+    createFolder,
+    createNote,
+    moveItem,
+  } = useSidebarData();
 
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   const [selectedAppDetails, setSelectedAppDetails] = useState<UserApp | null>(null);
@@ -74,34 +87,33 @@ export default function Home() {
     }
   }, [aiResponseSpeed]);
 
+  // NEW: Polling logic for provisioning status
   useEffect(() => {
-    if (selectedAppDetails?.status === 'provisioning' && selectedAppDetails.id) {
-      const channel = supabase
-        .channel(`app-status-updates-${selectedAppDetails.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'user_apps',
-            filter: `id=eq.${selectedAppDetails.id}`,
-          },
-          (payload) => {
-            const updatedApp = payload.new as UserApp;
-            setSelectedAppDetails(updatedApp);
-            if (updatedApp.status !== 'provisioning') {
-              toast.success(`La aplicación "${updatedApp.name}" está lista.`);
-              supabase.removeChannel(channel);
-            }
-          }
-        )
-        .subscribe();
+    let intervalId: NodeJS.Timeout | null = null;
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
+    const checkAppStatus = async () => {
+      if (!selectedAppDetails?.id) return;
+      const { data: updatedApp } = await supabase.from('user_apps').select('*').eq('id', selectedAppDetails.id).single();
+      if (updatedApp && updatedApp.status !== 'provisioning') {
+        setSelectedAppDetails(updatedApp);
+        if (updatedApp.status === 'ready') {
+          toast.success(`La aplicación "${updatedApp.name}" está lista.`);
+          refreshSidebarData(); // Refresh sidebar to show file tree etc.
+        } else {
+          toast.error(`Falló el aprovisionamiento de "${updatedApp.name}".`);
+        }
+        if (intervalId) clearInterval(intervalId);
+      }
+    };
+
+    if (selectedAppDetails?.status === 'provisioning') {
+      intervalId = setInterval(checkAppStatus, 5000); // Poll every 5 seconds
     }
-  }, [selectedAppDetails]);
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [selectedAppDetails, refreshSidebarData]);
 
   const handleSelectItem = useCallback(async (id: string | null, type: SelectedItem['type'] | null) => {
     setActiveFile(null);
@@ -147,8 +159,8 @@ export default function Home() {
     handleSelectItem(conversationId, 'conversation');
   };
 
-  const handleAppCreated = (newApp: UserApp) => {
-    refreshSidebarData();
+  const handleAppCreated = async (newApp: UserApp) => {
+    await refreshSidebarData();
     handleSelectItem(newApp.id, 'app');
   };
 
@@ -178,6 +190,11 @@ export default function Home() {
     <div className="h-screen bg-background flex">
       <div className="w-[320px] flex-shrink-0">
         <ConversationSidebar
+          apps={apps}
+          conversations={conversations}
+          folders={folders}
+          notes={notes}
+          isLoading={isLoadingData}
           selectedItem={selectedItem}
           onSelectItem={handleSelectItem}
           onFileSelect={handleFileSelect}
@@ -186,6 +203,11 @@ export default function Home() {
           onOpenServerManagement={handleOpenServerManagement}
           onOpenUserManagement={handleOpenUserManagement}
           onOpenDeepAiCoder={handleOpenDeepAiCoder}
+          refreshData={refreshSidebarData}
+          createConversation={createConversation as any}
+          createFolder={createFolder}
+          createNote={createNote as any}
+          moveItem={moveItem}
         />
       </div>
       <div className="flex-1 min-w-0">

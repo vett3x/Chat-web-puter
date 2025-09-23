@@ -2,25 +2,55 @@
 
 import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useSession } from '@/components/session-context-provider';
 import { Loader2, MessageSquare, ChevronRight, ChevronDown, Wand2, Code, FileText, Folder as FolderIcon } from 'lucide-react';
 import { SidebarHeader } from './sidebar-header';
-import { useSidebarData } from '@/hooks/use-sidebar-data';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DraggableFolderItem } from './draggable-folder-item';
 import { DraggableConversationCard } from './draggable-conversation-card';
 import { DraggableNoteItem } from './draggable-note-item';
-import { DraggableAppItem } from './draggable-app-item'; // Import the new component
+import { DraggableAppItem } from './draggable-app-item';
 import { toast } from 'sonner';
 import { FileTree } from './file-tree';
 
+// Types from useSidebarData hook
+interface Conversation {
+  id: string;
+  title: string;
+  created_at: string;
+  folder_id: string | null;
+  order_index: number;
+}
+interface Folder {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  created_at: string;
+  user_id: string;
+}
+interface UserApp {
+  id: string;
+  name: string;
+  status: string;
+  url: string | null;
+  conversation_id: string | null;
+}
+interface Note {
+  id: string;
+  title: string;
+  folder_id: string | null;
+}
 interface SelectedItem {
   id: string;
   type: 'app' | 'conversation' | 'note' | 'folder';
 }
 
 interface ConversationSidebarProps {
+  apps: UserApp[];
+  conversations: Conversation[];
+  folders: Folder[];
+  notes: Note[];
+  isLoading: boolean;
   selectedItem: SelectedItem | null;
   onSelectItem: (id: string | null, type: SelectedItem['type'] | null) => void;
   onFileSelect: (path: string) => void;
@@ -29,9 +59,19 @@ interface ConversationSidebarProps {
   onOpenServerManagement: () => void;
   onOpenUserManagement: () => void;
   onOpenDeepAiCoder: () => void;
+  refreshData: () => void;
+  createConversation: (onSuccess: (newItem: Conversation) => void) => void;
+  createFolder: (parentId?: string | null) => void;
+  createNote: (onSuccess: (newItem: Note) => void) => void;
+  moveItem: (itemId: string, itemType: 'conversation' | 'note' | 'folder', targetFolderId: string | null) => void;
 }
 
 export function ConversationSidebar({
+  apps,
+  conversations,
+  folders,
+  notes,
+  isLoading,
   selectedItem,
   onSelectItem,
   onFileSelect,
@@ -40,21 +80,12 @@ export function ConversationSidebar({
   onOpenServerManagement,
   onOpenUserManagement,
   onOpenDeepAiCoder,
+  refreshData,
+  createConversation,
+  createFolder,
+  createNote,
+  moveItem,
 }: ConversationSidebarProps) {
-  const { isLoading: isSessionLoading } = useSession();
-  const {
-    apps,
-    conversations,
-    folders,
-    notes,
-    isLoading: isLoadingData,
-    fetchData,
-    createConversation,
-    createFolder,
-    createNote,
-    moveItem,
-  } = useSidebarData();
-
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
@@ -96,7 +127,7 @@ export function ConversationSidebar({
       if (selectedItem?.id === appId) {
         onSelectItem(null, null);
       }
-      await fetchData();
+      await refreshData();
     } catch (error: any) {
       toast.error(`Error al eliminar el proyecto: ${error.message}`);
     } finally {
@@ -156,7 +187,7 @@ export function ConversationSidebar({
       <SidebarHeader onNewConversation={handleCreateConversation} onNewFolder={handleCreateFolder} onNewNote={handleCreateNote} isCreatingConversation={isCreatingConversation} isCreatingFolder={isCreatingFolder} isCreatingNote={isCreatingNote} onOpenProfileSettings={onOpenProfileSettings} onOpenAppSettings={onOpenAppSettings} onOpenServerManagement={onOpenServerManagement} onOpenUserManagement={onOpenUserManagement} onOpenDeepAiCoder={onOpenDeepAiCoder} />
       <ScrollArea className="flex-1" onDrop={(e) => handleDrop(e, null)} onDragOver={(e) => e.preventDefault()} onDragEnter={(e) => handleDragEnter(e, null)} onDragLeave={(e) => handleDragLeave(e, null)}>
         <div className="space-y-2">
-          {isLoadingData ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />) : (
+          {isLoading ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />) : (
             <>
               {renderSection("Proyectos", <Wand2 className="h-4 w-4" />, "apps", apps.map(app => (
                 <div key={app.id}>
@@ -172,15 +203,15 @@ export function ConversationSidebar({
               )))}
               <Separator className="my-4 bg-sidebar-border" />
               {renderSection("Notas", <FileText className="h-4 w-4" />, "notes", notes.filter(n => !n.folder_id).map(note => (
-                <DraggableNoteItem key={note.id} note={note} selected={selectedItem?.type === 'note' && selectedItem.id === note.id} onSelect={() => onSelectItem(note.id, 'note')} onDragStart={(e) => handleDragStart(e, note.id, 'note')} level={0} onNoteUpdated={fetchData} onNoteDeleted={fetchData} />
+                <DraggableNoteItem key={note.id} note={note} selected={selectedItem?.type === 'note' && selectedItem.id === note.id} onSelect={() => onSelectItem(note.id, 'note')} onDragStart={(e) => handleDragStart(e, note.id, 'note')} level={0} onNoteUpdated={refreshData} onNoteDeleted={refreshData} />
               )))}
               <Separator className="my-4 bg-sidebar-border" />
               {renderSection("Chats", <MessageSquare className="h-4 w-4" />, "chats", conversations.filter(c => !c.folder_id).map(conv => (
-                <DraggableConversationCard key={conv.id} conversation={conv} selectedConversationId={selectedItem?.type === 'conversation' ? selectedItem.id : null} onSelectConversation={(id) => onSelectItem(id!, 'conversation')} onConversationUpdated={fetchData} onConversationDeleted={fetchData} onConversationMoved={() => {}} onConversationReordered={() => {}} allFolders={[]} level={0} onDragStart={(e) => handleDragStart(e, conv.id, 'conversation')} isDraggingOver={false} dropPosition={null} />
+                <DraggableConversationCard key={conv.id} conversation={conv} selectedConversationId={selectedItem?.type === 'conversation' ? selectedItem.id : null} onSelectConversation={(id) => onSelectItem(id!, 'conversation')} onConversationUpdated={refreshData} onConversationDeleted={refreshData} onConversationMoved={() => {}} onConversationReordered={() => {}} allFolders={[]} level={0} onDragStart={(e) => handleDragStart(e, conv.id, 'conversation')} isDraggingOver={false} dropPosition={null} />
               )))}
               <Separator className="my-4 bg-sidebar-border" />
               {renderSection("Carpetas", <FolderIcon className="h-4 w-4" />, "folders", folders.filter(f => !f.parent_id).map(folder => (
-                <DraggableFolderItem key={folder.id} folder={folder} level={0} selectedItem={selectedItem} onSelectItem={(id, type) => onSelectItem(id, type)} conversations={conversations} notes={notes} subfolders={folders} onFolderUpdated={fetchData} onFolderDeleted={fetchData} onItemMoved={moveItem} onCreateSubfolder={handleCreateFolder} onDragStart={handleDragStart} onDrop={handleDrop} isDraggingOver={draggedOverFolder === folder.id} onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} draggedItemType={draggedItem?.type || null} />
+                <DraggableFolderItem key={folder.id} folder={folder} level={0} selectedItem={selectedItem} onSelectItem={(id, type) => onSelectItem(id, type)} conversations={conversations} notes={notes} subfolders={folders} onFolderUpdated={refreshData} onFolderDeleted={refreshData} onItemMoved={moveItem} onCreateSubfolder={handleCreateFolder} onDragStart={handleDragStart} onDrop={handleDrop} isDraggingOver={draggedOverFolder === folder.id} onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} draggedItemType={draggedItem?.type || null} />
               )))}
             </>
           )}
