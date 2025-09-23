@@ -48,8 +48,8 @@ export async function POST(req: NextRequest, context: any) {
       commandsToRun.push(restartTunnelCommand);
     }
 
-    // Unimos los comandos con ' && ' que es robusto para bash
-    const commandsToRunInShell = commandsToRun.join(' && ');
+    // Unimos los comandos con ';' para ejecutarlos en secuencia.
+    const commandsToRunInShell = commandsToRun.join('; ');
 
     const fullCommand = `docker exec ${app.container_id} bash -c "${commandsToRunInShell}"`;
 
