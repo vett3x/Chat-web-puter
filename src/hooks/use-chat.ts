@@ -244,6 +244,8 @@ export function useChat({
     setIsLoading(true);
     const tempTypingId = `assistant-typing-${Date.now()}`;
     setMessages(prev => [...prev, { id: tempTypingId, role: 'assistant', content: '', isTyping: true, timestamp: new Date() }]);
+    
+    const userMessageToSave = history.findLast(m => m.role === 'user');
 
     try {
       const puterMessages: PuterMessage[] = history.map(msg => ({
@@ -271,6 +273,11 @@ export function useChat({
 
       const response = await window.puter.ai.chat([systemMessage, ...puterMessages], { model: selectedModel });
       if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
+
+      // --- On Success ---
+      if (userMessageToSave) {
+        await saveMessageToDB(convId, userMessageToSave);
+      }
 
       const assistantMessageContent = response?.message?.content || 'Sin contenido.';
       
@@ -313,10 +320,11 @@ export function useChat({
       }
 
     } catch (error: any) {
+      // --- On Failure ---
       let rawError = error;
       try {
         rawError = JSON.parse(error.message);
-      } catch (e) { /* No es un JSON, lo dejamos como está */ }
+      } catch (e) { /* Not a JSON string, use as is */ }
 
       let errorMessageForDisplay: string;
       const isAdmin = userRole === 'admin' || userRole === 'super_admin';
@@ -325,7 +333,6 @@ export function useChat({
         errorMessageForDisplay = `Error: ${error.message}`;
       } else {
         errorMessageForDisplay = 'Error con la IA, se ha enviado un ticket automático.';
-        // Enviar ticket a la API
         fetch('/api/error-tickets', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -334,8 +341,17 @@ export function useChat({
       }
 
       toast.error(errorMessageForDisplay);
-      setMessages(prev => prev.filter(m => m.id !== tempTypingId));
-      setMessages(prev => [...prev, { id: `error-${Date.now()}`, role: 'assistant', content: errorMessageForDisplay, isNew: true, timestamp: new Date() }]);
+      
+      // Remove the "typing" indicator AND the user's last message from the UI
+      setMessages(prev => {
+        const withoutTyping = prev.filter(m => m.id !== tempTypingId);
+        // The last message should be the user's message that failed. Remove it.
+        if (withoutTyping.length > 0 && withoutTyping[withoutTyping.length - 1].role === 'user') {
+            return withoutTyping.slice(0, -1);
+        }
+        return withoutTyping;
+      });
+
     } finally {
       setIsLoading(false);
     }
@@ -367,8 +383,10 @@ export function useChat({
     
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
-    await saveMessageToDB(finalConvId, userMessage);
+    
+    // Message is NOT saved to DB here. It's saved on successful AI response.
     await getAndStreamAIResponse(finalConvId, newMessages);
+    
     if (!conversationId) setIsSendingFirstMessage(false);
   };
 
