@@ -166,7 +166,7 @@ export default function Home() {
           onOpenProfileSettings={handleOpenProfileSettings}
           onOpenAppSettings={handleOpenAppSettings}
           onOpenServerManagement={handleOpenServerManagement}
-          onOpenUserManagement={onOpenUserManagement}
+          onOpenUserManagement={handleOpenUserManagement}
           onOpenDeepAiCoder={handleOpenDeepAiCoder}
         />
       </div>
