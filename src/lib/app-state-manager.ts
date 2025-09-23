@@ -11,33 +11,31 @@ const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, proces
 async function ensureServicesAreRunning(server: any, app: any) {
   if (!app.container_id) return;
 
-  // Obtener detalles del túnel si existe para esta app
   const { data: tunnel } = await supabaseAdmin
     .from('docker_tunnels')
     .select('tunnel_id, tunnel_secret, container_port')
     .eq('container_id', app.container_id)
     .single();
 
-  // Comandos para reiniciar los servicios DENTRO del contenedor
   const killAppCommand = "pkill -f 'npm run dev' || true";
   const killTunnelCommand = "pkill cloudflared || true";
-  const restartAppCommand = `nohup npm run dev -- -p ${tunnel?.container_port || 3000} > /app/dev.log 2>&1 &`;
+  const restartAppCommand = `nohup npm run dev -- -p ${tunnel?.container_port || 3000} > /app/dev.log 2>&1`;
 
-  let backgroundCommands = restartAppCommand;
+  let backgroundCommandList = [restartAppCommand];
 
   if (tunnel && tunnel.tunnel_id && tunnel.tunnel_secret) {
-    const restartTunnelCommand = `nohup cloudflared tunnel run --token ${tunnel.tunnel_secret} ${tunnel.tunnel_id} > /app/cloudflared.log 2>&1 &`;
-    backgroundCommands += ` ${restartTunnelCommand}`;
+    const restartTunnelCommand = `nohup cloudflared tunnel run --token ${tunnel.tunnel_secret} ${tunnel.tunnel_id} > /app/cloudflared.log 2>&1`;
+    backgroundCommandList.push(restartTunnelCommand);
   }
 
-  const commandsToRunInShell = `${killAppCommand}; ${killTunnelCommand}; cd /app && (${backgroundCommands})`;
+  const backgroundCommandString = backgroundCommandList.map(cmd => `(${cmd}) &`).join(' ');
+  const commandsToRunInShell = `${killAppCommand}; ${killTunnelCommand}; cd /app && ${backgroundCommandString}`;
   const fullCommand = `docker exec ${app.container_id} bash -c "${commandsToRunInShell}"`;
 
   const { stderr, code } = await executeSshCommand(server, fullCommand);
 
   if (code !== 0 && stderr && !stderr.toLowerCase().includes('no process found')) {
     console.error(`[ensureServicesAreRunning] Error restarting services for container ${app.container_id}: ${stderr}`);
-    // No lanzamos un error fatal, pero lo registramos. La app podría seguir funcionando parcialmente.
   } else {
     console.log(`[ensureServicesAreRunning] Services checked/restarted for container ${app.container_id}`);
   }
@@ -61,7 +59,6 @@ export async function getAppAndServerForFileOps(appId: string, userId: string) {
     if (!app.user_servers) {
         throw new Error('La información del servidor para esta aplicación no está disponible.');
     }
-    // Allow file operations only on ready or suspended apps
     if (app.status !== 'ready' && app.status !== 'suspended') {
         throw new Error(`La aplicación está en estado '${app.status}' y no se pueden modificar sus archivos. Por favor, espera a que esté lista.`);
     }
@@ -70,7 +67,6 @@ export async function getAppAndServerForFileOps(appId: string, userId: string) {
 }
 
 export async function getAppAndServerWithStateCheck(appId: string, userId: string) {
-    // 1. Get current app state and update activity timestamp
     const { data: app, error: appError } = await supabaseAdmin
         .from('user_apps')
         .update({ last_activity_at: new Date().toISOString() })
@@ -80,10 +76,8 @@ export async function getAppAndServerWithStateCheck(appId: string, userId: strin
 
     if (appError || !app) throw new Error('Aplicación no encontrada o acceso denegado.');
 
-    // 2. Handle different states
     if (app.status === 'hibernated') {
         await restoreAppFromArchive(app.id, userId, app.name, app.conversation_id!, app.prompt || '');
-        // Re-fetch app data as it has changed
         const { data: restoredApp, error: restoredAppError } = await supabaseAdmin.from('user_apps').select('*, user_servers(*)').eq('id', appId).single();
         if (restoredAppError || !restoredApp || !restoredApp.user_servers) throw new Error('No se pudo obtener la información del servidor después de la restauración.');
         return { app: restoredApp, server: restoredApp.user_servers as any };
@@ -94,7 +88,6 @@ export async function getAppAndServerWithStateCheck(appId: string, userId: strin
         if (!server || !app.container_id) throw new Error('Faltan detalles del servidor o contenedor para la aplicación suspendida.');
         await executeSshCommand(server, `docker start ${app.container_id}`);
         await supabaseAdmin.from('user_apps').update({ status: 'ready' }).eq('id', app.id);
-        // NEW: Ensure services are running after waking up
         await ensureServicesAreRunning(server, app);
         return { app, server };
     }
@@ -102,7 +95,6 @@ export async function getAppAndServerWithStateCheck(appId: string, userId: strin
     if (app.status === 'ready') {
         const server = app.user_servers as any;
         if (!server) throw new Error('La información del servidor para esta aplicación no está disponible.');
-        // NEW: Ensure services are running even if state is 'ready'
         await ensureServicesAreRunning(server, app);
         return { app, server };
     }
@@ -117,10 +109,8 @@ export async function getAppAndServerWithStateCheck(appId: string, userId: strin
 }
 
 async function restoreAppFromArchive(appId: string, userId: string, appName: string, conversationId: string, prompt: string) {
-    // 1. Re-provision the app (creates container, installs deps, creates tunnel)
     await provisionApp({ appId, userId, appName, conversationId, prompt });
 
-    // 2. Get the new container and server details
     const { data: appDetails, error: appDetailsError } = await supabaseAdmin.from('user_apps').select('container_id, user_servers(*)').eq('id', appId).single();
     if (appDetailsError || !appDetails || !appDetails.container_id || !appDetails.user_servers) {
         throw new Error('No se pudieron obtener los detalles del nuevo contenedor después del reaprovisionamiento.');
@@ -128,7 +118,6 @@ async function restoreAppFromArchive(appId: string, userId: string, appName: str
     const server = appDetails.user_servers as any;
     const containerId = appDetails.container_id;
 
-    // 3. Restore files from backup
     const { data: backups, error: backupError } = await supabaseAdmin.from('app_file_backups').select('file_path, file_content').eq('app_id', appId);
     if (backupError) {
         throw new Error(`Error al recuperar las copias de seguridad de los archivos: ${backupError.message}`);
@@ -137,10 +126,8 @@ async function restoreAppFromArchive(appId: string, userId: string, appName: str
     if (backups) {
         for (const backup of backups) {
             const encodedContent = Buffer.from(backup.file_content || '').toString('base64');
-            // Comando robusto para crear directorios y luego el archivo
             const command = `mkdir -p /app/$(dirname '${backup.file_path}') && echo '${encodedContent}' | base64 -d > /app/${backup.file_path}`;
             await executeSshCommand(server, `docker exec ${containerId} bash -c "${command}"`);
         }
     }
-    // NO eliminamos las copias de seguridad. Son la fuente de la verdad.
 }

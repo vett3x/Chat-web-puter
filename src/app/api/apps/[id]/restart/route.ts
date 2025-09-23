@@ -28,39 +28,31 @@ export async function POST(req: NextRequest, context: any) {
       throw new Error('La aplicación no tiene un contenedor asociado para reiniciar.');
     }
 
-    // Obtener detalles del túnel si existe
     const { data: tunnel } = await supabaseAdmin
       .from('docker_tunnels')
       .select('tunnel_id, tunnel_secret, container_port')
-      .eq('container_id', app.container_id) // Search by container_id
+      .eq('container_id', app.container_id)
       .single();
 
-    // Comandos para reiniciar los servicios DENTRO del contenedor
     const killAppCommand = "pkill -f 'npm run dev' || true";
     const killTunnelCommand = "pkill cloudflared || true";
-    const restartAppCommand = `cd /app && nohup npm run dev -- -p ${tunnel?.container_port || 3000} > /app/dev.log 2>&1 &`;
-    
-    let commandsToRun = [killAppCommand, killTunnelCommand, restartAppCommand];
+    const restartAppCommand = `nohup npm run dev -- -p ${tunnel?.container_port || 3000} > /app/dev.log 2>&1`;
 
-    // Si hay un túnel, también lo reiniciamos
+    let backgroundCommandList = [restartAppCommand];
+
     if (tunnel && tunnel.tunnel_id && tunnel.tunnel_secret) {
-      const restartTunnelCommand = `nohup cloudflared tunnel run --token ${tunnel.tunnel_secret} ${tunnel.tunnel_id} > /app/cloudflared.log 2>&1 &`;
-      commandsToRun.push(restartTunnelCommand);
+      const restartTunnelCommand = `nohup cloudflared tunnel run --token ${tunnel.tunnel_secret} ${tunnel.tunnel_id} > /app/cloudflared.log 2>&1`;
+      backgroundCommandList.push(restartTunnelCommand);
     }
 
-    // Unimos los comandos con ';' para ejecutarlos en secuencia.
-    const commandsToRunInShell = commandsToRun.join('; ');
-
+    const backgroundCommandString = backgroundCommandList.map(cmd => `(${cmd}) &`).join(' ');
+    const commandsToRunInShell = `${killAppCommand}; ${killTunnelCommand}; cd /app && ${backgroundCommandString}`;
     const fullCommand = `docker exec ${app.container_id} bash -c "${commandsToRunInShell}"`;
 
     const { stderr, code } = await executeSshCommand(server, fullCommand);
 
-    if (code !== 0) {
-      // A veces pkill devuelve un código de error si no encuentra procesos, lo cual es esperado.
-      // El '|| true' maneja esto, por lo que si aún hay un error, es un problema real.
-      if (stderr) {
-        throw new Error(`Error al reiniciar los servicios: ${stderr}`);
-      }
+    if (code !== 0 && stderr && !stderr.toLowerCase().includes('no process found')) {
+      throw new Error(`Error al reiniciar los servicios: ${stderr}`);
     }
 
     return NextResponse.json({ message: 'Los servicios de la aplicación se están reiniciando.' });
