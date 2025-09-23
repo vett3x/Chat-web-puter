@@ -12,7 +12,7 @@ import { AppSettingsDialog } from "@/components/app-settings-dialog";
 import { ServerManagementDialog } from "@/components/server-management-dialog";
 import { UserManagementDialog } from "@/components/user-management-dialog";
 import { DeepAiCoderDialog } from "@/components/deep-ai-coder-dialog";
-import { RetryUploadDialog } from "@/components/retry-upload-dialog"; // Import the new dialog
+import { RetryUploadDialog } from "@/components/retry-upload-dialog";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -29,7 +29,7 @@ interface UserApp {
   status: string;
   url: string | null;
   conversation_id: string | null;
-  prompt: string | null; // Added prompt
+  prompt: string | null;
 }
 
 interface SelectedItem {
@@ -146,7 +146,7 @@ export default function Home() {
     if (!selectedItem || selectedItem.type !== 'app') return;
     setIsFileLoading(true);
     try {
-      const response = await fetch(`/api/apps/${selectedItem.id}/file?path=${encodeURIComponent(path)}`);
+      const response = await fetch(`/api/apps/${selectedItem.id}/files?path=${encodeURIComponent(path)}`);
       if (!response.ok) throw new Error('No se pudo cargar el contenido del archivo.');
       const data = await response.json();
       setActiveFile({ path, content: data.content });
@@ -188,49 +188,27 @@ export default function Home() {
   const writeFilesToApp = async (files: { path: string; content: string }[]) => {
     if (!selectedAppDetails?.id || files.length === 0) return;
 
-    const toastId = toast.loading(`Aplicando 0 de ${files.length} archivos...`);
-    let failedFiles: { path: string; content: string }[] = [];
-    let successfulCount = 0;
+    const toastId = toast.loading(`Aplicando ${files.length} archivo(s)...`);
+    try {
+      const response = await fetch(`/api/apps/${selectedAppDetails.id}/files`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ files }), // Send all files in one go
+      });
 
-    for (const file of files) {
-      try {
-        const response = await fetch(`/api/apps/${selectedAppDetails.id}/file`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(file),
-        });
-
-        if (!response.ok) {
-          let errorMessage = `Error del servidor: ${response.status}`;
-          try {
-            const result = await response.json();
-            errorMessage = result.message || errorMessage;
-          } catch (e) {
-            errorMessage = `Error inesperado del servidor (${response.status}).`;
-          }
-          console.error(`Failed to save ${file.path}:`, errorMessage);
-          failedFiles.push(file);
-        } else {
-          successfulCount++;
-        }
-        toast.loading(`Aplicando ${successfulCount} de ${files.length} archivos...`, { id: toastId });
-        
-        // Add a small delay to prevent overwhelming the server
-        await new Promise(resolve => setTimeout(resolve, 200));
-
-      } catch (networkError) {
-        console.error(`Network error saving ${file.path}:`, networkError);
-        failedFiles.push(file);
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || 'Error del servidor al guardar los archivos.');
       }
-    }
 
-    if (failedFiles.length > 0) {
-      toast.error(`${failedFiles.length} archivo(s) no se pudieron guardar.`, { id: toastId });
-      setRetryState({ isOpen: true, files: failedFiles });
-    } else {
-      toast.success(`¡${successfulCount} archivo(s) aplicados! Actualizando vista previa...`, { id: toastId });
+      toast.success(`¡${files.length} archivo(s) aplicados! Actualizando vista previa...`, { id: toastId });
       refreshSidebarData();
       setTimeout(() => appBrowserRef.current?.refresh(), 1000);
+
+    } catch (error: any) {
+      console.error("Error writing files in batch:", error);
+      toast.error(`Error al aplicar los archivos: ${error.message}`, { id: toastId });
+      setRetryState({ isOpen: true, files: files });
     }
   };
 
