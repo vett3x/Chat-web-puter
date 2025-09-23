@@ -11,6 +11,7 @@ import { Save, Loader2, Eye, Code } from 'lucide-react';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 interface Note {
   id: string;
@@ -31,7 +32,7 @@ export function NoteEditorPanel({ noteId, onNoteUpdated }: NoteEditorPanelProps)
   const [content, setContent] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [viewMode, setViewMode] = useState<'split' | 'editor' | 'preview'>('split');
+  const [viewMode, setViewMode] = useState<'editor' | 'split' | 'preview'>('editor');
 
   const fetchNote = useCallback(async () => {
     if (!session?.user?.id || !noteId) return;
@@ -94,10 +95,25 @@ export function NoteEditorPanel({ noteId, onNoteUpdated }: NoteEditorPanelProps)
           disabled={isSaving}
         />
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => setViewMode(viewMode === 'split' ? 'editor' : 'split')}>
-            {viewMode === 'split' ? <Code className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-            {viewMode === 'split' ? 'Editor' : 'Dividir'}
-          </Button>
+          <ToggleGroup
+            type="single"
+            value={viewMode}
+            onValueChange={(value) => {
+              if (value) setViewMode(value as 'editor' | 'split' | 'preview');
+            }}
+            className="h-9"
+            aria-label="Modo de vista del editor"
+          >
+            <ToggleGroupItem value="editor" aria-label="Solo editor">
+              <Code className="h-4 w-4" />
+            </ToggleGroupItem>
+            <ToggleGroupItem value="split" aria-label="Vista dividida">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-split-square-horizontal"><path d="M8 12h8"/><path d="M12 18V6"/><rect width="18" height="18" x="3" y="3" rx="2"/></svg>
+            </ToggleGroupItem>
+            <ToggleGroupItem value="preview" aria-label="Solo vista previa">
+              <Eye className="h-4 w-4" />
+            </ToggleGroupItem>
+          </ToggleGroup>
           <Button size="sm" onClick={handleSave} disabled={isSaving}>
             {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
             Guardar
@@ -106,20 +122,26 @@ export function NoteEditorPanel({ noteId, onNoteUpdated }: NoteEditorPanelProps)
       </div>
       <ResizablePanelGroup direction="horizontal" className="flex-1">
         {viewMode !== 'preview' && (
-          <ResizablePanel defaultSize={viewMode === 'editor' ? 100 : 50}>
+          <ResizablePanel defaultSize={viewMode === 'editor' ? 100 : 50} minSize={30}>
             <Textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="Escribe tu nota en Markdown..."
-              className="h-full w-full border-none resize-none focus-visible:ring-0 focus-visible:ring-offset-0 p-4 font-mono"
+              className="h-full w-full border-none resize-none focus-visible:ring-0 focus-visible:ring-offset-0 p-4 font-mono bg-transparent"
             />
           </ResizablePanel>
         )}
         {viewMode === 'split' && <ResizableHandle withHandle />}
         {viewMode !== 'editor' && (
-          <ResizablePanel defaultSize={viewMode === 'preview' ? 100 : 50}>
-            <div className="prose dark:prose-invert p-4 h-full overflow-y-auto">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+          <ResizablePanel defaultSize={viewMode === 'preview' ? 100 : 50} minSize={30}>
+            <div className="prose dark:prose-invert p-4 h-full overflow-y-auto w-full max-w-none">
+              {content.trim() === '' ? (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  <p>La vista previa aparecerá aquí.</p>
+                </div>
+              ) : (
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+              )}
             </div>
           </ResizablePanel>
         )}
