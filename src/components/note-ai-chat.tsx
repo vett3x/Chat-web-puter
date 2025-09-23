@@ -58,25 +58,24 @@ export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent }: NoteAiCh
     setIsLoading(true);
 
     try {
-      const systemPrompt = `Eres un asistente de IA experto que ayuda a un usuario con su nota. La nota del usuario se proporciona a continuación, delimitada por '---'. Tu tarea es responder a la pregunta del usuario basándote únicamente en el contexto de esta nota. Sé conciso y directo.
+      const systemPrompt = `Eres un asistente de IA experto que ayuda a un usuario con su nota. La nota del usuario se proporciona a continuación, delimitada por '---'. Tu tarea es responder a las preguntas del usuario basándote únicamente en el contexto de esta nota y la conversación actual. Sé conciso y directo.
 ---
 Título: ${noteTitle}
 
 Contenido:
 ${noteContent}
----
-Ahora, por favor responde a la siguiente pregunta del usuario:`;
+---`;
 
       const puterMessages: PuterMessage[] = [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: userInput },
+        ...newMessages.map(msg => ({ role: msg.role, content: msg.content }))
       ];
 
       toast.info("Leyendo nota y generando respuesta...");
       const response = await window.puter.ai.chat(puterMessages, { model: 'claude-sonnet-4' });
 
       if (!response || response.error) {
-        throw new Error(response?.error?.message || 'Error de la IA.');
+        throw new Error(response?.error?.message || 'La IA devolvió una respuesta de error.');
       }
 
       const assistantResponse = response?.message?.content || 'No se pudo obtener una respuesta.';
@@ -97,8 +96,9 @@ Ahora, por favor responde a la siguiente pregunta del usuario:`;
       setMessages([...newMessages, { role: 'assistant', content: responseText }]);
 
     } catch (error: any) {
-      toast.error(error.message);
-      setMessages([...newMessages, { role: 'assistant', content: `Error: ${error.message}` }]);
+      const errorMessage = error?.message || (typeof error === 'string' ? error : 'Ocurrió un error desconocido.');
+      toast.error(errorMessage);
+      setMessages([...newMessages, { role: 'assistant', content: `Error: ${errorMessage}` }]);
     } finally {
       setIsLoading(false);
     }
