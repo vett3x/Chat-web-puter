@@ -153,6 +153,7 @@ export function CodeBlock({ language, code, filename, isNew, onAnimationComplete
           style={vscDarkPlus}
           customStyle={{ margin: 0, borderRadius: '0 0 0.5rem 0.5rem', background: '#1E1E1E' }}
           codeTagProps={{ style: { fontFamily: 'var(--font-geist-mono)' } }}
+          wrapLongLines={true}
         >
           {displayedCode}
         </SyntaxHighlighter>
