@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { DraggableFolderItem } from './draggable-folder-item';
 import { DraggableConversationCard } from './draggable-conversation-card';
 import { toast } from 'sonner';
+import { FileTree } from './file-tree'; // Import the new component
 
 interface SelectedItem {
   id: string;
@@ -23,6 +24,7 @@ interface SelectedItem {
 interface ConversationSidebarProps {
   selectedItem: SelectedItem | null;
   onSelectItem: (id: string | null, type: 'app' | 'conversation' | null) => void;
+  onFileSelect: (path: string) => void; // New prop
   onOpenProfileSettings: () => void;
   onOpenAppSettings: () => void;
   onOpenServerManagement: () => void;
@@ -33,6 +35,7 @@ interface ConversationSidebarProps {
 export function ConversationSidebar({
   selectedItem,
   onSelectItem,
+  onFileSelect, // New prop
   onOpenProfileSettings,
   onOpenAppSettings,
   onOpenServerManagement,
@@ -164,33 +167,37 @@ export function ConversationSidebar({
             ))
           ) : (
             <>
-              {/* DeepAI Coder Projects Section */}
               <div className="px-2 py-1">
                 <h3 className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-2">
                   <Wand2 className="h-4 w-4" /> Proyectos DeepAI Coder
                 </h3>
               </div>
               {apps.map(app => (
-                <Card
-                  key={app.id}
-                  className={cn(
-                    "cursor-pointer hover:bg-sidebar-accent transition-colors group relative",
-                    selectedItem?.type === 'app' && selectedItem.id === app.id && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary"
-                  )}
-                  onClick={() => onSelectItem(app.id, 'app')}
-                >
-                  <CardContent className="py-1 px-1.5 flex items-center justify-between gap-1">
-                    <div className="flex items-center gap-1 flex-1 overflow-hidden">
-                      <Code className="h-3 w-3 flex-shrink-0 ml-2" />
-                      <span className="text-xs truncate">{app.name}</span>
+                <div key={app.id}>
+                  <Card
+                    className={cn(
+                      "cursor-pointer hover:bg-sidebar-accent transition-colors group relative",
+                      selectedItem?.type === 'app' && selectedItem.id === app.id && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary"
+                    )}
+                    onClick={() => onSelectItem(app.id, 'app')}
+                  >
+                    <CardContent className="py-1 px-1.5 flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1 flex-1 overflow-hidden">
+                        <Code className="h-3 w-3 flex-shrink-0 ml-2" />
+                        <span className="text-xs truncate">{app.name}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  {selectedItem?.type === 'app' && selectedItem.id === app.id && (
+                    <div className="border-l-2 border-sidebar-primary ml-2">
+                      <FileTree appId={app.id} onFileSelect={onFileSelect} />
                     </div>
-                  </CardContent>
-                </Card>
+                  )}
+                </div>
               ))}
 
               <Separator className="my-4 bg-sidebar-border" />
 
-              {/* Conventional Chats Section */}
               <div className="px-2 py-1">
                 <h3 className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-2">
                   <MessageSquare className="h-4 w-4" /> Chats Convencionales

@@ -5,6 +5,7 @@ import { useSession } from "@/components/session-context-provider";
 import { ConversationSidebar } from "@/components/conversation-sidebar";
 import { ChatInterface } from "@/components/chat-interface";
 import { AppPreviewPanel } from "@/components/app-preview-panel";
+import { CodeEditorPanel } from "@/components/code-editor-panel";
 import { ProfileSettingsDialog } from "@/components/profile-settings-dialog";
 import { AppSettingsDialog } from "@/components/app-settings-dialog";
 import { ServerManagementDialog } from "@/components/server-management-dialog";
@@ -17,6 +18,7 @@ import {
 } from "@/components/ui/resizable";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
 interface UserApp {
   id: string;
@@ -31,6 +33,13 @@ interface SelectedItem {
   type: 'app' | 'conversation';
   conversationId: string | null;
 }
+
+interface ActiveFile {
+  path: string;
+  content: string;
+}
+
+type RightPanelView = 'chat' | 'editor' | 'preview';
 
 export default function Home() {
   const { session, isLoading: isSessionLoading, userRole } = useSession();
@@ -52,6 +61,11 @@ export default function Home() {
     return 'normal';
   });
 
+  // State for the right-hand panel
+  const [rightPanelView, setRightPanelView] = useState<RightPanelView>('chat');
+  const [activeFile, setActiveFile] = useState<ActiveFile | null>(null);
+  const [isFileLoading, setIsFileLoading] = useState(false);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('aiResponseSpeed', aiResponseSpeed);
@@ -59,6 +73,9 @@ export default function Home() {
   }, [aiResponseSpeed]);
 
   const handleSelectItem = useCallback(async (id: string | null, type: 'app' | 'conversation' | null) => {
+    setActiveFile(null); // Reset active file on any new selection
+    setRightPanelView('chat'); // Default to chat view
+
     if (!id || !type) {
       setSelectedItem(null);
       setSelectedAppDetails(null);
@@ -66,33 +83,42 @@ export default function Home() {
     }
 
     if (type === 'app') {
-      const { data, error } = await supabase
-        .from('user_apps')
-        .select('*')
-        .eq('id', id)
-        .eq('user_id', userId)
-        .single();
-      
+      const { data, error } = await supabase.from('user_apps').select('*').eq('id', id).eq('user_id', userId).single();
       if (error) {
         toast.error('Error al cargar los detalles de la aplicación.');
         return;
       }
-      
       setSelectedAppDetails(data);
       setSelectedItem({ id, type, conversationId: data.conversation_id });
+      setRightPanelView('preview'); // For apps, default to preview
     } else {
       setSelectedAppDetails(null);
       setSelectedItem({ id, type, conversationId: id });
+      setRightPanelView('chat'); // For conversations, it's always chat
     }
   }, [userId]);
+
+  const handleFileSelect = async (path: string) => {
+    if (!selectedItem || selectedItem.type !== 'app') return;
+    setIsFileLoading(true);
+    try {
+      const response = await fetch(`/api/apps/${selectedItem.id}/file?path=${encodeURIComponent(path)}`);
+      if (!response.ok) throw new Error('No se pudo cargar el contenido del archivo.');
+      const data = await response.json();
+      setActiveFile({ path, content: data.content });
+      setRightPanelView('editor');
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setIsFileLoading(false);
+    }
+  };
 
   const handleNewConversationCreated = (conversationId: string) => {
     handleSelectItem(conversationId, 'conversation');
   };
 
   const handleAppCreated = (newApp: UserApp) => {
-    // The sidebar will update automatically via its own hook.
-    // We just need to select the new app.
     handleSelectItem(newApp.id, 'app');
   };
 
@@ -108,20 +134,18 @@ export default function Home() {
 
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
 
-  const renderPanels = () => {
-    const sidebar = (
-      <ConversationSidebar
-        selectedItem={selectedItem}
-        onSelectItem={handleSelectItem}
-        onOpenProfileSettings={handleOpenProfileSettings}
-        onOpenAppSettings={handleOpenAppSettings}
-        onOpenServerManagement={handleOpenServerManagement}
-        onOpenUserManagement={handleOpenUserManagement}
-        onOpenDeepAiCoder={handleOpenDeepAiCoder}
-      />
-    );
-
-    const chat = (
+  const renderRightPanel = () => {
+    if (isFileLoading) {
+      return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+    }
+    if (rightPanelView === 'editor' && activeFile && selectedItem?.type === 'app') {
+      return <CodeEditorPanel appId={selectedItem.id} file={activeFile} onClose={() => { setActiveFile(null); setRightPanelView('preview'); }} onSwitchToPreview={() => setRightPanelView('preview')} />;
+    }
+    if (rightPanelView === 'preview' && selectedItem?.type === 'app') {
+      return <AppPreviewPanel appUrl={selectedAppDetails?.url || null} appStatus={selectedAppDetails?.status || null} />;
+    }
+    // Default to chat interface
+    return (
       <ChatInterface
         userId={userId}
         conversationId={selectedItem?.conversationId || null}
@@ -130,69 +154,37 @@ export default function Home() {
         aiResponseSpeed={aiResponseSpeed}
       />
     );
-
-    return (
-      <div className="flex h-full w-full">
-        {/* Sidebar (fixed width) */}
-        <div className="w-[320px] flex-shrink-0">
-          {sidebar}
-        </div>
-        
-        {/* Main content area (flexible and resizable) */}
-        <div className="flex-1 min-w-0">
-          <ResizablePanelGroup direction="horizontal">
-            <ResizablePanel defaultSize={selectedItem?.type === 'app' ? 60 : 100} minSize={30}>
-              {chat}
-            </ResizablePanel>
-            {selectedItem?.type === 'app' && (
-              <>
-                <ResizableHandle withHandle />
-                <ResizablePanel defaultSize={40} minSize={20}>
-                  <AppPreviewPanel 
-                    appUrl={selectedAppDetails?.url || null}
-                    appStatus={selectedAppDetails?.status || null}
-                  />
-                </ResizablePanel>
-              </>
-            )}
-          </ResizablePanelGroup>
-        </div>
-      </div>
-    );
   };
 
   return (
-    <div className="h-screen bg-background">
-      {renderPanels()}
+    <div className="h-screen bg-background flex">
+      <div className="w-[320px] flex-shrink-0">
+        <ConversationSidebar
+          selectedItem={selectedItem}
+          onSelectItem={handleSelectItem}
+          onFileSelect={handleFileSelect}
+          onOpenProfileSettings={handleOpenProfileSettings}
+          onOpenAppSettings={handleOpenAppSettings}
+          onOpenServerManagement={handleOpenServerManagement}
+          onOpenUserManagement={onOpenUserManagement}
+          onOpenDeepAiCoder={handleOpenDeepAiCoder}
+        />
+      </div>
+      
+      <div className="flex-1 min-w-0">
+        <ResizablePanelGroup direction="horizontal">
+          <ResizablePanel defaultSize={100} minSize={30}>
+            {renderRightPanel()}
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </div>
 
       {/* Dialogs */}
-      <ProfileSettingsDialog
-        open={isProfileSettingsOpen}
-        onOpenChange={setIsProfileSettingsOpen}
-      />
-      <AppSettingsDialog
-        open={isAppSettingsOpen}
-        onOpenChange={setIsAppSettingsOpen}
-        aiResponseSpeed={aiResponseSpeed}
-        onAiResponseSpeedChange={handleAiResponseSpeedChange}
-      />
-      {isAdmin && (
-        <ServerManagementDialog
-          open={isServerManagementOpen}
-          onOpenChange={setIsServerManagementOpen}
-        />
-      )}
-      {isAdmin && (
-        <UserManagementDialog
-          open={isUserManagementOpen}
-          onOpenChange={setIsUserManagementOpen}
-        />
-      )}
-      <DeepAiCoderDialog
-        open={isDeepAiCoderOpen}
-        onOpenChange={setIsDeepAiCoderOpen}
-        onAppCreated={handleAppCreated}
-      />
+      <ProfileSettingsDialog open={isProfileSettingsOpen} onOpenChange={setIsProfileSettingsOpen} />
+      <AppSettingsDialog open={isAppSettingsOpen} onOpenChange={setIsAppSettingsOpen} aiResponseSpeed={aiResponseSpeed} onAiResponseSpeedChange={handleAiResponseSpeedChange} />
+      {isAdmin && <ServerManagementDialog open={isServerManagementOpen} onOpenChange={setIsServerManagementOpen} />}
+      {isAdmin && <UserManagementDialog open={isUserManagementOpen} onOpenChange={setIsUserManagementOpen} />}
+      <DeepAiCoderDialog open={isDeepAiCoderOpen} onOpenChange={setIsDeepAiCoderOpen} onAppCreated={handleAppCreated} />
     </div>
   );
 }

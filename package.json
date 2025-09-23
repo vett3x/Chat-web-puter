@@ -43,6 +43,9 @@
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.57.4",
     "@types/react-syntax-highlighter": "^15.5.13",
+    "@uiw/react-textarea-code-editor": "^3.1.1",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.4.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -68,9 +71,7 @@
     "tailwindcss-animate": "^1.0.7",
     "ts-node": "^10.9.2",
     "vaul": "^1.1.2",
-    "ws": "^8.18.3",
-    "@xterm/xterm": "^5.4.0",
-    "@xterm/addon-fit": "^0.10.0"
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "@dyad-sh/nextjs-webpack-component-tagger": "latest",
