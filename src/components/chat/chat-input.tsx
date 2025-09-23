@@ -114,7 +114,7 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
           <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isLoading || selectedImages.length >= 4} className="flex-shrink-0 text-muted-foreground hover:text-foreground" aria-label="Adjuntar archivo">
             <Paperclip className="h-5 w-5" />
           </Button>
-          <Textarea value={inputMessage} onChange={(e) => setInputMessage(e.target.value)} onKeyPress={handleKeyPress} onPaste={handlePaste} placeholder="Pregunta a Claude AI..." disabled={isLoading} className="flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none max-h-[200px] overflow-y-auto bg-transparent px-3 py-2" rows={1} />
+          <Textarea value={inputMessage} onChange={(e) => setInputMessage(e.target.value)} onKeyPress={handleKeyPress} onPaste={handlePaste} placeholder="Pregunta a Claude AI..." disabled={isLoading} className="flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none max-h-[200px] overflow-y-auto bg-transparent px-3 py-2.5" rows={1} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="default" size="icon" className="rounded-full bg-info text-info-foreground shadow-avatar-user hover:shadow-avatar-user-hover transition-all duration-200" aria-label="Seleccionar modelo de IA">
