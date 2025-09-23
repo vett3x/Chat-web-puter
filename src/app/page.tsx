@@ -201,13 +201,23 @@ export default function Home() {
         });
 
         if (!response.ok) {
-          const result = await response.json();
-          console.error(`Failed to save ${file.path}:`, result.message);
+          let errorMessage = `Error del servidor: ${response.status}`;
+          try {
+            const result = await response.json();
+            errorMessage = result.message || errorMessage;
+          } catch (e) {
+            errorMessage = `Error inesperado del servidor (${response.status}).`;
+          }
+          console.error(`Failed to save ${file.path}:`, errorMessage);
           failedFiles.push(file);
         } else {
           successfulCount++;
         }
         toast.loading(`Aplicando ${successfulCount} de ${files.length} archivos...`, { id: toastId });
+        
+        // Add a small delay to prevent overwhelming the server
+        await new Promise(resolve => setTimeout(resolve, 200));
+
       } catch (networkError) {
         console.error(`Network error saving ${file.path}:`, networkError);
         failedFiles.push(file);
@@ -216,7 +226,7 @@ export default function Home() {
 
     if (failedFiles.length > 0) {
       toast.error(`${failedFiles.length} archivo(s) no se pudieron guardar.`, { id: toastId });
-      setRetryState({ isOpen: true, files: failedFiles }); // Retry only failed files
+      setRetryState({ isOpen: true, files: failedFiles });
     } else {
       toast.success(`¡${successfulCount} archivo(s) aplicados! Actualizando vista previa...`, { id: toastId });
       refreshSidebarData();
