@@ -73,7 +73,7 @@ export async function GET(req: NextRequest, context: any) {
       return NextResponse.json({ content: stdout });
     } else {
       // --- GET FILE TREE ---
-      const command = `find /app -print`;
+      const command = `find /app -path /app/node_modules -prune -o -path /app/.next -prune -o -path /app/dev.log -prune -o -path /app/cloudflared.log -prune -o -print`;
       const { stdout, stderr, code } = await executeSshCommand(server, `docker exec ${app.container_id} bash -c "${command}"`);
       if (code !== 0) throw new Error(`Error al listar archivos: ${stderr}`);
       const paths = stdout.trim().split('\n').map(p => p.replace('/app/', '')).filter(p => p && p !== '/app');
