@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useSession } from "@/components/session-context-provider";
 import { ConversationSidebar } from "@/components/conversation-sidebar";
 import { ChatInterface } from "@/components/chat-interface";
-import { AppPreviewPanel } from "@/components/app-preview-panel";
+import { AppBrowserPanel } from "@/components/app-browser-panel";
 import { CodeEditorPanel } from "@/components/code-editor-panel";
 import { NoteEditorPanel } from "@/components/note-editor-panel";
 import { ProfileSettingsDialog } from "@/components/profile-settings-dialog";
@@ -171,7 +171,7 @@ export default function Home() {
     if (rightPanelView === 'editor' && activeFile && selectedItem?.type === 'app') {
       return <CodeEditorPanel appId={selectedItem.id} file={activeFile} onClose={() => { setActiveFile(null); setRightPanelView('preview'); }} onSwitchToPreview={() => setRightPanelView('preview')} />;
     }
-    return <AppPreviewPanel appUrl={selectedAppDetails?.url || null} appStatus={selectedAppDetails?.status || null} />;
+    return <AppBrowserPanel appId={selectedAppDetails?.id || null} appUrl={selectedAppDetails?.url || null} appStatus={selectedAppDetails?.status || null} />;
   };
 
   return (
