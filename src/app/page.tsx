@@ -176,46 +176,43 @@ export default function Home() {
 
   return (
     <div className="h-screen bg-background flex">
-      <ResizablePanelGroup direction="horizontal">
-        <ResizablePanel defaultSize={20} minSize={15} maxSize={30}>
-          <ConversationSidebar
-            selectedItem={selectedItem}
-            onSelectItem={handleSelectItem}
-            onFileSelect={handleFileSelect}
-            onOpenProfileSettings={handleOpenProfileSettings}
-            onOpenAppSettings={handleOpenAppSettings}
-            onOpenServerManagement={handleOpenServerManagement}
-            onOpenUserManagement={handleOpenUserManagement}
-            onOpenDeepAiCoder={handleOpenDeepAiCoder}
-          />
-        </ResizablePanel>
-        <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={80} minSize={30}>
-          {selectedItem?.type === 'note' ? (
-            <NoteEditorPanel noteId={selectedItem.id} onNoteUpdated={refreshSidebarData} />
-          ) : (
-            <ResizablePanelGroup direction="horizontal">
-              <ResizablePanel defaultSize={50} minSize={30}>
-                <ChatInterface
-                  userId={userId}
-                  conversationId={selectedItem?.conversationId || null}
-                  onNewConversationCreated={handleNewConversationCreated}
-                  onConversationTitleUpdate={(id, newTitle) => {}}
-                  aiResponseSpeed={aiResponseSpeed}
-                />
-              </ResizablePanel>
-              {selectedItem?.type === 'app' && (
-                <>
-                  <ResizableHandle withHandle />
-                  <ResizablePanel defaultSize={50} minSize={30}>
-                    {renderRightPanelContent()}
-                  </ResizablePanel>
-                </>
-              )}
-            </ResizablePanelGroup>
-          )}
-        </ResizablePanel>
-      </ResizablePanelGroup>
+      <div className="w-[320px] flex-shrink-0">
+        <ConversationSidebar
+          selectedItem={selectedItem}
+          onSelectItem={handleSelectItem}
+          onFileSelect={handleFileSelect}
+          onOpenProfileSettings={handleOpenProfileSettings}
+          onOpenAppSettings={handleOpenAppSettings}
+          onOpenServerManagement={handleOpenServerManagement}
+          onOpenUserManagement={handleOpenUserManagement}
+          onOpenDeepAiCoder={handleOpenDeepAiCoder}
+        />
+      </div>
+      <div className="flex-1 min-w-0">
+        {selectedItem?.type === 'note' ? (
+          <NoteEditorPanel noteId={selectedItem.id} onNoteUpdated={refreshSidebarData} />
+        ) : (
+          <ResizablePanelGroup direction="horizontal">
+            <ResizablePanel defaultSize={50} minSize={30}>
+              <ChatInterface
+                userId={userId}
+                conversationId={selectedItem?.conversationId || null}
+                onNewConversationCreated={handleNewConversationCreated}
+                onConversationTitleUpdate={(id, newTitle) => {}}
+                aiResponseSpeed={aiResponseSpeed}
+              />
+            </ResizablePanel>
+            {selectedItem?.type === 'app' && (
+              <>
+                <ResizableHandle withHandle />
+                <ResizablePanel defaultSize={50} minSize={30}>
+                  {renderRightPanelContent()}
+                </ResizablePanel>
+              </>
+            )}
+          </ResizablePanelGroup>
+        )}
+      </div>
 
       <ProfileSettingsDialog open={isProfileSettingsOpen} onOpenChange={setIsProfileSettingsOpen} />
       <AppSettingsDialog
