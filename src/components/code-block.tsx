@@ -26,7 +26,7 @@ const SPEED_CONFIG = {
 
 export function CodeBlock({ language, code, filename, isNew, onAnimationComplete, animationSpeed }: CodeBlockProps) {
   const [isCopied, setIsCopied] = useState(false);
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(!isNew);
   const [displayedCode, setDisplayedCode] = useState(isNew ? '' : code);
   const [isTyping, setIsTyping] = useState(!!isNew);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -39,10 +39,12 @@ export function CodeBlock({ language, code, filename, isNew, onAnimationComplete
     if (!isNew) {
       setDisplayedCode(code);
       setIsTyping(false);
+      setIsOpen(true);
       return;
     }
 
     setIsTyping(true);
+    setIsOpen(false);
     setDisplayedCode('');
     
     if (code) {
@@ -66,12 +68,14 @@ export function CodeBlock({ language, code, filename, isNew, onAnimationComplete
           timeoutRef.current = setTimeout(typeChunk, delayPerChunk);
         } else {
           setIsTyping(false);
+          setIsOpen(true);
           onAnimationComplete?.(); // Animation finished
         }
       };
       typeChunk();
     } else {
       setIsTyping(false);
+      setIsOpen(true);
       onAnimationComplete?.(); // No code to animate
     }
 

@@ -54,10 +54,12 @@ interface UseChatProps {
   conversationId: string | null;
   onNewConversationCreated: (conversationId: string) => void;
   onConversationTitleUpdate: (conversationId: string, newTitle: string) => void;
-  appPrompt?: string | null; // New prop for the project prompt
+  appPrompt?: string | null;
+  appId?: string | null;
+  onFilesWritten?: () => void;
 }
 
-const codeBlockRegex = /```(\w+)?(?::([\w./-]+))?\n([\s\S]*?)\n```/g;
+const codeBlockRegex = /```(\w+)?(?::([\w./-]+))?\s*\n([\s\S]*?)\s*```/g;
 interface ParsedPart {
   type: 'text' | 'code';
   content: string;
@@ -90,7 +92,9 @@ export function useChat({
   conversationId,
   onNewConversationCreated,
   onConversationTitleUpdate,
-  appPrompt, // Destructure the new prop
+  appPrompt,
+  appId,
+  onFilesWritten,
 }: UseChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -199,6 +203,29 @@ export function useChat({
     return { id: data.id, timestamp: new Date(data.created_at) };
   };
 
+  const writeFilesToApp = async (files: { path: string; content: string }[]) => {
+    if (!appId || files.length === 0) return;
+    toast.info(`Aplicando ${files.length} archivo(s) al proyecto...`);
+    try {
+      const promises = files.map(file =>
+        fetch(`/api/apps/${appId}/file`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(file),
+        })
+      );
+      const responses = await Promise.all(promises);
+      const failed = responses.filter(res => !res.ok);
+      if (failed.length > 0) {
+        throw new Error(`${failed.length} archivo(s) no se pudieron guardar.`);
+      }
+      toast.success('¡Archivos aplicados! Actualizando vista previa...');
+      onFilesWritten?.();
+    } catch (error: any) {
+      toast.error(`Error al aplicar archivos: ${error.message}`);
+    }
+  };
+
   const getAndStreamAIResponse = async (convId: string, history: Message[]) => {
     setIsLoading(true);
     const tempTypingId = `assistant-typing-${Date.now()}`;
@@ -243,6 +270,7 @@ export function useChat({
       }
 
       const parts = parseStringIntoTextAndCode(contentToParse);
+      const filesToWrite: { path: string; content: string }[] = [];
 
       setMessages(prev => prev.filter(m => m.id !== tempTypingId));
 
@@ -260,7 +288,20 @@ export function useChat({
         if (savedData) {
           setMessages(prev => prev.map(msg => msg.id === tempPartId ? { ...msg, id: savedData.id, timestamp: savedData.timestamp } : msg));
         }
+
+        if (part.type === 'code' && appId) {
+          const fileMatch = part.content.match(/```(?:\w+)?(?::([\w./-]+))?/);
+          const codeContentMatch = part.content.match(/\s*\n([\s\S]*?)\s*```/);
+          if (fileMatch?.[1] && codeContentMatch?.[1]) {
+            filesToWrite.push({ path: fileMatch[1], content: codeContentMatch[1] });
+          }
+        }
       }
+
+      if (filesToWrite.length > 0) {
+        await writeFilesToApp(filesToWrite);
+      }
+
     } catch (error: any) {
       toast.error(error.message);
       setMessages(prev => prev.filter(m => m.id !== tempTypingId));

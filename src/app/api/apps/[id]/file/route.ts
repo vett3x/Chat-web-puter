@@ -53,6 +53,7 @@ export async function POST(req: NextRequest, context: any) {
 
     // 1. Escribir en el contenedor para hot-reloading
     const encodedContent = Buffer.from(content).toString('base64');
+    // Comando robusto para crear directorios y luego el archivo
     const command = `bash -c "mkdir -p /app/$(dirname '${filePath}') && echo '${encodedContent}' | base64 -d > /app/${filePath}"`;
     
     const { stderr, code } = await executeSshCommand(server, `docker exec ${app.container_id} ${command}`);
