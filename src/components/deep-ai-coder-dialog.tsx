@@ -23,6 +23,7 @@ interface UserApp {
   status: string;
   url: string | null;
   conversation_id: string | null;
+  prompt: string | null;
 }
 
 interface DeepAiCoderDialogProps {

@@ -14,6 +14,7 @@ interface ChatInterfaceProps {
   aiResponseSpeed: 'slow' | 'normal' | 'fast';
   isAppProvisioning?: boolean;
   isAppDeleting?: boolean;
+  appPrompt?: string | null; // New prop for the project prompt
 }
 
 export function ChatInterface({
@@ -24,6 +25,7 @@ export function ChatInterface({
   aiResponseSpeed,
   isAppProvisioning = false,
   isAppDeleting = false,
+  appPrompt, // Destructure the new prop
 }: ChatInterfaceProps) {
   const {
     messages,
@@ -38,6 +40,7 @@ export function ChatInterface({
     conversationId,
     onNewConversationCreated,
     onConversationTitleUpdate,
+    appPrompt, // Pass the prompt to the hook
   });
 
   if (isAppProvisioning) {

@@ -28,6 +28,7 @@ interface UserApp {
   status: string;
   url: string | null;
   conversation_id: string | null;
+  prompt: string | null; // Added prompt
 }
 
 interface SelectedItem {
@@ -241,6 +242,7 @@ export default function Home() {
           <ResizablePanelGroup direction="horizontal">
             <ResizablePanel defaultSize={50} minSize={30}>
               <ChatInterface
+                key={selectedItem?.conversationId || 'no-conversation'} // Force re-mount on conversation change
                 userId={userId}
                 conversationId={selectedItem?.conversationId || null}
                 onNewConversationCreated={handleNewConversationCreated}
@@ -248,6 +250,7 @@ export default function Home() {
                 aiResponseSpeed={aiResponseSpeed}
                 isAppProvisioning={selectedAppDetails?.status === 'provisioning'}
                 isAppDeleting={isAppDeleting}
+                appPrompt={selectedAppDetails?.prompt}
               />
             </ResizablePanel>
             {selectedItem?.type === 'app' && (
