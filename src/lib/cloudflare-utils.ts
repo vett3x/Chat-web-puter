@@ -250,17 +250,15 @@ export async function installAndRunCloudflaredService(
 ): Promise<void> {
   await logApiCall(userId, 'cloudflared_container_install_run_ssh', `Attempting to install and run cloudflared inside container ${containerId.substring(0,12)} on ${serverDetails.ip_address}.`);
 
-  // Use the `cloudflared service install` command with the token.
-  // This command handles creating the necessary configuration files and starting the service.
-  // We run it as root inside the container, so `sudo` is not needed.
-  const installCommand = `cloudflared service install ${tunnelToken}`;
-  const { stdout, stderr, code } = await executeSshCommand(serverDetails, `docker exec ${containerId} bash -c "${installCommand}"`);
+  // The correct command to run the tunnel in the background and log its output
+  const runCommand = `nohup cloudflared tunnel run --token ${tunnelToken} ${tunnelId} > /app/cloudflared.log 2>&1 &`;
+  const { stdout, stderr, code } = await executeSshCommand(serverDetails, `docker exec ${containerId} bash -c "${runCommand}"`);
 
   if (code !== 0) {
-    await logApiCall(userId, 'cloudflared_container_install_failed', `Failed to install cloudflared service inside container ${containerId.substring(0,12)}. STDERR: ${stderr}`);
-    throw new Error(`Error installing cloudflared service inside container via SSH: ${stderr}`);
+    await logApiCall(userId, 'cloudflared_container_run_failed', `Failed to run cloudflared service inside container ${containerId.substring(0,12)}. STDERR: ${stderr}`);
+    throw new Error(`Error running cloudflared service inside container via SSH: ${stderr}`);
   }
-  await logApiCall(userId, 'cloudflared_container_install_success', `Cloudflared service installed successfully inside container ${containerId.substring(0,12)}. STDOUT: ${stdout}`);
+  await logApiCall(userId, 'cloudflared_container_run_success', `Cloudflared service started successfully inside container ${containerId.substring(0,12)}. STDOUT: ${stdout}`);
 }
 
 /**
