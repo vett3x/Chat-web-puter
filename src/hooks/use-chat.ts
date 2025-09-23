@@ -56,6 +56,40 @@ interface UseChatProps {
   onConversationTitleUpdate: (conversationId: string, newTitle: string) => void;
 }
 
+// Helper to parse a single string response into multiple parts (text and code)
+const codeBlockRegex = /```(\w+)?(?::([\w./-]+))?\n([\s\S]*?)\n```/g;
+interface ParsedPart {
+  type: 'text' | 'code';
+  content: string;
+}
+function parseContentIntoParts(content: string | PuterContentPart[]): ParsedPart[] {
+  if (typeof content !== 'string') {
+    // For now, treat multimodal content as a single part
+    return [{ type: 'text', content: JSON.stringify(content) }];
+  }
+
+  const parts: ParsedPart[] = [];
+  let lastIndex = 0;
+  let match;
+  codeBlockRegex.lastIndex = 0;
+
+  while ((match = codeBlockRegex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      const textPart = content.substring(lastIndex, match.index).trim();
+      if (textPart) parts.push({ type: 'text', content: textPart });
+    }
+    parts.push({ type: 'code', content: match[0] });
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < content.length) {
+    const textPart = content.substring(lastIndex).trim();
+    if (textPart) parts.push({ type: 'text', content: textPart });
+  }
+
+  return parts.length > 0 ? parts : [{ type: 'text', content }];
+}
+
 export function useChat({
   userId,
   conversationId,
@@ -91,12 +125,7 @@ export function useChat({
   }, [selectedModel]);
 
   const getConversationDetails = useCallback(async (convId: string) => {
-    const { data, error } = await supabase
-      .from('conversations')
-      .select('id, title, model')
-      .eq('id', convId)
-      .eq('user_id', userId)
-      .single();
+    const { data, error } = await supabase.from('conversations').select('id, title, model').eq('id', convId).eq('user_id', userId).single();
     if (error) {
       console.error('Error fetching conversation details:', error);
       toast.error('Error al cargar los detalles de la conversación.');
@@ -106,12 +135,7 @@ export function useChat({
   }, [userId]);
 
   const getMessagesFromDB = useCallback(async (convId: string) => {
-    const { data, error } = await supabase
-      .from('messages')
-      .select('id, content, role, model, created_at, conversation_id, type')
-      .eq('conversation_id', convId)
-      .eq('user_id', userId)
-      .order('created_at', { ascending: true });
+    const { data, error } = await supabase.from('messages').select('id, content, role, model, created_at, conversation_id, type').eq('conversation_id', convId).eq('user_id', userId).order('created_at', { ascending: true });
     if (error) {
       console.error('Error fetching messages:', error);
       toast.error('Error al cargar los mensajes.');
@@ -133,15 +157,10 @@ export function useChat({
       if (conversationId && userId) {
         setIsLoading(true);
         const details = await getConversationDetails(conversationId);
-        if (details?.model) {
-          setSelectedModel(details.model);
-        } else {
-          setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL);
-        }
+        if (details?.model) setSelectedModel(details.model);
+        else setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL);
         const fetchedMsgs = await getMessagesFromDB(conversationId);
-        if (!isSendingFirstMessage || fetchedMsgs.length > 0) {
-          setMessages(fetchedMsgs);
-        }
+        if (!isSendingFirstMessage || fetchedMsgs.length > 0) setMessages(fetchedMsgs);
         setIsLoading(false);
       } else {
         setMessages([]);
@@ -153,11 +172,7 @@ export function useChat({
 
   const createNewConversationInDB = async () => {
     if (!userId) return null;
-    const { data, error } = await supabase
-      .from('conversations')
-      .insert({ user_id: userId, title: 'Nueva conversación', model: selectedModel })
-      .select('id, title')
-      .single();
+    const { data, error } = await supabase.from('conversations').insert({ user_id: userId, title: 'Nueva conversación', model: selectedModel }).select('id, title').single();
     if (error) {
       toast.error('Error al crear una nueva conversación.');
       return null;
@@ -169,35 +184,18 @@ export function useChat({
 
   const updateConversationModelInDB = async (convId: string, model: string) => {
     if (!userId) return;
-    const { error } = await supabase
-      .from('conversations')
-      .update({ model })
-      .eq('id', convId)
-      .eq('user_id', userId);
+    const { error } = await supabase.from('conversations').update({ model }).eq('id', convId).eq('user_id', userId);
     if (error) toast.error('Error al actualizar el modelo de la conversación.');
   };
 
   const handleModelChange = (modelValue: string) => {
     setSelectedModel(modelValue);
-    if (conversationId) {
-      updateConversationModelInDB(conversationId, modelValue);
-    }
+    if (conversationId) updateConversationModelInDB(conversationId, modelValue);
   };
 
   const saveMessageToDB = async (convId: string, msg: Omit<Message, 'timestamp' | 'id'>) => {
     if (!userId) return null;
-    const { data, error } = await supabase
-      .from('messages')
-      .insert({
-        conversation_id: convId,
-        user_id: userId,
-        role: msg.role,
-        content: msg.content,
-        model: msg.model,
-        type: msg.type,
-      })
-      .select('id, created_at')
-      .single();
+    const { data, error } = await supabase.from('messages').insert({ conversation_id: convId, user_id: userId, role: msg.role, content: msg.content, model: msg.model, type: msg.type }).select('id, created_at').single();
     if (error) {
       toast.error('Error al guardar el mensaje.');
       return null;
@@ -205,10 +203,55 @@ export function useChat({
     return { id: data.id, timestamp: new Date(data.created_at) };
   };
 
+  const getAndStreamAIResponse = async (convId: string, history: Message[]) => {
+    setIsLoading(true);
+    const tempTypingId = `assistant-typing-${Date.now()}`;
+    setMessages(prev => [...prev, { id: tempTypingId, role: 'assistant', content: '', isTyping: true, timestamp: new Date() }]);
+
+    try {
+      const puterMessages: PuterMessage[] = history.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+      
+      const systemMessage: PuterMessage = { role: 'system', content: "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante." };
+
+      const response = await window.puter.ai.chat([systemMessage, ...puterMessages], { model: selectedModel });
+      if (!response || response.error) throw new Error(response?.error?.message || 'Error de la IA.');
+
+      const assistantMessageContent = response?.message?.content || 'Sin contenido.';
+      const parts = parseContentIntoParts(assistantMessageContent);
+
+      setMessages(prev => prev.filter(m => m.id !== tempTypingId));
+
+      for (const part of parts) {
+        const assistantMessageData = {
+          content: part.content,
+          role: 'assistant' as const,
+          model: selectedModel,
+          type: 'text' as const,
+        };
+        const tempPartId = `assistant-part-${Date.now()}-${Math.random()}`;
+        setMessages(prev => [...prev, { ...assistantMessageData, id: tempPartId, timestamp: new Date(), isNew: true }]);
+        
+        const savedData = await saveMessageToDB(convId, assistantMessageData);
+        if (savedData) {
+          setMessages(prev => prev.map(msg => msg.id === tempPartId ? { ...msg, id: savedData.id, timestamp: savedData.timestamp } : msg));
+        }
+        await new Promise(res => setTimeout(res, 300));
+      }
+    } catch (error: any) {
+      toast.error(error.message);
+      setMessages(prev => prev.filter(m => m.id !== tempTypingId));
+      setMessages(prev => [...prev, { id: `error-${Date.now()}`, role: 'assistant', content: `Error: ${error.message}`, isNew: true, timestamp: new Date() }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const sendMessage = async (userContent: PuterContentPart[], messageText: string) => {
     if (isLoading || !isPuterReady || !userId) return;
 
-    setIsLoading(true);
     let currentConvId = conversationId;
     if (!currentConvId) {
       setIsSendingFirstMessage(true);
@@ -229,68 +272,28 @@ export function useChat({
       timestamp: new Date(),
       type: userContent.some(p => p.type === 'image_url') ? 'multimodal' : 'text',
     };
-    setMessages(prev => [...prev, userMessage]);
-
-    const tempAssistantId = `assistant-${Date.now()}`;
-    setMessages(prev => [...prev, {
-      id: tempAssistantId,
-      conversation_id: finalConvId,
-      content: '',
-      role: 'assistant',
-      model: selectedModel,
-      timestamp: new Date(),
-      isTyping: true,
-      type: 'text',
-    }]);
-
-    try {
-      const { data: historyData } = await supabase
-        .from('messages')
-        .select('content, role, type')
-        .eq('conversation_id', finalConvId)
-        .eq('user_id', userId)
-        .order('created_at', { ascending: true });
-
-      const puterMessages: PuterMessage[] = (historyData || []).map(msg => ({
-        role: msg.role as 'user' | 'assistant',
-        content: msg.content as string | PuterContentPart[],
-      }));
-      
-      const systemMessage: PuterMessage = {
-        role: 'system',
-        content: "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante."
-      };
-
-      const response = await window.puter.ai.chat([systemMessage, ...puterMessages, { role: 'user', content: userContent }], { model: selectedModel });
-
-      if (!response || response.error) throw new Error(response?.error?.message || 'Error de la IA.');
-
-      const assistantMessageContent = response?.message?.content || 'Sin contenido.';
-      const assistantMessageType: 'text' | 'multimodal' = Array.isArray(assistantMessageContent) ? 'multimodal' : 'text';
-
-      const assistantMessageData = {
-        content: assistantMessageContent,
-        role: 'assistant' as const,
-        model: selectedModel,
-        type: assistantMessageType,
-      };
-
-      setMessages(prev => prev.map(msg => msg.id === tempAssistantId ? { ...msg, ...assistantMessageData, isTyping: false, isNew: true } : msg));
-
-      await saveMessageToDB(finalConvId, userMessage);
-      saveMessageToDB(finalConvId, assistantMessageData).then(savedData => {
-        if (savedData) {
-          setMessages(prev => prev.map(msg => msg.id === tempAssistantId ? { ...msg, id: savedData.id, timestamp: savedData.timestamp } : msg));
-        }
-      });
-    } catch (error: any) {
-      toast.error(error.message);
-      setMessages(prev => prev.map(msg => msg.id === tempAssistantId ? { ...msg, content: `Error: ${error.message}`, isTyping: false, isNew: true } : msg));
-    } finally {
-      setIsLoading(false);
-      if (!conversationId) setIsSendingFirstMessage(false);
-    }
+    
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
+    await saveMessageToDB(finalConvId, userMessage);
+    await getAndStreamAIResponse(finalConvId, newMessages);
+    if (!conversationId) setIsSendingFirstMessage(false);
   };
+
+  const regenerateLastResponse = useCallback(async () => {
+    if (isLoading) return;
+    const lastUserMessageIndex = messages.findLastIndex(m => m.role === 'user');
+    if (lastUserMessageIndex === -1) {
+      toast.info("No hay nada que regenerar.");
+      return;
+    }
+    const historyForRegen = messages.slice(0, lastUserMessageIndex + 1);
+    setMessages(historyForRegen);
+    const convId = historyForRegen[0]?.conversation_id;
+    if (convId) {
+      await getAndStreamAIResponse(convId, historyForRegen);
+    }
+  }, [isLoading, messages]);
 
   return {
     messages,
@@ -299,5 +302,6 @@ export function useChat({
     selectedModel,
     handleModelChange,
     sendMessage,
+    regenerateLastResponse,
   };
 }

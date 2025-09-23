@@ -28,6 +28,7 @@ export function ChatInterface({
     selectedModel,
     handleModelChange,
     sendMessage,
+    regenerateLastResponse,
   } = useChat({
     userId,
     conversationId,
@@ -63,6 +64,7 @@ export function ChatInterface({
           messages={messages}
           isLoading={isLoading}
           aiResponseSpeed={aiResponseSpeed}
+          onRegenerate={regenerateLastResponse}
         />
         <ChatInput
           isLoading={isLoading}
