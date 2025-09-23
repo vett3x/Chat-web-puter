@@ -46,6 +46,15 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
   const [selectedImages, setSelectedImages] = useState<{ file: File; preview: string }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const SelectedModelIcon = React.useMemo(() => {
+    for (const provider of AI_PROVIDERS) {
+      if (provider.models.some(model => model.value === selectedModel)) {
+        return provider.logo;
+      }
+    }
+    return Bot; // Fallback to the generic bot icon
+  }, [selectedModel]);
+
   const handleSendMessage = () => {
     if (!inputMessage.trim() && selectedImages.length === 0) return;
 
@@ -118,7 +127,7 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="default" className="rounded-full bg-info text-info-foreground shadow-avatar-user hover:shadow-avatar-user-hover transition-all duration-200 h-8 w-8 p-0" aria-label="Seleccionar modelo de IA">
-                <Bot className="h-4 w-4" />
+                <SelectedModelIcon className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="top" align="end" className="w-64 bg-popover text-popover-foreground border-border rounded-lg">
