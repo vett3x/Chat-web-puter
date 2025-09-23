@@ -68,13 +68,13 @@ export async function GET(req: NextRequest, context: any) {
         throw new Error(`Acceso denegado: La ruta '${filePath}' está fuera del directorio permitido.`);
       }
       const command = `cat '${resolvedPath}'`;
-      const { stdout, stderr, code } = await executeSshCommand(server, `docker exec ${app.container_id} ${command}`);
+      const { stdout, stderr, code } = await executeSshCommand(server, `docker exec ${app.container_id} bash -c "${command}"`);
       if (code !== 0) throw new Error(`Error al leer el archivo: ${stderr}`);
       return NextResponse.json({ content: stdout });
     } else {
       // --- GET FILE TREE ---
       const command = `find /app -print`;
-      const { stdout, stderr, code } = await executeSshCommand(server, `docker exec ${app.container_id} ${command}`);
+      const { stdout, stderr, code } = await executeSshCommand(server, `docker exec ${app.container_id} bash -c "${command}"`);
       if (code !== 0) throw new Error(`Error al listar archivos: ${stderr}`);
       const paths = stdout.trim().split('\n').map(p => p.replace('/app/', '')).filter(p => p && p !== '/app');
       const fileTree = buildFileTree(paths);
@@ -126,7 +126,7 @@ export async function POST(req: NextRequest, context: any) {
 
       // 1. Crear directorios
       const mkdirCommand = `mkdir -p '${directoryInContainer}'`;
-      await executeSshOnExistingConnection(conn, `docker exec ${app.container_id} ${mkdirCommand}`);
+      await executeSshOnExistingConnection(conn, `docker exec ${app.container_id} bash -c "${mkdirCommand}"`);
 
       // 2. Escribir archivo
       const encodedContent = Buffer.from(content).toString('base64');

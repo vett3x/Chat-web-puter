@@ -26,7 +26,7 @@ export async function GET(req: NextRequest, context: any) {
     }
 
     // Changed command to read the Next.js dev server log file
-    const { stdout, stderr, code } = await executeSshCommand(server, `docker exec ${app.container_id} tail -n 100 /app/dev.log`);
+    const { stdout, stderr, code } = await executeSshCommand(server, `docker exec ${app.container_id} bash -c "tail -n 100 /app/dev.log"`);
     
     // Combine stdout and stderr, as tail might output to either.
     // If the file doesn't exist yet, stderr will contain an error message which is useful feedback.

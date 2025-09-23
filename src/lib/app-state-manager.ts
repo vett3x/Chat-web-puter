@@ -22,12 +22,12 @@ async function ensureServicesAreRunning(server: any, app: any) {
   const killCommands = "pkill -f 'npm run dev' || true; pkill cloudflared || true";
   const restartAppCommand = `cd /app && nohup npm run dev -- -p ${tunnel?.container_port || 3000} > /app/dev.log 2>&1 &`;
   
-  let fullCommand = `docker exec ${app.container_id} sh -c "${killCommands} && ${restartAppCommand}"`;
+  let fullCommand = `docker exec ${app.container_id} bash -c "${killCommands}; ${restartAppCommand}"`;
 
   // Si hay un túnel, también lo reiniciamos
   if (tunnel && tunnel.tunnel_id && tunnel.tunnel_secret) {
     const restartTunnelCommand = `nohup cloudflared tunnel run --token ${tunnel.tunnel_secret} ${tunnel.tunnel_id} > /app/cloudflared.log 2>&1 &`;
-    fullCommand = `docker exec ${app.container_id} sh -c "${killCommands} && ${restartAppCommand} && ${restartTunnelCommand}"`;
+    fullCommand = `docker exec ${app.container_id} bash -c "${killCommands}; ${restartAppCommand}; ${restartTunnelCommand}"`;
   }
 
   const { stderr, code } = await executeSshCommand(server, fullCommand);
@@ -135,8 +135,8 @@ async function restoreAppFromArchive(appId: string, userId: string, appName: str
         for (const backup of backups) {
             const encodedContent = Buffer.from(backup.file_content || '').toString('base64');
             // Comando robusto para crear directorios y luego el archivo
-            const command = `bash -c "mkdir -p /app/$(dirname '${backup.file_path}') && echo '${encodedContent}' | base64 -d > /app/${backup.file_path}"`;
-            await executeSshCommand(server, `docker exec ${containerId} ${command}`);
+            const command = `mkdir -p /app/$(dirname '${backup.file_path}') && echo '${encodedContent}' | base64 -d > /app/${backup.file_path}`;
+            await executeSshCommand(server, `docker exec ${containerId} bash -c "${command}"`);
         }
     }
     // NO eliminamos las copias de seguridad. Son la fuente de la verdad.
