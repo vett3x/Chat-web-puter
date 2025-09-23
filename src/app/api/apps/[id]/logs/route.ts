@@ -1,7 +1,7 @@
 export const runtime = 'nodejs';
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { getAppAndServerForFileOps } from '@/lib/app-state-manager'; // Changed import
+import { getAppAndServerForFileOps } from '@/lib/app-state-manager';
 import { executeSshCommand } from '@/lib/ssh-utils';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
@@ -19,20 +19,25 @@ export async function GET(req: NextRequest, context: any) {
 
   try {
     const userId = await getUserId();
-    const { app, server } = await getAppAndServerForFileOps(appId, userId); // Use new function
+    const { app, server } = await getAppAndServerForFileOps(appId, userId);
 
     if (!app.container_id) {
-      return NextResponse.json({ logs: 'La aplicación no tiene un contenedor asociado.' });
+      return NextResponse.json({ 
+        nextjsLogs: 'La aplicación no tiene un contenedor asociado.',
+        cloudflaredLogs: 'La aplicación no tiene un contenedor asociado.'
+      });
     }
 
-    // Changed command to read the Next.js dev server log file
-    const { stdout, stderr, code } = await executeSshCommand(server, `docker exec ${app.container_id} bash -c "tail -n 100 /app/dev.log"`);
-    
-    // Combine stdout and stderr, as tail might output to either.
-    // If the file doesn't exist yet, stderr will contain an error message which is useful feedback.
-    const logs = stdout || stderr;
+    // Fetch both logs in parallel
+    const [nextjsResult, cloudflaredResult] = await Promise.all([
+      executeSshCommand(server, `docker exec ${app.container_id} bash -c "tail -n 100 /app/dev.log"`),
+      executeSshCommand(server, `docker exec ${app.container_id} bash -c "tail -n 100 /app/cloudflared.log"`)
+    ]);
 
-    return NextResponse.json({ logs });
+    const nextjsLogs = nextjsResult.stdout || nextjsResult.stderr || 'No se encontraron logs de Next.js.';
+    const cloudflaredLogs = cloudflaredResult.stdout || cloudflaredResult.stderr || 'No se encontraron logs del túnel.';
+
+    return NextResponse.json({ nextjsLogs, cloudflaredLogs });
   } catch (error: any) {
     console.error(`[API LOGS /apps/${appId}] Error:`, error);
     return NextResponse.json({ message: error.message }, { status: 500 });

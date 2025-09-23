@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
-import { Wand2, Loader2, ArrowLeft, ArrowRight, RefreshCw, ExternalLink, Terminal, ChevronDown, ChevronRight, Power } from 'lucide-react';
+import { Wand2, Loader2, ArrowLeft, ArrowRight, RefreshCw, ExternalLink, Terminal, Power, Server, Cloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { toast } from 'sonner';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface AppBrowserPanelProps {
   appId: string | null;
@@ -17,55 +17,62 @@ interface AppBrowserPanelProps {
 }
 
 function SystemLogsPanel({ appId }: { appId: string }) {
-  const [logs, setLogs] = useState('');
-  const [isLoading, setIsLoading] = useState(true); // Start in loading state
+  const [logs, setLogs] = useState({ nextjs: '', cloudflared: '' });
+  const [isLoading, setIsLoading] = useState(true);
 
   const fetchLogs = useCallback(async () => {
     if (!appId) return;
-    // No setIsLoading(true) here to make refreshes subtle
     try {
       const response = await fetch(`/api/apps/${appId}/logs`);
       const data = await response.json();
       if (!response.ok) throw new Error(data.message);
-      setLogs(data.logs);
+      setLogs({ nextjs: data.nextjsLogs, cloudflared: data.cloudflaredLogs });
     } catch (error: any) {
-      setLogs(`Error al cargar los logs: ${error.message}`);
+      setLogs({ 
+        nextjs: `Error al cargar los logs de Next.js: ${error.message}`,
+        cloudflared: `Error al cargar los logs del túnel: ${error.message}`
+      });
     } finally {
-      setIsLoading(false); // Set to false after the first load
+      setIsLoading(false);
     }
   }, [appId]);
 
   useEffect(() => {
-    fetchLogs(); // Initial fetch
-    const interval = setInterval(fetchLogs, 10000); // Refresh logs every 10 seconds
+    fetchLogs();
+    const interval = setInterval(fetchLogs, 10000);
     return () => clearInterval(interval);
   }, [fetchLogs]);
 
+  const renderLogContent = (logContent: string) => (
+    <div className="h-full overflow-auto bg-[#1E1E1E]">
+      {isLoading ? (
+        <div className="flex items-center justify-center h-full text-white"><Loader2 className="h-5 w-5 animate-spin" /></div>
+      ) : (
+        <SyntaxHighlighter language="bash" style={vscDarkPlus} customStyle={{ margin: 0, height: '100%', overflow: 'auto' }} codeTagProps={{ style: { fontFamily: 'var(--font-geist-mono)' } }}>
+          {logContent}
+        </SyntaxHighlighter>
+      )}
+    </div>
+  );
+
   return (
-    <Collapsible className="flex flex-col h-full">
-      <CollapsibleTrigger asChild>
-        <div className="flex items-center justify-between p-2 border-t bg-muted cursor-pointer">
-          <div className="flex items-center gap-2">
-            <Terminal className="h-4 w-4" />
-            <h3 className="text-sm font-semibold">Mensajes del Sistema</h3>
-          </div>
-          <Button variant="ghost" size="icon" className="h-6 w-6">
-            <ChevronDown className="h-4 w-4" />
-          </Button>
-        </div>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="flex-1 overflow-hidden">
-        <div className="h-full overflow-auto bg-[#1E1E1E]">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-full text-white"><Loader2 className="h-5 w-5 animate-spin" /></div>
-          ) : (
-            <SyntaxHighlighter language="bash" style={vscDarkPlus} customStyle={{ margin: 0, height: '100%', overflow: 'auto' }} codeTagProps={{ style: { fontFamily: 'var(--font-geist-mono)' } }}>
-              {logs}
-            </SyntaxHighlighter>
-          )}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+    <Tabs defaultValue="nextjs" className="flex flex-col h-full">
+      <div className="flex items-center justify-between p-2 border-t bg-muted">
+        <TabsList className="grid grid-cols-2 w-[300px]">
+          <TabsTrigger value="nextjs" className="flex items-center gap-2"><Server className="h-4 w-4" /> Logs de Next.js</TabsTrigger>
+          <TabsTrigger value="cloudflared" className="flex items-center gap-2"><Cloud className="h-4 w-4" /> Logs del Túnel</TabsTrigger>
+        </TabsList>
+        <Button variant="ghost" size="icon" onClick={fetchLogs} disabled={isLoading} className="h-7 w-7">
+          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+        </Button>
+      </div>
+      <TabsContent value="nextjs" className="flex-1 overflow-hidden">
+        {renderLogContent(logs.nextjs)}
+      </TabsContent>
+      <TabsContent value="cloudflared" className="flex-1 overflow-hidden">
+        {renderLogContent(logs.cloudflared)}
+      </TabsContent>
+    </Tabs>
   );
 }
 
