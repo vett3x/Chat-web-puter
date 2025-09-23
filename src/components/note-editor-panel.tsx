@@ -113,7 +113,6 @@ export function NoteEditorPanel({ noteId, onNoteUpdated }: NoteEditorPanelProps)
       <div className="flex-1 overflow-y-auto">
         <BlockNoteView 
           editor={editor} 
-          theme={theme === 'dark' ? 'dark' : 'light'}
           className="h-full"
         />
       </div>
