@@ -61,8 +61,19 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error('[API /ai/chat] Error:', error);
-    // Provide a more specific error message if available
-    const errorMessage = error.details || error.message || 'Error desconocido en la API de IA.';
-    return NextResponse.json({ message: `Error en la API de Gemini: ${errorMessage}` }, { status: 500 });
+    
+    let userFriendlyMessage = 'Ocurrió un error inesperado con la API de Gemini.';
+    const errorMessage = error.message || '';
+
+    if (errorMessage.includes('503') || errorMessage.toLowerCase().includes('overloaded')) {
+      userFriendlyMessage = 'El modelo de IA de Google está sobrecargado en este momento. Por favor, intenta de nuevo en unos minutos o cambia a otro modelo.';
+    } else if (errorMessage.toLowerCase().includes('api key not valid')) {
+      userFriendlyMessage = 'Tu API Key de Google Gemini no es válida. Por favor, verifica que sea correcta en la Gestión de API Keys.';
+    } else {
+      // Keep a more generic but still helpful message for other errors
+      userFriendlyMessage = `Error en la API de Gemini: ${errorMessage}`;
+    }
+
+    return NextResponse.json({ message: userFriendlyMessage }, { status: 500 });
   }
 }
