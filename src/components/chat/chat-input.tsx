@@ -164,7 +164,7 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
 
   return (
     <div className="absolute bottom-0 left-0 right-0 flex justify-center px-4 pb-4 pt-2">
-      <div className="w-full max-w-3xl bg-card rounded-xl border border-input shadow-lg p-2 flex flex-col gap-2 focus-within:ring-2 focus-within:ring-green-500 focus-within:ring-offset-2 focus-within:ring-offset-background focus-within:shadow-[0_0_20px_5px_rgb(34_197_94_/_0.4)] transition-all duration-200">
+      <div className="w-full max-w-3xl bg-card rounded-xl border border-input p-2 flex flex-col gap-2 focus-within:ring-2 focus-within:ring-green-500 focus-within:ring-offset-2 focus-within:ring-offset-background transition-all duration-200">
         {selectedFiles.length > 0 && (
           <div className="flex flex-wrap gap-2 p-2 border-b border-input">
             {selectedFiles.map((item, index) => (
@@ -209,7 +209,7 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
                     <DropdownMenuLabel className={cn("flex items-center gap-2 font-bold text-foreground px-2 py-1.5", isDisabled && "text-muted-foreground")}>
                       <span>{provider.company}</span>
                       <provider.logo className="h-4 w-4" />
-                      {isDisabled && <span title="Requiere API Key"><KeyRound className="h-4 w-4 text-warning" /></span>}
+                      {isDisabled && <span title="Requiere API Key"><KeyRound className="h-4 w-4 text-muted-foreground" /></span>}
                     </DropdownMenuLabel>
                     {provider.models.map((model) => (
                       <DropdownMenuItem key={model.value} onClick={() => onModelChange(model.value)} disabled={isDisabled} className={cn("flex items-center justify-between cursor-pointer pl-8", selectedModel === model.value && "bg-accent text-accent-foreground", isDisabled && "cursor-not-allowed")}>
