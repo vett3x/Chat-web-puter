@@ -197,21 +197,10 @@ export default function Home() {
         body: JSON.stringify({ files }),
       });
 
-      // Improved error handling to prevent SyntaxError
+      const result = await response.json();
       if (!response.ok) {
-        const errorText = await response.text();
-        try {
-          // Attempt to parse as JSON
-          const errorJson = JSON.parse(errorText);
-          throw new Error(errorJson.message || 'Error del servidor al guardar los archivos.');
-        } catch (e) {
-          // If parsing fails, it's likely HTML or plain text
-          console.error("Server returned a non-JSON error response:", errorText);
-          throw new Error(`El servidor devolvió un error inesperado. Revisa la consola del navegador para ver los detalles.`);
-        }
+        throw new Error(result.message || 'Error del servidor al guardar los archivos.');
       }
-
-      await response.json(); // Consume the successful JSON response
       toast.success(`Archivos aplicados. Reiniciando servidor...`, { id: toastId });
 
       // Now, restart the server

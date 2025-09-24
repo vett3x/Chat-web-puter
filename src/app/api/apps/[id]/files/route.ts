@@ -95,22 +95,13 @@ export async function POST(req: NextRequest, context: any) {
     const { app, server } = await getAppAndServerForFileOps(appId, userId);
     const { files } = await req.json();
 
-    console.log(`[API /apps/${appId}/files POST] Received ${files.length} files for writing.`);
-
     if (!Array.isArray(files) || files.length === 0) {
       return NextResponse.json({ message: 'Se requiere una lista de archivos.' }, { status: 400 });
     }
 
     // --- Conexión SSH Única ---
-    console.log(`[API /apps/${appId}/files POST] Attempting SSH connection to ${server.ip_address}:${server.ssh_port} as ${server.ssh_username}...`);
     await new Promise<void>((resolve, reject) => {
-      conn.on('ready', () => {
-        console.log(`[API /apps/${appId}/files POST] SSH connection established.`);
-        resolve();
-      }).on('error', (err) => {
-        console.error(`[API /apps/${appId}/files POST] SSH connection error:`, err);
-        reject(new Error(`Error de conexión SSH: ${err.message}`));
-      }).connect({
+      conn.on('ready', resolve).on('error', reject).connect({
         host: server.ip_address,
         port: server.ssh_port || 22,
         username: server.ssh_username,
@@ -129,56 +120,35 @@ export async function POST(req: NextRequest, context: any) {
       const safeBasePath = '/app';
       const resolvedPath = path.join(safeBasePath, filePath);
       if (!resolvedPath.startsWith(safeBasePath + path.sep) && resolvedPath !== safeBasePath) {
-        console.warn(`[API /apps/${appId}/files POST] Skipping unsafe file path: ${filePath}`);
-        logEntries.push({
-          user_id: userId,
-          server_id: server.id,
-          event_type: 'file_write_failed',
-          description: `Intento de escritura de archivo con ruta insegura: '${filePath}'.`,
-        });
+        console.warn(`Skipping unsafe file path: ${filePath}`);
         continue;
       }
       const directoryInContainer = path.dirname(resolvedPath);
 
-      try {
-        // 1. Crear directorios
-        const mkdirCommand = `mkdir -p '${directoryInContainer}'`;
-        console.log(`[API /apps/${appId}/files POST] Executing mkdir: docker exec ${app.container_id} bash -c "${mkdirCommand}"`);
-        await executeSshOnExistingConnection(conn, `docker exec ${app.container_id} bash -c "${mkdirCommand}"`);
-        console.log(`[API /apps/${appId}/files POST] Directories created for ${filePath}.`);
+      // 1. Crear directorios
+      const mkdirCommand = `mkdir -p '${directoryInContainer}'`;
+      await executeSshOnExistingConnection(conn, `docker exec ${app.container_id} bash -c "${mkdirCommand}"`);
 
-        // 2. Escribir archivo (Método robusto usando pipe y Base64)
-        const encodedContent = Buffer.from(content).toString('base64');
-        const writeCommand = `echo '${encodedContent}' | docker exec -i ${app.container_id} bash -c "base64 -d > '${resolvedPath}'"`;
-        console.log(`[API /apps/${appId}/files POST] Executing write for ${filePath}: docker exec -i ${app.container_id} bash -c "base64 -d > '${resolvedPath}'"`);
-        await executeSshOnExistingConnection(conn, writeCommand);
-        console.log(`[API /apps/${appId}/files POST] File ${filePath} written successfully.`);
-        
-        // 3. Preparar para respaldo en DB
-        backups.push({
-          app_id: appId,
-          user_id: userId,
-          file_path: filePath,
-          file_content: content,
-        });
+      // 2. Escribir archivo (Método robusto usando pipe y Base64)
+      const encodedContent = Buffer.from(content).toString('base64');
+      const writeCommand = `echo '${encodedContent}' | docker exec -i ${app.container_id} bash -c "base64 -d > '${resolvedPath}'"`;
+      await executeSshOnExistingConnection(conn, writeCommand);
+      
+      // 3. Preparar para respaldo en DB
+      backups.push({
+        app_id: appId,
+        user_id: userId,
+        file_path: filePath,
+        file_content: content,
+      });
 
-        // 4. Preparar entrada de log
-        logEntries.push({
-          user_id: userId,
-          server_id: server.id,
-          event_type: 'file_written',
-          description: `Archivo '${filePath}' escrito en el contenedor ${app.container_id.substring(0, 12)}.`,
-        });
-      } catch (fileWriteError: any) {
-        console.error(`[API /apps/${appId}/files POST] Error writing file ${filePath}:`, fileWriteError);
-        logEntries.push({
-          user_id: userId,
-          server_id: server.id,
-          event_type: 'file_write_failed',
-          description: `Fallo al escribir archivo '${filePath}'. Error: ${fileWriteError.message}`,
-        });
-        // Continue to next file, but the overall operation will be marked as failed by the client if any file fails.
-      }
+      // 4. Preparar entrada de log
+      logEntries.push({
+        user_id: userId,
+        server_id: server.id,
+        event_type: 'file_written',
+        description: `Archivo '${filePath}' escrito en el contenedor ${app.container_id.substring(0, 12)}.`,
+      });
     }
 
     // 5. Insertar logs y respaldos en paralelo
@@ -189,11 +159,9 @@ export async function POST(req: NextRequest, context: any) {
 
     return NextResponse.json({ message: 'Archivos guardados y respaldados correctamente.' });
   } catch (error: any) {
-    console.error(`[API /apps/${appId}/files POST] Unhandled error:`, error);
-    return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
+    return NextResponse.json({ message: error.message }, { status: 500 });
   } finally {
     conn.end(); // Asegurarse de cerrar la conexión
-    console.log(`[API /apps/${appId}/files POST] SSH connection closed.`);
   }
 }
 
@@ -202,9 +170,8 @@ function executeSshOnExistingConnection(conn: SshClient, command: string): Promi
   return new Promise((resolve, reject) => {
     conn.exec(command, (err, stream) => {
       if (err) return reject(err);
-      let stdout = '';
       let stderr = '';
-      stream.on('data', (data: Buffer) => { stdout += data.toString(); });
+      stream.on('data', (data: Buffer) => {}); // Consumir stdout
       stream.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
       stream.on('close', (code: number) => {
         if (code === 0) {
