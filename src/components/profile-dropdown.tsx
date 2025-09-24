@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
-import { Moon, Sun, Settings, LogOut, User as UserIcon, Server, Users, Crown, Shield, Bot } from 'lucide-react'; // Import Bot icon
+import { Moon, Sun, Settings, LogOut, User as UserIcon, Server, Users, Crown, Shield, Bot, GitPullRequest } from 'lucide-react'; // Corrected icon import
 import { useTheme } from 'next-themes';
 import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
@@ -29,11 +29,12 @@ interface ProfileDropdownProps {
   onOpenProfileSettings: () => void;
   onOpenAppSettings: () => void;
   onOpenServerManagement: () => void;
-  onOpenUserManagement: () => void; // New prop for user management
+  onOpenUserManagement: () => void;
+  onOpenUpdateManager: () => void; // New prop for update manager
 }
 
-export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOpenServerManagement, onOpenUserManagement }: ProfileDropdownProps) {
-  const { session, userRole } = useSession(); // Changed isSuperUser to userRole
+export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOpenServerManagement, onOpenUserManagement, onOpenUpdateManager }: ProfileDropdownProps) {
+  const { session, userRole } = useSession();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -82,10 +83,11 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
   };
 
   if (!session) {
-    return null; // No mostrar el dropdown si no hay sesión
+    return null;
   }
 
-  const isAdmin = userRole === 'admin' || userRole === 'super_admin'; // Helper for admin access
+  const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+  const isSuperAdmin = userRole === 'super_admin'; // Helper for super admin
 
   return (
     <DropdownMenu>
@@ -95,11 +97,11 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
           className="w-full justify-start p-2 h-auto text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
         >
           <Avatar className="h-8 w-8 mr-2">
-            {profile?.avatar_url && profile.avatar_url !== '' ? ( // Updated condition
+            {profile?.avatar_url && profile.avatar_url !== '' ? (
               <AvatarImage src={profile.avatar_url} alt="Avatar" />
             ) : (
               <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground">
-                <Bot className="h-4 w-4" /> {/* Changed to Bot icon */}
+                <Bot className="h-4 w-4" />
               </AvatarFallback>
             )}
           </Avatar>
@@ -110,7 +112,7 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
             <span className="text-xs text-muted-foreground truncate">
               {profile?.first_name && profile?.last_name ? `${profile.first_name} ${profile.last_name}` : session.user.email}
             </span>
-            {userRole && userRole !== 'user' && ( // Only show role badge if not 'user'
+            {userRole && userRole !== 'user' && (
               <span className={`flex items-center gap-1 text-xs font-semibold px-1.5 py-0.5 rounded-full mt-1 capitalize
                 ${userRole === 'super_admin' ? 'bg-yellow-500 text-yellow-900 dark:bg-yellow-400 dark:text-yellow-950' : ''}
                 ${userRole === 'admin' ? 'bg-purple-500 text-purple-900 dark:bg-purple-400 dark:text-purple-950' : ''}
@@ -136,7 +138,7 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
         </DropdownMenuItem>
         <DropdownMenuItem
           className="flex items-center justify-between cursor-pointer"
-          onSelect={(e: Event) => e.preventDefault()} // Prevenir que el menú se cierre al interactuar con el switch
+          onSelect={(e: Event) => e.preventDefault()}
         >
           <div className="flex items-center">
             {isMounted && theme === 'dark' ? <Moon className="mr-2 h-4 w-4" /> : <Sun className="mr-2 h-4 w-4" />}
@@ -146,7 +148,7 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
             <Switch
               checked={theme === 'dark'}
               onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
-              onClick={(e) => e.stopPropagation()} // Asegurar que el clic del switch no propague
+              onClick={(e) => e.stopPropagation()}
             />
           )}
         </DropdownMenuItem>
@@ -156,7 +158,7 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
             <span>Configuración</span>
           </div>
         </DropdownMenuItem>
-        {isAdmin && ( // Show Server Management for Admins and Super Admins
+        {isAdmin && (
           <DropdownMenuItem onClick={onOpenServerManagement} className="flex items-center cursor-pointer">
             <div className="flex items-center">
               <Server className="mr-2 h-4 w-4" />
@@ -164,11 +166,19 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
             </div>
           </DropdownMenuItem>
         )}
-        {isAdmin && ( // Show User Management for Admins and Super Admins
+        {isAdmin && (
           <DropdownMenuItem onClick={onOpenUserManagement} className="flex items-center cursor-pointer">
             <div className="flex items-center">
               <Users className="mr-2 h-4 w-4" />
               <span>Gestión de Usuarios</span>
+            </div>
+          </DropdownMenuItem>
+        )}
+        {isSuperAdmin && ( // New item for Super Admins
+          <DropdownMenuItem onClick={onOpenUpdateManager} className="flex items-center cursor-pointer">
+            <div className="flex items-center">
+              <GitPullRequest className="mr-2 h-4 w-4" />
+              <span>Gestión de Actualizaciones</span>
             </div>
           </DropdownMenuItem>
         )}

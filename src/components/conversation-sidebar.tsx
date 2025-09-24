@@ -12,6 +12,7 @@ import { DraggableNoteItem } from './draggable-note-item';
 import { DraggableAppItem } from './draggable-app-item';
 import { toast } from 'sonner';
 import { FileTree } from './file-tree';
+import { VersionDisplay } from './version-display'; // Import the new component
 
 interface Conversation {
   id: string;
@@ -58,6 +59,7 @@ interface ConversationSidebarProps {
   onOpenServerManagement: () => void;
   onOpenUserManagement: () => void;
   onOpenDeepAiCoder: () => void;
+  onOpenUpdateManager: () => void;
   refreshData: () => void;
   createConversation: (onSuccess: (newItem: Conversation) => void) => void;
   createFolder: (parentId?: string | null) => void;
@@ -82,6 +84,7 @@ export function ConversationSidebar({
   onOpenServerManagement,
   onOpenUserManagement,
   onOpenDeepAiCoder,
+  onOpenUpdateManager,
   refreshData,
   createConversation,
   createFolder,
@@ -170,7 +173,7 @@ export function ConversationSidebar({
 
   return (
     <div className="flex flex-col h-full p-4 border-r bg-sidebar text-sidebar-foreground">
-      <SidebarHeader onNewConversation={handleCreateConversation} onNewFolder={handleCreateFolder} onNewNote={handleCreateNote} isCreatingConversation={isCreatingConversation} isCreatingFolder={isCreatingFolder} isCreatingNote={isCreatingNote} onOpenProfileSettings={onOpenProfileSettings} onOpenAppSettings={onOpenAppSettings} onOpenServerManagement={onOpenServerManagement} onOpenUserManagement={onOpenUserManagement} onOpenDeepAiCoder={onOpenDeepAiCoder} />
+      <SidebarHeader onNewConversation={handleCreateConversation} onNewFolder={handleCreateFolder} onNewNote={handleCreateNote} isCreatingConversation={isCreatingConversation} isCreatingFolder={isCreatingFolder} isCreatingNote={isCreatingNote} onOpenProfileSettings={onOpenProfileSettings} onOpenAppSettings={onOpenAppSettings} onOpenServerManagement={onOpenServerManagement} onOpenUserManagement={onOpenUserManagement} onOpenDeepAiCoder={onOpenDeepAiCoder} onOpenUpdateManager={onOpenUpdateManager} />
       <ScrollArea className="flex-1" onDrop={(e) => handleDrop(e, null)} onDragOver={(e) => e.preventDefault()} onDragEnter={(e) => handleDragEnter(e, null)} onDragLeave={(e) => handleDragLeave(e, null)}>
         <div className="space-y-2">
           {isLoading ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />) : (
@@ -217,6 +220,7 @@ export function ConversationSidebar({
           )}
         </div>
       </ScrollArea>
+      <VersionDisplay />
     </div>
   );
 }

@@ -20,6 +20,7 @@ interface SidebarHeaderProps {
   onOpenServerManagement: () => void;
   onOpenUserManagement: () => void;
   onOpenDeepAiCoder: () => void;
+  onOpenUpdateManager: () => void;
 }
 
 export function SidebarHeader({
@@ -34,6 +35,7 @@ export function SidebarHeader({
   onOpenServerManagement,
   onOpenUserManagement,
   onOpenDeepAiCoder,
+  onOpenUpdateManager,
 }: SidebarHeaderProps) {
   const { userRole } = useSession();
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
@@ -75,6 +77,7 @@ export function SidebarHeader({
           onOpenAppSettings={onOpenAppSettings}
           onOpenServerManagement={onOpenServerManagement}
           onOpenUserManagement={onOpenUserManagement}
+          onOpenUpdateManager={onOpenUpdateManager}
         />
       </div>
       <div className="flex items-center justify-center mb-4">
