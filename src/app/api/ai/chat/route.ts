@@ -3,7 +3,7 @@ export const runtime = 'nodejs';
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, Part } from '@google/generative-ai';
 
 async function getSupabaseClient() {
   const cookieStore = cookies() as any;
@@ -45,15 +45,44 @@ export async function POST(req: NextRequest) {
     const genAI = new GoogleGenerativeAI(apiKey);
     const geminiModel = genAI.getGenerativeModel({ model });
 
+    // Helper to convert our message format to Gemini's format
+    const convertToGeminiParts = (content: any) => {
+      if (typeof content === 'string') {
+        return [{ text: content }];
+      }
+      if (Array.isArray(content)) {
+        return content.map(part => {
+          if (part.type === 'text') {
+            return { text: part.text };
+          }
+          if (part.type === 'image_url') {
+            const url = part.image_url.url;
+            const match = url.match(/^data:(image\/\w+);base64,(.*)$/);
+            if (!match) {
+              console.warn("Skipping invalid image data URL format for Gemini:", url.substring(0, 50) + '...');
+              return { text: "[Unsupported Image]" };
+            }
+            const mimeType = match[1];
+            const data = match[2];
+            return { inlineData: { mimeType, data } };
+          }
+          // Ignore code blocks or other types not supported by Gemini API directly
+          return null;
+        }).filter((p): p is Part => p !== null); // Filter out nulls with a type guard
+      }
+      return [];
+    };
+
     // Convert messages to Gemini format
     const history = messages.slice(0, -1).map((msg: any) => ({
       role: msg.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: msg.content }],
+      parts: convertToGeminiParts(msg.content),
     }));
     const lastMessage = messages[messages.length - 1];
+    const lastMessageParts = convertToGeminiParts(lastMessage.content);
 
     const chat = geminiModel.startChat({ history });
-    const result = await chat.sendMessage(lastMessage.content);
+    const result = await chat.sendMessage(lastMessageParts);
     const response = await result.response;
     const text = response.text();
 
