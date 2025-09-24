@@ -13,7 +13,8 @@ import { ServerManagementDialog } from "@/components/server-management-dialog";
 import { UserManagementDialog } from "@/components/user-management-dialog";
 import { DeepAiCoderDialog } from "@/components/deep-ai-coder-dialog";
 import { RetryUploadDialog } from "@/components/retry-upload-dialog";
-import { UpdateManagerDialog } from "@/components/update-manager-dialog"; // Import the new dialog
+import { UpdateManagerDialog } from "@/components/update-manager-dialog";
+import { ApiManagementDialog } from "@/components/api-management-dialog"; // Import the new dialog
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -76,7 +77,8 @@ export default function Home() {
   const [isServerManagementOpen, setIsServerManagementOpen] = useState(false);
   const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
   const [isDeepAiCoderOpen, setIsDeepAiCoderOpen] = useState(false);
-  const [isUpdateManagerOpen, setIsUpdateManagerOpen] = useState(false); // State for the new dialog
+  const [isUpdateManagerOpen, setIsUpdateManagerOpen] = useState(false);
+  const [isApiManagementOpen, setIsApiManagementOpen] = useState(false); // State for the new dialog
   
   const [aiResponseSpeed, setAiResponseSpeed] = useState<'slow' | 'normal' | 'fast'>(() => {
     if (typeof window !== 'undefined') {
@@ -237,7 +239,8 @@ export default function Home() {
   const handleOpenServerManagement = () => setIsServerManagementOpen(true);
   const handleOpenUserManagement = () => setIsUserManagementOpen(true);
   const handleOpenDeepAiCoder = () => setIsDeepAiCoderOpen(true);
-  const handleOpenUpdateManager = () => setIsUpdateManagerOpen(true); // Handler for the new dialog
+  const handleOpenUpdateManager = () => setIsUpdateManagerOpen(true);
+  const handleOpenApiManagement = () => setIsApiManagementOpen(true); // Handler for the new dialog
 
   const handleAiResponseSpeedChange = (speed: 'slow' | 'normal' | 'fast') => {
     setAiResponseSpeed(speed);
@@ -283,6 +286,7 @@ export default function Home() {
           onOpenUserManagement={handleOpenUserManagement}
           onOpenDeepAiCoder={handleOpenDeepAiCoder}
           onOpenUpdateManager={handleOpenUpdateManager}
+          onOpenApiManagement={handleOpenApiManagement} // Pass handler
           refreshData={refreshSidebarData}
           createConversation={createConversation as any}
           createFolder={createFolder}
@@ -334,6 +338,7 @@ export default function Home() {
       />
       {isAdmin && <ServerManagementDialog open={isServerManagementOpen} onOpenChange={setIsServerManagementOpen} />}
       {isAdmin && <UserManagementDialog open={isUserManagementOpen} onOpenChange={setIsUserManagementOpen} />}
+      {isAdmin && <ApiManagementDialog open={isApiManagementOpen} onOpenChange={setIsApiManagementOpen} />}
       <DeepAiCoderDialog open={isDeepAiCoderOpen} onOpenChange={setIsDeepAiCoderOpen} onAppCreated={handleAppCreated} />
       <RetryUploadDialog
         open={retryState.isOpen}

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Loader2, Folder, Server, Users, Wand2, FileText, ShieldAlert } from 'lucide-react';
+import { Plus, Loader2, Folder, Server, Users, Wand2, FileText, ShieldAlert, KeyRound } from 'lucide-react';
 import { ProfileDropdown } from './profile-dropdown';
 import { useSession } from './session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,16 +11,17 @@ import { toast } from 'sonner';
 interface SidebarHeaderProps {
   onNewConversation: () => void;
   onNewFolder: (parentId?: string | null) => void;
-  onNewNote: () => void; // New prop for creating notes
+  onNewNote: () => void;
   isCreatingConversation: boolean;
   isCreatingFolder: boolean;
-  isCreatingNote: boolean; // New prop
+  isCreatingNote: boolean;
   onOpenProfileSettings: () => void;
   onOpenAppSettings: () => void;
   onOpenServerManagement: () => void;
   onOpenUserManagement: () => void;
   onOpenDeepAiCoder: () => void;
   onOpenUpdateManager: () => void;
+  onOpenApiManagement: () => void; // New prop
 }
 
 export function SidebarHeader({
@@ -36,6 +37,7 @@ export function SidebarHeader({
   onOpenUserManagement,
   onOpenDeepAiCoder,
   onOpenUpdateManager,
+  onOpenApiManagement, // New prop
 }: SidebarHeaderProps) {
   const { userRole } = useSession();
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
@@ -81,7 +83,7 @@ export function SidebarHeader({
         />
       </div>
       <div className="flex items-center justify-center mb-4">
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-center gap-2">
           <Button
             variant="default"
             size="icon"
@@ -159,6 +161,17 @@ export function SidebarHeader({
                 </span>
               )}
               <Users className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onOpenApiManagement}
+              className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7"
+              title="Gestión de API Keys"
+            >
+              <KeyRound className="h-3.5 w-3.5" />
             </Button>
           )}
         </div>
