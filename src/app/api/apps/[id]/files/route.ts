@@ -159,12 +159,10 @@ export async function POST(req: NextRequest, context: any) {
   try {
     const { session, userRole, userPermissions } = await getSessionAndRole();
     if (!session || !userRole) {
-      console.error(`[API /apps/${appId}/files] Access denied: Not authenticated.`);
       return NextResponse.json({ message: 'Acceso denegado. No autenticado.' }, { status: 401 });
     }
     // Check for granular permission: can_manage_docker_containers
     if (!userPermissions[PERMISSION_KEYS.CAN_MANAGE_DOCKER_CONTAINERS]) {
-      console.error(`[API /apps/${appId}/files] Access denied for user ${session.user.id}: Missing permission ${PERMISSION_KEYS.CAN_MANAGE_DOCKER_CONTAINERS}.`);
       return NextResponse.json({ message: 'Acceso denegado. No tienes permiso para gestionar contenedores Docker.' }, { status: 403 });
     }
 
@@ -173,23 +171,20 @@ export async function POST(req: NextRequest, context: any) {
     const { files } = await req.json();
 
     if (!Array.isArray(files) || files.length === 0) {
-      console.warn(`[API /apps/${appId}/files] No files provided for POST request.`);
       return NextResponse.json({ message: 'Se requiere una lista de archivos.' }, { status: 400 });
     }
 
     // --- Conexión SSH Única ---
-    console.log(`[API /apps/${appId}/files] Attempting SSH connection to ${server.ip_address}:${server.ssh_port} for user ${server.ssh_username}...`);
+    console.log(`[API /apps/${appId}/files] Establishing SSH connection to ${server.ip_address}...`);
     await new Promise<void>((resolve, reject) => {
       conn.on('ready', () => {
-        console.log(`[API /apps/${appId}/files] SSH connection ready. Requesting SFTP session...`);
+        console.log(`[API /apps/${appId}/files] SSH connection ready.`);
         conn.sftp((err, sftpClient) => {
           if (err) {
             conn.end();
-            console.error(`[API /apps/${appId}/files] SFTP session error: ${err.message}`);
             return reject(new Error(`SFTP error: ${err.message}`));
           }
           sftp = sftpClient;
-          console.log(`[API /apps/${appId}/files] SFTP session ready.`);
           resolve();
         });
       }).on('error', (err) => {
@@ -230,29 +225,23 @@ export async function POST(req: NextRequest, context: any) {
 
       // 1. Crear directorios dentro del contenedor (SFTP no crea directorios recursivamente por defecto)
       const mkdirCommand = `mkdir -p '${directoryInContainer}'`;
-      console.log(`[API /apps/${appId}/files] Executing mkdir in container ${app.container_id}: ${mkdirCommand}`);
+      console.log(`[API /apps/${appId}/files] Executing mkdir: ${mkdirCommand}`);
       const mkdirResult = await executeSshOnExistingConnection(conn, `docker exec ${app.container_id} bash -c "${mkdirCommand}"`);
       if (mkdirResult.code !== 0) {
-        console.error(`[API /apps/${appId}/files] mkdir failed for ${filePath} in container ${app.container_id}: STDOUT: ${mkdirResult.stdout}, STDERR: ${mkdirResult.stderr}`);
-        throw new Error(`Error creating directory for ${filePath}: ${mkdirResult.stderr || mkdirResult.stdout}`);
+        console.error(`[API /apps/${appId}/files] mkdir failed for ${filePath}: STDERR: ${mkdirResult.stderr}`);
+        throw new Error(`Error creating directory for ${filePath}: ${mkdirResult.stderr}`);
       }
       console.log(`[API /apps/${appId}/files] mkdir successful for ${filePath}.`);
 
       // 2. Escribir archivo usando SFTP
-      // Para escribir en un contenedor Docker desde el host vía SFTP, se accede al sistema de archivos del contenedor
-      // a través de /proc/<container-id>/root en el host.
-      const containerRootPath = `/proc/${app.container_id}/root`;
-      const fullHostPath = path.join(containerRootPath, resolvedPath);
-      console.log(`[API /apps/${appId}/files] Writing file via SFTP to host path: ${fullHostPath}. Content length: ${content.length} bytes.`);
+      const containerFilePath = `/proc/${app.container_id}/root${resolvedPath}`; // Path to file inside host's /proc/container_id/root
+      console.log(`[API /apps/${appId}/files] Writing file via SFTP to host path: ${containerFilePath}. Content length: ${content.length}`);
       
       await new Promise<void>((resolve, reject) => {
-        const writeStream = sftp!.createWriteStream(fullHostPath, { mode: 0o644 }); // Use sftp! to assert non-null
+        const writeStream = sftp!.createWriteStream(containerFilePath, { mode: 0o644 }); // Use sftp! to assert non-null
         writeStream.write(content);
         writeStream.end();
-        writeStream.on('finish', () => {
-          console.log(`[API /apps/${appId}/files] SFTP write stream finished for ${filePath}.`);
-          resolve();
-        });
+        writeStream.on('finish', resolve);
         writeStream.on('error', (writeErr: Error) => {
           console.error(`[API /apps/${appId}/files] SFTP write failed for ${filePath}:`, writeErr);
           reject(new Error(`Error writing file ${filePath} via SFTP: ${writeErr.message}`));
@@ -262,11 +251,11 @@ export async function POST(req: NextRequest, context: any) {
 
       // 3. Verificar que el archivo se escribió correctamente
       const verifyCommand = `ls -l '${resolvedPath}' && cat '${resolvedPath}' | wc -c`;
-      console.log(`[API /apps/${appId}/files] Verifying file in container ${app.container_id}: ${verifyCommand}`);
+      console.log(`[API /apps/${appId}/files] Verifying file: ${verifyCommand}`);
       const verifyResult = await executeSshOnExistingConnection(conn, `docker exec ${app.container_id} bash -c "${verifyCommand}"`);
       if (verifyResult.code !== 0) {
-        console.error(`[API /apps/${appId}/files] Verification failed for ${filePath} in container ${app.container_id}: STDOUT: ${verifyResult.stdout}, STDERR: ${verifyResult.stderr}`);
-        throw new Error(`Error verifying file ${filePath}: ${verifyResult.stderr || verifyResult.stdout}`);
+        console.error(`[API /apps/${appId}/files] Verification failed for ${filePath}: STDERR: ${verifyResult.stderr}`);
+        throw new Error(`Error verifying file ${filePath}: ${verifyResult.stderr}`);
       }
       const [lsOutput, wcOutput] = verifyResult.stdout.split('\n');
       const fileSize = parseInt(wcOutput.trim(), 10);
