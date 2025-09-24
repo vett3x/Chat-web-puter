@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Send, Bot, Loader2, Paperclip, XCircle, Check, FileText } from 'lucide-react';
+import { Send, Bot, Loader2, Paperclip, XCircle, Check, FileText, KeyRound } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,7 +37,24 @@ interface SelectedFile {
 export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage }: ChatInputProps) {
   const [inputMessage, setInputMessage] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
+  const [availableKeys, setAvailableKeys] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const fetchKeys = async () => {
+      try {
+        const response = await fetch('/api/ai-keys');
+        const data = await response.json();
+        if (response.ok) {
+          const providers = [...new Set(data.map((key: any) => key.provider))] as string[];
+          setAvailableKeys(providers);
+        }
+      } catch (error) {
+        console.error("Failed to fetch API keys", error);
+      }
+    };
+    fetchKeys();
+  }, []);
 
   const SelectedModelIcon = React.useMemo(() => {
     for (const provider of AI_PROVIDERS) {
@@ -171,7 +188,7 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
           <Button variant="ghost" onClick={() => fileInputRef.current?.click()} disabled={isLoading || selectedFiles.length >= 10} className="flex-shrink-0 text-muted-foreground hover:text-foreground h-8 w-8 p-0" aria-label="Adjuntar archivo">
             <Paperclip className="h-4 w-4" />
           </Button>
-          <Textarea value={inputMessage} onChange={(e) => setInputMessage(e.target.value)} onKeyPress={handleKeyPress} onPaste={handlePaste} placeholder="Pregunta a Claude AI..." disabled={isLoading} className="flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none max-h-[200px] overflow-y-auto bg-transparent px-3 py-1.5 min-h-8" />
+          <Textarea value={inputMessage} onChange={(e) => setInputMessage(e.target.value)} onKeyPress={handleKeyPress} onPaste={handlePaste} placeholder="Pregunta a la IA..." disabled={isLoading} className="flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none max-h-[200px] overflow-y-auto bg-transparent px-3 py-1.5 min-h-8" />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="default" className="rounded-full bg-info text-info-foreground shadow-avatar-user hover:shadow-avatar-user-hover transition-all duration-200 h-8 w-8 p-0" aria-label="Seleccionar modelo de IA">
@@ -181,21 +198,28 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
             <DropdownMenuContent side="top" align="end" className="w-64 bg-popover text-popover-foreground border-border rounded-lg">
               <DropdownMenuLabel className="text-sm font-semibold">Seleccionar Modelo de IA</DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-border" />
-              {AI_PROVIDERS.map((provider, providerIndex) => (
-                <React.Fragment key={provider.company}>
-                  <DropdownMenuLabel className="flex items-center gap-2 font-bold text-foreground px-2 py-1.5">
-                    <span>{provider.company}</span>
-                    <provider.logo className="h-4 w-4" />
-                  </DropdownMenuLabel>
-                  {provider.models.map((model) => (
-                    <DropdownMenuItem key={model.value} onClick={() => onModelChange(model.value)} className={cn("flex items-center justify-between cursor-pointer pl-8", selectedModel === model.value && "bg-accent text-accent-foreground")}>
-                      <span>{model.label}</span>
-                      {selectedModel === model.value && <Check className="h-4 w-4 text-green-500" />}
-                    </DropdownMenuItem>
-                  ))}
-                  {providerIndex < AI_PROVIDERS.length - 1 && <DropdownMenuSeparator className="bg-border" />}
-                </React.Fragment>
-              ))}
+              {AI_PROVIDERS.map((provider, providerIndex) => {
+                const requiresKey = provider.source === 'user_key';
+                const hasKey = availableKeys.includes('google_gemini'); // Assuming provider name in DB is 'google_gemini'
+                const isDisabled = requiresKey && !hasKey;
+
+                return (
+                  <React.Fragment key={provider.company}>
+                    <DropdownMenuLabel className={cn("flex items-center gap-2 font-bold text-foreground px-2 py-1.5", isDisabled && "text-muted-foreground")}>
+                      <span>{provider.company}</span>
+                      <provider.logo className="h-4 w-4" />
+                      {isDisabled && <KeyRound className="h-4 w-4 text-warning" title="Requiere API Key" />}
+                    </DropdownMenuLabel>
+                    {provider.models.map((model) => (
+                      <DropdownMenuItem key={model.value} onClick={() => onModelChange(model.value)} disabled={isDisabled} className={cn("flex items-center justify-between cursor-pointer pl-8", selectedModel === model.value && "bg-accent text-accent-foreground", isDisabled && "cursor-not-allowed")}>
+                        <span>{model.label}</span>
+                        {selectedModel === model.value && <Check className="h-4 w-4 text-green-500" />}
+                      </DropdownMenuItem>
+                    ))}
+                    {providerIndex < AI_PROVIDERS.length - 1 && <DropdownMenuSeparator className="bg-border" />}
+                  </React.Fragment>
+                )
+              })}
             </DropdownMenuContent>
           </DropdownMenu>
           <Button onClick={handleSendMessage} disabled={isLoading || (!inputMessage.trim() && selectedFiles.length === 0)} className="flex-shrink-0 h-8 w-8 p-0">

@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useSession } from '@/components/session-context-provider';
+import { AI_PROVIDERS } from '@/lib/ai-models';
 
 // Define unified part types
 interface TextPart {
@@ -129,13 +130,14 @@ function messageContentToApiFormat(content: Message['content']): string | PuterC
         return content.map((part) => {
             switch (part.type) {
                 case 'text':
-                    return part.text;
+                    return (part as TextPart).text;
                 case 'code':
-                    const lang = part.language || '';
-                    const filename = part.filename ? `:${part.filename}` : '';
-                    return `\`\`\`${lang}${filename}\n${part.code || ''}\n\`\`\``;
+                    const codePart = part as CodePart;
+                    const lang = codePart.language || '';
+                    const filename = codePart.filename ? `:${codePart.filename}` : '';
+                    return `\`\`\`${lang}${filename}\n${codePart.code || ''}\n\`\`\``;
                 case 'image_url':
-                    return `[Image Attached: ${part.image_url.url}]`;
+                    return `[Image Attached: ${(part as ImagePart).image_url.url}]`;
             }
         }).join('\n\n');
     }
@@ -268,30 +270,34 @@ export function useChat({
     const userMessageToSave = history.findLast(m => m.role === 'user');
 
     try {
-      const puterMessages: PuterMessage[] = history.map(msg => ({
-        role: msg.role,
-        content: messageContentToApiFormat(msg.content),
-      }));
-      
-      let systemMessage: PuterMessage;
-      if (appPrompt) {
-        systemMessage = {
-          role: 'system',
-          content: `Eres un desarrollador experto en Next.js (App Router), TypeScript y Tailwind CSS. Tu tarea es generar los archivos necesarios para construir la aplicación que el usuario ha descrito: "${appPrompt}".
-          REGLAS ESTRICTAS:
-          1. Responde ÚNICAMENTE con bloques de código.
-          2. Cada bloque de código DEBE representar un archivo completo.
-          3. Usa el formato \`\`\`language:ruta/del/archivo.tsx\`\`\` para cada bloque.
-          4. NO incluyas ningún texto conversacional, explicaciones, saludos o introducciones. Solo el código.`
-        };
+      const modelProvider = AI_PROVIDERS.find(p => p.models.some(m => m.value === selectedModel));
+      let response: any;
+
+      if (modelProvider?.source === 'user_key') {
+        // Use our backend proxy for user-key models
+        const apiResponse = await fetch('/api/ai/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: history.map(m => ({ role: m.role, content: messageContentToApiFormat(m.content) })), model: selectedModel }),
+        });
+        response = await apiResponse.json();
+        if (!apiResponse.ok) throw new Error(response.message || 'Error en la API de IA.');
       } else {
-        systemMessage = {
-          role: 'system',
-          content: "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante."
-        };
+        // Use Puter.js for other models
+        const puterMessages: PuterMessage[] = history.map(msg => ({
+          role: msg.role,
+          content: messageContentToApiFormat(msg.content) as string | PuterContentPart[],
+        }));
+        
+        let systemMessage: PuterMessage;
+        if (appPrompt) {
+          systemMessage = { role: 'system', content: `Eres un desarrollador experto en Next.js (App Router), TypeScript y Tailwind CSS. Tu tarea es generar los archivos necesarios para construir la aplicación que el usuario ha descrito: "${appPrompt}". REGLAS ESTRICTAS: 1. Responde ÚNICAMENTE con bloques de código. 2. Cada bloque de código DEBE representar un archivo completo. 3. Usa el formato \`\`\`language:ruta/del/archivo.tsx\`\`\` para cada bloque. 4. NO incluyas ningún texto conversacional, explicaciones, saludos o introducciones. Solo el código.` };
+        } else {
+          systemMessage = { role: 'system', content: "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante." };
+        }
+        response = await window.puter.ai.chat([systemMessage, ...puterMessages], { model: selectedModel });
       }
 
-      const response = await window.puter.ai.chat([systemMessage, ...puterMessages], { model: selectedModel });
       if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
 
       if (userMessageToSave) {
@@ -299,17 +305,7 @@ export function useChat({
       }
 
       const assistantMessageContent = response?.message?.content || 'Sin contenido.';
-      
-      let contentToParse: string;
-      if (typeof assistantMessageContent === 'string') {
-        contentToParse = assistantMessageContent;
-      } else if (Array.isArray(assistantMessageContent) && assistantMessageContent[0]?.type === 'text') {
-        contentToParse = assistantMessageContent[0].text;
-      } else {
-        contentToParse = JSON.stringify(assistantMessageContent);
-      }
-
-      const parts = parseAiResponseToRenderableParts(contentToParse);
+      const parts = parseAiResponseToRenderableParts(assistantMessageContent);
       const filesToWrite: { path: string; content: string }[] = [];
 
       parts.forEach(part => {
@@ -340,32 +336,17 @@ export function useChat({
 
     } catch (error: any) {
       let errorMessage = 'Ocurrió un error desconocido.';
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      } else if (typeof error === 'string') {
-        errorMessage = error;
-      } else if (error && typeof error === 'object' && error.message) {
-        errorMessage = String(error.message);
-      } else {
-        try {
-          errorMessage = JSON.stringify(error);
-        } catch {
-          errorMessage = 'No se pudo procesar el objeto de error.';
-        }
-      }
-
+      if (error instanceof Error) errorMessage = error.message;
+      else if (typeof error === 'string') errorMessage = error;
+      else if (error && typeof error === 'object' && error.message) errorMessage = String(error.message);
+      
       let rawError = error;
-      try {
-        rawError = JSON.parse(errorMessage);
-      } catch (e) { /* Not a JSON string, use as is */ }
+      try { rawError = JSON.parse(errorMessage); } catch (e) { /* Not a JSON string */ }
 
-      let errorMessageForDisplay: string;
       const isAdmin = userRole === 'admin' || userRole === 'super_admin';
-
-      if (isAdmin) {
-        errorMessageForDisplay = `Error: ${errorMessage}`;
-      } else {
-        errorMessageForDisplay = 'Error con la IA, se ha enviado un ticket automático.';
+      const errorMessageForDisplay = isAdmin ? `Error: ${errorMessage}` : 'Error con la IA, se ha enviado un ticket automático.';
+      
+      if (!isAdmin) {
         fetch('/api/error-tickets', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
