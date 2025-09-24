@@ -5,20 +5,27 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useSession } from '@/components/session-context-provider';
 
-// Define types
-interface PuterTextContentPart {
+// Define unified part types
+interface TextPart {
   type: 'text';
   text: string;
 }
-
-interface PuterImageContentPart {
+interface ImagePart {
   type: 'image_url';
-  image_url: {
-    url: string;
-  };
+  image_url: { url: string };
+}
+interface CodePart {
+  type: 'code';
+  language?: string;
+  filename?: string;
+  code?: string;
 }
 
-type PuterContentPart = PuterTextContentPart | PuterImageContentPart;
+// Union of all possible content parts for our internal state
+type MessageContentPart = TextPart | ImagePart | CodePart;
+
+// The format Puter.js API expects for content arrays
+type PuterContentPart = TextPart | ImagePart;
 
 interface PuterMessage {
   role: 'user' | 'assistant' | 'system';
@@ -36,10 +43,13 @@ declare global {
   }
 }
 
+// The type returned by our response parser
+type RenderablePart = TextPart | CodePart;
+
 interface Message {
   id: string;
   conversation_id?: string;
-  content: string | PuterContentPart[];
+  content: string | MessageContentPart[]; // Use the unified type
   role: 'user' | 'assistant';
   model?: string;
   timestamp: Date;
@@ -57,19 +67,10 @@ interface UseChatProps {
   onConversationTitleUpdate: (conversationId: string, newTitle: string) => void;
   appPrompt?: string | null;
   appId?: string | null;
-  onWriteFiles: (files: { path: string; content: string }[]) => Promise<void>; // Changed from onFilesWritten
+  onWriteFiles: (files: { path: string; content: string }[]) => Promise<void>;
 }
 
 const codeBlockRegex = /```(\w+)?(?::([\w./-]+))?\s*\n([\s\S]*?)\s*```/g;
-
-// This is a more flexible type for our internal rendering logic
-interface RenderablePart {
-  type: 'text' | 'code';
-  text?: string;
-  language?: string;
-  filename?: string;
-  code?: string;
-}
 
 function parseAiResponseToRenderableParts(content: string): RenderablePart[] {
   const parts: RenderablePart[] = [];
@@ -90,16 +91,14 @@ function parseAiResponseToRenderableParts(content: string): RenderablePart[] {
       code: (match[3] || '').trim(),
     };
 
-    // Fallback logic: If filename is not in the header, check the first line of the code
     if (!part.filename && part.code) {
       const lines = part.code.split('\n');
       const firstLine = lines[0].trim();
-      // Regex to find a file path in a comment (e.g., // src/app/page.tsx or # /components/Button.tsx)
       const pathRegex = /^(?:\/\/|#|\/\*|\*)\s*([\w./-]+\.[a-zA-Z]+)\s*\*?\/?$/;
       const pathMatch = firstLine.match(pathRegex);
       if (pathMatch && pathMatch[1]) {
         part.filename = pathMatch[1];
-        part.code = lines.slice(1).join('\n').trim(); // Remove the first line from the code
+        part.code = lines.slice(1).join('\n').trim();
       }
     }
 
@@ -115,6 +114,34 @@ function parseAiResponseToRenderableParts(content: string): RenderablePart[] {
   return parts.length > 0 ? parts : [{ type: 'text', text: content }];
 }
 
+function messageContentToApiFormat(content: Message['content']): string | PuterContentPart[] {
+    if (typeof content === 'string') {
+        return content;
+    }
+
+    if (Array.isArray(content)) {
+        const hasCodePart = content.some(p => p.type === 'code');
+
+        if (!hasCodePart) {
+            return content as PuterContentPart[];
+        }
+
+        return content.map((part) => {
+            switch (part.type) {
+                case 'text':
+                    return part.text;
+                case 'code':
+                    const lang = part.language || '';
+                    const filename = part.filename ? `:${part.filename}` : '';
+                    return `\`\`\`${lang}${filename}\n${part.code || ''}\n\`\`\``;
+                case 'image_url':
+                    return `[Image Attached: ${part.image_url.url}]`;
+            }
+        }).join('\n\n');
+    }
+
+    return '';
+}
 
 export function useChat({
   userId,
@@ -123,7 +150,7 @@ export function useChat({
   onConversationTitleUpdate,
   appPrompt,
   appId,
-  onWriteFiles, // Changed from onFilesWritten
+  onWriteFiles,
 }: UseChatProps) {
   const { userRole } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -174,7 +201,7 @@ export function useChat({
     return data.map((msg) => ({
       id: msg.id,
       conversation_id: msg.conversation_id,
-      content: msg.content,
+      content: msg.content as Message['content'],
       role: msg.role as 'user' | 'assistant',
       model: msg.model || undefined,
       timestamp: new Date(msg.created_at),
@@ -225,7 +252,7 @@ export function useChat({
 
   const saveMessageToDB = async (convId: string, msg: Omit<Message, 'timestamp' | 'id'>) => {
     if (!userId) return null;
-    const { data, error } = await supabase.from('messages').insert({ conversation_id: convId, user_id: userId, role: msg.role, content: msg.content, model: msg.model, type: msg.type }).select('id, created_at').single();
+    const { data, error } = await supabase.from('messages').insert({ conversation_id: convId, user_id: userId, role: msg.role, content: msg.content as any, model: msg.model, type: msg.type }).select('id, created_at').single();
     if (error) {
       toast.error('Error al guardar el mensaje.');
       return null;
@@ -243,7 +270,7 @@ export function useChat({
     try {
       const puterMessages: PuterMessage[] = history.map(msg => ({
         role: msg.role,
-        content: msg.content,
+        content: messageContentToApiFormat(msg.content),
       }));
       
       let systemMessage: PuterMessage;
@@ -267,7 +294,6 @@ export function useChat({
       const response = await window.puter.ai.chat([systemMessage, ...puterMessages], { model: selectedModel });
       if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
 
-      // --- On Success ---
       if (userMessageToSave) {
         await saveMessageToDB(convId, userMessageToSave);
       }
@@ -295,7 +321,7 @@ export function useChat({
       setMessages(prev => prev.filter(m => m.id !== tempTypingId));
 
       const assistantMessageData = {
-        content: parts as any,
+        content: parts,
         role: 'assistant' as const,
         model: selectedModel,
         type: 'multimodal' as const,
@@ -309,13 +335,10 @@ export function useChat({
       }
 
       if (filesToWrite.length > 0) {
-        await onWriteFiles(filesToWrite); // Use the passed-in function
+        await onWriteFiles(filesToWrite);
       }
 
     } catch (error: any) {
-      // --- On Failure ---
-      
-      // Robust error message extraction
       let errorMessage = 'Ocurrió un error desconocido.';
       if (error instanceof Error) {
         errorMessage = error.message;
@@ -333,7 +356,6 @@ export function useChat({
 
       let rawError = error;
       try {
-        // Try to parse if the error message itself is a JSON string
         rawError = JSON.parse(errorMessage);
       } catch (e) { /* Not a JSON string, use as is */ }
 
@@ -353,10 +375,8 @@ export function useChat({
 
       toast.error(errorMessageForDisplay);
       
-      // Remove the "typing" indicator AND the user's last message from the UI
       setMessages(prev => {
         const withoutTyping = prev.filter(m => m.id !== tempTypingId);
-        // The last message should be the user's message that failed. Remove it.
         if (withoutTyping.length > 0 && withoutTyping[withoutTyping.length - 1].role === 'user') {
             return withoutTyping.slice(0, -1);
         }
@@ -395,7 +415,6 @@ export function useChat({
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     
-    // Message is NOT saved to DB here. It's saved on successful AI response.
     await getAndStreamAIResponse(finalConvId, newMessages);
     
     if (!conversationId) setIsSendingFirstMessage(false);
@@ -427,15 +446,16 @@ export function useChat({
 
     if (Array.isArray(content)) {
       content.forEach(part => {
-        const renderablePart = part as RenderablePart;
-        if (renderablePart.type === 'code' && renderablePart.filename && renderablePart.code) {
-          filesToWrite.push({ path: renderablePart.filename, content: renderablePart.code });
+        if (part.type === 'code') {
+          if (part.filename && part.code) {
+            filesToWrite.push({ path: part.filename, content: part.code });
+          }
         }
       });
     }
 
     if (filesToWrite.length > 0) {
-      await onWriteFiles(filesToWrite); // Use the passed-in function
+      await onWriteFiles(filesToWrite);
     } else {
       toast.info("No se encontraron archivos para aplicar en este mensaje.");
     }
