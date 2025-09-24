@@ -100,8 +100,15 @@ export async function POST(req: NextRequest, context: any) {
     }
 
     // --- Conexión SSH Única ---
+    console.log(`[API /apps/${appId}/files] Establishing SSH connection to ${server.ip_address}...`);
     await new Promise<void>((resolve, reject) => {
-      conn.on('ready', resolve).on('error', reject).connect({
+      conn.on('ready', () => {
+        console.log(`[API /apps/${appId}/files] SSH connection ready.`);
+        resolve();
+      }).on('error', (err) => {
+        console.error(`[API /apps/${appId}/files] SSH connection error:`, err);
+        reject(err);
+      }).connect({
         host: server.ip_address,
         port: server.ssh_port || 22,
         username: server.ssh_username,
@@ -115,26 +122,59 @@ export async function POST(req: NextRequest, context: any) {
 
     for (const file of files) {
       const { filePath, content } = file;
-      if (!filePath || content === undefined) continue;
+      if (!filePath || content === undefined) {
+        console.warn(`[API /apps/${appId}/files] Skipping file due to missing path or content:`, file);
+        continue;
+      }
 
       const safeBasePath = '/app';
       const resolvedPath = path.join(safeBasePath, filePath);
       if (!resolvedPath.startsWith(safeBasePath + path.sep) && resolvedPath !== safeBasePath) {
-        console.warn(`Skipping unsafe file path: ${filePath}`);
+        console.warn(`[API /apps/${appId}/files] Skipping unsafe file path: ${filePath}`);
         continue;
       }
       const directoryInContainer = path.dirname(resolvedPath);
 
+      console.log(`[API /apps/${appId}/files] Processing file: ${filePath}`);
+
       // 1. Crear directorios
       const mkdirCommand = `mkdir -p '${directoryInContainer}'`;
-      await executeSshOnExistingConnection(conn, `docker exec ${app.container_id} bash -c "${mkdirCommand}"`);
+      console.log(`[API /apps/${appId}/files] Executing mkdir: ${mkdirCommand}`);
+      const mkdirResult = await executeSshOnExistingConnection(conn, `docker exec ${app.container_id} bash -c "${mkdirCommand}"`);
+      if (mkdirResult.code !== 0) {
+        console.error(`[API /apps/${appId}/files] mkdir failed for ${filePath}: STDERR: ${mkdirResult.stderr}`);
+        throw new Error(`Error creating directory for ${filePath}: ${mkdirResult.stderr}`);
+      }
+      console.log(`[API /apps/${appId}/files] mkdir successful for ${filePath}.`);
 
       // 2. Escribir archivo (Método robusto usando pipe y Base64)
       const encodedContent = Buffer.from(content).toString('base64');
       const writeCommand = `echo '${encodedContent}' | docker exec -i ${app.container_id} bash -c "base64 -d > '${resolvedPath}'"`;
-      await executeSshOnExistingConnection(conn, writeCommand);
+      console.log(`[API /apps/${appId}/files] Executing write command for ${filePath}. Content length: ${content.length}`);
+      const writeResult = await executeSshOnExistingConnection(conn, writeCommand);
+      if (writeResult.code !== 0) {
+        console.error(`[API /apps/${appId}/files] Write failed for ${filePath}: STDERR: ${writeResult.stderr}`);
+        throw new Error(`Error writing file ${filePath}: ${writeResult.stderr}`);
+      }
+      console.log(`[API /apps/${appId}/files] Write successful for ${filePath}.`);
+
+      // 3. Verificar que el archivo se escribió correctamente
+      const verifyCommand = `ls -l '${resolvedPath}' && cat '${resolvedPath}' | wc -c`;
+      console.log(`[API /apps/${appId}/files] Verifying file: ${verifyCommand}`);
+      const verifyResult = await executeSshOnExistingConnection(conn, `docker exec ${app.container_id} bash -c "${verifyCommand}"`);
+      if (verifyResult.code !== 0) {
+        console.error(`[API /apps/${appId}/files] Verification failed for ${filePath}: STDERR: ${verifyResult.stderr}`);
+        throw new Error(`Error verifying file ${filePath}: ${verifyResult.stderr}`);
+      }
+      const [lsOutput, wcOutput] = verifyResult.stdout.split('\n');
+      const fileSize = parseInt(wcOutput.trim(), 10);
+      if (fileSize !== content.length) {
+        console.error(`[API /apps/${appId}/files] File size mismatch for ${filePath}. Expected: ${content.length}, Actual: ${fileSize}`);
+        throw new Error(`Error de verificación: el tamaño del archivo ${filePath} no coincide. Esperado: ${content.length}, Real: ${fileSize}`);
+      }
+      console.log(`[API /apps/${appId}/files] File ${filePath} verified. Size: ${fileSize} bytes.`);
       
-      // 3. Preparar para respaldo en DB
+      // 4. Preparar para respaldo en DB
       backups.push({
         app_id: appId,
         user_id: userId,
@@ -142,7 +182,7 @@ export async function POST(req: NextRequest, context: any) {
         file_content: content,
       });
 
-      // 4. Preparar entrada de log
+      // 5. Preparar entrada de log
       logEntries.push({
         user_id: userId,
         server_id: server.id,
@@ -151,34 +191,38 @@ export async function POST(req: NextRequest, context: any) {
       });
     }
 
-    // 5. Insertar logs y respaldos en paralelo
+    // 6. Insertar logs y respaldos en paralelo
+    console.log(`[API /apps/${appId}/files] Inserting ${backups.length} backups and ${logEntries.length} log entries into Supabase.`);
     await Promise.all([
       supabaseAdmin.from('app_file_backups').upsert(backups, { onConflict: 'app_id, file_path' }),
       supabaseAdmin.from('server_events_log').insert(logEntries)
     ]);
+    console.log(`[API /apps/${appId}/files] Supabase updates complete.`);
 
     return NextResponse.json({ message: 'Archivos guardados y respaldados correctamente.' });
   } catch (error: any) {
-    return NextResponse.json({ message: error.message }, { status: 500 });
+    console.error(`[API /apps/${appId}/files] Unhandled error in POST:`, error);
+    return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
   } finally {
+    console.log(`[API /apps/${appId}/files] Closing SSH connection.`);
     conn.end(); // Asegurarse de cerrar la conexión
   }
 }
 
 // Helper para ejecutar comandos en una conexión SSH ya abierta
-function executeSshOnExistingConnection(conn: SshClient, command: string): Promise<void> {
+function executeSshOnExistingConnection(conn: SshClient, command: string): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolve, reject) => {
     conn.exec(command, (err, stream) => {
       if (err) return reject(err);
+      let stdout = '';
       let stderr = '';
-      stream.on('data', (data: Buffer) => {}); // Consumir stdout
+      let exitCode = 1; // Default to non-zero exit code for errors
+
+      stream.on('data', (data: Buffer) => { stdout += data.toString(); });
       stream.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
       stream.on('close', (code: number) => {
-        if (code === 0) {
-          resolve();
-        } else {
-          reject(new Error(`Command failed with code ${code}: ${stderr.trim()}`));
-        }
+        exitCode = code;
+        resolve({ stdout, stderr, code: exitCode });
       });
     });
   });
