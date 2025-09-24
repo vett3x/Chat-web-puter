@@ -11,6 +11,12 @@ const apiKeySchema = z.object({
   nickname: z.string().optional(),
 });
 
+const updateApiKeySchema = z.object({
+  provider: z.string().min(1),
+  api_key: z.string().min(10, { message: 'La API Key parece demasiado corta.' }).optional(),
+  nickname: z.string().optional(),
+});
+
 async function getSupabaseClient() {
   const cookieStore = cookies() as any;
   return createServerClient(
@@ -77,6 +83,48 @@ export async function POST(req: NextRequest) {
     if (error) throw error;
 
     return NextResponse.json({ message: 'API Key guardada correctamente.', key: data }, { status: 201 });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ message: 'Error de validación', errors: error.errors }, { status: 400 });
+    }
+    return NextResponse.json({ message: error.message }, { status: 500 });
+  }
+}
+
+export async function PUT(req: NextRequest) {
+  const supabase = await getSupabaseClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    return NextResponse.json({ message: 'Acceso denegado.' }, { status: 401 });
+  }
+
+  try {
+    const body = await req.json();
+    const { provider, api_key, nickname } = updateApiKeySchema.parse(body);
+
+    const updateData: { api_key?: string; nickname?: string | null } = {};
+    if (api_key) {
+      updateData.api_key = api_key;
+    }
+    if (nickname !== undefined) {
+      updateData.nickname = nickname || null;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ message: 'No se proporcionaron datos para actualizar.' }, { status: 400 });
+    }
+
+    const { data, error } = await supabase
+      .from('user_api_keys')
+      .update(updateData)
+      .eq('user_id', session.user.id)
+      .eq('provider', provider)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return NextResponse.json({ message: 'API Key actualizada correctamente.', key: data });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ message: 'Error de validación', errors: error.errors }, { status: 400 });
