@@ -57,7 +57,7 @@ interface UseChatProps {
   onConversationTitleUpdate: (conversationId: string, newTitle: string) => void;
   appPrompt?: string | null;
   appId?: string | null;
-  onWriteFiles: (files: { path: string; content: string }[]) => Promise<void>;
+  onWriteFiles: (files: { path: string; content: string }[]) => Promise<void>; // Changed from onFilesWritten
 }
 
 const codeBlockRegex = /```(\w+)?(?::([\w./-]+))?\s*\n([\s\S]*?)\s*```/g;
@@ -72,8 +72,6 @@ interface RenderablePart {
 }
 
 function parseAiResponseToRenderableParts(content: string): RenderablePart[] {
-  console.log('[parseAiResponseToRenderableParts] Parsing content:', content.substring(0, 200) + '...');
-  
   const parts: RenderablePart[] = [];
   let lastIndex = 0;
   let match;
@@ -92,12 +90,6 @@ function parseAiResponseToRenderableParts(content: string): RenderablePart[] {
       code: (match[3] || '').trim(),
     };
 
-    console.log('[parseAiResponseToRenderableParts] Found code block:', {
-      language: part.language,
-      filename: part.filename,
-      codeLength: part.code?.length
-    });
-
     // Fallback logic: If filename is not in the header, check the first line of the code
     if (!part.filename && part.code) {
       const lines = part.code.split('\n');
@@ -108,7 +100,6 @@ function parseAiResponseToRenderableParts(content: string): RenderablePart[] {
       if (pathMatch && pathMatch[1]) {
         part.filename = pathMatch[1];
         part.code = lines.slice(1).join('\n').trim(); // Remove the first line from the code
-        console.log('[parseAiResponseToRenderableParts] Extracted filename from first line:', part.filename);
       }
     }
 
@@ -121,7 +112,6 @@ function parseAiResponseToRenderableParts(content: string): RenderablePart[] {
     if (textPart) parts.push({ type: 'text', text: textPart });
   }
 
-  console.log('[parseAiResponseToRenderableParts] Total parts found:', parts.length);
   return parts.length > 0 ? parts : [{ type: 'text', text: content }];
 }
 
@@ -133,7 +123,7 @@ export function useChat({
   onConversationTitleUpdate,
   appPrompt,
   appId,
-  onWriteFiles,
+  onWriteFiles, // Changed from onFilesWritten
 }: UseChatProps) {
   const { userRole } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -293,19 +283,14 @@ export function useChat({
         contentToParse = JSON.stringify(assistantMessageContent);
       }
 
-      console.log('[getAndStreamAIResponse] AI response content:', contentToParse.substring(0, 500) + '...');
-
       const parts = parseAiResponseToRenderableParts(contentToParse);
       const filesToWrite: { path: string; content: string }[] = [];
 
       parts.forEach(part => {
         if (part.type === 'code' && appId && part.filename && part.code) {
-          console.log('[getAndStreamAIResponse] Found file to write:', part.filename);
           filesToWrite.push({ path: part.filename, content: part.code });
         }
       });
-
-      console.log('[getAndStreamAIResponse] Total files to write:', filesToWrite.length);
 
       setMessages(prev => prev.filter(m => m.id !== tempTypingId));
 
@@ -324,10 +309,7 @@ export function useChat({
       }
 
       if (filesToWrite.length > 0) {
-        console.log('[getAndStreamAIResponse] Calling onWriteFiles with files:', filesToWrite);
-        await onWriteFiles(filesToWrite);
-      } else {
-        console.log('[getAndStreamAIResponse] No files to write');
+        await onWriteFiles(filesToWrite); // Use the passed-in function
       }
 
     } catch (error: any) {
@@ -422,8 +404,6 @@ export function useChat({
       return;
     }
 
-    console.log('[reapplyFilesFromMessage] Reapplying files from message:', message);
-
     const content = message.content;
     const filesToWrite: { path: string; content: string }[] = [];
 
@@ -431,16 +411,13 @@ export function useChat({
       content.forEach(part => {
         const renderablePart = part as RenderablePart;
         if (renderablePart.type === 'code' && renderablePart.filename && renderablePart.code) {
-          console.log('[reapplyFilesFromMessage] Found file to reapply:', renderablePart.filename);
           filesToWrite.push({ path: renderablePart.filename, content: renderablePart.code });
         }
       });
     }
 
-    console.log('[reapplyFilesFromMessage] Total files to reapply:', filesToWrite.length);
-
     if (filesToWrite.length > 0) {
-      await onWriteFiles(filesToWrite);
+      await onWriteFiles(filesToWrite); // Use the passed-in function
     } else {
       toast.info("No se encontraron archivos para aplicar en este mensaje.");
     }
