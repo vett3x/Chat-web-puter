@@ -208,7 +208,7 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
                     <DropdownMenuLabel className={cn("flex items-center gap-2 font-bold text-foreground px-2 py-1.5", isDisabled && "text-muted-foreground")}>
                       <span>{provider.company}</span>
                       <provider.logo className="h-4 w-4" />
-                      {isDisabled && <KeyRound className="h-4 w-4 text-warning" title="Requiere API Key" />}
+                      {isDisabled && <span title="Requiere API Key"><KeyRound className="h-4 w-4 text-warning" /></span>}
                     </DropdownMenuLabel>
                     {provider.models.map((model) => (
                       <DropdownMenuItem key={model.value} onClick={() => onModelChange(model.value)} disabled={isDisabled} className={cn("flex items-center justify-between cursor-pointer pl-8", selectedModel === model.value && "bg-accent text-accent-foreground", isDisabled && "cursor-not-allowed")}>
