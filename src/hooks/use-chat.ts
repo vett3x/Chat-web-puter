@@ -314,16 +314,34 @@ export function useChat({
 
     } catch (error: any) {
       // --- On Failure ---
+      
+      // Robust error message extraction
+      let errorMessage = 'Ocurrió un error desconocido.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error && typeof error === 'object' && error.message) {
+        errorMessage = String(error.message);
+      } else {
+        try {
+          errorMessage = JSON.stringify(error);
+        } catch {
+          errorMessage = 'No se pudo procesar el objeto de error.';
+        }
+      }
+
       let rawError = error;
       try {
-        rawError = JSON.parse(error.message);
+        // Try to parse if the error message itself is a JSON string
+        rawError = JSON.parse(errorMessage);
       } catch (e) { /* Not a JSON string, use as is */ }
 
       let errorMessageForDisplay: string;
       const isAdmin = userRole === 'admin' || userRole === 'super_admin';
 
       if (isAdmin) {
-        errorMessageForDisplay = `Error: ${error.message}`;
+        errorMessageForDisplay = `Error: ${errorMessage}`;
       } else {
         errorMessageForDisplay = 'Error con la IA, se ha enviado un ticket automático.';
         fetch('/api/error-tickets', {
