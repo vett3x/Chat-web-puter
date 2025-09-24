@@ -129,14 +129,13 @@ function messageContentToApiFormat(content: Message['content']): string | PuterC
         return content.map((part) => {
             switch (part.type) {
                 case 'text':
-                    return (part as TextPart).text;
+                    return part.text;
                 case 'code':
-                    const codePart = part as CodePart;
-                    const lang = codePart.language || '';
-                    const filename = codePart.filename ? `:${codePart.filename}` : '';
-                    return `\`\`\`${lang}${filename}\n${codePart.code || ''}\n\`\`\``;
+                    const lang = part.language || '';
+                    const filename = part.filename ? `:${part.filename}` : '';
+                    return `\`\`\`${lang}${filename}\n${part.code || ''}\n\`\`\``;
                 case 'image_url':
-                    return `[Image Attached: ${(part as ImagePart).image_url.url}]`;
+                    return `[Image Attached: ${part.image_url.url}]`;
             }
         }).join('\n\n');
     }
@@ -293,18 +292,13 @@ export function useChat({
       }
 
       const response = await window.puter.ai.chat([systemMessage, ...puterMessages], { model: selectedModel });
-      
-      // **NEW VALIDATION STEP**
-      if (!response?.message?.content) {
-        throw new Error('La respuesta de la IA llegó incompleta o vacía. Por favor, inténtalo de nuevo.');
-      }
-      if (response.error) throw new Error(response.error.message || JSON.stringify(response.error));
+      if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
 
       if (userMessageToSave) {
         await saveMessageToDB(convId, userMessageToSave);
       }
 
-      const assistantMessageContent = response.message.content;
+      const assistantMessageContent = response?.message?.content || 'Sin contenido.';
       
       let contentToParse: string;
       if (typeof assistantMessageContent === 'string') {
@@ -452,9 +446,10 @@ export function useChat({
 
     if (Array.isArray(content)) {
       content.forEach(part => {
-        const renderablePart = part as RenderablePart;
-        if (renderablePart.type === 'code' && renderablePart.filename && renderablePart.code) {
-          filesToWrite.push({ path: renderablePart.filename, content: renderablePart.code });
+        if (part.type === 'code') {
+          if (part.filename && part.code) {
+            filesToWrite.push({ path: part.filename, content: part.code });
+          }
         }
       });
     }
