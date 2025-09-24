@@ -8,8 +8,8 @@ import { executeSshCommand } from '@/lib/ssh-utils';
 import { getAppAndServerForFileOps } from '@/lib/app-state-manager';
 import path from 'path';
 import { Client as SshClient } from 'ssh2';
-import type { SFTPWrapper } from 'ssh2'; // Import SFTPWrapper type
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
+import { randomBytes } from 'crypto'; // Importar para generar nombres de archivo temporales
 
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
@@ -150,12 +150,11 @@ export async function GET(req: NextRequest, context: any) {
   }
 }
 
-// POST: Escribir MÚLTIPLES archivos en una sola conexión usando SFTP
+// POST: Escribir MÚLTIPLES archivos en una sola conexión usando `docker cp`
 export async function POST(req: NextRequest, context: any) {
   const appId = context.params.id;
   
   const conn = new SshClient();
-  let sftp: SFTPWrapper | undefined; // Declare sftp variable
   try {
     const { session, userRole, userPermissions } = await getSessionAndRole();
     if (!session || !userRole) {
@@ -179,14 +178,7 @@ export async function POST(req: NextRequest, context: any) {
     await new Promise<void>((resolve, reject) => {
       conn.on('ready', () => {
         console.log(`[API /apps/${appId}/files] SSH connection ready.`);
-        conn.sftp((err, sftpClient) => {
-          if (err) {
-            conn.end();
-            return reject(new Error(`SFTP error: ${err.message}`));
-          }
-          sftp = sftpClient;
-          resolve();
-        });
+        resolve();
       }).on('error', (err) => {
         console.error(`[API /apps/${appId}/files] SSH connection error:`, err);
         reject(err);
@@ -198,10 +190,6 @@ export async function POST(req: NextRequest, context: any) {
         readyTimeout: 10000,
       });
     });
-
-    if (!sftp) {
-      throw new Error('Failed to establish SFTP connection.');
-    }
 
     const backups = [];
     const logEntries = [];
@@ -215,21 +203,20 @@ export async function POST(req: NextRequest, context: any) {
 
       // Asegurarse de que filePath no comience con /app/ si ya se va a añadir
       const cleanedFilePath = filePath.startsWith('app/') ? filePath.substring(4) : filePath;
-      const resolvedPath = path.join('/app', cleanedFilePath); // La ruta dentro del contenedor
+      const targetPathInContainer = path.join('/app', cleanedFilePath); // La ruta final dentro del contenedor
       
-      if (!resolvedPath.startsWith('/app/')) { // Validación de seguridad adicional
-        console.warn(`[API /apps/${appId}/files] Skipping unsafe file path: ${filePath} -> ${resolvedPath}`);
+      if (!targetPathInContainer.startsWith('/app/')) { // Validación de seguridad adicional
+        console.warn(`[API /apps/${appId}/files] Skipping unsafe file path: ${filePath} -> ${targetPathInContainer}`);
         continue;
       }
-      const directoryInContainer = path.dirname(resolvedPath);
+      const directoryInContainer = path.dirname(targetPathInContainer);
 
       console.log(`[API /apps/${appId}/files] Processing file: ${filePath}`);
-      console.log(`[API /apps/${appId}/files] Target path inside container: ${resolvedPath}`);
+      console.log(`[API /apps/${appId}/files] Target path inside container: ${targetPathInContainer}`);
 
-
-      // 1. Crear directorios dentro del contenedor (SFTP no crea directorios recursivamente por defecto)
+      // 1. Crear directorios dentro del contenedor (docker cp no crea directorios padre por defecto)
       const mkdirCommand = `mkdir -p '${directoryInContainer}'`;
-      console.log(`[API /apps/${appId}/files] Executing mkdir: ${mkdirCommand}`);
+      console.log(`[API /apps/${appId}/files] Executing mkdir in container: ${mkdirCommand}`);
       const mkdirResult = await executeSshOnExistingConnection(conn, `docker exec ${app.container_id} bash -c "${mkdirCommand}"`);
       if (mkdirResult.code !== 0) {
         console.error(`[API /apps/${appId}/files] mkdir failed for ${filePath}: STDERR: ${mkdirResult.stderr}`);
@@ -237,36 +224,46 @@ export async function POST(req: NextRequest, context: any) {
       }
       console.log(`[API /apps/${appId}/files] mkdir successful for ${filePath}.`);
 
-      // 2. Escribir archivo usando SFTP
-      // La ruta para SFTP debe ser la ruta ABSOLUTA en el sistema de archivos del HOST
-      // que corresponde al archivo dentro del contenedor.
-      // En Linux, los sistemas de archivos de los contenedores Docker se montan en /var/lib/docker/overlay2/.../merged/
-      // o se pueden acceder a través de /proc/<container_id>/root/
-      // Usaremos /proc/<container_id>/root/ para mayor consistencia y simplicidad.
-      const containerRootOnHost = `/proc/${app.container_id}/root`;
-      const sftpTargetPath = path.join(containerRootOnHost, resolvedPath); // Ruta completa en el host para SFTP
-      
-      console.log(`[API /apps/${appId}/files] Writing file via SFTP to host path: ${sftpTargetPath}. Content length: ${content.length}`);
-      
-      await new Promise<void>((resolve, reject) => {
-        const writeStream = sftp!.createWriteStream(sftpTargetPath, { mode: 0o644 }); // Use sftp! to assert non-null
-        writeStream.write(content);
-        writeStream.end();
-        writeStream.on('finish', resolve);
-        writeStream.on('error', (writeErr: Error) => {
-          console.error(`[API /apps/${appId}/files] SFTP write failed for ${filePath}:`, writeErr);
-          reject(new Error(`Error writing file ${filePath} via SFTP: ${writeErr.message}`));
-        });
-      });
-      console.log(`[API /apps/${appId}/files] SFTP write successful for ${filePath}.`);
+      // 2. Crear un archivo temporal en el host con el contenido
+      const tempFileName = `temp_file_${randomBytes(16).toString('hex')}`;
+      const tempFilePathOnHost = `/tmp/${tempFileName}`;
+      const encodedContent = Buffer.from(content).toString('base64');
+      const writeTempFileCommand = `echo '${encodedContent}' | base64 -d > '${tempFilePathOnHost}'`;
+      console.log(`[API /apps/${appId}/files] Writing temporary file to host: ${tempFilePathOnHost}. Content length: ${content.length}`);
+      const writeTempResult = await executeSshOnExistingConnection(conn, writeTempFileCommand);
+      if (writeTempResult.code !== 0) {
+        console.error(`[API /apps/${appId}/files] Writing temp file failed: STDERR: ${writeTempResult.stderr}`);
+        throw new Error(`Error writing temporary file to host: ${writeTempResult.stderr}`);
+      }
+      console.log(`[API /apps/${appId}/files] Temporary file written to host: ${tempFilePathOnHost}.`);
 
-      // 3. Verificar que el archivo se escribió correctamente
-      const verifyCommand = `ls -l '${resolvedPath}' && cat '${resolvedPath}' | wc -c`;
-      console.log(`[API /apps/${appId}/files] Verifying file: ${verifyCommand}`);
+      // 3. Copiar el archivo temporal del host al contenedor usando `docker cp`
+      const dockerCpCommand = `docker cp '${tempFilePathOnHost}' ${app.container_id}:'${targetPathInContainer}'`;
+      console.log(`[API /apps/${appId}/files] Executing docker cp: ${dockerCpCommand}`);
+      const dockerCpResult = await executeSshOnExistingConnection(conn, dockerCpCommand);
+      if (dockerCpResult.code !== 0) {
+        console.error(`[API /apps/${appId}/files] docker cp failed for ${filePath}: STDERR: ${dockerCpResult.stderr}`);
+        throw new Error(`Error copying file with docker cp: ${dockerCpResult.stderr}`);
+      }
+      console.log(`[API /apps/${appId}/files] docker cp successful for ${filePath}.`);
+
+      // 4. Eliminar el archivo temporal del host
+      const deleteTempFileCommand = `rm -f '${tempFilePathOnHost}'`;
+      console.log(`[API /apps/${appId}/files] Deleting temporary file from host: ${tempFilePathOnHost}`);
+      const deleteTempResult = await executeSshOnExistingConnection(conn, deleteTempFileCommand);
+      if (deleteTempResult.code !== 0) {
+        console.warn(`[API /apps/${appId}/files] Failed to delete temporary file ${tempFilePathOnHost}: STDERR: ${deleteTempResult.stderr}`);
+        // No lanzar error, es una limpieza post-operación
+      }
+      console.log(`[API /apps/${appId}/files] Temporary file deleted from host.`);
+
+      // 5. Verificar que el archivo se escribió correctamente dentro del contenedor
+      const verifyCommand = `ls -l '${targetPathInContainer}' && cat '${targetPathInContainer}' | wc -c`;
+      console.log(`[API /apps/${appId}/files] Verifying file in container: ${verifyCommand}`);
       const verifyResult = await executeSshOnExistingConnection(conn, `docker exec ${app.container_id} bash -c "${verifyCommand}"`);
       if (verifyResult.code !== 0) {
         console.error(`[API /apps/${appId}/files] Verification failed for ${filePath}: STDERR: ${verifyResult.stderr}`);
-        throw new Error(`Error verifying file ${filePath}: ${verifyResult.stderr}`);
+        throw new Error(`Error verifying file ${filePath} in container: ${verifyResult.stderr}`);
       }
       const [lsOutput, wcOutput] = verifyResult.stdout.split('\n');
       const fileSize = parseInt(wcOutput.trim(), 10);
@@ -274,9 +271,9 @@ export async function POST(req: NextRequest, context: any) {
         console.error(`[API /apps/${appId}/files] File size mismatch for ${filePath}. Expected: ${content.length}, Actual: ${fileSize}`);
         throw new Error(`Error de verificación: el tamaño del archivo ${filePath} no coincide. Esperado: ${content.length}, Real: ${fileSize}`);
       }
-      console.log(`[API /apps/${appId}/files] File ${filePath} verified. Size: ${fileSize} bytes.`);
+      console.log(`[API /apps/${appId}/files] File ${filePath} verified in container. Size: ${fileSize} bytes.`);
       
-      // 4. Preparar para respaldo en DB
+      // 6. Preparar para respaldo en DB
       backups.push({
         app_id: appId,
         user_id: userId,
@@ -284,7 +281,7 @@ export async function POST(req: NextRequest, context: any) {
         file_content: content,
       });
 
-      // 5. Preparar entrada de log
+      // 7. Preparar entrada de log
       logEntries.push({
         user_id: userId,
         server_id: server.id,
@@ -293,7 +290,7 @@ export async function POST(req: NextRequest, context: any) {
       });
     }
 
-    // 6. Insertar logs y respaldos en paralelo
+    // 8. Insertar logs y respaldos en paralelo
     console.log(`[API /apps/${appId}/files] Inserting ${backups.length} backups and ${logEntries.length} log entries into Supabase.`);
     await Promise.all([
       supabaseAdmin.from('app_file_backups').upsert(backups, { onConflict: 'app_id, file_path' }),
@@ -307,7 +304,6 @@ export async function POST(req: NextRequest, context: any) {
     return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
   } finally {
     console.log(`[API /apps/${appId}/files] Closing SSH connection.`);
-    if (sftp) sftp.end(); // Close SFTP session
     conn.end(); // Asegurarse de cerrar la conexión
   }
 }
