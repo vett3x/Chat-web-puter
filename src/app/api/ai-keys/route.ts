@@ -19,6 +19,8 @@ async function getSupabaseClient() {
     {
       cookies: {
         get: (name: string) => cookieStore.get(name)?.value,
+        set: (name: string, value: string, options: CookieOptions) => {},
+        remove: (name: string, options: CookieOptions) => {},
       },
     }
   );
