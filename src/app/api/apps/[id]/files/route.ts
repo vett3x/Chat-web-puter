@@ -213,15 +213,19 @@ export async function POST(req: NextRequest, context: any) {
         continue;
       }
 
-      const safeBasePath = '/app';
-      const resolvedPath = path.join(safeBasePath, filePath);
-      if (!resolvedPath.startsWith(safeBasePath + path.sep) && resolvedPath !== safeBasePath) {
-        console.warn(`[API /apps/${appId}/files] Skipping unsafe file path: ${filePath}`);
+      // Asegurarse de que filePath no comience con /app/ si ya se va a añadir
+      const cleanedFilePath = filePath.startsWith('app/') ? filePath.substring(4) : filePath;
+      const resolvedPath = path.join('/app', cleanedFilePath); // La ruta dentro del contenedor
+      
+      if (!resolvedPath.startsWith('/app/')) { // Validación de seguridad adicional
+        console.warn(`[API /apps/${appId}/files] Skipping unsafe file path: ${filePath} -> ${resolvedPath}`);
         continue;
       }
       const directoryInContainer = path.dirname(resolvedPath);
 
       console.log(`[API /apps/${appId}/files] Processing file: ${filePath}`);
+      console.log(`[API /apps/${appId}/files] Target path inside container: ${resolvedPath}`);
+
 
       // 1. Crear directorios dentro del contenedor (SFTP no crea directorios recursivamente por defecto)
       const mkdirCommand = `mkdir -p '${directoryInContainer}'`;
@@ -234,11 +238,18 @@ export async function POST(req: NextRequest, context: any) {
       console.log(`[API /apps/${appId}/files] mkdir successful for ${filePath}.`);
 
       // 2. Escribir archivo usando SFTP
-      const containerFilePath = `/proc/${app.container_id}/root${resolvedPath}`; // Path to file inside host's /proc/container_id/root
-      console.log(`[API /apps/${appId}/files] Writing file via SFTP to host path: ${containerFilePath}. Content length: ${content.length}`);
+      // La ruta para SFTP debe ser la ruta ABSOLUTA en el sistema de archivos del HOST
+      // que corresponde al archivo dentro del contenedor.
+      // En Linux, los sistemas de archivos de los contenedores Docker se montan en /var/lib/docker/overlay2/.../merged/
+      // o se pueden acceder a través de /proc/<container_id>/root/
+      // Usaremos /proc/<container_id>/root/ para mayor consistencia y simplicidad.
+      const containerRootOnHost = `/proc/${app.container_id}/root`;
+      const sftpTargetPath = path.join(containerRootOnHost, resolvedPath); // Ruta completa en el host para SFTP
+      
+      console.log(`[API /apps/${appId}/files] Writing file via SFTP to host path: ${sftpTargetPath}. Content length: ${content.length}`);
       
       await new Promise<void>((resolve, reject) => {
-        const writeStream = sftp!.createWriteStream(containerFilePath, { mode: 0o644 }); // Use sftp! to assert non-null
+        const writeStream = sftp!.createWriteStream(sftpTargetPath, { mode: 0o644 }); // Use sftp! to assert non-null
         writeStream.write(content);
         writeStream.end();
         writeStream.on('finish', resolve);
