@@ -8,33 +8,31 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getModelLabel } from '@/lib/ai-models'; // Import the helper function
 
-// Define unified part types to match the source hook
-interface TextPart {
+// Define types
+interface PuterTextContentPart {
   type: 'text';
   text: string;
 }
-interface ImagePart {
+
+interface PuterImageContentPart {
   type: 'image_url';
-  image_url: { url: string };
+  image_url: {
+    url: string;
+  };
 }
-interface CodePart {
-  type: 'code';
-  language?: string;
-  filename?: string;
-  code?: string;
-}
-type MessageContentPart = TextPart | ImagePart | CodePart;
+
+type PuterContentPart = PuterTextContentPart | PuterImageContentPart;
 
 interface Message {
   id: string;
-  content: string | MessageContentPart[]; // Use the unified type
+  content: string | PuterContentPart[];
   role: 'user' | 'assistant';
   model?: string;
   isNew?: boolean;
   isTyping?: boolean;
-  timestamp: Date;
-  conversation_id?: string;
-  type?: 'text' | 'multimodal';
+  timestamp: Date; // Added to fix type mismatch
+  conversation_id?: string; // Added for consistency
+  type?: 'text' | 'multimodal'; // Added for consistency
 }
 
 interface ChatMessagesProps {
@@ -58,7 +56,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
     }
   }, [messages, isLoading]);
 
-  const handleCopy = (content: string | MessageContentPart[]) => {
+  const handleCopy = (content: string | PuterContentPart[]) => {
     let textToCopy = '';
     if (typeof content === 'string') {
       textToCopy = content;
@@ -120,7 +118,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
                         <span className="text-sm">Pensando...</span>
                       </div>
                     ) : (
-                      <MessageContent content={message.content as any} isNew={!!message.isNew} aiResponseSpeed={aiResponseSpeed} />
+                      <MessageContent content={message.content} isNew={!!message.isNew} aiResponseSpeed={aiResponseSpeed} />
                     )}
                   </div>
                   {message.role === 'assistant' && !message.isTyping && (
