@@ -8,10 +8,18 @@ import { executeSshCommand } from '@/lib/ssh-utils';
 import { getAppAndServerForFileOps } from '@/lib/app-state-manager';
 import path from 'path';
 import { Client as SshClient } from 'ssh2';
+import type { SFTPWrapper } from 'ssh2'; // Import SFTPWrapper type
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
-import { randomBytes } from 'crypto'; // Importar para generar nombres de archivo temporales
 
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+
+async function getUserId() {
+  const cookieStore = cookies() as any;
+  const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { cookies: { get: (name: string) => cookieStore.get(name)?.value } });
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Acceso denegado.');
+  return session.user.id;
+}
 
 // Helper function to get the session and user role and permissions
 async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null; userPermissions: UserPermissions }> {
@@ -114,12 +122,7 @@ export async function GET(req: NextRequest, context: any) {
   const filePath = searchParams.get('path');
 
   try {
-    const { session, userRole } = await getSessionAndRole();
-    if (!session || !userRole || !session.user.id) {
-      return NextResponse.json({ message: 'Acceso denegado. No autenticado.' }, { status: 401 });
-    }
-    const userId = session.user.id; // Ensure userId is a string here
-
+    const userId = await getUserId();
     const { app, server } = await getAppAndServerForFileOps(appId, userId);
     
     if (filePath) {
@@ -147,14 +150,12 @@ export async function GET(req: NextRequest, context: any) {
   }
 }
 
-// POST: Escribir MÚLTIPLES archivos en una sola conexión usando `docker cp`
+// POST: Escribir MÚLTIPLES archivos en una sola conexión usando SFTP
 export async function POST(req: NextRequest, context: any) {
   const appId = context.params.id;
   
   const conn = new SshClient();
-  let currentUserId: string | undefined; // Declarar userId con let
-  let currentServer: any | undefined; // Declarar server con let
-
+  let sftp: SFTPWrapper | undefined; // Declare sftp variable
   try {
     const { session, userRole, userPermissions } = await getSessionAndRole();
     if (!session || !userRole) {
@@ -165,10 +166,8 @@ export async function POST(req: NextRequest, context: any) {
       return NextResponse.json({ message: 'Acceso denegado. No tienes permiso para gestionar contenedores Docker.' }, { status: 403 });
     }
 
-    currentUserId = session.user.id; // Asignar valor a currentUserId
-    const { app, server } = await getAppAndServerForFileOps(appId, currentUserId!); // Use non-null assertion
-    currentServer = server; // Asignar valor a currentServer
-
+    const userId = session.user.id; // Use userId from session
+    const { app, server } = await getAppAndServerForFileOps(appId, userId);
     const { files } = await req.json();
 
     if (!Array.isArray(files) || files.length === 0) {
@@ -176,22 +175,33 @@ export async function POST(req: NextRequest, context: any) {
     }
 
     // --- Conexión SSH Única ---
-    console.log(`[API /apps/${appId}/files] Establishing SSH connection to ${currentServer.ip_address}...`);
+    console.log(`[API /apps/${appId}/files] Establishing SSH connection to ${server.ip_address}...`);
     await new Promise<void>((resolve, reject) => {
       conn.on('ready', () => {
         console.log(`[API /apps/${appId}/files] SSH connection ready.`);
-        resolve();
+        conn.sftp((err, sftpClient) => {
+          if (err) {
+            conn.end();
+            return reject(new Error(`SFTP error: ${err.message}`));
+          }
+          sftp = sftpClient;
+          resolve();
+        });
       }).on('error', (err) => {
         console.error(`[API /apps/${appId}/files] SSH connection error:`, err);
         reject(err);
       }).connect({
-        host: currentServer.ip_address,
-        port: currentServer.ssh_port || 22,
-        username: currentServer.ssh_username,
-        password: currentServer.ssh_password,
+        host: server.ip_address,
+        port: server.ssh_port || 22,
+        username: server.ssh_username,
+        password: server.ssh_password,
         readyTimeout: 10000,
       });
     });
+
+    if (!sftp) {
+      throw new Error('Failed to establish SFTP connection.');
+    }
 
     const backups = [];
     const logEntries = [];
@@ -203,170 +213,76 @@ export async function POST(req: NextRequest, context: any) {
         continue;
       }
 
-      // Asegurarse de que filePath no comience con /app/ si ya se va a añadir
-      const cleanedFilePath = filePath.startsWith('app/') ? filePath.substring(4) : filePath;
-      const targetPathInContainer = path.join('/app', cleanedFilePath); // La ruta final dentro del contenedor
-      
-      if (!targetPathInContainer.startsWith('/app/')) { // Validación de seguridad adicional
-        console.warn(`[API /apps/${appId}/files] Skipping unsafe file path: ${filePath} -> ${targetPathInContainer}`);
+      const safeBasePath = '/app';
+      const resolvedPath = path.join(safeBasePath, filePath);
+      if (!resolvedPath.startsWith(safeBasePath + path.sep) && resolvedPath !== safeBasePath) {
+        console.warn(`[API /apps/${appId}/files] Skipping unsafe file path: ${filePath}`);
         continue;
       }
-      const directoryInContainer = path.dirname(targetPathInContainer);
+      const directoryInContainer = path.dirname(resolvedPath);
 
       console.log(`[API /apps/${appId}/files] Processing file: ${filePath}`);
-      console.log(`[API /apps/${appId}/files] Target path inside container: ${targetPathInContainer}`);
 
-      // Log: Iniciando procesamiento de archivo
-      await supabaseAdmin.from('server_events_log').insert({
-        user_id: currentUserId,
-        server_id: currentServer.id,
-        event_type: 'file_upload_step',
-        description: `Iniciando subida de archivo: '${filePath}'`,
-      });
-
-      // 1. Crear directorios dentro del contenedor (docker cp no crea directorios padre por defecto)
+      // 1. Crear directorios dentro del contenedor (SFTP no crea directorios recursivamente por defecto)
       const mkdirCommand = `mkdir -p '${directoryInContainer}'`;
-      console.log(`[API /apps/${appId}/files] Executing mkdir in container: ${mkdirCommand}`);
+      console.log(`[API /apps/${appId}/files] Executing mkdir: ${mkdirCommand}`);
       const mkdirResult = await executeSshOnExistingConnection(conn, `docker exec ${app.container_id} bash -c "${mkdirCommand}"`);
       if (mkdirResult.code !== 0) {
         console.error(`[API /apps/${appId}/files] mkdir failed for ${filePath}: STDERR: ${mkdirResult.stderr}`);
-        await supabaseAdmin.from('server_events_log').insert({
-          user_id: currentUserId,
-          server_id: currentServer.id,
-          event_type: 'file_upload_failed',
-          description: `Fallo al crear directorio para '${filePath}': ${mkdirResult.stderr}`,
-        });
         throw new Error(`Error creating directory for ${filePath}: ${mkdirResult.stderr}`);
       }
       console.log(`[API /apps/${appId}/files] mkdir successful for ${filePath}.`);
-      // Log: Directorio creado
-      await supabaseAdmin.from('server_events_log').insert({
-        user_id: currentUserId,
-        server_id: currentServer.id,
-        event_type: 'file_upload_step',
-        description: `Directorio creado para '${filePath}'`,
-      });
 
-      // 2. Crear un archivo temporal en el host con el contenido
-      const tempFileName = `temp_file_${randomBytes(16).toString('hex')}`;
-      const tempFilePathOnHost = `/tmp/${tempFileName}`;
-      const encodedContent = Buffer.from(content).toString('base64');
-      const writeTempFileCommand = `echo '${encodedContent}' | base64 -d > '${tempFilePathOnHost}'`;
-      console.log(`[API /apps/${appId}/files] Writing temporary file to host: ${tempFilePathOnHost}. Content length: ${content.length}`);
-      const writeTempResult = await executeSshOnExistingConnection(conn, writeTempFileCommand);
-      if (writeTempResult.code !== 0) {
-        console.error(`[API /apps/${appId}/files] Writing temp file failed: STDERR: ${writeTempResult.stderr}`);
-        await supabaseAdmin.from('server_events_log').insert({
-          user_id: currentUserId,
-          server_id: currentServer.id,
-          event_type: 'file_upload_failed',
-          description: `Fallo al escribir archivo temporal en host para '${filePath}': ${writeTempResult.stderr}`,
+      // 2. Escribir archivo usando SFTP
+      const containerFilePath = `/proc/${app.container_id}/root${resolvedPath}`; // Path to file inside host's /proc/container_id/root
+      console.log(`[API /apps/${appId}/files] Writing file via SFTP to host path: ${containerFilePath}. Content length: ${content.length}`);
+      
+      await new Promise<void>((resolve, reject) => {
+        const writeStream = sftp!.createWriteStream(containerFilePath, { mode: 0o644 }); // Use sftp! to assert non-null
+        writeStream.write(content);
+        writeStream.end();
+        writeStream.on('finish', resolve);
+        writeStream.on('error', (writeErr: Error) => {
+          console.error(`[API /apps/${appId}/files] SFTP write failed for ${filePath}:`, writeErr);
+          reject(new Error(`Error writing file ${filePath} via SFTP: ${writeErr.message}`));
         });
-        throw new Error(`Error writing temporary file to host: ${writeTempResult.stderr}`);
-      }
-      console.log(`[API /apps/${appId}/files] Temporary file written to host: ${tempFilePathOnHost}.`);
-      // Log: Archivo temporal creado
-      await supabaseAdmin.from('server_events_log').insert({
-        user_id: currentUserId,
-        server_id: currentServer.id,
-        event_type: 'file_upload_step',
-        description: `Archivo temporal creado en host para '${filePath}'`,
       });
+      console.log(`[API /apps/${appId}/files] SFTP write successful for ${filePath}.`);
 
-      // 3. Copiar el archivo temporal del host al contenedor usando `docker cp`
-      const dockerCpCommand = `docker cp '${tempFilePathOnHost}' ${app.container_id}:'${targetPathInContainer}'`;
-      console.log(`[API /apps/${appId}/files] Executing docker cp: ${dockerCpCommand}`);
-      const dockerCpResult = await executeSshOnExistingConnection(conn, dockerCpCommand);
-      if (dockerCpResult.code !== 0) {
-        console.error(`[API /apps/${appId}/files] docker cp failed for ${filePath}: STDERR: ${dockerCpResult.stderr}`);
-        await supabaseAdmin.from('server_events_log').insert({
-          user_id: currentUserId,
-          server_id: currentServer.id,
-          event_type: 'file_upload_failed',
-          description: `Fallo al copiar archivo a contenedor con docker cp para '${filePath}': ${dockerCpResult.stderr}`,
-        });
-        throw new Error(`Error copying file with docker cp: ${dockerCpResult.stderr}`);
-      }
-      console.log(`[API /apps/${appId}/files] docker cp successful for ${filePath}.`);
-      // Log: Archivo copiado al contenedor
-      await supabaseAdmin.from('server_events_log').insert({
-        user_id: currentUserId,
-        server_id: currentServer.id,
-        event_type: 'file_upload_step',
-        description: `Archivo '${filePath}' copiado al contenedor`,
-      });
-
-      // 4. Eliminar el archivo temporal del host
-      const deleteTempFileCommand = `rm -f '${tempFilePathOnHost}'`;
-      console.log(`[API /apps/${appId}/files] Deleting temporary file from host: ${tempFilePathOnHost}`);
-      const deleteTempResult = await executeSshOnExistingConnection(conn, deleteTempFileCommand);
-      if (deleteTempResult.code !== 0) {
-        console.warn(`[API /apps/${appId}/files] Failed to delete temporary file ${tempFilePathOnHost}: STDERR: ${deleteTempResult.stderr}`);
-        // No lanzar error, es una limpieza post-operación
-      }
-      console.log(`[API /apps/${appId}/files] Temporary file deleted from host.`);
-      // Log: Archivo temporal eliminado
-      await supabaseAdmin.from('server_events_log').insert({
-        user_id: currentUserId,
-        server_id: currentServer.id,
-        event_type: 'file_upload_step',
-        description: `Archivo temporal eliminado del host para '${filePath}'`,
-      });
-
-      // 5. Verificar que el archivo se escribió correctamente dentro del contenedor
-      const verifyCommand = `ls -l '${targetPathInContainer}' && cat '${targetPathInContainer}' | wc -c`;
-      console.log(`[API /apps/${appId}/files] Verifying file in container: ${verifyCommand}`);
+      // 3. Verificar que el archivo se escribió correctamente
+      const verifyCommand = `ls -l '${resolvedPath}' && cat '${resolvedPath}' | wc -c`;
+      console.log(`[API /apps/${appId}/files] Verifying file: ${verifyCommand}`);
       const verifyResult = await executeSshOnExistingConnection(conn, `docker exec ${app.container_id} bash -c "${verifyCommand}"`);
       if (verifyResult.code !== 0) {
         console.error(`[API /apps/${appId}/files] Verification failed for ${filePath}: STDERR: ${verifyResult.stderr}`);
-        await supabaseAdmin.from('server_events_log').insert({
-          user_id: currentUserId,
-          server_id: currentServer.id,
-          event_type: 'file_upload_failed',
-          description: `Fallo de verificación para '${filePath}': ${verifyResult.stderr}`,
-        });
-        throw new Error(`Error verifying file ${filePath} in container: ${verifyResult.stderr}`);
+        throw new Error(`Error verifying file ${filePath}: ${verifyResult.stderr}`);
       }
       const [lsOutput, wcOutput] = verifyResult.stdout.split('\n');
       const fileSize = parseInt(wcOutput.trim(), 10);
       if (fileSize !== content.length) {
         console.error(`[API /apps/${appId}/files] File size mismatch for ${filePath}. Expected: ${content.length}, Actual: ${fileSize}`);
-        await supabaseAdmin.from('server_events_log').insert({
-          user_id: currentUserId,
-          server_id: currentServer.id,
-          event_type: 'file_upload_failed',
-          description: `Fallo de verificación de tamaño para '${filePath}'. Esperado: ${content.length}, Real: ${fileSize}`,
-        });
         throw new Error(`Error de verificación: el tamaño del archivo ${filePath} no coincide. Esperado: ${content.length}, Real: ${fileSize}`);
       }
       console.log(`[API /apps/${appId}/files] File ${filePath} verified. Size: ${fileSize} bytes.`);
-      // Log: Archivo verificado
-      await supabaseAdmin.from('server_events_log').insert({
-        user_id: currentUserId,
-        server_id: currentServer.id,
-        event_type: 'file_upload_step',
-        description: `Archivo '${filePath}' verificado en el contenedor`,
-      });
       
-      // 6. Preparar para respaldo en DB
+      // 4. Preparar para respaldo en DB
       backups.push({
         app_id: appId,
-        user_id: currentUserId,
-        server_id: currentServer.id, // Add server_id to backup
+        user_id: userId,
         file_path: filePath,
         file_content: content,
       });
 
-      // 7. Preparar entrada de log
+      // 5. Preparar entrada de log
       logEntries.push({
-        user_id: currentUserId,
-        server_id: currentServer.id,
+        user_id: userId,
+        server_id: server.id,
         event_type: 'file_written',
         description: `Archivo '${filePath}' escrito en el contenedor ${app.container_id.substring(0, 12)}.`,
       });
     }
 
-    // 8. Insertar logs y respaldos en paralelo
+    // 6. Insertar logs y respaldos en paralelo
     console.log(`[API /apps/${appId}/files] Inserting ${backups.length} backups and ${logEntries.length} log entries into Supabase.`);
     await Promise.all([
       supabaseAdmin.from('app_file_backups').upsert(backups, { onConflict: 'app_id, file_path' }),
@@ -377,16 +293,10 @@ export async function POST(req: NextRequest, context: any) {
     return NextResponse.json({ message: 'Archivos guardados y respaldados correctamente.' });
   } catch (error: any) {
     console.error(`[API /apps/${appId}/files] Unhandled error in POST:`, error);
-    // Log general error
-    await supabaseAdmin.from('server_events_log').insert({
-      user_id: currentUserId, // Usar currentUserId
-      server_id: currentServer?.id, // Usar currentServer?.id para manejar si no está definido
-      event_type: 'file_upload_failed',
-      description: `Error general al subir archivos: ${error.message}`,
-    });
     return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
   } finally {
     console.log(`[API /apps/${appId}/files] Closing SSH connection.`);
+    if (sftp) sftp.end(); // Close SFTP session
     conn.end(); // Asegurarse de cerrar la conexión
   }
 }
