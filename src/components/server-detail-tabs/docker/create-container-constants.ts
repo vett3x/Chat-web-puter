@@ -43,7 +43,7 @@ chmod a+r /usr/share/keyrings/cloudflare-main.gpg # Ensure correct permissions
 echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' | sudo tee /etc/apt/sources.list.d/cloudflared.list >/dev/null || { echo "ERROR: adding cloudflared repo failed"; exit 1; }
 
 # install cloudflared
-sudo apt-get install -y cloudflared || { echo "ERROR: cloudflared installation failed"; exit 1; }
+sudo apt-get update -y && sudo apt-get install -y cloudflared || { echo "ERROR: cloudflared installation failed"; exit 1; }
 
 echo "--- Verifying cloudflared installation ---"
 which cloudflared || { echo "ERROR: cloudflared binary not found in PATH"; exit 1; }
@@ -55,11 +55,6 @@ echo "--- Creating Next.js 'hello-world' app in /app directory... ---"
 cd /
 npx --yes create-next-app@latest app --use-npm --example "https://github.com/vercel/next.js/tree/canary/examples/hello-world" || { echo "ERROR: create-next-app failed"; exit 1; }
 echo "--- Next.js app created. ---"
-
-# IMPORTANT: Ensure /app directory is writable by non-root users
-echo "--- Setting /app directory permissions to 777 ---"
-chmod -R 777 /app || { echo "ERROR: chmod 777 /app failed"; exit 1; }
-echo "--- /app directory permissions set. ---"
 
 echo "--- Installing Next.js app dependencies... ---"
 cd /app
