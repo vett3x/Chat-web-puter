@@ -26,6 +26,7 @@ interface ChatInputProps {
   selectedModel: string;
   onModelChange: (model: string) => void;
   sendMessage: (content: PuterContentPart[], messageText: string) => void;
+  isAppChat?: boolean;
 }
 
 interface SelectedFile {
@@ -34,7 +35,7 @@ interface SelectedFile {
   type: 'image' | 'other';
 }
 
-export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage }: ChatInputProps) {
+export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage, isAppChat = false }: ChatInputProps) {
   const [inputMessage, setInputMessage] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const [availableKeys, setAvailableKeys] = useState<string[]>([]);
@@ -198,7 +199,7 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
             <DropdownMenuContent side="top" align="end" className="w-64 bg-popover text-popover-foreground border-border rounded-lg">
               <DropdownMenuLabel className="text-sm font-semibold">Seleccionar Modelo de IA</DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-border" />
-              {AI_PROVIDERS.map((provider, providerIndex) => {
+              {AI_PROVIDERS.filter(provider => !isAppChat || provider.source === 'user_key').map((provider, providerIndex) => {
                 const requiresKey = provider.source === 'user_key';
                 const hasKey = availableKeys.includes('google_gemini'); // Assuming provider name in DB is 'google_gemini'
                 const isDisabled = requiresKey && !hasKey;

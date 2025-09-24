@@ -315,6 +315,7 @@ export default function Home() {
                 appPrompt={selectedAppDetails?.prompt}
                 appId={selectedAppDetails?.id}
                 onWriteFiles={writeFilesToApp}
+                isAppChat={selectedItem?.type === 'app'}
               />
             </ResizablePanel>
             {selectedItem?.type === 'app' && (

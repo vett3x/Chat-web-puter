@@ -17,6 +17,7 @@ interface ChatInterfaceProps {
   appPrompt?: string | null;
   appId?: string | null;
   onWriteFiles: (files: { path: string; content: string }[]) => Promise<void>; // Changed from onFilesWritten
+  isAppChat?: boolean;
 }
 
 export function ChatInterface({
@@ -30,6 +31,7 @@ export function ChatInterface({
   appPrompt,
   appId,
   onWriteFiles, // Changed from onFilesWritten
+  isAppChat = false,
 }: ChatInterfaceProps) {
   const {
     messages,
@@ -107,6 +109,7 @@ export function ChatInterface({
           selectedModel={selectedModel}
           onModelChange={handleModelChange}
           sendMessage={sendMessage}
+          isAppChat={isAppChat}
         />
       </div>
     </div>
