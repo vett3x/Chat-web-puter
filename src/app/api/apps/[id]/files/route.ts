@@ -8,6 +8,7 @@ import { executeSshCommand } from '@/lib/ssh-utils';
 import { getAppAndServerForFileOps } from '@/lib/app-state-manager';
 import path from 'path';
 import { Client as SshClient } from 'ssh2';
+import type { SFTPWrapper } from 'ssh2'; // Import SFTPWrapper type
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
 
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
@@ -149,11 +150,12 @@ export async function GET(req: NextRequest, context: any) {
   }
 }
 
-// POST: Escribir MÚLTIPLES archivos en una sola conexión
+// POST: Escribir MÚLTIPLES archivos en una sola conexión usando SFTP
 export async function POST(req: NextRequest, context: any) {
   const appId = context.params.id;
   
   const conn = new SshClient();
+  let sftp: SFTPWrapper | undefined; // Declare sftp variable
   try {
     const { session, userRole, userPermissions } = await getSessionAndRole();
     if (!session || !userRole) {
@@ -177,7 +179,14 @@ export async function POST(req: NextRequest, context: any) {
     await new Promise<void>((resolve, reject) => {
       conn.on('ready', () => {
         console.log(`[API /apps/${appId}/files] SSH connection ready.`);
-        resolve();
+        conn.sftp((err, sftpClient) => {
+          if (err) {
+            conn.end();
+            return reject(new Error(`SFTP error: ${err.message}`));
+          }
+          sftp = sftpClient;
+          resolve();
+        });
       }).on('error', (err) => {
         console.error(`[API /apps/${appId}/files] SSH connection error:`, err);
         reject(err);
@@ -189,6 +198,10 @@ export async function POST(req: NextRequest, context: any) {
         readyTimeout: 10000,
       });
     });
+
+    if (!sftp) {
+      throw new Error('Failed to establish SFTP connection.');
+    }
 
     const backups = [];
     const logEntries = [];
@@ -210,7 +223,7 @@ export async function POST(req: NextRequest, context: any) {
 
       console.log(`[API /apps/${appId}/files] Processing file: ${filePath}`);
 
-      // 1. Crear directorios
+      // 1. Crear directorios dentro del contenedor (SFTP no crea directorios recursivamente por defecto)
       const mkdirCommand = `mkdir -p '${directoryInContainer}'`;
       console.log(`[API /apps/${appId}/files] Executing mkdir: ${mkdirCommand}`);
       const mkdirResult = await executeSshOnExistingConnection(conn, `docker exec ${app.container_id} bash -c "${mkdirCommand}"`);
@@ -220,16 +233,21 @@ export async function POST(req: NextRequest, context: any) {
       }
       console.log(`[API /apps/${appId}/files] mkdir successful for ${filePath}.`);
 
-      // 2. Escribir archivo (Método robusto usando pipe y Base64)
-      const encodedContent = Buffer.from(content).toString('base64');
-      const writeCommand = `echo '${encodedContent}' | docker exec -i ${app.container_id} bash -c "base64 -d > '${resolvedPath}'"`;
-      console.log(`[API /apps/${appId}/files] Executing write command for ${filePath}. Content length: ${content.length}`);
-      const writeResult = await executeSshOnExistingConnection(conn, writeCommand);
-      if (writeResult.code !== 0) {
-        console.error(`[API /apps/${appId}/files] Write failed for ${filePath}: STDERR: ${writeResult.stderr}`);
-        throw new Error(`Error writing file ${filePath}: ${writeResult.stderr}`);
-      }
-      console.log(`[API /apps/${appId}/files] Write successful for ${filePath}.`);
+      // 2. Escribir archivo usando SFTP
+      const containerFilePath = `/proc/${app.container_id}/root${resolvedPath}`; // Path to file inside host's /proc/container_id/root
+      console.log(`[API /apps/${appId}/files] Writing file via SFTP to host path: ${containerFilePath}. Content length: ${content.length}`);
+      
+      await new Promise<void>((resolve, reject) => {
+        const writeStream = sftp!.createWriteStream(containerFilePath, { mode: 0o644 }); // Use sftp! to assert non-null
+        writeStream.write(content);
+        writeStream.end();
+        writeStream.on('finish', resolve);
+        writeStream.on('error', (writeErr: Error) => {
+          console.error(`[API /apps/${appId}/files] SFTP write failed for ${filePath}:`, writeErr);
+          reject(new Error(`Error writing file ${filePath} via SFTP: ${writeErr.message}`));
+        });
+      });
+      console.log(`[API /apps/${appId}/files] SFTP write successful for ${filePath}.`);
 
       // 3. Verificar que el archivo se escribió correctamente
       const verifyCommand = `ls -l '${resolvedPath}' && cat '${resolvedPath}' | wc -c`;
@@ -278,6 +296,7 @@ export async function POST(req: NextRequest, context: any) {
     return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
   } finally {
     console.log(`[API /apps/${appId}/files] Closing SSH connection.`);
+    if (sftp) sftp.end(); // Close SFTP session
     conn.end(); // Asegurarse de cerrar la conexión
   }
 }
