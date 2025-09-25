@@ -29,6 +29,7 @@ const messageSchema = z.object({
 const chatRequestSchema = z.object({
   messages: z.array(messageSchema),
   selectedKeyId: z.string().uuid(),
+  stream: z.boolean().optional().default(true), // New field to control streaming
 });
 
 async function getSupabaseClient() {
@@ -98,7 +99,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { messages: rawMessages, selectedKeyId } = chatRequestSchema.parse(body);
+    const { messages: rawMessages, selectedKeyId, stream } = chatRequestSchema.parse(body);
 
     const { data: keyDetails, error: keyError } = await supabase
       .from('user_api_keys')
@@ -138,10 +139,6 @@ export async function POST(req: NextRequest) {
       }
       
       if (keyDetails.use_vertex_ai) {
-        // Vertex AI streaming is more complex and not implemented here for brevity.
-        // This section would need to be adapted to handle streaming responses from Vertex.
-        // For now, we'll keep the non-streaming implementation for Vertex.
-        // ... (existing non-streaming Vertex AI logic) ...
         return NextResponse.json({ message: { content: "Vertex AI streaming not implemented yet." } });
 
       } else { // Public Gemini API
@@ -152,7 +149,7 @@ export async function POST(req: NextRequest) {
 
         const result = await genAI.getGenerativeModel({ model: finalModel }).generateContentStream({ contents: geminiFormattedMessages });
         
-        const stream = new ReadableStream({
+        const streamResponse = new ReadableStream({
           async start(controller) {
             for await (const chunk of result.stream) {
               const chunkText = chunk.text();
@@ -162,12 +159,11 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        return new Response(stream, {
+        return new Response(streamResponse, {
           headers: { 'Content-Type': 'text/plain; charset=utf-8' },
         });
       }
     } else if (keyDetails.provider === 'custom_endpoint') {
-      // Custom endpoint streaming
       const customApiKey = keyDetails.api_key;
       const customEndpointUrl = keyDetails.api_endpoint;
       const customModelId = keyDetails.model_name;
@@ -190,7 +186,7 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({
           model: customModelId,
           messages: customApiMessages,
-          stream: true, // Request streaming from the custom endpoint
+          stream: false, // Force non-streaming for custom endpoints
         }),
       });
 
@@ -199,9 +195,10 @@ export async function POST(req: NextRequest) {
         throw new Error(`Custom Endpoint API returned an error: ${customEndpointResponse.status} - ${errorText.substring(0, 200)}...`);
       }
 
-      return new Response(customEndpointResponse.body as ReadableStream, {
-        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-      });
+      const result = await customEndpointResponse.json();
+      const content = result.choices[0]?.message?.content || '';
+      
+      return NextResponse.json({ message: { content } });
 
     } else {
       throw new Error('Proveedor de IA no válido seleccionado.');

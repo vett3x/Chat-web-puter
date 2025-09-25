@@ -359,9 +359,27 @@ export function useChat({
       let fullResponseText = '';
       let modelUsedForResponse = selectedModel;
 
-      if (selectedModel.startsWith('puter:')) {
-        const actualModelForPuter = selectedModel.substring(6);
-        const response = await window.puter.ai.chat([systemMessage, ...messagesForApi], { model: actualModelForPuter });
+      const selectedKey = userApiKeys.find(k => `user_key:${k.id}` === selectedModel);
+      const isCustomEndpoint = selectedKey?.provider === 'custom_endpoint';
+
+      if (selectedModel.startsWith('puter:') || isCustomEndpoint) {
+        let response;
+        if (isCustomEndpoint) {
+          const apiResponse = await fetch('/api/ai/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messages: [systemMessage, ...messagesForApi],
+              selectedKeyId: selectedModel.substring(9),
+              stream: false, // Request non-streaming for custom endpoint
+            }),
+          });
+          response = await apiResponse.json();
+          if (!apiResponse.ok) throw new Error(response.message || 'Error en la API de IA.');
+        } else {
+          const actualModelForPuter = selectedModel.substring(6);
+          response = await window.puter.ai.chat([systemMessage, ...messagesForApi], { model: actualModelForPuter });
+        }
         if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
         fullResponseText = response?.message?.content || 'Sin contenido.';
       } else if (selectedModel.startsWith('user_key:')) {
@@ -371,6 +389,7 @@ export function useChat({
           body: JSON.stringify({
             messages: [systemMessage, ...messagesForApi],
             selectedKeyId: selectedModel.substring(9),
+            stream: true, // Request streaming for Gemini
           }),
         });
         if (!apiResponse.ok || !apiResponse.body) {
@@ -423,7 +442,7 @@ export function useChat({
     } finally {
       setIsLoading(false);
     }
-  }, [appId, appPrompt, userRole, onWriteFiles, selectedModel, userId, saveMessageToDB, chatMode]);
+  }, [appId, appPrompt, userRole, onWriteFiles, selectedModel, userId, saveMessageToDB, chatMode, userApiKeys]);
 
   const sendMessage = useCallback(async (content: PuterContentPart[], messageText: string) => {
     if (!userId) {
