@@ -6,7 +6,6 @@ import { cookies } from 'next/headers';
 import { GoogleGenerativeAI, Part } from '@google/generative-ai';
 import { GoogleAuth } from 'google-auth-library';
 import { z } from 'zod';
-import { StreamingTextResponse, streamToResponse } from 'ai';
 
 // Define unified part types for internal API handling
 interface TextPart { type: 'text'; text: string; }
@@ -163,7 +162,9 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        return new StreamingTextResponse(stream);
+        return new Response(stream, {
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        });
       }
     } else if (keyDetails.provider === 'custom_endpoint') {
       // Custom endpoint streaming
@@ -198,8 +199,9 @@ export async function POST(req: NextRequest) {
         throw new Error(`Custom Endpoint API returned an error: ${customEndpointResponse.status} - ${errorText.substring(0, 200)}...`);
       }
 
-      // Assuming the custom endpoint returns a Server-Sent Events (SSE) stream compatible with Vercel AI SDK
-      return new StreamingTextResponse(customEndpointResponse.body as ReadableStream);
+      return new Response(customEndpointResponse.body as ReadableStream, {
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      });
 
     } else {
       throw new Error('Proveedor de IA no válido seleccionado.');

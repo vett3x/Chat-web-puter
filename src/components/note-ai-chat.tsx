@@ -147,12 +147,13 @@ ${noteContent}
         ...newMessages.map(msg => ({ role: msg.role, content: msg.content }))
       ];
 
-      let responseStream: ReadableStream<Uint8Array> | null = null;
+      let fullResponseText = '';
 
       if (selectedModel.startsWith('puter:')) {
         const actualModelForPuter = selectedModel.substring(6);
-        const response = await window.puter.ai.chat(puterMessages, { model: actualModelForPuter, stream: true });
-        responseStream = response.body;
+        const response = await window.puter.ai.chat(puterMessages, { model: actualModelForPuter });
+        if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
+        fullResponseText = response?.message?.content || 'Sin contenido.';
       } else if (selectedModel.startsWith('user_key:')) {
         const apiResponse = await fetch('/api/ai/chat', {
           method: 'POST',
@@ -166,26 +167,22 @@ ${noteContent}
           const errorData = await apiResponse.json();
           throw new Error(errorData.message || 'Error en la API de IA.');
         }
-        responseStream = apiResponse.body;
+        const responseStream = apiResponse.body;
+        const reader = responseStream.getReader();
+        const decoder = new TextDecoder();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          fullResponseText += chunk;
+          setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: fullResponseText, isTyping: false } : m));
+        }
       } else {
         throw new Error('Modelo de IA no válido seleccionado.');
       }
 
-      if (!responseStream) throw new Error('No se pudo obtener un stream de respuesta.');
-
-      let fullResponseText = '';
-      const reader = responseStream.getReader();
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        fullResponseText += chunk;
-        setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: fullResponseText, isTyping: false } : m));
-      }
-
       const finalMessages = [...newMessages, { role: 'assistant' as const, content: fullResponseText }];
+      setMessages(finalMessages);
       onSaveHistory(finalMessages);
 
     } catch (error: any) {

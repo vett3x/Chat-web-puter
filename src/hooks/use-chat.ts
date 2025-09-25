@@ -360,13 +360,14 @@ export function useChat({
         content: messageContentToApiFormat(msg.content),
       }));
 
-      let responseStream: ReadableStream<Uint8Array> | null = null;
+      let fullResponseText = '';
       let modelUsedForResponse = selectedModel;
 
       if (selectedModel.startsWith('puter:')) {
         const actualModelForPuter = selectedModel.substring(6);
-        const response = await window.puter.ai.chat([systemMessage, ...messagesForApi], { model: actualModelForPuter, stream: true });
-        responseStream = response.body;
+        const response = await window.puter.ai.chat([systemMessage, ...messagesForApi], { model: actualModelForPuter });
+        if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
+        fullResponseText = response?.message?.content || 'Sin contenido.';
       } else if (selectedModel.startsWith('user_key:')) {
         const apiResponse = await fetch('/api/ai/chat', {
           method: 'POST',
@@ -380,23 +381,18 @@ export function useChat({
           const errorData = await apiResponse.json();
           throw new Error(errorData.message || 'Error en la API de IA.');
         }
-        responseStream = apiResponse.body;
+        const responseStream = apiResponse.body;
+        const reader = responseStream.getReader();
+        const decoder = new TextDecoder();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          fullResponseText += chunk;
+          setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: fullResponseText, isTyping: false, isNew: true } : m));
+        }
       } else {
         throw new Error('Modelo de IA no válido seleccionado.');
-      }
-
-      if (!responseStream) throw new Error('No se pudo obtener un stream de respuesta.');
-
-      let fullResponseText = '';
-      const reader = responseStream.getReader();
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        fullResponseText += chunk;
-        setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: fullResponseText, isTyping: false, isNew: true } : m));
       }
 
       const isConstructionPlan = chatMode === 'build' && fullResponseText.includes('### 1. Análisis del Requerimiento');
@@ -420,7 +416,7 @@ export function useChat({
       };
 
       const savedData = await saveMessageToDB(convId, finalAssistantMessageData);
-      setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, ...finalAssistantMessageData, id: savedData?.id || assistantMessageId, timestamp: savedData?.timestamp || new Date(), isNew: false } : m));
+      setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, ...finalAssistantMessageData, id: savedData?.id || assistantMessageId, timestamp: savedData?.timestamp || new Date(), isNew: false, isTyping: false } : m));
 
       if (filesToWrite.length > 0) {
         await onWriteFiles(filesToWrite);
