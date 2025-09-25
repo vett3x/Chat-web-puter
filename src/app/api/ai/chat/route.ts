@@ -3,15 +3,15 @@ export const runtime = 'nodejs';
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { GoogleGenerativeAI, Part } from '@google/generative-ai'; // Corrected import
+import { GoogleGenerativeAI, Part } from '@google/generative-ai';
 import { GoogleAuth } from 'google-auth-library';
-import { z } from 'zod'; // Import z for validation
+import { z } from 'zod';
 
 // Define unified part types for internal API handling
 interface TextPart { type: 'text'; text: string; }
 interface ImagePart { type: 'image_url'; image_url: { url: string }; }
-interface CodePart { type: 'code'; language?: string; filename?: string; code?: string; } // Added CodePart
-type MessageContentPart = TextPart | ImagePart | CodePart; // Unified type for internal messages
+interface CodePart { type: 'code'; language?: string; filename?: string; code?: string; }
+type MessageContentPart = TextPart | ImagePart | CodePart;
 
 // Define the schema for incoming messages from the client
 const messageSchema = z.object({
@@ -21,7 +21,7 @@ const messageSchema = z.object({
     z.array(z.union([
       z.object({ type: z.literal('text'), text: z.string() }),
       z.object({ type: z.literal('image_url'), image_url: z.object({ url: z.string() }) }),
-      z.object({ type: z.literal('code'), language: z.string().optional(), filename: z.string().optional(), code: z.string().optional() }), // Added code part
+      z.object({ type: z.literal('code'), language: z.string().optional(), filename: z.string().optional(), code: z.string().optional() }),
     ]))
   ]),
 });
@@ -65,7 +65,6 @@ const convertToGeminiParts = (content: string | MessageContentPart[]): Part[] =>
           parts.push({ inlineData: { mimeType, data } });
         }
       } else if (part.type === 'code') {
-        // Convert code blocks to text for Gemini API
         const codePart = part as CodePart;
         const lang = codePart.language || '';
         const filename = codePart.filename ? `:${codePart.filename}` : '';
@@ -99,7 +98,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { messages, selectedKeyId } = chatRequestSchema.parse(body);
+    const { messages: rawMessages, selectedKeyId } = chatRequestSchema.parse(body);
 
     const { data: keyDetails, error: keyError } = await supabase
       .from('user_api_keys')
@@ -117,11 +116,30 @@ export async function POST(req: NextRequest) {
     let aiResponseContent: string;
 
     if (keyDetails.provider === 'google_gemini') {
-      const geminiMessages = messages.map((msg: any) => ({
-        role: msg.role === 'assistant' ? 'model' : 'user',
-        parts: convertToGeminiParts(msg.content),
-      }));
+      const messagesCopy = [...rawMessages]; // Create a mutable copy
+      let systemPrompt = '';
 
+      // Extract system message if present (it should be the first one)
+      if (messagesCopy.length > 0 && messagesCopy[0].role === 'system') {
+        systemPrompt = typeof messagesCopy[0].content === 'string' ? messagesCopy[0].content : messageContentToString(messagesCopy[0].content);
+        messagesCopy.shift(); // Remove system message from the list to process
+      }
+
+      const geminiFormattedMessages: { role: 'user' | 'model'; parts: Part[] }[] = [];
+      for (let i = 0; i < messagesCopy.length; i++) {
+        const msg = messagesCopy[i];
+        if (msg.role === 'user') {
+          let userParts = convertToGeminiParts(msg.content);
+          if (i === 0 && systemPrompt) { // If this is the first user message and we have a system prompt
+            userParts = [{ text: systemPrompt + "\n\n" }, ...userParts];
+          }
+          geminiFormattedMessages.push({ role: 'user', parts: userParts });
+        } else if (msg.role === 'assistant') {
+          geminiFormattedMessages.push({ role: 'model', parts: convertToGeminiParts(msg.content) });
+        }
+        // Ignore other roles like 'system' if they appear later (shouldn't happen with current client logic)
+      }
+      
       if (keyDetails.use_vertex_ai) {
         const project = keyDetails.project_id;
         const location = keyDetails.location_id;
@@ -157,7 +175,7 @@ export async function POST(req: NextRequest) {
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ contents: geminiMessages }),
+          body: JSON.stringify({ contents: geminiFormattedMessages }),
         });
 
         if (!vertexAiResponse.ok) {
@@ -184,7 +202,7 @@ export async function POST(req: NextRequest) {
           finalModel = 'gemini-1.5-flash-latest'; // Fallback to a default if not set
         }
 
-        const result = await genAI.getGenerativeModel({ model: finalModel }).generateContent({ contents: geminiMessages });
+        const result = await genAI.getGenerativeModel({ model: finalModel }).generateContent({ contents: geminiFormattedMessages });
         aiResponseContent = result.response.text();
       }
     } else if (keyDetails.provider === 'custom_endpoint') {
@@ -196,9 +214,9 @@ export async function POST(req: NextRequest) {
         throw new Error('Configuración incompleta para el endpoint personalizado. Asegúrate de que el endpoint, la API Key y el ID del modelo estén configurados.');
       }
 
-      const customApiMessages = messages.map((msg: any) => ({
+      const customApiMessages = rawMessages.map((msg: any) => ({
         role: msg.role === 'assistant' ? 'assistant' : 'user',
-        content: messageContentToString(msg.content), // Convert content to string for custom endpoint
+        content: messageContentToString(msg.content),
       }));
 
       const customEndpointResponse = await fetch(customEndpointUrl, {
