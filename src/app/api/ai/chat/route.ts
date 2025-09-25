@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
       const credentials = JSON.parse(jsonKeyContent);
       const auth = new GoogleAuth({
         credentials,
-        scopes: ['https://www.googleapis.com/auth/cloud-platform'], // ADDED THIS LINE
+        scopes: ['https://www.googleapis.com/auth/cloud-platform'],
       });
       const client = await auth.getClient(); // Get the authenticated client
       const accessToken = (await client.getAccessToken()).token;
@@ -122,9 +122,17 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({ contents }),
       });
 
+      // --- START: Added error logging for non-OK responses ---
+      if (!vertexAiResponse.ok) {
+        const errorText = await vertexAiResponse.text();
+        console.error(`[API /ai/chat] Vertex AI API returned non-OK status: ${vertexAiResponse.status}. Response: ${errorText}`);
+        throw new Error(`Vertex AI API returned an error: ${vertexAiResponse.status} - ${errorText.substring(0, 200)}...`);
+      }
+      // --- END: Added error logging for non-OK responses ---
+
       const vertexAiResult = await vertexAiResponse.json();
 
-      if (!vertexAiResponse.ok || vertexAiResult.error) {
+      if (vertexAiResult.error) { // Check for error object within a 200 OK response
         throw new Error(vertexAiResult.error?.message || `Error en la API de Vertex AI: ${JSON.stringify(vertexAiResult)}`);
       }
 
@@ -192,6 +200,8 @@ export async function POST(req: NextRequest) {
       userFriendlyMessage = 'El modelo de IA de Google está sobrecargado en este momento. Por favor, intenta de nuevo en unos minutos o cambia a otro modelo.';
     } else if (errorMessage.toLowerCase().includes('api key not valid')) {
       userFriendlyMessage = 'Tu API Key de Google Gemini no es válida. Por favor, verifica que sea correcta en la Gestión de API Keys.';
+    } else if (errorMessage.includes('Vertex AI API returned an error:')) { // Catch our custom error
+      userFriendlyMessage = errorMessage; // Use the detailed error from our check
     } else if (errorMessage.includes('GOOGLE_CLOUD_PROJECT') || errorMessage.includes('GOOGLE_CLOUD_LOCATION')) {
       userFriendlyMessage = `Error de configuración de Vertex AI: ${errorMessage}`;
     }
