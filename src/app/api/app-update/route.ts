@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
       
       output += '--- Ejecutando git pull origin main ---\n';
       const { stdout: pullOut, stderr: pullErr } = await execAsync('git pull origin main');
-      output += pullOut + (pullErr ? `\nSTDERR: ${pullErr}` : '') + '\n';
+      output += pullOut.replace(/\[dyad\].*\n/g, '') + (pullErr ? `\nSTDERR: ${pullErr}` : '') + '\n'; // Filter Dyad commits
 
       output += '\n--- Ejecutando npm install ---\n';
       const { stdout: installOut, stderr: installErr } = await execAsync('npm install');
