@@ -27,21 +27,78 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { AI_PROVIDERS } from '@/lib/ai-models'; // Import AI_PROVIDERS
 
-const apiKeySchema = z.object({
-  id: z.string().optional(), // Added for editing existing keys
+// Define a base schema for API key fields
+const baseApiKeySchema = z.object({
+  id: z.string().optional(),
   provider: z.string().min(1, { message: 'Debes seleccionar un proveedor.' }),
-  api_key: z.string().optional(), // Make optional for Vertex AI
   nickname: z.string().optional(),
-  // New fields for Vertex AI
-  project_id: z.string().optional(),
-  location_id: z.string().optional(),
   use_vertex_ai: z.boolean().optional(),
-  model_name: z.string().optional(), // New: model_name for Vertex AI
-  json_key_file: z.any().optional(), // New: for file upload
-  json_key_content: z.string().optional(), // Added for payload
+  json_key_file: z.any().optional(),
+  json_key_content: z.string().optional(),
 });
 
-type ApiKeyFormValues = z.infer<typeof apiKeySchema>;
+// Extend base schema with optional fields that are conditionally required by superRefine
+const fullApiKeySchema = baseApiKeySchema.extend({
+  api_key: z.string().optional(),
+  project_id: z.string().optional(),
+  location_id: z.string().optional(),
+  model_name: z.string().optional(),
+});
+
+// Refined schema with conditional validation
+const validatedApiKeySchema = fullApiKeySchema.superRefine((data, ctx) => {
+  if (data.provider === 'google_gemini') {
+    if (data.use_vertex_ai) {
+      if (!data.project_id) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Project ID es requerido para usar Vertex AI.',
+          path: ['project_id'],
+        });
+      }
+      if (!data.location_id) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Location ID es requerido para usar Vertex AI.',
+          path: ['location_id'],
+        });
+      }
+      if (!data.model_name) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Debes seleccionar un modelo para usar Vertex AI.',
+          path: ['model_name'],
+        });
+      }
+      // json_key_content is handled by file upload, so it's checked in onSubmit
+    } else { // Not using Vertex AI (public API)
+      if (!data.api_key && !data.id) { // api_key is only required for new keys, or if it's being updated
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'La API Key es requerida para la API pública de Gemini.',
+          path: ['api_key'],
+        });
+      }
+      if (!data.model_name) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Debes seleccionar un modelo para la API pública de Gemini.',
+          path: ['model_name'],
+        });
+      }
+    }
+  } else { // Other providers (e.g., Anthropic)
+    if (!data.api_key && !data.id) { // api_key is only required for new keys, or if it's being updated
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'La API Key es requerida para este proveedor.',
+        path: ['api_key'],
+      });
+    }
+  }
+});
+
+type ApiKeyFormValues = z.infer<typeof validatedApiKeySchema>;
 
 interface ApiKey {
   id: string;
@@ -77,7 +134,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
   const [jsonKeyFileName, setJsonKeyFileName] = useState<string | null>(null);
 
   const form = useForm<ApiKeyFormValues>({
-    resolver: zodResolver(apiKeySchema),
+    resolver: zodResolver(validatedApiKeySchema),
     defaultValues: {
       provider: '',
       api_key: '',
@@ -193,28 +250,6 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
   const onSubmit = async (values: ApiKeyFormValues) => {
     setIsSubmitting(true);
     try {
-      // Validation logic
-      if (!values.use_vertex_ai && (!values.api_key || values.api_key.length < 10) && !editingKeyId) {
-        toast.error('La API Key es requerida y debe ser válida para un nuevo proveedor si no usas Vertex AI.');
-        setIsSubmitting(false);
-        return;
-      }
-      if (values.use_vertex_ai && (!values.project_id || !values.location_id)) {
-        toast.error('Project ID y Location ID son requeridos para usar Vertex AI.');
-        setIsSubmitting(false);
-        return;
-      }
-      if (values.use_vertex_ai && !values.model_name) {
-        toast.error('Debes seleccionar un modelo para usar Vertex AI.');
-        setIsSubmitting(false);
-        return;
-      }
-      if (values.use_vertex_ai && !selectedJsonKeyFile && !editingKeyId) {
-        toast.error('Debes subir el archivo JSON de la cuenta de servicio para Vertex AI.');
-        setIsSubmitting(false);
-        return;
-      }
-
       const method = editingKeyId ? 'PUT' : 'POST';
       const payload: ApiKeyFormValues = { ...values };
       
@@ -301,7 +336,17 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                   <FormField control={form.control} name="provider" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Proveedor</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || editingKeyId !== null}>
+                      <Select onValueChange={(value) => {
+                        field.onChange(value);
+                        form.setValue('use_vertex_ai', false); // Reset Vertex AI switch on provider change
+                        form.setValue('model_name', ''); // Reset model name on provider change
+                        form.setValue('api_key', ''); // Reset api key on provider change
+                        form.setValue('project_id', ''); // Reset project_id
+                        form.setValue('location_id', ''); // Reset location_id
+                        setSelectedJsonKeyFile(null); // Clear file selection
+                        setJsonKeyFileName(null);
+                        if (jsonKeyFileInputRef.current) jsonKeyFileInputRef.current.value = '';
+                      }} value={field.value} disabled={isSubmitting || editingKeyId !== null}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un proveedor" /></SelectTrigger></FormControl>
                         <SelectContent>
                           {providerOptions.map(opt => (
@@ -328,6 +373,10 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                               checked={field.value}
                               onCheckedChange={(checked) => {
                                 field.onChange(checked);
+                                form.setValue('model_name', ''); // Reset model name when toggling Vertex AI
+                                form.setValue('api_key', ''); // Clear API key if switching to Vertex AI
+                                form.setValue('project_id', ''); // Clear project_id
+                                form.setValue('location_id', ''); // Clear location_id
                                 // Clear file selection if switching off Vertex AI
                                 if (!checked) {
                                   setSelectedJsonKeyFile(null);
@@ -510,13 +559,13 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                               <span>Vertex AI (Activo)</span>
                               <span className="text-muted-foreground">Project: {key.project_id || 'N/A'}</span>
                               <span className="text-muted-foreground">Location: {key.location_id || 'N/A'}</span>
-                              <span className="text-muted-foreground">Modelo: {key.model_name || 'N/A'}</span>
+                              <span className="text-muted-foreground">Modelo: {key.model_name || 'Modelo no seleccionado'}</span>
                               {key.json_key_content && <span className="text-muted-foreground">JSON Key: Subido</span>}
                             </div>
                           ) : (
                             <>
                               <span>{key.api_key}</span>
-                              {key.model_name && <span className="text-muted-foreground">Modelo: {key.model_name}</span>}
+                              {key.model_name && <span className="text-muted-foreground">Modelo: {key.model_name || 'Modelo no seleccionado'}</span>}
                             </>
                           )}
                         </TableCell>
