@@ -269,9 +269,7 @@ export async function uninstallCloudflaredService(
   serverDetails: ServerDetails,
   containerId: string, // NEW: containerId to exec into
   tunnelId: string, // NEW: tunnelId for cleanup and file removal
-  fullDomain: string, // NEW: Added for consistency, not directly used in uninstall logic
-  containerPort: number, // NEW: Added for consistency, not directly used in uninstall logic
-  userId?: string,
+  userId?: string, // REMOVED: fullDomain, containerPort
 ): Promise<void> {
   await logApiCall(userId, 'cloudflared_container_uninstall_ssh', `Attempting to uninstall cloudflared from inside container ${containerId.substring(0,12)} on ${serverDetails.ip_address}.`);
 
@@ -282,11 +280,13 @@ export async function uninstallCloudflaredService(
   // 1. Find and kill the cloudflared process inside the container
   await logApiCall(userId, 'cloudflared_container_kill_process', `Killing cloudflared process inside container ${containerId.substring(0,12)}.`);
   await executeSshCommand(serverDetails, `docker exec ${containerId} bash -c "pkill cloudflared || true"`).catch(e => console.warn(`[CloudflareUtils] Could not kill cloudflared process cleanly in container ${containerId.substring(0,12)}: ${e.message}`));
+  await new Promise(resolve => setTimeout(resolve, 1000)); // Small delay after pkill
 
   // 2. Clean up stale connections on Cloudflare's side
   await logApiCall(userId, 'cloudflared_container_cleanup_connections', `Cleaning up stale connections for tunnel ${tunnelId} inside container ${containerId.substring(0,12)}.`);
   const cleanupCommand = `cloudflared tunnel cleanup ${tunnelId}`;
   await executeSshCommand(serverDetails, `docker exec ${containerId} bash -c "${cleanupCommand}"`).catch(e => console.warn(`[CloudflareUtils] 'cloudflared tunnel cleanup' may have failed (this is often safe to ignore): ${e.message}`));
+  await new Promise(resolve => setTimeout(resolve, 1000)); // Small delay after cleanup
 
   // 3. Remove config.yml and credentials file from inside the container
   await executeSshCommand(serverDetails, `docker exec ${containerId} bash -c "rm -f ${configFilePath}"`).catch(e => console.warn(`[CloudflareUtils] Could not remove config.yml from container ${containerId.substring(0,12)}: ${e.message}`));

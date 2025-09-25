@@ -185,7 +185,7 @@ export async function createAndProvisionCloudflareTunnel({
       try {
         await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Attempting rollback: Uninstalling cloudflared client from container ${containerId.substring(0,12)} via SSH...\n` });
         // Pass dummy values for fullDomain and containerPort during rollback if not available from tunnel object
-        await uninstallCloudflaredService(serverDetails, containerId, tunnelId, "dummy.domain", 80, userId); // MODIFIED LINE
+        await uninstallCloudflaredService(serverDetails, containerId, tunnelId, userId); // MODIFIED LINE
         await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel] Rollback: cloudflared client uninstalled from container.\n` });
       } catch (rollbackError) {
         console.error(`[Rollback] Failed to uninstall cloudflared service:`, rollbackError);
@@ -239,8 +239,10 @@ export async function deleteCloudflareTunnelAndCleanup({
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Tunnel details fetched. Cloudflare Tunnel ID: ${tunnel.tunnel_id}\n` });
 
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Cleaning up cloudflared client from container ${containerId.substring(0,12)} via SSH...\n` });
-    await uninstallCloudflaredService(serverDetails, containerId, tunnel.tunnel_id, tunnel.full_domain, tunnel.container_port, userId); // MODIFIED LINE
+    await uninstallCloudflaredService(serverDetails, containerId, tunnel.tunnel_id, userId); // MODIFIED LINE
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] cloudflared client cleaned up from container.\n` });
+
+    await new Promise(resolve => setTimeout(resolve, 5000)); // NEW: Add 5-second delay here
 
     try {
       await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Deleting Cloudflare Tunnel ${tunnel.tunnel_id} via API...\n` });
