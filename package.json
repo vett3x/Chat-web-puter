@@ -51,6 +51,7 @@
     "@uiw/react-textarea-code-editor": "^3.1.1",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.4.0",
+    "ai": "^5.0.53",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -84,7 +85,7 @@
   },
   "devDependencies": {
     "@dyad-sh/nextjs-webpack-component-tagger": "latest",
-    "@types/cors": "^2.8.19",
+    "@types/cors": "latest",
     "@types/express": "^5.0.3",
     "@types/node": "^20",
     "@types/react": "^19",

@@ -7,54 +7,21 @@ interface TextAnimatorProps {
   className?: string;
   isNew?: boolean;
   onAnimationComplete?: () => void;
-  animationSpeed: 'slow' | 'normal' | 'fast'; // New prop
+  animationSpeed: 'slow' | 'normal' | 'fast';
 }
 
-const SPEED_DELAYS = {
-  slow: 15,
-  normal: 7,
-  fast: 2,
-};
-
-export function TextAnimator({ text, className, isNew, onAnimationComplete, animationSpeed }: TextAnimatorProps) {
-  const [displayedText, setDisplayedText] = useState(isNew ? '' : text);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-
+export function TextAnimator({ text, className, isNew, onAnimationComplete }: TextAnimatorProps) {
+  // The streaming from useChat now handles the animation.
+  // This component just needs to render the text as it receives it.
+  // The onAnimationComplete is called by the stream handler in useChat when the stream ends.
+  
   useEffect(() => {
+    // If this component is part of a message that is NOT new (i.e., loaded from history),
+    // and it's the last part of that message, we can consider its "animation" complete immediately.
     if (!isNew) {
-      setDisplayedText(text);
-      return;
-    }
-
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-    }
-
-    setDisplayedText('');
-    if (text) {
-      let i = 0;
-      const delay = SPEED_DELAYS[animationSpeed];
-      intervalRef.current = setInterval(() => {
-        if (i < text.length) {
-          setDisplayedText(text.substring(0, i + 1));
-          i++;
-        } else {
-          if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-          }
-          onAnimationComplete?.();
-        }
-      }, delay);
-    } else {
       onAnimationComplete?.();
     }
+  }, [isNew, onAnimationComplete]);
 
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [text, isNew, onAnimationComplete, animationSpeed]);
-
-  return <span className={className}>{displayedText}</span>;
+  return <span className={className}>{text}</span>;
 }

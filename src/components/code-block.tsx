@@ -15,72 +15,30 @@ interface CodeBlockProps {
   filename?: string;
   isNew?: boolean;
   onAnimationComplete?: () => void;
-  animationSpeed: 'slow' | 'normal' | 'fast'; // New prop
+  animationSpeed: 'slow' | 'normal' | 'fast';
 }
 
-const SPEED_CONFIG = {
-  slow: { targetCharsPerSecond: 1500, chunkSize: 20, minDelay: 2 },
-  normal: { targetCharsPerSecond: 3000, chunkSize: 30, minDelay: 1 },
-  fast: { targetCharsPerSecond: 5000, chunkSize: 40, minDelay: 0.5 },
-};
-
-export function CodeBlock({ language, code, filename, isNew, onAnimationComplete, animationSpeed }: CodeBlockProps) {
+export function CodeBlock({ language, code, filename, isNew, onAnimationComplete }: CodeBlockProps) {
   const [isCopied, setIsCopied] = useState(false);
-  const [isOpen, setIsOpen] = useState(false); // Always start collapsed
-  const [displayedCode, setDisplayedCode] = useState(isNew ? '' : code);
+  const [isOpen, setIsOpen] = useState(false);
   const [isTyping, setIsTyping] = useState(!!isNew);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // The streaming from useChat now handles the animation.
+  // This component just needs to render the code as it receives it.
+  // The onAnimationComplete is called by the stream handler in useChat when the stream ends.
   useEffect(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-
     if (!isNew) {
-      setDisplayedCode(code);
       setIsTyping(false);
-      return;
-    }
-
-    setIsTyping(true);
-    setDisplayedCode('');
-    
-    if (code) {
-      const { targetCharsPerSecond, chunkSize, minDelay } = SPEED_CONFIG[animationSpeed];
-      const MAX_DURATION = 6000; // Max duration remains constant
-
-      const totalDuration = Math.min(
-        (code.length / targetCharsPerSecond) * 1000,
-        MAX_DURATION
-      );
-      
-      const numberOfChunks = Math.ceil(code.length / chunkSize);
-      const delayPerChunk = Math.max(totalDuration / numberOfChunks, minDelay);
-
-      let i = 0;
-      const typeChunk = () => {
-        if (i < code.length) {
-          const nextI = Math.min(i + chunkSize, code.length);
-          setDisplayedCode(code.substring(0, nextI));
-          i = nextI;
-          timeoutRef.current = setTimeout(typeChunk, delayPerChunk);
-        } else {
-          setIsTyping(false);
-          onAnimationComplete?.(); // Animation finished
-        }
-      };
-      typeChunk();
+      onAnimationComplete?.();
     } else {
-      setIsTyping(false);
-      onAnimationComplete?.(); // No code to animate
+      // A simple heuristic: if the code length stops changing for a moment, assume typing is done.
+      const timer = setTimeout(() => {
+        setIsTyping(false);
+        onAnimationComplete?.();
+      }, 1000); // If no new code for 1 second, stop the typing indicator.
+      return () => clearTimeout(timer);
     }
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, [code, isNew, onAnimationComplete, animationSpeed]);
+  }, [code, isNew, onAnimationComplete]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(code).then(() => {
@@ -155,7 +113,7 @@ export function CodeBlock({ language, code, filename, isNew, onAnimationComplete
           codeTagProps={{ style: { fontFamily: 'var(--font-geist-mono)' } }}
           wrapLongLines={true}
         >
-          {displayedCode}
+          {code}
         </SyntaxHighlighter>
       </CollapsibleContent>
     </Collapsible>

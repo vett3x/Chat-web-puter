@@ -35,6 +35,8 @@ interface PuterMessage {
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  id?: string;
+  isTyping?: boolean;
 }
 
 const DEFAULT_AI_MODEL_FALLBACK = 'puter:claude-sonnet-4'; // Fallback if Gemini 2.5 Flash not found or configured
@@ -129,6 +131,9 @@ export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialCha
     setUserInput('');
     setIsLoading(true);
 
+    const assistantMessageId = `assistant-${Date.now()}`;
+    setMessages(prev => [...prev, { role: 'assistant', content: '', isTyping: true, id: assistantMessageId }]);
+
     try {
       const systemPrompt = `Eres un asistente de IA experto que ayuda a un usuario con su nota. La nota del usuario se proporciona a continuación, delimitada por '---'. Tu tarea es responder a las preguntas del usuario basándote únicamente en el contexto de esta nota y la conversación actual. Sé conciso y directo.
 ---
@@ -142,49 +147,51 @@ ${noteContent}
         ...newMessages.map(msg => ({ role: msg.role, content: msg.content }))
       ];
 
-      let response: any;
+      let responseStream: ReadableStream<Uint8Array> | null = null;
+
       if (selectedModel.startsWith('puter:')) {
         const actualModelForPuter = selectedModel.substring(6);
-        response = await window.puter.ai.chat(puterMessages, { model: actualModelForPuter });
+        const response = await window.puter.ai.chat(puterMessages, { model: actualModelForPuter, stream: true });
+        responseStream = response.body;
       } else if (selectedModel.startsWith('user_key:')) {
-        const selectedKeyId = selectedModel.substring(9);
         const apiResponse = await fetch('/api/ai/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             messages: puterMessages,
-            selectedKeyId: selectedKeyId,
+            selectedKeyId: selectedModel.substring(9),
           }),
         });
-        response = await apiResponse.json();
-        if (!apiResponse.ok) throw new Error(response.message || 'Error en la API de IA.');
+        if (!apiResponse.ok || !apiResponse.body) {
+          const errorData = await apiResponse.json();
+          throw new Error(errorData.message || 'Error en la API de IA.');
+        }
+        responseStream = apiResponse.body;
       } else {
         throw new Error('Modelo de IA no válido seleccionado.');
       }
 
-      if (!response || response.error) {
-        throw new Error(response?.error?.message || 'La IA devolvió una respuesta de error.');
+      if (!responseStream) throw new Error('No se pudo obtener un stream de respuesta.');
+
+      let fullResponseText = '';
+      const reader = responseStream.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        fullResponseText += chunk;
+        setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: fullResponseText, isTyping: false } : m));
       }
 
-      const assistantResponse = response?.message?.content || 'No se pudo obtener una respuesta.';
-      
-      let responseText = '';
-      if (typeof assistantResponse === 'string') {
-        responseText = assistantResponse;
-      } else if (Array.isArray(assistantResponse)) {
-        responseText = assistantResponse.filter(part => part.type === 'text' && part.text).map(part => part.text).join('\n\n');
-      } else {
-        responseText = 'Respuesta con formato no soportado.';
-      }
-
-      const finalMessages = [...newMessages, { role: 'assistant' as const, content: responseText }];
-      setMessages(finalMessages);
+      const finalMessages = [...newMessages, { role: 'assistant' as const, content: fullResponseText }];
       onSaveHistory(finalMessages);
 
     } catch (error: any) {
       const errorMessage = error?.message || 'Ocurrió un error desconocido.';
       toast.error(errorMessage);
-      setMessages([...newMessages, { role: 'assistant' as const, content: `Error: ${errorMessage}` }]);
+      setMessages(prev => prev.filter(m => m.id !== assistantMessageId));
     } finally {
       setIsLoading(false);
     }
@@ -196,7 +203,6 @@ ${noteContent}
     toast.success('Historial del chat limpiado.');
   };
 
-  // Determine the icon for the ModelSelectorDropdown trigger
   const SelectedModelIcon = React.useMemo(() => {
     if (selectedModel.startsWith('puter:')) {
       const modelValue = selectedModel.substring(6);
@@ -212,9 +218,9 @@ ${noteContent}
         const provider = AI_PROVIDERS.find(p => p.value === key.provider);
         if (provider) return provider.logo;
       }
-      return KeyRound; // Default for user_key if provider not found, or for custom_endpoint
+      return KeyRound;
     }
-    return Bot; // Fallback
+    return Bot;
   }, [selectedModel, userApiKeys]);
 
   if (!isOpen) return null;
@@ -258,12 +264,17 @@ ${noteContent}
                     {msg.role === 'user' ? (<div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center"><User className="h-3 w-3 text-primary-foreground" /></div>) : (<div className="w-6 h-6 bg-secondary rounded-full flex items-center justify-center"><Bot className="h-3 w-3 text-secondary-foreground" /></div>)}
                   </div>
                   <div className={`rounded-lg p-2 text-sm ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                    <div className="prose prose-sm dark:prose-invert max-w-none"><ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown></div>
+                    {msg.isTyping ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      </div>
+                    ) : (
+                      <div className="prose prose-sm dark:prose-invert max-w-none"><ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown></div>
+                    )}
                   </div>
                 </div>
               </div>
             ))}
-            {isLoading && (<div className="flex justify-start"><div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /><span>Pensando...</span></div></div>)}
           </div>
         </ScrollArea>
       </CardContent>
