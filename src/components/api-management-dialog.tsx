@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { KeyRound, PlusCircle, Trash2, Loader2, RefreshCw, Edit, Upload, XCircle } from 'lucide-react';
+import { KeyRound, PlusCircle, Trash2, Loader2, RefreshCw, Edit, Upload, XCircle, Search } from 'lucide-react'; // Import Search icon
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -233,6 +233,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
   const jsonKeyFileInputRef = useRef<HTMLInputElement>(null);
   const [selectedJsonKeyFile, setSelectedJsonKeyFile] = useState<File | null>(null);
   const [jsonKeyFileName, setJsonKeyFileName] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState(''); // New state for search query
 
   const form = useForm<ApiKeyFormValues>({
     resolver: zodResolver(apiKeySchema),
@@ -288,6 +289,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       setEditingKeyId(null);
       setSelectedJsonKeyFile(null);
       setJsonKeyFileName(null);
+      setSearchQuery(''); // Reset search query on dialog open
     }
   }, [open, fetchKeys, form]);
 
@@ -431,6 +433,20 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       toast.error(`Error al eliminar la clave: ${error.message}`);
     }
   };
+
+  const filteredKeys = keys.filter(key => {
+    const lowerCaseQuery = searchQuery.toLowerCase();
+    const providerLabel = providerOptions.find(p => p.value === key.provider)?.label || key.provider;
+    
+    return (
+      (key.nickname && key.nickname.toLowerCase().includes(lowerCaseQuery)) ||
+      (providerLabel.toLowerCase().includes(lowerCaseQuery)) ||
+      (key.model_name && getModelLabel(key.model_name ?? undefined).toLowerCase().includes(lowerCaseQuery)) ||
+      (key.project_id && key.project_id.toLowerCase().includes(lowerCaseQuery)) ||
+      (key.location_id && key.location_id.toLowerCase().includes(lowerCaseQuery)) ||
+      (key.api_endpoint && key.api_endpoint.toLowerCase().includes(lowerCaseQuery))
+    );
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -681,6 +697,15 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
           <div className="flex-1 flex flex-col">
             <div className="flex justify-between items-center mb-2">
               <h3 className="text-lg font-semibold">Claves Guardadas</h3>
+              <div className="relative flex-1 max-w-xs ml-auto"> {/* Added ml-auto to push to right */}
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar clave..."
+                  className="pl-9"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
               <Button variant="ghost" size="icon" onClick={fetchKeys} disabled={isLoading}><RefreshCw className="h-4 w-4" /></Button>
             </div>
             <ScrollArea className="flex-1">
@@ -696,10 +721,10 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                 <TableBody>
                   {isLoading ? (
                     <TableRow><TableCell colSpan={4} className="text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
-                  ) : keys.length === 0 ? (
-                    <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No hay claves guardadas.</TableCell></TableRow>
+                  ) : filteredKeys.length === 0 ? (
+                    <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No hay claves que coincidan con la búsqueda.</TableCell></TableRow>
                   ) : (
-                    keys.map(key => (
+                    filteredKeys.map(key => (
                       <TableRow key={key.id}>
                         <TableCell>{key.nickname || 'N/A'}</TableCell>
                         <TableCell>{providerOptions.find(p => p.value === key.provider)?.label || key.provider}</TableCell>
