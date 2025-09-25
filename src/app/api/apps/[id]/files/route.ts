@@ -129,7 +129,7 @@ export async function POST(req: NextRequest, context: any) {
   const appId = context.params.id;
   const localTempDir = path.join(os.tmpdir(), `dyad-upload-${crypto.randomBytes(16).toString('hex')}`);
   const remoteTempDir = `/tmp/dyad-upload-${crypto.randomBytes(16).toString('hex')}`;
-  let serverDetailsForCleanup: any = null; // Variable to hold server details for the finally block
+  let serverDetailsForCleanup: any = null;
 
   try {
     const { session, userPermissions } = await getSessionAndRole();
@@ -139,14 +139,13 @@ export async function POST(req: NextRequest, context: any) {
 
     const userId = session.user.id;
     const { app, server } = await getAppAndServerWithStateCheck(appId, userId);
-    serverDetailsForCleanup = server; // Store server details for cleanup
+    serverDetailsForCleanup = server;
     const { files } = await req.json();
 
     if (!Array.isArray(files) || files.length === 0) {
       return NextResponse.json({ message: 'Se requiere una lista de archivos.' }, { status: 400 });
     }
 
-    // 1. Create local temporary directory and write files
     await fs.mkdir(localTempDir, { recursive: true });
     for (const file of files) {
       const localFilePath = path.join(localTempDir, file.path);
@@ -154,21 +153,45 @@ export async function POST(req: NextRequest, context: any) {
       await fs.writeFile(localFilePath, file.content);
     }
 
-    // 2. Create remote temporary directory
     await executeSshCommand(server, `mkdir -p ${remoteTempDir}`);
-
-    // 3. Transfer files using scp
     await transferDirectoryScp(server, localTempDir, remoteTempDir);
 
-    // 4. Copy files from remote temp dir to Docker container
     const localDirName = path.basename(localTempDir);
-    const remoteSourcePath = `${remoteTempDir}/${localDirName}/.`; // Correct path to copy CONTENTS
+    const remoteSourcePath = `${remoteTempDir}/${localDirName}/.`;
     const { stderr: cpStderr, code: cpCode } = await executeSshCommand(server, `docker cp '${remoteSourcePath}' '${app.container_id}:/app/'`);
     if (cpCode !== 0) {
       throw new Error(`Error al copiar archivos al contenedor: ${cpStderr}`);
     }
 
-    // 5. Backup and log
+    const hasPackageJson = files.some((file: { path: string }) => file.path === 'package.json');
+    if (hasPackageJson) {
+      await supabaseAdmin.from('server_events_log').insert({
+        user_id: userId,
+        server_id: server.id,
+        event_type: 'npm_install_started',
+        description: `package.json modificado. Ejecutando 'npm install' en el contenedor ${app.container_id.substring(0, 12)}.`
+      });
+
+      const { stderr: installStderr, code: installCode } = await executeSshCommand(server, `docker exec ${app.container_id} bash -c "cd /app && npm install"`);
+      
+      if (installCode !== 0) {
+        await supabaseAdmin.from('server_events_log').insert({
+          user_id: userId,
+          server_id: server.id,
+          event_type: 'npm_install_failed',
+          description: `Falló 'npm install' en el contenedor ${app.container_id.substring(0, 12)}. Error: ${installStderr}`
+        });
+        throw new Error(`Error al ejecutar 'npm install' en el contenedor: ${installStderr}`);
+      }
+
+      await supabaseAdmin.from('server_events_log').insert({
+        user_id: userId,
+        server_id: server.id,
+        event_type: 'npm_install_succeeded',
+        description: `'npm install' completado exitosamente en el contenedor ${app.container_id.substring(0, 12)}.`
+      });
+    }
+
     const backups = files.map(file => ({ app_id: appId, user_id: userId, file_path: file.path, file_content: file.content }));
     const logEntries = files.map(file => ({ user_id: userId, server_id: server.id, event_type: 'file_written', description: `Archivo '${file.path}' escrito en el contenedor ${app.container_id.substring(0, 12)}.` }));
     
@@ -183,7 +206,6 @@ export async function POST(req: NextRequest, context: any) {
     console.error(`[API /apps/${appId}/files] Error en POST:`, error);
     return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
   } finally {
-    // 6. Cleanup both local and remote temporary directories
     try {
       await fs.rm(localTempDir, { recursive: true, force: true });
     } catch (cleanupError) {
