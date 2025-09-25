@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react';
 import { useChat } from '@/hooks/use-chat';
 import { ChatMessages } from '@/components/chat/chat-messages';
 import { ChatInput } from '@/components/chat/chat-input';
+import { ApiKey } from '@/hooks/use-user-api-keys'; // NEW: Import ApiKey type
 
 interface ChatInterfaceProps {
   userId: string | undefined;
@@ -16,9 +17,11 @@ interface ChatInterfaceProps {
   isAppDeleting?: boolean;
   appPrompt?: string | null;
   appId?: string | null;
-  onWriteFiles: (files: { path: string; content: string }[]) => Promise<void>; // Changed from onFilesWritten
+  onWriteFiles: (files: { path: string; content: string }[]) => Promise<void>;
   isAppChat?: boolean;
-  onSidebarDataRefresh: () => void; // NEW: Prop to refresh sidebar data
+  onSidebarDataRefresh: () => void;
+  userApiKeys: ApiKey[]; // NEW: Prop for user API keys
+  isLoadingApiKeys: boolean; // NEW: Prop for loading state of API keys
 }
 
 export function ChatInterface({
@@ -31,9 +34,11 @@ export function ChatInterface({
   isAppDeleting = false,
   appPrompt,
   appId,
-  onWriteFiles, // Changed from onFilesWritten
+  onWriteFiles,
   isAppChat = false,
-  onSidebarDataRefresh, // NEW: Destructure the prop
+  onSidebarDataRefresh,
+  userApiKeys, // NEW: Destructure
+  isLoadingApiKeys, // NEW: Destructure
 }: ChatInterfaceProps) {
   const {
     messages,
@@ -51,8 +56,10 @@ export function ChatInterface({
     onConversationTitleUpdate,
     appPrompt,
     appId,
-    onWriteFiles, // Pass the function down
-    onSidebarDataRefresh, // NEW: Pass the prop to useChat
+    onWriteFiles,
+    onSidebarDataRefresh,
+    userApiKeys, // NEW: Pass to useChat
+    isLoadingApiKeys, // NEW: Pass to useChat
   });
 
   if (isAppProvisioning) {
@@ -75,12 +82,12 @@ export function ChatInterface({
     );
   }
 
-  if (!isPuterReady) {
+  if (!isPuterReady || isLoadingApiKeys) { // NEW: Check isLoadingApiKeys
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Cargando Puter AI...</p>
+          <p className="text-muted-foreground">Cargando IA y claves...</p> {/* NEW: Updated message */}
         </div>
       </div>
     );

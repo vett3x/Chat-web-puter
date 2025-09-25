@@ -14,7 +14,7 @@ import { UserManagementDialog } from "@/components/user-management-dialog";
 import { DeepAiCoderDialog } from "@/components/deep-ai-coder-dialog";
 import { RetryUploadDialog } from "@/components/retry-upload-dialog";
 import { UpdateManagerDialog } from "@/components/update-manager-dialog";
-import { ApiManagementDialog } from "@/components/api-management-dialog"; // Import the new dialog
+import { ApiManagementDialog } from "@/components/api-management-dialog";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -24,6 +24,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { useSidebarData } from "@/hooks/use-sidebar-data";
+import { useUserApiKeys } from "@/hooks/use-user-api-keys"; // NEW: Import useUserApiKeys
 
 interface UserApp {
   id: string;
@@ -69,6 +70,8 @@ export default function Home() {
     moveItem,
   } = useSidebarData();
 
+  const { userApiKeys, isLoadingApiKeys } = useUserApiKeys(); // NEW: Get user API keys
+
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   const [selectedAppDetails, setSelectedAppDetails] = useState<UserApp | null>(null);
   
@@ -78,7 +81,7 @@ export default function Home() {
   const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
   const [isDeepAiCoderOpen, setIsDeepAiCoderOpen] = useState(false);
   const [isUpdateManagerOpen, setIsUpdateManagerOpen] = useState(false);
-  const [isApiManagementOpen, setIsApiManagementOpen] = useState(false); // State for the new dialog
+  const [isApiManagementOpen, setIsApiManagementOpen] = useState(false);
   
   const [aiResponseSpeed, setAiResponseSpeed] = useState<'slow' | 'normal' | 'fast'>(() => {
     if (typeof window !== 'undefined') {
@@ -93,7 +96,7 @@ export default function Home() {
   const [isDeletingAppId, setIsDeletingAppId] = useState<string | null>(null);
   const [retryState, setRetryState] = useState<RetryState>({ isOpen: false, files: null });
   const appBrowserRef = useRef<{ refresh: () => void }>(null);
-  const [fileTreeRefreshKey, setFileTreeRefreshKey] = useState(0); // Key for forcing FileTree refresh
+  const [fileTreeRefreshKey, setFileTreeRefreshKey] = useState(0);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -240,7 +243,7 @@ export default function Home() {
   const handleOpenUserManagement = () => setIsUserManagementOpen(true);
   const handleOpenDeepAiCoder = () => setIsDeepAiCoderOpen(true);
   const handleOpenUpdateManager = () => setIsUpdateManagerOpen(true);
-  const handleOpenApiManagement = () => setIsApiManagementOpen(true); // Handler for the new dialog
+  const handleOpenApiManagement = () => setIsApiManagementOpen(true);
 
   const handleAiResponseSpeedChange = (speed: 'slow' | 'normal' | 'fast') => {
     setAiResponseSpeed(speed);
@@ -286,7 +289,7 @@ export default function Home() {
           onOpenUserManagement={handleOpenUserManagement}
           onOpenDeepAiCoder={handleOpenDeepAiCoder}
           onOpenUpdateManager={handleOpenUpdateManager}
-          onOpenApiManagement={handleOpenApiManagement} // Pass handler
+          onOpenApiManagement={handleOpenApiManagement}
           refreshData={refreshSidebarData}
           createConversation={createConversation as any}
           createFolder={createFolder}
@@ -299,12 +302,17 @@ export default function Home() {
       </div>
       <div className="flex-1 min-w-0">
         {selectedItem?.type === 'note' ? (
-          <NoteEditorPanel noteId={selectedItem.id} onNoteUpdated={refreshSidebarData} />
+          <NoteEditorPanel
+            noteId={selectedItem.id}
+            onNoteUpdated={refreshSidebarData}
+            userApiKeys={userApiKeys} // NEW: Pass userApiKeys
+            isLoadingApiKeys={isLoadingApiKeys} // NEW: Pass isLoadingApiKeys
+          />
         ) : (
           <ResizablePanelGroup direction="horizontal">
             <ResizablePanel defaultSize={50} minSize={30}>
               <ChatInterface
-                key={selectedItem?.conversationId || 'no-conversation'} // Force re-mount on conversation change
+                key={selectedItem?.conversationId || 'no-conversation'}
                 userId={userId}
                 conversationId={selectedItem?.conversationId || null}
                 onNewConversationCreated={handleNewConversationCreated}
@@ -316,8 +324,9 @@ export default function Home() {
                 appId={selectedAppDetails?.id}
                 onWriteFiles={writeFilesToApp}
                 isAppChat={selectedItem?.type === 'app'}
-                /* NEW: Pass refreshSidebarData */
                 onSidebarDataRefresh={refreshSidebarData}
+                userApiKeys={userApiKeys} // NEW: Pass userApiKeys
+                isLoadingApiKeys={isLoadingApiKeys} // NEW: Pass isLoadingApiKeys
               />
             </ResizablePanel>
             {selectedItem?.type === 'app' && (

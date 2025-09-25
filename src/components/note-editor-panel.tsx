@@ -6,7 +6,7 @@ import { useSession } from '@/components/session-context-provider';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Save, Loader2, Eye, Code, Wand2, X, Settings, Sparkles } from 'lucide-react';
+import { Save, Loader2, Eye, Code, Wand2, X, Settings, Sparkles, Check } from 'lucide-react';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -17,6 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { CodeBlock } from './code-block';
+import { ApiKey } from '@/hooks/use-user-api-keys'; // NEW: Import ApiKey type
 
 interface Note {
   id: string;
@@ -29,9 +30,11 @@ interface Note {
 interface NoteEditorPanelProps {
   noteId: string;
   onNoteUpdated: () => void;
+  userApiKeys: ApiKey[]; // NEW: Prop for user API keys
+  isLoadingApiKeys: boolean; // NEW: Prop for loading state of API keys
 }
 
-export function NoteEditorPanel({ noteId, onNoteUpdated }: NoteEditorPanelProps) {
+export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingApiKeys }: NoteEditorPanelProps) {
   const { session } = useSession();
   const [note, setNote] = useState<Note | null>(null);
   const [title, setTitle] = useState('');
@@ -157,8 +160,8 @@ export function NoteEditorPanel({ noteId, onNoteUpdated }: NoteEditorPanelProps)
     },
   };
 
-  if (isLoading) {
-    return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  if (isLoading || isLoadingApiKeys) { // NEW: Check isLoadingApiKeys
+    return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /><p className="ml-2 text-muted-foreground">Cargando nota y claves...</p></div>;
   }
   if (!note) {
     return <div className="flex items-center justify-center h-full"><p>Nota no encontrada.</p></div>;
@@ -204,7 +207,16 @@ export function NoteEditorPanel({ noteId, onNoteUpdated }: NoteEditorPanelProps)
       )}
       {showAiHint && (<div className="absolute bottom-20 right-4 bg-info text-info-foreground p-2 rounded-md shadow-lg text-sm animate-in fade-in slide-in-from-bottom-2 flex items-center gap-2 z-10"><span>¡Usa la IA para chatear con tu nota!</span><Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setShowAiHint(false)}><X className="h-3 w-3" /></Button></div>)}
       <Button variant="destructive" size="icon" onClick={() => setIsAiChatOpen(prev => !prev)} className="absolute bottom-4 right-4 rounded-full h-12 w-12 animate-pulse-red z-10" title="Asistente de Nota"><Wand2 className="h-6 w-6" /></Button>
-      <NoteAiChat isOpen={isAiChatOpen} onClose={() => setIsAiChatOpen(false)} noteTitle={title} noteContent={content} initialChatHistory={note.chat_history} onSaveHistory={handleSaveChatHistory} />
+      <NoteAiChat
+        isOpen={isAiChatOpen}
+        onClose={() => setIsAiChatOpen(false)}
+        noteTitle={title}
+        noteContent={content}
+        initialChatHistory={note.chat_history}
+        onSaveHistory={handleSaveChatHistory}
+        userApiKeys={userApiKeys} // NEW: Pass userApiKeys
+        isLoadingApiKeys={isLoadingApiKeys} // NEW: Pass isLoadingApiKeys
+      />
     </div>
   );
 }

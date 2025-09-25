@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useSession } from '@/components/session-context-provider';
 import { AI_PROVIDERS } from '@/lib/ai-models';
+import { ApiKey } from '@/hooks/use-user-api-keys'; // NEW: Import ApiKey type
 
 // Define unified part types
 interface TextPart {
@@ -30,10 +31,9 @@ type PuterContentPart = TextPart | ImagePart;
 
 interface PuterMessage {
   role: 'user' | 'assistant' | 'system';
-  content: string | PuterContentPart[]; // MODIFIED: Content is now string or array of PuterContentPart objects
+  content: string | PuterContentPart[];
 }
 
-// Add global declaration for window.puter to fix TypeScript errors
 declare global {
   interface Window {
     puter: {
@@ -44,22 +44,21 @@ declare global {
   }
 }
 
-// The type returned by our response parser
 type RenderablePart = TextPart | CodePart;
 
 interface Message {
   id: string;
   conversation_id?: string;
-  content: string | MessageContentPart[]; // Use the unified type
+  content: string | MessageContentPart[];
   role: 'user' | 'assistant';
-  model?: string; // This will now store the full 'puter:model-value' or 'user_key:key-id' string
+  model?: string;
   timestamp: Date;
   isNew?: boolean;
   isTyping?: boolean;
   type?: 'text' | 'multimodal';
 }
 
-const DEFAULT_AI_MODEL_FORMAT = 'puter:claude-sonnet-4'; // New default format
+const DEFAULT_AI_MODEL_FALLBACK = 'puter:claude-sonnet-4'; // Fallback if Gemini 2.5 Flash not found or configured
 
 interface UseChatProps {
   userId: string | undefined;
@@ -69,7 +68,9 @@ interface UseChatProps {
   appPrompt?: string | null;
   appId?: string | null;
   onWriteFiles: (files: { path: string; content: string }[]) => Promise<void>;
-  onSidebarDataRefresh: () => void; // NEW: Callback to refresh sidebar data
+  onSidebarDataRefresh: () => void;
+  userApiKeys: ApiKey[]; // NEW: Prop for user API keys
+  isLoadingApiKeys: boolean; // NEW: Prop for loading state of API keys
 }
 
 const codeBlockRegex = /```(\w+)?(?::([\w./-]+))?\s*\n([\s\S]*?)\s*```/g;
@@ -111,9 +112,9 @@ function parseAiResponseToRenderableParts(content: string): RenderablePart[] {
   return parts.length > 0 ? parts : [{ type: 'text', text: content }];
 }
 
-function messageContentToApiFormat(content: Message['content']): string | PuterContentPart[] { // MODIFIED return type
+function messageContentToApiFormat(content: Message['content']): string | PuterContentPart[] {
     if (typeof content === 'string') {
-        return content; // If it's a simple string, return it as is.
+        return content;
     }
 
     if (Array.isArray(content)) {
@@ -124,16 +125,15 @@ function messageContentToApiFormat(content: Message['content']): string | PuterC
                 const codePart = part as CodePart;
                 const lang = codePart.language || '';
                 const filename = codePart.filename ? `:${codePart.filename}` : '';
-                // Convert code block to a text part with markdown formatting
                 return { type: 'text', text: `\`\`\`${lang}${filename}\n${codePart.code || ''}\n\`\`\`` };
             } else if (part.type === 'image_url') {
-                return part; // Image parts are already in the correct format
+                return part;
             }
-            return { type: 'text', text: '' }; // Fallback for unknown part types
+            return { type: 'text', text: '' };
         }).filter(Boolean) as PuterContentPart[];
     }
 
-    return ''; // Fallback for unexpected content type
+    return '';
 }
 
 export function useChat({
@@ -144,7 +144,9 @@ export function useChat({
   appPrompt,
   appId,
   onWriteFiles,
-  onSidebarDataRefresh, // NEW: Destructure the prop
+  onSidebarDataRefresh,
+  userApiKeys, // NEW: Destructure
+  isLoadingApiKeys, // NEW: Destructure
 }: UseChatProps) {
   const { userRole } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -153,9 +155,9 @@ export function useChat({
   const [isSendingFirstMessage, setIsSendingFirstMessage] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FORMAT;
+      return localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FALLBACK;
     }
-    return DEFAULT_AI_MODEL_FORMAT;
+    return DEFAULT_AI_MODEL_FALLBACK;
   });
 
   useEffect(() => {
@@ -174,6 +176,53 @@ export function useChat({
       localStorage.setItem('selected_ai_model', selectedModel);
     }
   }, [selectedModel]);
+
+  // NEW: Effect to determine default model based on userApiKeys
+  useEffect(() => {
+    if (!isLoadingApiKeys && userApiKeys.length > 0) {
+      const storedModel = localStorage.getItem('selected_ai_model');
+      let newDefaultModel = DEFAULT_AI_MODEL_FALLBACK;
+
+      // Check if the stored model is a user_key and if it's still valid
+      if (storedModel && storedModel.startsWith('user_key:')) {
+        const storedKeyId = storedModel.substring(9);
+        const isValidStoredKey = userApiKeys.some(key => key.id === storedKeyId);
+        if (isValidStoredKey) {
+          newDefaultModel = storedModel; // Keep the valid stored user_key model
+        }
+      } else if (storedModel && storedModel.startsWith('puter:')) {
+        newDefaultModel = storedModel; // Keep the valid puter model
+      }
+
+      // If the current default is not Gemini 2.5 Flash, or if it's invalid, try to find Gemini 2.5 Flash
+      const isCurrentDefaultGeminiFlash = newDefaultModel.includes('gemini-2.5-flash');
+      
+      if (!isCurrentDefaultGeminiFlash || !userApiKeys.some(key => `user_key:${key.id}` === newDefaultModel)) {
+        const geminiFlashKey = userApiKeys.find(key => 
+          key.provider === 'google_gemini' && 
+          (key.model_name === 'gemini-2.5-flash' || key.model_name === 'gemini-2.5-pro') // Prioritize 2.5 Flash, then 2.5 Pro
+        );
+
+        if (geminiFlashKey) {
+          newDefaultModel = `user_key:${geminiFlashKey.id}`;
+        }
+      }
+      
+      if (newDefaultModel !== selectedModel) {
+        setSelectedModel(newDefaultModel);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('selected_ai_model', newDefaultModel);
+        }
+      }
+    } else if (!isLoadingApiKeys && userApiKeys.length === 0 && selectedModel !== DEFAULT_AI_MODEL_FALLBACK) {
+      // If no API keys are configured, fall back to Puter.js default
+      setSelectedModel(DEFAULT_AI_MODEL_FALLBACK);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('selected_ai_model', DEFAULT_AI_MODEL_FALLBACK);
+      }
+    }
+  }, [isLoadingApiKeys, userApiKeys, selectedModel]);
+
 
   const getConversationDetails = useCallback(async (convId: string) => {
     const { data, error } = await supabase.from('conversations').select('id, title, model').eq('id', convId).eq('user_id', userId).single();
@@ -209,13 +258,13 @@ export function useChat({
         setIsLoading(true);
         const details = await getConversationDetails(conversationId);
         if (details?.model) setSelectedModel(details.model);
-        else setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FORMAT);
+        else setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FALLBACK); // NEW: Use fallback
         const fetchedMsgs = await getMessagesFromDB(conversationId);
         if (!isSendingFirstMessage || fetchedMsgs.length > 0) setMessages(fetchedMsgs);
         setIsLoading(false);
       } else {
         setMessages([]);
-        setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FORMAT);
+        setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FALLBACK); // NEW: Use fallback
       }
     };
     loadConversationData();
@@ -230,7 +279,7 @@ export function useChat({
     }
     onNewConversationCreated(data.id);
     onConversationTitleUpdate(data.id, data.title);
-    onSidebarDataRefresh(); // NEW: Refresh sidebar data
+    onSidebarDataRefresh();
     return data.id;
   };
 
@@ -264,12 +313,11 @@ export function useChat({
 
     try {
       let response: any;
-      let modelUsedForResponse: string; // To store the actual model string for the message record
+      let modelUsedForResponse: string;
 
       if (selectedModel.startsWith('puter:')) {
         const actualModelForPuter = selectedModel.substring(6);
-        modelUsedForResponse = selectedModel; // Store the full format
-        // Use Puter.js for these models
+        modelUsedForResponse = selectedModel;
         const puterMessages: PuterMessage[] = history.map(msg => ({
           role: msg.role,
           content: messageContentToApiFormat(msg.content),
@@ -285,14 +333,13 @@ export function useChat({
 
       } else if (selectedModel.startsWith('user_key:')) {
         const selectedKeyId = selectedModel.substring(9);
-        modelUsedForResponse = selectedModel; // Store the full format
-        // Use our backend proxy for user-key models
+        modelUsedForResponse = selectedModel;
         const apiResponse = await fetch('/api/ai/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             messages: history.map(m => ({ role: m.role, content: messageContentToApiFormat(m.content) })),
-            selectedKeyId: selectedKeyId, // Pass the key ID
+            selectedKeyId: selectedKeyId,
           }),
         });
         response = await apiResponse.json();
@@ -322,7 +369,7 @@ export function useChat({
       const assistantMessageData = {
         content: parts,
         role: 'assistant' as const,
-        model: modelUsedForResponse, // Store the full selectedModel string
+        model: modelUsedForResponse,
         type: 'multimodal' as const,
       };
       const tempId = `assistant-${Date.now()}`;

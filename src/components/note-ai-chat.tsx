@@ -14,6 +14,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel, // NEW: Import DropdownMenuLabel
 } from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
@@ -28,6 +30,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import ClaudeAILogo from '@/components/claude-ai-logo';
+import { AI_PROVIDERS } from '@/lib/ai-models';
+import { ApiKey } from '@/hooks/use-user-api-keys';
 
 interface PuterMessage {
   role: 'user' | 'assistant' | 'system';
@@ -44,6 +48,8 @@ const AI_MODELS = [
   { value: 'claude-opus-4', label: 'Claude Opus 4' },
 ];
 
+const DEFAULT_AI_MODEL_FALLBACK = 'puter:claude-sonnet-4'; // Fallback if Gemini 2.5 Flash not found or configured
+
 interface NoteAiChatProps {
   isOpen: boolean;
   onClose: () => void;
@@ -51,13 +57,15 @@ interface NoteAiChatProps {
   noteContent: string;
   initialChatHistory: ChatMessage[] | null;
   onSaveHistory: (history: ChatMessage[]) => void;
+  userApiKeys: ApiKey[]; // NEW: Prop for user API keys
+  isLoadingApiKeys: boolean; // NEW: Prop for loading state of API keys
 }
 
-export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialChatHistory, onSaveHistory }: NoteAiChatProps) {
+export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialChatHistory, onSaveHistory, userApiKeys, isLoadingApiKeys }: NoteAiChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedModel, setSelectedModel] = useState(AI_MODELS[0].value);
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_AI_MODEL_FALLBACK); // NEW: Default to fallback
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const defaultWelcomeMessage: ChatMessage = { role: 'assistant', content: 'Hola, soy tu asistente. Pregúntame cualquier cosa sobre esta nota.' };
@@ -77,6 +85,52 @@ export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialCha
       }
     }
   }, [messages]);
+
+  // NEW: Effect to determine default model based on userApiKeys
+  useEffect(() => {
+    if (!isLoadingApiKeys && userApiKeys.length > 0) {
+      const storedModel = localStorage.getItem('selected_ai_model_note_chat'); // Separate storage key
+      let newDefaultModel = DEFAULT_AI_MODEL_FALLBACK;
+
+      // Check if the stored model is a user_key and if it's still valid
+      if (storedModel && storedModel.startsWith('user_key:')) {
+        const storedKeyId = storedModel.substring(9);
+        const isValidStoredKey = userApiKeys.some(key => key.id === storedKeyId);
+        if (isValidStoredKey) {
+          newDefaultModel = storedModel; // Keep the valid stored user_key model
+        }
+      } else if (storedModel && storedModel.startsWith('puter:')) {
+        newDefaultModel = storedModel; // Keep the valid puter model
+      }
+
+      // If the current default is not Gemini 2.5 Flash, or if it's invalid, try to find Gemini 2.5 Flash
+      const isCurrentDefaultGeminiFlash = newDefaultModel.includes('gemini-2.5-flash');
+      
+      if (!isCurrentDefaultGeminiFlash || !userApiKeys.some(key => `user_key:${key.id}` === newDefaultModel)) {
+        const geminiFlashKey = userApiKeys.find(key => 
+          key.provider === 'google_gemini' && 
+          (key.model_name === 'gemini-2.5-flash' || key.model_name === 'gemini-2.5-pro') // Prioritize 2.5 Flash, then 2.5 Pro
+        );
+
+        if (geminiFlashKey) {
+          newDefaultModel = `user_key:${geminiFlashKey.id}`;
+        }
+      }
+      
+      if (newDefaultModel !== selectedModel) {
+        setSelectedModel(newDefaultModel);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('selected_ai_model_note_chat', newDefaultModel);
+        }
+      }
+    } else if (!isLoadingApiKeys && userApiKeys.length === 0 && selectedModel !== DEFAULT_AI_MODEL_FALLBACK) {
+      // If no API keys are configured, fall back to Puter.js default
+      setSelectedModel(DEFAULT_AI_MODEL_FALLBACK);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('selected_ai_model_note_chat', DEFAULT_AI_MODEL_FALLBACK);
+      }
+    }
+  }, [isLoadingApiKeys, userApiKeys, selectedModel]);
 
   const handleSendMessage = async () => {
     if (!userInput.trim() || isLoading) return;
@@ -99,7 +153,25 @@ ${noteContent}
         ...newMessages.map(msg => ({ role: msg.role, content: msg.content }))
       ];
 
-      const response = await window.puter.ai.chat(puterMessages, { model: selectedModel });
+      let response: any;
+      if (selectedModel.startsWith('puter:')) {
+        const actualModelForPuter = selectedModel.substring(6);
+        response = await window.puter.ai.chat(puterMessages, { model: actualModelForPuter });
+      } else if (selectedModel.startsWith('user_key:')) {
+        const selectedKeyId = selectedModel.substring(9);
+        const apiResponse = await fetch('/api/ai/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: puterMessages,
+            selectedKeyId: selectedKeyId,
+          }),
+        });
+        response = await apiResponse.json();
+        if (!apiResponse.ok) throw new Error(response.message || 'Error en la API de IA.');
+      } else {
+        throw new Error('Modelo de IA no válido seleccionado.');
+      }
 
       if (!response || response.error) {
         throw new Error(response?.error?.message || 'La IA devolvió una respuesta de error.');
@@ -145,15 +217,43 @@ ${noteContent}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-6 w-6" title="Cambiar modelo de IA">
-                <ClaudeAILogo className="h-4 w-4" />
+                <ClaudeAILogo className="h-4 w-4" /> {/* Placeholder, ideally dynamic based on selectedModel */}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {AI_MODELS.map(model => (
-                <DropdownMenuItem key={model.value} onClick={() => setSelectedModel(model.value)} className={cn("flex items-center justify-between", selectedModel === model.value && "bg-accent")}>
-                  <span>{model.label}</span>
-                  {selectedModel === model.value && <Check className="h-4 w-4 text-green-500" />}
-                </DropdownMenuItem>
+              {AI_PROVIDERS.filter(p => p.source === 'puter' || p.source === 'user_key').map(providerGroup => (
+                <React.Fragment key={providerGroup.value}>
+                  <DropdownMenuLabel className="flex items-center gap-2 font-bold text-foreground px-2 py-1.5">
+                    <span>{providerGroup.company}</span>
+                    <providerGroup.logo className="h-4 w-4" />
+                  </DropdownMenuLabel>
+                  {providerGroup.source === 'puter' ? (
+                    providerGroup.models.map(model => (
+                      <DropdownMenuItem
+                        key={model.value}
+                        onClick={() => setSelectedModel(`puter:${model.value}`)}
+                        className={cn("flex items-center justify-between cursor-pointer pl-8", selectedModel === `puter:${model.value}` && "bg-accent text-accent-foreground")}
+                      >
+                        <span>{model.label}</span>
+                        {selectedModel === `puter:${model.value}` && <Check className="h-4 w-4 text-green-500" />}
+                      </DropdownMenuItem>
+                    ))
+                  ) : (
+                    userApiKeys.filter(key => key.provider === providerGroup.value).map(key => {
+                      const itemValue = `user_key:${key.id}`;
+                      return (
+                        <DropdownMenuItem
+                          key={key.id}
+                          onClick={() => setSelectedModel(itemValue)}
+                          className={cn("flex items-center justify-between cursor-pointer pl-8", selectedModel === itemValue && "bg-accent text-accent-foreground")}
+                        >
+                          <span>{key.nickname || key.model_name || `${providerGroup.company} Key`}</span>
+                          {selectedModel === itemValue && <Check className="h-4 w-4 text-green-500" />}
+                        </DropdownMenuItem>
+                      );
+                    })
+                  )}
+                </React.Fragment>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
