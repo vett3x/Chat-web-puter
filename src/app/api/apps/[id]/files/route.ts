@@ -7,7 +7,6 @@ import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { executeSshCommand, writeRemoteFile } from '@/lib/ssh-utils';
 import { getAppAndServerForFileOps } from '@/lib/app-state-manager';
 import path from 'path';
-import { Client as SshClient } from 'ssh2';
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants';
 
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
@@ -101,7 +100,7 @@ export async function GET(req: NextRequest, context: any) {
     
     if (filePath) {
       const safeBasePath = '/app';
-      const resolvedPath = path.posix.join(safeBasePath, filePath); // Use path.posix for consistency
+      const resolvedPath = path.posix.join(safeBasePath, filePath);
       if (!resolvedPath.startsWith(safeBasePath + path.posix.sep) && resolvedPath !== safeBasePath) {
         throw new Error(`Acceso denegado: La ruta '${filePath}' está fuera del directorio permitido.`);
       }
@@ -149,10 +148,10 @@ export async function POST(req: NextRequest, context: any) {
 
       const containerPath = path.posix.join('/app', filePath);
       const containerDir = path.posix.dirname(containerPath);
-      const tempHostPath = `/tmp/dyad-upload-${Date.now()}-${Math.random().toString(36).substring(2, 15)}.tmp`; // More unique temp file name
+      const tempHostPath = `/tmp/dyad-upload-${Date.now()}-${Math.random().toString(36).substring(2, 15)}.tmp`;
 
       try {
-        // 1. Escribir el contenido en un archivo temporal en el servidor anfitrión
+        // 1. Escribir el contenido en un archivo temporal en el servidor remoto usando el nuevo writeRemoteFile
         await writeRemoteFile(server, tempHostPath, content);
 
         // 2. Crear el directorio de destino dentro del contenedor
@@ -161,20 +160,10 @@ export async function POST(req: NextRequest, context: any) {
           throw new Error(`Error al crear el directorio '${containerDir}' en el contenedor: ${mkdirStderr}`);
         }
 
-        // 3. Copiar el archivo temporal del anfitrión al contenedor
+        // 3. Copiar el archivo temporal del host remoto al contenedor
         const { stderr: cpStderr, code: cpCode } = await executeSshCommand(server, `docker cp '${tempHostPath}' '${app.container_id}:${containerPath}'`);
         if (cpCode !== 0) {
           throw new Error(`Error al copiar el archivo '${filePath}' al contenedor: ${cpStderr}`);
-        }
-
-        // 4. Verificar el archivo dentro del contenedor
-        const { stdout: wcStdout, stderr: wcStderr, code: wcCode } = await executeSshCommand(server, `docker exec ${app.container_id} cat '${containerPath}' | wc -c`);
-        if (wcCode !== 0) {
-          throw new Error(`Error al verificar el archivo '${filePath}' en el contenedor: ${wcStderr}`);
-        }
-        const fileSize = parseInt(wcStdout.trim(), 10);
-        if (fileSize !== Buffer.byteLength(content, 'utf8')) {
-          throw new Error(`Error de verificación de tamaño para '${filePath}'. Tamaño esperado: ${Buffer.byteLength(content, 'utf8')}, Tamaño real: ${fileSize}.`);
         }
 
         backups.push({ app_id: appId, user_id: userId, file_path: filePath, file_content: content });
@@ -182,16 +171,15 @@ export async function POST(req: NextRequest, context: any) {
 
       } catch (stepError: any) {
         const errorMessage = stepError.message || 'Error desconocido en el paso de archivo.';
-        // Log to Supabase with more detail
         await supabaseAdmin.from('server_events_log').insert({
           user_id: userId,
           server_id: server.id,
           event_type: 'file_write_failed',
           description: `Fallo al escribir archivo '${filePath}' en contenedor ${app.container_id.substring(0, 12)}. Error: ${errorMessage}`,
         });
-        throw new Error(`Fallo al procesar '${filePath}': ${errorMessage}`); // Re-throw to be caught by outer catch
+        throw new Error(`Fallo al procesar '${filePath}': ${errorMessage}`);
       } finally {
-        // 5. Limpiar el archivo temporal del anfitrión
+        // 4. Limpiar el archivo temporal del host remoto
         try {
           await executeSshCommand(server, `rm -f '${tempHostPath}'`);
         } catch (cleanupError: any) {

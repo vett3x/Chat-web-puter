@@ -1,4 +1,10 @@
-import { Client as SshClient } from 'ssh2';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import fs from 'fs/promises';
+import path from 'path';
+import { randomBytes } from 'crypto';
+
+const execAsync = promisify(exec);
 
 interface SshCommandResult {
   stdout: string;
@@ -13,8 +19,11 @@ interface ServerDetails {
   ssh_password?: string;
 }
 
+// Common SSH options to avoid interactive prompts
+const SSH_OPTIONS = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null";
+
 /**
- * Executes an SSH command on a remote server.
+ * Executes an SSH command on a remote server using the native ssh client.
  * @param serverDetails Details for connecting to the SSH server.
  * @param command The command string to execute.
  * @returns A promise that resolves with the stdout, stderr, and exit code of the command.
@@ -23,90 +32,59 @@ export async function executeSshCommand(
   serverDetails: ServerDetails,
   command: string
 ): Promise<SshCommandResult> {
-  const conn = new SshClient();
-  let stdout = '';
-  let stderr = '';
-  let exitCode = 1; // Default to non-zero exit code for errors
+  const sshCommand = `sshpass -p '${serverDetails.ssh_password}' ssh ${SSH_OPTIONS} -p ${serverDetails.ssh_port || 22} ${serverDetails.ssh_username}@${serverDetails.ip_address} "${command.replace(/"/g, '\\"')}"`;
 
   try {
-    await new Promise<void>((resolve, reject) => {
-      conn.on('ready', () => {
-        conn.exec(command, (err, stream) => {
-          if (err) {
-            conn.end();
-            return reject(new Error(`SSH exec error: ${err.message}`));
-          }
-          stream.on('data', (data: Buffer) => { stdout += data.toString(); });
-          stream.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
-          stream.on('close', (code: number) => {
-            exitCode = code;
-            resolve();
-          });
-        });
-      }).on('error', (err) => {
-        reject(new Error(`SSH connection error: ${err.message}`));
-      }).connect({
-        host: serverDetails.ip_address,
-        port: serverDetails.ssh_port || 22,
-        username: serverDetails.ssh_username,
-        password: serverDetails.ssh_password,
-        readyTimeout: 10000, // 10 seconds timeout for connection
-      });
-    });
-  } finally {
-    conn.end();
+    const { stdout, stderr } = await execAsync(sshCommand);
+    return { stdout, stderr, code: 0 };
+  } catch (error: any) {
+    // execAsync rejects with an object that contains stdout and stderr
+    return {
+      stdout: error.stdout || '',
+      stderr: error.stderr || error.message,
+      code: error.code || 1,
+    };
   }
-
-  return { stdout, stderr, code: exitCode };
 }
 
 /**
- * Writes content to a file on the remote server via SSH.
+ * Writes content to a file on the remote server by creating a local temp file
+ * and using the native scp client to transfer it.
  * @param serverDetails Details for connecting to the SSH server.
- * @param filePath The path to the file on the remote server.
+ * @param remoteFilePath The path to the file on the remote server.
  * @param content The content to write to the file.
- * @param mode The file permissions (e.g., '0600').
  */
 export async function writeRemoteFile(
   serverDetails: ServerDetails,
-  filePath: string,
-  content: string,
-  mode: string = '0600' // Keep as string for input, convert to number for sftp
+  remoteFilePath: string,
+  content: string
 ): Promise<void> {
-  const conn = new SshClient();
+  const tempFileName = `dyad-upload-${randomBytes(16).toString('hex')}.tmp`;
+  const localTempPath = path.join('/tmp', tempFileName);
+
   try {
-    await new Promise<void>((resolve, reject) => {
-      conn.on('ready', () => {
-        conn.sftp((err, sftp) => {
-          if (err) {
-            conn.end();
-            return reject(new Error(`SFTP error: ${err.message}`));
-          }
-          // Convert mode string (e.g., '0600') to an octal number (e.g., 0o600)
-          const numericMode = parseInt(mode, 8);
-          const writeStream = sftp.createWriteStream(filePath, { mode: numericMode });
-          writeStream.write(content);
-          writeStream.end();
-          writeStream.on('finish', () => {
-            sftp.end();
-            resolve();
-          });
-          writeStream.on('error', (writeErr: Error) => { // Explicitly type writeErr as Error
-            sftp.end();
-            reject(new Error(`Error writing file to remote server: ${writeErr.message}`));
-          });
-        });
-      }).on('error', (err) => {
-        reject(new Error(`SSH connection error for file write: ${err.message}`));
-      }).connect({
-        host: serverDetails.ip_address,
-        port: serverDetails.ssh_port || 22,
-        username: serverDetails.ssh_username,
-        password: serverDetails.ssh_password,
-        readyTimeout: 10000,
-      });
-    });
+    // 1. Write content to a temporary file on the local server (where this code runs)
+    await fs.writeFile(localTempPath, content, 'utf8');
+
+    // 2. Use scp to copy the local temporary file to the remote server
+    const scpCommand = `sshpass -p '${serverDetails.ssh_password}' scp ${SSH_OPTIONS} -P ${serverDetails.ssh_port || 22} '${localTempPath}' '${serverDetails.ssh_username}@${serverDetails.ip_address}:${remoteFilePath}'`;
+    
+    const { stderr } = await execAsync(scpCommand);
+    if (stderr) {
+      // scp can sometimes write to stderr on success, so we check for common error keywords
+      const lowerStderr = stderr.toLowerCase();
+      if (lowerStderr.includes('error') || lowerStderr.includes('denied') || lowerStderr.includes('failed')) {
+        throw new Error(`SCP error: ${stderr}`);
+      }
+    }
+  } catch (error: any) {
+    throw new Error(`Failed to write remote file: ${error.stderr || error.message}`);
   } finally {
-    conn.end();
+    // 3. Clean up the local temporary file
+    try {
+      await fs.unlink(localTempPath);
+    } catch (cleanupError) {
+      console.warn(`Warning: Failed to clean up temporary file ${localTempPath}:`, cleanupError);
+    }
   }
 }
