@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Send, Bot, Loader2, Paperclip, KeyRound, Trash2 } from 'lucide-react';
+import { Send, Bot, Loader2, Paperclip, KeyRound, Trash2, MessageSquare, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
 import { AI_PROVIDERS } from '@/lib/ai-models';
 import { useUserApiKeys } from '@/hooks/use-user-api-keys';
@@ -22,10 +22,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 interface PuterTextContentPart { type: 'text'; text: string; }
 interface PuterImageContentPart { type: 'image_url'; image_url: { url: string; }; }
 type PuterContentPart = PuterTextContentPart | PuterImageContentPart;
+
+export type ChatMode = 'build' | 'chat';
 
 interface ChatInputProps {
   isLoading: boolean;
@@ -33,7 +36,9 @@ interface ChatInputProps {
   onModelChange: (model: string) => void;
   sendMessage: (content: PuterContentPart[], messageText: string) => void;
   isAppChat?: boolean;
-  onClearChat: () => void; // NEW: Add onClearChat prop
+  onClearChat: () => void;
+  chatMode: ChatMode;
+  onChatModeChange: (mode: ChatMode) => void;
 }
 
 interface SelectedFile {
@@ -42,7 +47,7 @@ interface SelectedFile {
   type: 'image' | 'other';
 }
 
-export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage, isAppChat = false, onClearChat }: ChatInputProps) {
+export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage, isAppChat = false, onClearChat, chatMode, onChatModeChange }: ChatInputProps) {
   const [inputMessage, setInputMessage] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const { userApiKeys } = useUserApiKeys();
@@ -176,6 +181,27 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
           </Button>
           <Textarea value={inputMessage} onChange={(e) => setInputMessage(e.target.value)} onKeyPress={handleKeyPress} onPaste={handlePaste} placeholder="Pregunta a la IA..." disabled={isLoading} className="flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none max-h-[200px] overflow-y-auto bg-transparent px-3 py-1.5 min-h-8" />
           
+          {isAppChat && (
+            <ToggleGroup
+              type="single"
+              value={chatMode}
+              onValueChange={(value: ChatMode) => {
+                if (value) onChatModeChange(value);
+              }}
+              className="flex-shrink-0"
+              disabled={isLoading}
+            >
+              <ToggleGroupItem value="build" aria-label="Modo Build" className="h-8 px-2.5">
+                <Wrench className="h-4 w-4 mr-1.5" />
+                <span className="text-xs">Build</span>
+              </ToggleGroupItem>
+              <ToggleGroupItem value="chat" aria-label="Modo Chat" className="h-8 px-2.5">
+                <MessageSquare className="h-4 w-4 mr-1.5" />
+                <span className="text-xs">Chat</span>
+              </ToggleGroupItem>
+            </ToggleGroup>
+          )}
+
           <ModelSelectorDropdown
             selectedModel={selectedModel}
             onModelChange={onModelChange}
@@ -185,7 +211,6 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
             SelectedModelIcon={SelectedModelIcon}
           />
 
-          {/* NEW: Clear Chat Button */}
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive" disabled={isLoading} title="Limpiar chat">

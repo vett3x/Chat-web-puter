@@ -1,10 +1,10 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useChat } from '@/hooks/use-chat';
 import { ChatMessages } from '@/components/chat/chat-messages';
-import { ChatInput } from '@/components/chat/chat-input';
+import { ChatInput, ChatMode } from '@/components/chat/chat-input';
 import { ApiKey } from '@/hooks/use-user-api-keys';
 import { useSession } from './session-context-provider';
 
@@ -42,6 +42,7 @@ export function ChatInterface({
   isLoadingApiKeys,
 }: ChatInterfaceProps) {
   const { userAvatarUrl } = useSession();
+  const [chatMode, setChatMode] = useState<ChatMode>('build');
 
   const {
     messages,
@@ -64,6 +65,7 @@ export function ChatInterface({
     onSidebarDataRefresh,
     userApiKeys,
     isLoadingApiKeys,
+    chatMode, // Pass the current chat mode to the hook
   });
 
   if (isAppProvisioning) {
@@ -126,7 +128,9 @@ export function ChatInterface({
           onModelChange={handleModelChange}
           sendMessage={sendMessage}
           isAppChat={isAppChat}
-          onClearChat={clearChat} // NEW: Pass clearChat
+          onClearChat={clearChat}
+          chatMode={chatMode}
+          onChatModeChange={setChatMode}
         />
       </div>
     </div>

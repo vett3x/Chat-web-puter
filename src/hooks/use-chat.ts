@@ -8,6 +8,7 @@ import { AI_PROVIDERS } from '@/lib/ai-models';
 import { ApiKey } from '@/hooks/use-user-api-keys';
 import { GoogleGenerativeAI, Part } from '@google/generative-ai';
 import { GoogleAuth } from 'google-auth-library';
+import { ChatMode } from '@/components/chat/chat-input';
 
 // Define unified part types
 interface TextPart {
@@ -73,6 +74,7 @@ interface UseChatProps {
   onSidebarDataRefresh: () => void;
   userApiKeys: ApiKey[];
   isLoadingApiKeys: boolean;
+  chatMode: ChatMode; // New prop for chat mode
 }
 
 const codeBlockRegex = /```(\w+)?(?::([\w./-]+))?\s*\n([\s\S]*?)\s*```/g;
@@ -184,6 +186,7 @@ export function useChat({
   onSidebarDataRefresh,
   userApiKeys,
   isLoadingApiKeys,
+  chatMode,
 }: UseChatProps) {
   const { userRole } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -350,7 +353,11 @@ export function useChat({
       let systemPromptContent: string;
 
       if (appPrompt) {
-        systemPromptContent = `Eres un desarrollador experto en Next.js (App Router), TypeScript y Tailwind CSS. Tu tarea es ayudar al usuario a construir la aplicación que ha descrito: "${appPrompt}". REGLAS: 1. Primero, explica tu plan de acción en texto normal. 2. Después de tu explicación, pregunta al usuario si está de acuerdo antes de generar cualquier código. 3. Si el usuario aprueba, genera ÚNICAMENTE los bloques de código necesarios para los archivos completos. 4. Usa el formato \`\`\`language:ruta/del/archivo.tsx\`\`\` para cada bloque. 5. NO incluyas texto conversacional junto con los bloques de código en la respuesta final de código.`;
+        if (chatMode === 'build') {
+          systemPromptContent = `Eres un desarrollador experto en Next.js (App Router), TypeScript y Tailwind CSS. Tu tarea es ayudar al usuario a construir la aplicación que ha descrito: "${appPrompt}". REGLAS: 1. Primero, explica tu plan de acción en texto normal. 2. Después de tu explicación, pregunta al usuario si está de acuerdo antes de generar cualquier código. 3. Si el usuario aprueba, genera ÚNICAMENTE los bloques de código necesarios para los archivos completos. 4. Usa el formato \`\`\`language:ruta/del/archivo.tsx\`\`\` para cada bloque. 5. NO incluyas texto conversacional junto con los bloques de código en la respuesta final de código.`;
+        } else { // chatMode === 'chat'
+          systemPromptContent = `Eres un asistente de código experto y depurador para un proyecto Next.js. Estás en 'Modo Chat'. Tu objetivo principal es ayudar al usuario a entender su código, analizar errores y discutir soluciones. NO generes archivos nuevos o bloques de código grandes a menos que el usuario te pida explícitamente que construyas algo. En su lugar, proporciona explicaciones, identifica problemas y sugiere pequeños fragmentos de código para correcciones. Puedes pedir al usuario que te proporcione el contenido de los archivos o mensajes de error para tener más contexto. El proyecto es: "${appPrompt}".`;
+        }
       } else {
         systemPromptContent = "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante.";
       }
@@ -392,11 +399,13 @@ export function useChat({
       const parts = parseAiResponseToRenderableParts(assistantMessageContent);
       const filesToWrite: { path: string; content: string }[] = [];
 
-      parts.forEach(part => {
-        if (part.type === 'code' && appId && part.filename && part.code) {
-          filesToWrite.push({ path: part.filename, content: part.code });
-        }
-      });
+      if (chatMode === 'build') { // Only write files in build mode
+        parts.forEach(part => {
+          if (part.type === 'code' && appId && part.filename && part.code) {
+            filesToWrite.push({ path: part.filename, content: part.code });
+          }
+        });
+      }
 
       setMessages(prev => prev.filter(m => m.id !== tempTypingId));
 
@@ -451,7 +460,7 @@ export function useChat({
     } finally {
       setIsLoading(false);
     }
-  }, [appId, appPrompt, userRole, onWriteFiles, selectedModel, userId, saveMessageToDB]);
+  }, [appId, appPrompt, userRole, onWriteFiles, selectedModel, userId, saveMessageToDB, chatMode]);
 
   const sendMessage = useCallback(async (content: PuterContentPart[], messageText: string) => {
     if (!userId) {
