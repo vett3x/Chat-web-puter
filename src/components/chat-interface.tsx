@@ -18,6 +18,7 @@ interface ChatInterfaceProps {
   appId?: string | null;
   onWriteFiles: (files: { path: string; content: string }[]) => Promise<void>; // Changed from onFilesWritten
   isAppChat?: boolean;
+  onSidebarDataRefresh: () => void; // NEW: Prop to refresh sidebar data
 }
 
 export function ChatInterface({
@@ -32,6 +33,7 @@ export function ChatInterface({
   appId,
   onWriteFiles, // Changed from onFilesWritten
   isAppChat = false,
+  onSidebarDataRefresh, // NEW: Destructure the prop
 }: ChatInterfaceProps) {
   const {
     messages,
@@ -50,6 +52,7 @@ export function ChatInterface({
     appPrompt,
     appId,
     onWriteFiles, // Pass the function down
+    onSidebarDataRefresh, // NEW: Pass the prop to useChat
   });
 
   if (isAppProvisioning) {

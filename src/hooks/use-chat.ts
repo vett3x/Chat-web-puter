@@ -69,6 +69,7 @@ interface UseChatProps {
   appPrompt?: string | null;
   appId?: string | null;
   onWriteFiles: (files: { path: string; content: string }[]) => Promise<void>;
+  onSidebarDataRefresh: () => void; // NEW: Callback to refresh sidebar data
 }
 
 const codeBlockRegex = /```(\w+)?(?::([\w./-]+))?\s*\n([\s\S]*?)\s*```/g;
@@ -143,6 +144,7 @@ export function useChat({
   appPrompt,
   appId,
   onWriteFiles,
+  onSidebarDataRefresh, // NEW: Destructure the prop
 }: UseChatProps) {
   const { userRole } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -228,6 +230,7 @@ export function useChat({
     }
     onNewConversationCreated(data.id);
     onConversationTitleUpdate(data.id, data.title);
+    onSidebarDataRefresh(); // NEW: Refresh sidebar data
     return data.id;
   };
 

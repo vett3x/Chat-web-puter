@@ -316,6 +316,8 @@ export default function Home() {
                 appId={selectedAppDetails?.id}
                 onWriteFiles={writeFilesToApp}
                 isAppChat={selectedItem?.type === 'app'}
+                /* NEW: Pass refreshSidebarData */
+                onSidebarDataRefresh={refreshSidebarData}
               />
             </ResizablePanel>
             {selectedItem?.type === 'app' && (
