@@ -28,6 +28,34 @@ export async function POST(req: NextRequest, context: any) {
       throw new Error('La aplicación no tiene un contenedor asociado para reiniciar.');
     }
 
+    // 1. Run npm install first to ensure all dependencies are present
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: userId,
+      server_id: server.id,
+      event_type: 'npm_install_started',
+      description: `Ejecutando 'npm install' en el contenedor ${app.container_id.substring(0, 12)} antes de reiniciar.`
+    });
+
+    const { stderr: installStderr, code: installCode } = await executeSshCommand(server, `docker exec ${app.container_id} bash -c "cd /app && npm install"`);
+    
+    if (installCode !== 0) {
+      await supabaseAdmin.from('server_events_log').insert({
+        user_id: userId,
+        server_id: server.id,
+        event_type: 'npm_install_failed',
+        description: `Falló 'npm install' en el contenedor ${app.container_id.substring(0, 12)}. Error: ${installStderr}`
+      });
+      throw new Error(`Error al ejecutar 'npm install' en el contenedor: ${installStderr}`);
+    }
+
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: userId,
+      server_id: server.id,
+      event_type: 'npm_install_succeeded',
+      description: `'npm install' completado exitosamente en el contenedor ${app.container_id.substring(0, 12)}.`
+    });
+
+    // 2. Proceed with restarting services
     const { data: tunnel } = await supabaseAdmin
       .from('docker_tunnels')
       .select('tunnel_id, tunnel_secret, container_port')
@@ -51,7 +79,6 @@ export async function POST(req: NextRequest, context: any) {
 
     const { stderr, code } = await executeSshCommand(server, fullCommand);
 
-    // Filter out the harmless "known_hosts" warning from stderr
     const filteredStderr = stderr.split('\n').filter(line => !line.toLowerCase().includes('permanently added')).join('\n').trim();
 
     if (code !== 0 && filteredStderr && !filteredStderr.toLowerCase().includes('no process found')) {
@@ -59,9 +86,7 @@ export async function POST(req: NextRequest, context: any) {
     }
 
     const restartDescription = `Servicios reiniciados para el contenedor ${app.container_id.substring(0, 12)}.`;
-    console.log(`[API RESTART /apps/${appId}/restart] Inserting log with description: ${restartDescription}`); // NEW: Console log
-
-    // Log the restart event
+    
     await supabaseAdmin.from('server_events_log').insert({
       user_id: userId,
       server_id: server.id,
