@@ -48,8 +48,8 @@ export async function executeSshCommand(
 }
 
 /**
- * Writes content to a file on the remote server by creating a local temp file
- * and using the native scp client to transfer it.
+ * Writes content to a file on the remote server by piping base64 encoded content
+ * directly over SSH, avoiding local temp files and scp.
  * @param serverDetails Details for connecting to the SSH server.
  * @param remoteFilePath The path to the file on the remote server.
  * @param content The content to write to the file.
@@ -59,32 +59,23 @@ export async function writeRemoteFile(
   remoteFilePath: string,
   content: string
 ): Promise<void> {
-  const tempFileName = `dyad-upload-${randomBytes(16).toString('hex')}.tmp`;
-  const localTempPath = path.join('/tmp', tempFileName);
-
   try {
-    // 1. Write content to a temporary file on the local server (where this code runs)
-    await fs.writeFile(localTempPath, content, 'utf8');
+    // 1. Base64 encode the content to ensure safe transfer of all characters
+    const encodedContent = Buffer.from(content).toString('base64');
 
-    // 2. Use scp to copy the local temporary file to the remote server
-    const scpCommand = `sshpass -p '${serverDetails.ssh_password}' scp ${SSH_OPTIONS} -P ${serverDetails.ssh_port || 22} '${localTempPath}' '${serverDetails.ssh_username}@${serverDetails.ip_address}:${remoteFilePath}'`;
-    
-    const { stderr } = await execAsync(scpCommand);
-    if (stderr) {
-      // scp can sometimes write to stderr on success, so we check for common error keywords
-      const lowerStderr = stderr.toLowerCase();
-      if (lowerStderr.includes('error') || lowerStderr.includes('denied') || lowerStderr.includes('failed')) {
-        throw new Error(`SCP error: ${stderr}`);
-      }
+    // 2. Construct a command to decode and write the file on the remote server
+    //    - `echo '${encodedContent}'`: Prints the base64 string.
+    //    - `| base64 -d`: Pipes the string to the base64 command to decode it.
+    //    - `> '${remoteFilePath}'`: Redirects the decoded output to the target file.
+    const command = `echo '${encodedContent}' | base64 -d > '${remoteFilePath}'`;
+
+    // 3. Execute the command via SSH
+    const { stderr, code } = await executeSshCommand(serverDetails, command);
+
+    if (code !== 0) {
+      throw new Error(`Failed to write remote file. Exit code: ${code}. Stderr: ${stderr}`);
     }
   } catch (error: any) {
-    throw new Error(`Failed to write remote file: ${error.stderr || error.message}`);
-  } finally {
-    // 3. Clean up the local temporary file
-    try {
-      await fs.unlink(localTempPath);
-    } catch (cleanupError) {
-      console.warn(`Warning: Failed to clean up temporary file ${localTempPath}:`, cleanupError);
-    }
+    throw new Error(`Failed to write remote file '${remoteFilePath}': ${error.message}`);
   }
 }
