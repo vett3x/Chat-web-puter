@@ -593,6 +593,9 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                             <FormItem>
                               <FormLabel>API Key</FormLabel>
                               <FormControl><Input type="password" placeholder={editingKeyId ? "Dejar en blanco para no cambiar" : "Pega tu API key aquí"} {...field} disabled={isSubmitting} /></FormControl>
+                              <FormDescription>
+                                Obtén tu API Key desde <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Google AI Studio</a>.
+                              </FormDescription>
                               <FormMessage />
                             </FormItem>
                           )} />
