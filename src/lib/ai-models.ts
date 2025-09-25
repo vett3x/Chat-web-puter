@@ -11,8 +11,11 @@ export const AI_PROVIDERS = [
     value: 'google_gemini', // Added value for provider identification
     models: [
       // Vertex AI Models
-      { value: 'gemini-1.5-flash-001', label: 'Gemini 1.5 Flash', apiType: 'vertex' },
-      { value: 'gemini-1.5-pro-001', label: 'Gemini 1.5 Pro', apiType: 'vertex' },
+      { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', apiType: 'vertex' },
+      { value: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite', apiType: 'vertex' },
+      { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', apiType: 'vertex' },
+      { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', apiType: 'vertex' },
+      { value: 'gemini-pro', label: 'Gemini Pro', apiType: 'vertex' },
       // Public API Models
       { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', apiType: 'public' },
       { value: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite', apiType: 'public' },
