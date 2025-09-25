@@ -456,13 +456,17 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                     )} />
                   )}
 
-                  <FormField control={form.control} name="nickname" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Apodo (Opcional)</FormLabel>
-                      <FormControl><Input placeholder="Ej: Clave personal, Clave de equipo" {...field} disabled={isSubmitting} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
+                  {/* Conditional rendering for Nickname field */}
+                  {!isGoogleGemini && (
+                    <FormField control={form.control} name="nickname" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Apodo (Opcional)</FormLabel>
+                        <FormControl><Input placeholder="Ej: Clave personal, Clave de equipo" {...field} disabled={isSubmitting} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  )}
+                  
                   <div className="flex gap-2">
                     <Button type="submit" disabled={isSubmitting || !selectedProvider}>
                       {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingKeyId ? <Edit className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />)}
