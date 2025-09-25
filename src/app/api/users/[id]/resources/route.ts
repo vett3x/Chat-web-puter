@@ -2,11 +2,12 @@ export const runtime = 'nodejs'; // Force Node.js runtime
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { Client } from 'ssh2';
 import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { parseMemoryString } from '@/lib/utils'; // Import the utility function
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
+import { executeSshCommand } from '@/lib/ssh-utils'; // Import SSH utilities
+import { Client, type ExecChannel } from 'ssh2'; // Import Client as value, ExecChannel as type
 
 // Helper function to get the session and user role
 async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null; userPermissions: UserPermissions }> {
@@ -73,22 +74,16 @@ async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | '
   return { session, userRole, userPermissions };
 }
 
-function executeSshCommand(conn: Client, command: string): Promise<string> {
+function executeSshCommandForResources(conn: Client, command: string): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolve, reject) => {
-    conn.exec(command, (err, stream) => {
+    conn.exec(command, (err: Error | undefined, stream: ExecChannel) => { // Explicitly type err and stream
       if (err) return reject(err);
-      let output = '';
-      stream.on('data', (data: Buffer) => { output += data.toString(); });
+      let stdout = '';
+      let stderr = '';
+      stream.on('data', (data: Buffer) => { stdout += data.toString(); });
+      stream.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
       stream.on('close', (code: number) => {
-        if (code === 0) {
-          resolve(output.trim());
-        } else {
-          reject(new Error(`Command exited with code ${code}: ${output.trim()}`));
-        }
-      });
-      stream.stderr.on('data', (data: Buffer) => {
-        // Log stderr but don't necessarily reject unless it's the only output
-        console.error(`SSH STDERR for command "${command}": ${data.toString().trim()}`);
+        resolve({ stdout: stdout.trim(), stderr: stderr.trim(), code });
       });
     });
   });
@@ -150,20 +145,20 @@ export async function GET(
     const diskCommand = `df -h / | grep / | awk '{print $5}'`; // Usage %
 
     const [cpuOutput, memOutput, diskOutput] = await Promise.all([
-      executeSshCommand(conn, cpuCommand),
-      executeSshCommand(conn, memCommand),
-      executeSshCommand(conn, diskCommand),
+      executeSshCommandForResources(conn, cpuCommand),
+      executeSshCommandForResources(conn, memCommand),
+      executeSshCommandForResources(conn, diskCommand),
     ]);
 
     conn.end();
 
-    const cpu_usage_percent = parseFloat(cpuOutput);
-    const [raw_memory_used_str, raw_memory_total_str] = memOutput.split(' ');
+    const cpu_usage_percent = parseFloat(cpuOutput.stdout);
+    const [raw_memory_used_str, raw_memory_total_str] = memOutput.stdout.split(' ');
 
     const memory_used_mib = parseMemoryString(raw_memory_used_str || '0B');
     const memory_total_mib = parseMemoryString(raw_memory_total_str || '0B');
 
-    const disk_usage_percent = parseFloat(diskOutput.replace('%', ''));
+    const disk_usage_percent = parseFloat(diskOutput.stdout.replace('%', ''));
 
     return NextResponse.json({
       cpu_usage_percent: isNaN(cpu_usage_percent) ? 0 : cpu_usage_percent,

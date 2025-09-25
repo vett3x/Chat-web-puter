@@ -1,4 +1,4 @@
-import { Client as SshClient } from 'ssh2';
+import { Client as SshClient, type ExecChannel, type SFTPStream } from 'ssh2'; // Import Client as value, others as types
 
 interface SshCommandResult {
   stdout: string;
@@ -31,7 +31,7 @@ export async function executeSshCommand(
   try {
     await new Promise<void>((resolve, reject) => {
       conn.on('ready', () => {
-        conn.exec(command, (err, stream) => {
+        conn.exec(command, (err: Error | undefined, stream: ExecChannel) => { // Explicitly type err and stream
           if (err) {
             conn.end();
             return reject(new Error(`SSH exec error: ${err.message}`));
@@ -43,7 +43,7 @@ export async function executeSshCommand(
             resolve();
           });
         });
-      }).on('error', (err) => {
+      }).on('error', (err: Error) => { // Explicitly type err
         reject(new Error(`SSH connection error: ${err.message}`));
       }).connect({
         host: serverDetails.ip_address,
@@ -77,7 +77,7 @@ export async function writeRemoteFile(
   try {
     await new Promise<void>((resolve, reject) => {
       conn.on('ready', () => {
-        conn.sftp((err, sftp) => {
+        conn.sftp((err: Error | undefined, sftp: SFTPStream) => { // Explicitly type err and sftp
           if (err) {
             conn.end();
             return reject(new Error(`SFTP error: ${err.message}`));
@@ -96,7 +96,7 @@ export async function writeRemoteFile(
             reject(new Error(`Error writing file to remote server: ${writeErr.message}`));
           });
         });
-      }).on('error', (err) => {
+      }).on('error', (err: Error) => { // Explicitly type err
         reject(new Error(`SSH connection error for file write: ${err.message}`));
       }).connect({
         host: serverDetails.ip_address,
