@@ -28,34 +28,9 @@ export async function POST(req: NextRequest, context: any) {
       throw new Error('La aplicación no tiene un contenedor asociado para reiniciar.');
     }
 
-    // 1. Run npm install first to ensure all dependencies are present
-    await supabaseAdmin.from('server_events_log').insert({
-      user_id: userId,
-      server_id: server.id,
-      event_type: 'npm_install_started',
-      description: `Ejecutando 'npm install' en el contenedor ${app.container_id.substring(0, 12)} antes de reiniciar.`
-    });
+    // NOTE: `npm install` is now handled by the /files endpoint when package.json changes.
+    // This endpoint is now only responsible for restarting the services.
 
-    const { stderr: installStderr, code: installCode } = await executeSshCommand(server, `docker exec ${app.container_id} bash -c "cd /app && npm install"`);
-    
-    if (installCode !== 0) {
-      await supabaseAdmin.from('server_events_log').insert({
-        user_id: userId,
-        server_id: server.id,
-        event_type: 'npm_install_failed',
-        description: `Falló 'npm install' en el contenedor ${app.container_id.substring(0, 12)}. Error: ${installStderr}`
-      });
-      throw new Error(`Error al ejecutar 'npm install' en el contenedor: ${installStderr}`);
-    }
-
-    await supabaseAdmin.from('server_events_log').insert({
-      user_id: userId,
-      server_id: server.id,
-      event_type: 'npm_install_succeeded',
-      description: `'npm install' completado exitosamente en el contenedor ${app.container_id.substring(0, 12)}.`
-    });
-
-    // 2. Proceed with restarting services
     const { data: tunnel } = await supabaseAdmin
       .from('docker_tunnels')
       .select('tunnel_id, tunnel_secret, container_port')
