@@ -43,9 +43,12 @@ async function handleCustomOpenAI(config: any, messages: any[]) {
 }
 
 async function handleGoogleGemini(config: any, messages: any[]) {
-  const { api_key } = config;
+  const { api_key, model_name } = config;
+  if (!model_name) {
+    throw new Error('El nombre del modelo de Gemini es requerido.');
+  }
   const genAI = new GoogleGenerativeAI(api_key);
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" }); // Or make this dynamic if needed
+  const model = genAI.getGenerativeModel({ model: model_name });
 
   // Convert OpenAI message format to Gemini format
   const geminiHistory = messages.slice(0, -1).map(msg => ({

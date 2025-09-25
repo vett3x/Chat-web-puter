@@ -23,6 +23,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AI_PROVIDERS } from '@/lib/ai-models';
 
 const apiKeySchema = z.object({
   provider: z.string().min(1, { message: 'Debes seleccionar un proveedor.' }),
@@ -34,10 +35,13 @@ const apiKeySchema = z.object({
   if (data.provider === 'custom_openai') {
     return !!data.api_endpoint && z.string().url().safeParse(data.api_endpoint).success && !!data.model_name;
   }
+  if (data.provider === 'google_gemini') {
+    return !!data.model_name;
+  }
   return true;
 }, {
-  message: 'Endpoint y Modelo son requeridos para APIs personalizadas.',
-  path: ['api_endpoint'], // You can associate the error with a specific field
+  message: 'Endpoint y Modelo son requeridos para APIs personalizadas, y el Modelo es requerido para Gemini.',
+  path: ['model_name'],
 });
 
 type ApiKeyFormValues = z.infer<typeof apiKeySchema>;
@@ -157,6 +161,8 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
     }
   };
 
+  const geminiModels = AI_PROVIDERS.find(p => p.company === 'Google')?.models || [];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] p-6 h-[80vh] flex flex-col">
@@ -191,6 +197,20 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                           <FormField control={form.control} name="api_endpoint" render={({ field }) => (<FormItem><FormLabel>Endpoint de la API</FormLabel><FormControl><Input placeholder="https://api.a4f.co/v1" {...field} /></FormControl><FormMessage /></FormItem>)} />
                           <FormField control={form.control} name="model_name" render={({ field }) => (<FormItem><FormLabel>Nombre del Modelo</FormLabel><FormControl><Input placeholder="Ej: gpt-4o" {...field} /></FormControl><FormMessage /></FormItem>)} />
                         </>
+                      )}
+                      {selectedProvider === 'google_gemini' && (
+                        <FormField control={form.control} name="model_name" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Modelo de Gemini</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo de Gemini" /></SelectTrigger></FormControl>
+                              <SelectContent>
+                                {geminiModels.map(model => (<SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
                       )}
                       <div className="flex gap-2">
                         <Button type="submit" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingKey ? <Edit className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />)}{editingKey ? 'Actualizar' : 'Añadir'}</Button>

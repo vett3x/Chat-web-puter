@@ -9,8 +9,8 @@ export const AI_PROVIDERS = [
     logo: GoogleGeminiLogo,
     source: 'user_key', // This provider requires a user-provided API key
     models: [
-      { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
-      { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+      { value: 'gemini-1.5-flash-latest', label: 'Gemini 1.5 Flash' },
+      { value: 'gemini-1.5-pro-latest', label: 'Gemini 1.5 Pro' },
     ],
   },
   {
@@ -18,10 +18,7 @@ export const AI_PROVIDERS = [
     logo: ClaudeAILogo,
     source: 'puter', // This provider uses the integrated Puter.js service
     models: [
-      { value: 'claude-sonnet-4', label: 'Claude Sonnet 4' },
-      { value: 'claude-opus-4', label: 'Claude Opus 4' },
-      { value: 'claude-3-7-sonnet', label: 'Claude 3.7 Sonnet' },
-      { value: 'claude-3-7-opus', label: 'Claude 3.7 Opus' },
+      { value: 'claude-3-5-sonnet-20240620', label: 'Claude 3.5 Sonnet' },
     ],
   },
 ];
