@@ -215,6 +215,9 @@ importers:
       ws:
         specifier: ^8.18.3
         version: 8.18.3
+      zod:
+        specifier: ^3.25.28
+        version: 3.25.28
     devDependencies:
       '@dyad-sh/nextjs-webpack-component-tagger':
         specifier: latest
@@ -255,9 +258,6 @@ importers:
       typescript:
         specifier: ^5
         version: 5.8.3
-      zod:
-        specifier: ^3.25.28
-        version: 3.25.28
 
 packages:
 
