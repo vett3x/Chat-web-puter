@@ -10,12 +10,15 @@ export const AI_PROVIDERS = [
     source: 'user_key', // This provider requires a user-provided API key
     value: 'google_gemini', // Added value for provider identification
     models: [ // These are fallback/example models, actual models will come from user keys
-      // Removed Gemini 1.5 models as requested
       { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
       { value: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite' },
       { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
       { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-      // Add public API models for Gemini here
+      // Public API models for Gemini
+      { value: 'gemini-2.0-flash-public-api', label: 'Gemini 2.0 Flash (API Pública)' },
+      { value: 'gemini-2.0-flash-lite-public-api', label: 'Gemini 2.0 Flash Lite (API Pública)' },
+      { value: 'gemini-2.5-pro-public-api', label: 'Gemini 2.5 Pro (API Pública)' },
+      { value: 'gemini-2.5-flash-public-api', label: 'Gemini 2.5 Flash (API Pública)' },
       { value: 'gemini-pro', label: 'Gemini Pro (API Pública)' },
       { value: 'gemini-pro-vision', label: 'Gemini Pro Vision (API Pública)' },
     ],
