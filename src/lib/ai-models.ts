@@ -8,7 +8,8 @@ export const AI_PROVIDERS = [
     company: 'Google',
     logo: GoogleGeminiLogo,
     source: 'user_key', // This provider requires a user-provided API key
-    models: [
+    value: 'google_gemini', // Added value for provider identification
+    models: [ // These are fallback/example models, actual models will come from user keys
       { value: 'gemini-1.5-flash-latest', label: 'Gemini 1.5 Flash' },
       { value: 'gemini-1.5-pro-latest', label: 'Gemini 1.5 Pro' },
     ],
@@ -17,6 +18,7 @@ export const AI_PROVIDERS = [
     company: 'Anthropic (Puter.js)',
     logo: ClaudeAILogo,
     source: 'puter', // This provider uses the integrated Puter.js service
+    value: 'anthropic_claude', // Added value for provider identification
     models: [
       { value: 'claude-sonnet-4', label: 'Claude Sonnet 4' },
       { value: 'claude-opus-4', label: 'Claude Opus 4' },
@@ -28,9 +30,20 @@ export const AI_PROVIDERS = [
 
 export const getModelLabel = (modelValue?: string): string => {
     if (!modelValue) return '';
+
+    // Handle new format: puter:model-name or user_key:key-id
+    let actualModelValue = modelValue;
+    if (modelValue.startsWith('puter:')) {
+      actualModelValue = modelValue.substring(6);
+    } else if (modelValue.startsWith('user_key:')) {
+      // For user_key, we can't get the exact model label without fetching the key details.
+      // For now, return a generic label or the key ID.
+      return `Clave de Usuario (${modelValue.substring(9, 17)}...)`;
+    }
+
     for (const provider of AI_PROVIDERS) {
-        const model = provider.models.find(m => m.value === modelValue);
+        const model = provider.models.find(m => m.value === actualModelValue);
         if (model) return model.label;
     }
-    return modelValue;
+    return actualModelValue;
 };

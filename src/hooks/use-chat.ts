@@ -30,7 +30,7 @@ type PuterContentPart = TextPart | ImagePart;
 
 interface PuterMessage {
   role: 'user' | 'assistant' | 'system';
-  content: string | PuterContentPart[];
+  content: string | (string | PuterContentPart)[]; // MODIFIED: Allow array to contain strings (for code blocks)
 }
 
 // Add global declaration for window.puter to fix TypeScript errors
@@ -52,14 +52,14 @@ interface Message {
   conversation_id?: string;
   content: string | MessageContentPart[]; // Use the unified type
   role: 'user' | 'assistant';
-  model?: string;
+  model?: string; // This will now store the full 'puter:model-value' or 'user_key:key-id' string
   timestamp: Date;
   isNew?: boolean;
   isTyping?: boolean;
   type?: 'text' | 'multimodal';
 }
 
-const DEFAULT_AI_MODEL = 'claude-sonnet-4';
+const DEFAULT_AI_MODEL_FORMAT = 'puter:claude-sonnet-4'; // New default format
 
 interface UseChatProps {
   userId: string | undefined;
@@ -107,26 +107,16 @@ function parseAiResponseToRenderableParts(content: string): RenderablePart[] {
     lastIndex = match.index + match[0].length;
   }
 
-  if (lastIndex < content.length) {
-    const textPart = content.substring(lastIndex).trim();
-    if (textPart) parts.push({ type: 'text', text: textPart });
-  }
-
   return parts.length > 0 ? parts : [{ type: 'text', text: content }];
 }
 
-function messageContentToApiFormat(content: Message['content']): string | PuterContentPart[] {
+function messageContentToApiFormat(content: Message['content']): string | (string | PuterContentPart)[] { // MODIFIED return type
     if (typeof content === 'string') {
         return content;
     }
 
     if (Array.isArray(content)) {
-        const hasCodePart = content.some(p => p.type === 'code');
-
-        if (!hasCodePart) {
-            return content as PuterContentPart[];
-        }
-
+        // The map function will produce an array of (string | PuterContentPart)
         return content.map((part) => {
             switch (part.type) {
                 case 'text':
@@ -137,9 +127,9 @@ function messageContentToApiFormat(content: Message['content']): string | PuterC
                     const filename = codePart.filename ? `:${codePart.filename}` : '';
                     return `\`\`\`${lang}${filename}\n${codePart.code || ''}\n\`\`\``;
                 case 'image_url':
-                    return `[Image Attached: ${(part as ImagePart).image_url.url}]`;
+                    return part; // Keep image_url parts as objects for multimodal APIs
             }
-        }).join('\n\n');
+        }).filter(Boolean) as (string | PuterContentPart)[]; // Filter out null/undefined and cast
     }
 
     return '';
@@ -161,9 +151,9 @@ export function useChat({
   const [isSendingFirstMessage, setIsSendingFirstMessage] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL;
+      return localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FORMAT;
     }
-    return DEFAULT_AI_MODEL;
+    return DEFAULT_AI_MODEL_FORMAT;
   });
 
   useEffect(() => {
@@ -217,13 +207,13 @@ export function useChat({
         setIsLoading(true);
         const details = await getConversationDetails(conversationId);
         if (details?.model) setSelectedModel(details.model);
-        else setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL);
+        else setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FORMAT);
         const fetchedMsgs = await getMessagesFromDB(conversationId);
         if (!isSendingFirstMessage || fetchedMsgs.length > 0) setMessages(fetchedMsgs);
         setIsLoading(false);
       } else {
         setMessages([]);
-        setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL);
+        setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FORMAT);
       }
     };
     loadConversationData();
@@ -270,23 +260,16 @@ export function useChat({
     const userMessageToSave = history.findLast(m => m.role === 'user');
 
     try {
-      const modelProvider = AI_PROVIDERS.find(p => p.models.some(m => m.value === selectedModel));
       let response: any;
+      let modelUsedForResponse: string; // To store the actual model string for the message record
 
-      if (modelProvider?.source === 'user_key') {
-        // Use our backend proxy for user-key models
-        const apiResponse = await fetch('/api/ai/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: history.map(m => ({ role: m.role, content: messageContentToApiFormat(m.content) })), model: selectedModel }),
-        });
-        response = await apiResponse.json();
-        if (!apiResponse.ok) throw new Error(response.message || 'Error en la API de IA.');
-      } else {
-        // Use Puter.js for other models
+      if (selectedModel.startsWith('puter:')) {
+        const actualModelForPuter = selectedModel.substring(6);
+        modelUsedForResponse = selectedModel; // Store the full format
+        // Use Puter.js for these models
         const puterMessages: PuterMessage[] = history.map(msg => ({
           role: msg.role,
-          content: messageContentToApiFormat(msg.content) as string | PuterContentPart[],
+          content: messageContentToApiFormat(msg.content),
         }));
         
         let systemMessage: PuterMessage;
@@ -295,7 +278,24 @@ export function useChat({
         } else {
           systemMessage = { role: 'system', content: "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante." };
         }
-        response = await window.puter.ai.chat([systemMessage, ...puterMessages], { model: selectedModel });
+        response = await window.puter.ai.chat([systemMessage, ...puterMessages], { model: actualModelForPuter });
+
+      } else if (selectedModel.startsWith('user_key:')) {
+        const selectedKeyId = selectedModel.substring(9);
+        modelUsedForResponse = selectedModel; // Store the full format
+        // Use our backend proxy for user-key models
+        const apiResponse = await fetch('/api/ai/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: history.map(m => ({ role: m.role, content: messageContentToApiFormat(m.content) })),
+            selectedKeyId: selectedKeyId, // Pass the key ID
+          }),
+        });
+        response = await apiResponse.json();
+        if (!apiResponse.ok) throw new Error(response.message || 'Error en la API de IA.');
+      } else {
+        throw new Error('Modelo de IA no válido seleccionado.');
       }
 
       if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
@@ -319,7 +319,7 @@ export function useChat({
       const assistantMessageData = {
         content: parts,
         role: 'assistant' as const,
-        model: selectedModel,
+        model: modelUsedForResponse, // Store the full selectedModel string
         type: 'multimodal' as const,
       };
       const tempId = `assistant-${Date.now()}`;

@@ -26,40 +26,52 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { messages, model } = await req.json();
+    const { messages, selectedKeyId } = await req.json(); // Expect selectedKeyId
+
+    if (!selectedKeyId) {
+      return NextResponse.json({ message: 'ID de clave de API no proporcionado.' }, { status: 400 });
+    }
+
+    // Fetch active API key details for the user and the given key ID
+    const { data: keyDetails, error: keyError } = await supabase
+      .from('user_api_keys')
+      .select('api_key, project_id, location_id, use_vertex_ai, model_name')
+      .eq('id', selectedKeyId) // Filter by ID
+      .eq('user_id', session.user.id)
+      .eq('is_active', true)
+      .single();
+
+    if (keyError || !keyDetails) {
+      throw new Error('No se encontró una API key activa con el ID proporcionado para este usuario. Por favor, verifica la Gestión de API Keys.');
+    }
 
     let genAI: GoogleGenAI;
-    let finalModel = model; // Default to the model passed from frontend
+    let finalModel = keyDetails.model_name; // Use model_name from keyDetails
 
-    // Fetch active API keys for the user and provider
-    const { data: keys, error: keyError } = await supabase
-      .from('user_api_keys')
-      .select('api_key, project_id, location_id, use_vertex_ai, model_name') // Select new fields
-      .eq('user_id', session.user.id)
-      .eq('provider', 'google_gemini')
-      .eq('is_active', true);
-
-    if (keyError || !keys || keys.length === 0) {
-      throw new Error('No se encontró una API key de Google Gemini activa. Por favor, añade una en la Gestión de API Keys.');
-    }
-    const activeKey = keys[0]; // Get the active key details
-
-    if (activeKey.use_vertex_ai) {
-      const project = activeKey.project_id;
-      const location = activeKey.location_id;
+    if (keyDetails.use_vertex_ai) {
+      const project = keyDetails.project_id;
+      const location = keyDetails.location_id;
       if (!project || !location) {
         throw new Error('Project ID y Location ID son requeridos para Vertex AI. Por favor, configúralos en la Gestión de API Keys.');
       }
       genAI = new GoogleGenAI({ vertexai: true, project, location });
-      if (activeKey.model_name) {
-        finalModel = activeKey.model_name; // Override model with user's selected Vertex AI model
+      if (!finalModel) {
+        throw new Error('Nombre de modelo no configurado para Vertex AI. Por favor, selecciona un modelo en la Gestión de API Keys.');
       }
     } else {
-      const apiKey = activeKey.api_key;
+      const apiKey = keyDetails.api_key;
       if (!apiKey) {
         throw new Error('API Key no encontrada para Google Gemini. Por favor, configúrala en la Gestión de API Keys.');
       }
       genAI = new GoogleGenAI({ apiKey });
+      // For public API, if model_name is not set in keyDetails, use a default or require it.
+      // For now, let's assume the frontend sends a valid model string if not Vertex AI.
+      // Or, we can default to a public model if keyDetails.model_name is null.
+      // Let's stick to `finalModel` from `keyDetails.model_name` for consistency.
+      if (!finalModel) {
+        // Fallback for older keys or if model_name wasn't explicitly set for public API
+        finalModel = 'gemini-1.5-flash-latest'; // A reasonable default
+      }
     }
 
     // Helper to convert our message format to Gemini's format
@@ -82,6 +94,11 @@ export async function POST(req: NextRequest) {
               const data = match[2];
               parts.push({ inlineData: { mimeType, data } });
             }
+          } else if (part.type === 'code') { // Convert code blocks to text for Gemini
+            const codePart = part as { language?: string; filename?: string; code?: string };
+            const lang = codePart.language ? `(${codePart.language})` : '';
+            const filename = codePart.filename ? `[${codePart.filename}]` : '';
+            parts.push({ text: `\`\`\`${lang}${filename}\n${codePart.code || ''}\n\`\`\`` });
           }
         }
       }

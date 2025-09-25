@@ -16,6 +16,7 @@ import Image from 'next/image';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { AI_PROVIDERS } from '@/lib/ai-models';
+import GoogleGeminiLogo from '@/components/google-gemini-logo'; // Import explicitly for dynamic icon
 
 interface PuterTextContentPart { type: 'text'; text: string; }
 interface PuterImageContentPart { type: 'image_url'; image_url: { url: string; }; }
@@ -23,7 +24,7 @@ type PuterContentPart = PuterTextContentPart | PuterImageContentPart;
 
 interface ChatInputProps {
   isLoading: boolean;
-  selectedModel: string;
+  selectedModel: string; // Now in format 'puter:model-value' or 'user_key:key-id'
   onModelChange: (model: string) => void;
   sendMessage: (content: PuterContentPart[], messageText: string) => void;
   isAppChat?: boolean;
@@ -35,10 +36,22 @@ interface SelectedFile {
   type: 'image' | 'other';
 }
 
+// Define the ApiKey interface to match what /api/ai-keys returns
+interface ApiKey {
+  id: string;
+  provider: string;
+  api_key: string | null; // Masked
+  nickname: string | null;
+  project_id: string | null;
+  location_id: string | null;
+  use_vertex_ai: boolean;
+  model_name: string | null;
+}
+
 export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage, isAppChat = false }: ChatInputProps) {
   const [inputMessage, setInputMessage] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
-  const [availableKeys, setAvailableKeys] = useState<string[]>([]);
+  const [userApiKeys, setUserApiKeys] = useState<ApiKey[]>([]); // Changed to store full ApiKey objects
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -47,8 +60,7 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
         const response = await fetch('/api/ai-keys');
         const data = await response.json();
         if (response.ok) {
-          const providers = [...new Set(data.map((key: any) => key.provider))] as string[];
-          setAvailableKeys(providers);
+          setUserApiKeys(data);
         }
       } catch (error) {
         console.error("Failed to fetch API keys", error);
@@ -58,12 +70,19 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
   }, []);
 
   const SelectedModelIcon = React.useMemo(() => {
-    for (const provider of AI_PROVIDERS) {
-      if (provider.models.some(model => model.value === selectedModel)) {
-        return provider.logo;
+    if (selectedModel.startsWith('puter:')) {
+      const modelValue = selectedModel.substring(6);
+      for (const provider of AI_PROVIDERS) {
+        if (provider.source === 'puter' && provider.models.some(model => model.value === modelValue)) {
+          return provider.logo;
+        }
       }
+    } else if (selectedModel.startsWith('user_key:')) {
+      // For user_key models, we always use the Google Gemini logo for now,
+      // as it's the only user_key provider in AI_PROVIDERS with source 'user_key'.
+      return GoogleGeminiLogo;
     }
-    return Bot; // Fallback to the generic bot icon
+    return Bot; // Fallback
   }, [selectedModel]);
 
   const processFiles = (files: FileList | null) => {
@@ -199,27 +218,67 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
             <DropdownMenuContent side="top" align="end" className="w-64 bg-popover text-popover-foreground border-border rounded-lg">
               <DropdownMenuLabel className="text-sm font-semibold">Seleccionar Modelo de IA</DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-border" />
-              {AI_PROVIDERS.filter(provider => !isAppChat || provider.source === 'user_key').map((provider, providerIndex) => {
-                const requiresKey = provider.source === 'user_key';
-                const hasKey = availableKeys.includes('google_gemini'); // Assuming provider name in DB is 'google_gemini'
-                const isDisabled = requiresKey && !hasKey;
+              {AI_PROVIDERS.filter(providerGroup => !isAppChat || providerGroup.source === 'user_key').map((providerGroup, providerIndex) => {
+                if (providerGroup.source === 'puter') {
+                  return (
+                    <React.Fragment key={providerGroup.value}>
+                      <DropdownMenuLabel className="flex items-center gap-2 font-bold text-foreground px-2 py-1.5">
+                        <span>{providerGroup.company}</span>
+                        <providerGroup.logo className="h-4 w-4" />
+                      </DropdownMenuLabel>
+                      {providerGroup.models.map((model) => (
+                        <DropdownMenuItem
+                          key={model.value}
+                          onClick={() => onModelChange(`puter:${model.value}`)} // New format
+                          className={cn("flex items-center justify-between cursor-pointer pl-8", selectedModel === `puter:${model.value}` && "bg-accent text-accent-foreground")}
+                        >
+                          <span>{model.label}</span>
+                          {selectedModel === `puter:${model.value}` && <Check className="h-4 w-4 text-green-500" />}
+                        </DropdownMenuItem>
+                      ))}
+                      {providerIndex < AI_PROVIDERS.length - 1 && <DropdownMenuSeparator className="bg-border" />}
+                    </React.Fragment>
+                  );
+                } else if (providerGroup.source === 'user_key') {
+                  const userKeysForProvider = userApiKeys.filter(key => key.provider === providerGroup.value);
+                  const hasAnyKey = userKeysForProvider.length > 0;
 
-                return (
-                  <React.Fragment key={provider.company}>
-                    <DropdownMenuLabel className={cn("flex items-center gap-2 font-bold text-foreground px-2 py-1.5", isDisabled && "text-muted-foreground")}>
-                      <span>{provider.company}</span>
-                      <provider.logo className="h-4 w-4" />
-                      {isDisabled && <span title="Requiere API Key"><KeyRound className="h-4 w-4 text-muted-foreground" /></span>}
-                    </DropdownMenuLabel>
-                    {provider.models.map((model) => (
-                      <DropdownMenuItem key={model.value} onClick={() => onModelChange(model.value)} disabled={isDisabled} className={cn("flex items-center justify-between cursor-pointer pl-8", selectedModel === model.value && "bg-accent text-accent-foreground", isDisabled && "cursor-not-allowed")}>
-                        <span>{model.label}</span>
-                        {selectedModel === model.value && <Check className="h-4 w-4 text-green-500" />}
-                      </DropdownMenuItem>
-                    ))}
-                    {providerIndex < AI_PROVIDERS.length - 1 && <DropdownMenuSeparator className="bg-border" />}
-                  </React.Fragment>
-                )
+                  return (
+                    <React.Fragment key={providerGroup.value}>
+                      <DropdownMenuLabel className={cn("flex items-center gap-2 font-bold text-foreground px-2 py-1.5", !hasAnyKey && "text-muted-foreground")}>
+                        <span>{providerGroup.company}</span>
+                        <providerGroup.logo className="h-4 w-4" />
+                        {!hasAnyKey && <span title="Requiere API Key"><KeyRound className="h-4 w-4 text-muted-foreground" /></span>}
+                      </DropdownMenuLabel>
+                      {hasAnyKey ? (
+                        userKeysForProvider.map(key => {
+                          const modelLabel = key.use_vertex_ai
+                            ? `(Vertex AI: ${key.model_name || 'N/A'})`
+                            : `(${key.model_name || 'API Pública'})`;
+                          const displayLabel = key.nickname ? `${key.nickname} ${modelLabel}` : `${providerGroup.company} ${modelLabel}`;
+                          const itemValue = `user_key:${key.id}`; // New format
+
+                          return (
+                            <DropdownMenuItem
+                              key={key.id}
+                              onClick={() => onModelChange(itemValue)}
+                              className={cn("flex items-center justify-between cursor-pointer pl-8", selectedModel === itemValue && "bg-accent text-accent-foreground")}
+                            >
+                              <span>{displayLabel}</span>
+                              {selectedModel === itemValue && <Check className="h-4 w-4 text-green-500" />}
+                            </DropdownMenuItem>
+                          );
+                        })
+                      ) : (
+                        <DropdownMenuItem disabled className="pl-8 cursor-not-allowed text-muted-foreground">
+                          No hay claves configuradas.
+                        </DropdownMenuItem>
+                      )}
+                      {providerIndex < AI_PROVIDERS.length - 1 && <DropdownMenuSeparator className="bg-border" />}
+                    </React.Fragment>
+                  );
+                }
+                return null;
               })}
             </DropdownMenuContent>
           </DropdownMenu>
