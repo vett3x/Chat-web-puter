@@ -44,30 +44,26 @@ interface UpdateCheckResponse {
 
 export function UpdateManagerDialog({ open, onOpenChange }: UpdateManagerDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [logOutput, setLogOutput] = useState<string>('Listo para comprobar si hay actualizaciones...'); // This will be for POST action
+  const [logOutput, setLogOutput] = useState<string>(''); // Initialize as empty string
   const [updateInfo, setUpdateInfo] = useState<UpdateCheckResponse | null>(null);
 
   const handleCheckForUpdates = async () => {
     setIsLoading(true);
-    setLogOutput('Comprobando actualizaciones desde el repositorio de GitHub...'); // Clear previous log
-    setUpdateInfo(null);
+    setLogOutput(''); // Clear previous log output
+    setUpdateInfo(null); // Clear previous update info
     try {
       const response = await fetch('/api/app-update?action=check');
-      const result = await response.json(); // No cast here, let it be 'any' for initial check
+      const result = await response.json();
       if (!response.ok) {
-        // If response is not OK, it's an error object, not UpdateCheckResponse
         throw new Error(result.message || `HTTP error! status: ${response.status}`);
       }
 
-      // Now that we know it's OK, we can cast
       const typedResult: UpdateCheckResponse = result;
       setUpdateInfo(typedResult);
-      // The logOutput for GET is now structured data, not a single string.
-      // We'll update the display directly from updateInfo.
-      setLogOutput(''); // Clear logOutput for GET check, as info is structured
+      setLogOutput(''); // Ensure logOutput is empty on success
     } catch (error: any) {
       toast.error('Error al comprobar las actualizaciones.');
-      setLogOutput(`Error: ${error.message}`); // Keep error in logOutput
+      setLogOutput(`Error: ${error.message}`); // Set error in logOutput
     } finally {
       setIsLoading(false);
     }
@@ -106,13 +102,20 @@ export function UpdateManagerDialog({ open, onOpenChange }: UpdateManagerDialogP
         <div className="py-4 space-y-4">
           <div className="text-sm">
             <p>Versión Actual: <span className="font-semibold">{APP_VERSION} (Compilación {BUILD_NUMBER})</span></p>
-            {updateInfo && (
+            {isLoading && !updateInfo && !logOutput ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <p className="ml-2 text-muted-foreground">Comprobando actualizaciones...</p>
+              </div>
+            ) : updateInfo ? (
               <>
                 <p>Versión Local (package.json): <span className="font-mono text-xs bg-muted p-1 rounded">{updateInfo.localPackageVersion}</span></p>
                 <p>Versión Remota (package.json): <span className="font-mono text-xs bg-muted p-1 rounded">{updateInfo.remotePackageVersion}</span></p>
                 <p>Commit Local: <span className="font-mono text-xs bg-muted p-1 rounded">{updateInfo.localCommitHash}</span></p>
                 <p>Commit Remoto: <span className="font-mono text-xs bg-muted p-1 rounded">{updateInfo.remoteCommitHash}</span></p>
               </>
+            ) : (
+              <p className="text-muted-foreground mt-2">Haz clic en "Comprobar Actualizaciones" para empezar.</p>
             )}
           </div>
           {updateInfo?.updateAvailable && updateInfo.newCommits.length > 0 && (
@@ -133,7 +136,7 @@ export function UpdateManagerDialog({ open, onOpenChange }: UpdateManagerDialogP
           )}
           <div className="flex gap-2">
             <Button onClick={handleCheckForUpdates} disabled={isLoading}>
-              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              {isLoading && !updateInfo && !logOutput ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
               Comprobar Actualizaciones
             </Button>
             <AlertDialog>
