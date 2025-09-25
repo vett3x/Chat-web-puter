@@ -3,7 +3,7 @@ export const runtime = 'nodejs';
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { GoogleGenerativeAI, Part } from '@google/generative-ai';
+import { GoogleGenAI, Part } from '@google/genai';
 
 async function getSupabaseClient() {
   const cookieStore = cookies() as any;
@@ -42,11 +42,11 @@ export async function POST(req: NextRequest) {
 
     // For now, use the first available key.
     const apiKey = keys[0].api_key;
-    const genAI = new GoogleGenerativeAI(apiKey);
+    const genAI = new GoogleGenAI({ apiKey });
     const geminiModel = genAI.getGenerativeModel({ model });
 
     // Helper to convert our message format to Gemini's format
-    const convertToGeminiParts = (content: any) => {
+    const convertToGeminiParts = (content: any): Part[] => {
       if (typeof content === 'string') {
         return [{ text: content }];
       }
@@ -66,24 +66,20 @@ export async function POST(req: NextRequest) {
             const data = match[2];
             return { inlineData: { mimeType, data } };
           }
-          // Ignore code blocks or other types not supported by Gemini API directly
           return null;
-        }).filter((p): p is Part => p !== null); // Filter out nulls with a type guard
+        }).filter((p): p is Part => p !== null);
       }
       return [];
     };
 
-    // Convert messages to Gemini format
-    const history = messages.slice(0, -1).map((msg: any) => ({
+    // Convert messages to Gemini's `contents` format
+    const contents = messages.map((msg: any) => ({
       role: msg.role === 'assistant' ? 'model' : 'user',
       parts: convertToGeminiParts(msg.content),
     }));
-    const lastMessage = messages[messages.length - 1];
-    const lastMessageParts = convertToGeminiParts(lastMessage.content);
 
-    const chat = geminiModel.startChat({ history });
-    const result = await chat.sendMessage(lastMessageParts);
-    const response = await result.response;
+    const result = await geminiModel.generateContent({ contents });
+    const response = result.response;
     const text = response.text();
 
     return NextResponse.json({ message: { content: text } });
@@ -99,7 +95,6 @@ export async function POST(req: NextRequest) {
     } else if (errorMessage.toLowerCase().includes('api key not valid')) {
       userFriendlyMessage = 'Tu API Key de Google Gemini no es válida. Por favor, verifica que sea correcta en la Gestión de API Keys.';
     } else {
-      // Keep a more generic but still helpful message for other errors
       userFriendlyMessage = `Error en la API de Gemini: ${errorMessage}`;
     }
 
