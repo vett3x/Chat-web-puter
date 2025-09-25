@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { executeSshCommand, writeRemoteFile } from '@/lib/ssh-utils';
-import { getAppAndServerForFileOps } from '@/lib/app-state-manager';
+import { getAppAndServerWithStateCheck } from '@/lib/app-state-manager';
 import path from 'path';
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants';
 
@@ -96,7 +96,7 @@ export async function GET(req: NextRequest, context: any) {
 
   try {
     const userId = await getUserId();
-    const { app, server } = await getAppAndServerForFileOps(appId, userId);
+    const { app, server } = await getAppAndServerWithStateCheck(appId, userId);
     
     if (filePath) {
       const safeBasePath = '/app';
@@ -132,7 +132,7 @@ export async function POST(req: NextRequest, context: any) {
     }
 
     const userId = session.user.id;
-    const { app, server } = await getAppAndServerForFileOps(appId, userId);
+    const { app, server } = await getAppAndServerWithStateCheck(appId, userId);
     const { files } = await req.json();
 
     if (!Array.isArray(files) || files.length === 0) {

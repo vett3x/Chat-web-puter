@@ -41,31 +41,6 @@ async function ensureServicesAreRunning(server: any, app: any) {
   }
 }
 
-/**
- * Fetches app and server details specifically for file operations,
- * without triggering state changes or service restarts.
- */
-export async function getAppAndServerForFileOps(appId: string, userId: string) {
-    const { data: app, error: appError } = await supabaseAdmin
-        .from('user_apps')
-        .select('*, user_servers(id, ip_address, ssh_port, ssh_username, ssh_password)')
-        .eq('id', appId)
-        .eq('user_id', userId)
-        .single();
-
-    if (appError || !app) {
-        throw new Error('Aplicación no encontrada o acceso denegado.');
-    }
-    if (!app.user_servers) {
-        throw new Error('La información del servidor para esta aplicación no está disponible.');
-    }
-    if (app.status !== 'ready' && app.status !== 'suspended') {
-        throw new Error(`La aplicación está en estado '${app.status}' y no se pueden modificar sus archivos. Por favor, espera a que esté lista.`);
-    }
-
-    return { app, server: app.user_servers as any };
-}
-
 export async function getAppAndServerWithStateCheck(appId: string, userId: string) {
     const { data: app, error: appError } = await supabaseAdmin
         .from('user_apps')
