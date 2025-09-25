@@ -15,12 +15,12 @@ export const AI_PROVIDERS = [
       { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
       { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
       // Public API models for Gemini
-      { value: 'gemini-2.0-flash-public-api', label: 'Gemini 2.0 Flash (API Pública)' },
-      { value: 'gemini-2.0-flash-lite-public-api', label: 'Gemini 2.0 Flash Lite (API Pública)' },
-      { value: 'gemini-2.5-pro-public-api', label: 'Gemini 2.5 Pro (API Pública)' },
-      { value: 'gemini-2.5-flash-public-api', label: 'Gemini 2.5 Flash (API Pública)' },
-      { value: 'gemini-pro', label: 'Gemini Pro (API Pública)' },
-      { value: 'gemini-pro-vision', label: 'Gemini Pro Vision (API Pública)' },
+      { value: 'gemini-2.0-flash-public-api', label: 'Gemini 2.0 Flash' },
+      { value: 'gemini-2.0-flash-lite-public-api', label: 'Gemini 2.0 Flash Lite' },
+      { value: 'gemini-2.5-pro-public-api', label: 'Gemini 2.5 Pro' },
+      { value: 'gemini-2.5-flash-public-api', label: 'Gemini 2.5 Flash' },
+      { value: 'gemini-pro-public-api', label: 'Gemini Pro' },
+      { value: 'gemini-pro-vision-public-api', label: 'Gemini Pro Vision' },
     ],
   },
   {

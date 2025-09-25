@@ -36,7 +36,7 @@ const apiKeySchema = z.object({
   project_id: z.string().optional(),
   location_id: z.string().optional(),
   use_vertex_ai: z.boolean().optional(),
-  model_name: z.string().optional(), // New: model_name for Vertex AI
+  model_name: z.string().optional(), // New: model_name
   json_key_file: z.any().optional(), // New: for file upload
   json_key_content: z.string().optional(), // Added for payload
 });
@@ -371,7 +371,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                               <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
                                 <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
                                 <SelectContent>
-                                  {currentProviderModels.filter(m => !m.label.includes('(API Pública)')).map(model => (
+                                  {currentProviderModels.filter(m => !m.value.includes('-public-api')).map(model => (
                                     <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>
                                   ))}
                                 </SelectContent>
@@ -429,11 +429,11 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                           )} />
                           <FormField control={form.control} name="model_name" render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Modelo de Gemini (API Pública)</FormLabel>
+                              <FormLabel>Modelo de Gemini</FormLabel> {/* Removed (API Pública) */}
                               <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
                                 <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
                                 <SelectContent>
-                                  {currentProviderModels.filter(m => m.label.includes('(API Pública)')).map(model => (
+                                  {currentProviderModels.filter(m => m.value.includes('-public-api')).map(model => (
                                     <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>
                                   ))}
                                 </SelectContent>
