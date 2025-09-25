@@ -66,7 +66,7 @@ export function ModelSelectorDropdown({
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="end" className="w-64 bg-popover text-popover-foreground border-border rounded-lg">
         <DropdownMenuLabel className="text-sm font-semibold">Seleccionar Modelo de IA</DropdownMenuLabel>
-        <div className="p-2" onPointerDown={(e) => e.stopPropagation()}>
+        <div className="p-2" onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.preventDefault()}>
           <div className="relative">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
