@@ -36,9 +36,63 @@ const apiKeySchema = z.object({
   project_id: z.string().optional(),
   location_id: z.string().optional(),
   use_vertex_ai: z.boolean().optional(),
-  model_name: z.string().optional(), // New: model_name
+  model_name: z.string().optional(), // This needs to be conditional
   json_key_file: z.any().optional(), // New: for file upload
   json_key_content: z.string().optional(), // Added for payload
+}).superRefine((data, ctx) => {
+  if (data.provider === 'google_gemini') {
+    if (data.use_vertex_ai) {
+      if (!data.model_name || data.model_name === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Debes seleccionar un modelo para usar Vertex AI.',
+          path: ['model_name'],
+        });
+      }
+    } else { // Public API
+      if (!data.model_name || data.model_name === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Debes seleccionar un modelo para la API pública de Gemini.',
+          path: ['model_name'],
+        });
+      }
+    }
+  }
+});
+
+// Apply the same superRefine to updateApiKeySchema
+const updateApiKeySchema = z.object({
+  id: z.string().min(1, { message: 'ID de clave es requerido para actualizar.' }),
+  provider: z.string().min(1),
+  api_key: z.string().optional(),
+  nickname: z.string().optional(),
+  project_id: z.string().optional(),
+  location_id: z.string().optional(),
+  use_vertex_ai: z.boolean().optional(),
+  model_name: z.string().optional(),
+  json_key_file: z.any().optional(),
+  json_key_content: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.provider === 'google_gemini') {
+    if (data.use_vertex_ai) {
+      if (!data.model_name || data.model_name === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Debes seleccionar un modelo para usar Vertex AI.',
+          path: ['model_name'],
+        });
+      }
+    } else { // Public API
+      if (!data.model_name || data.model_name === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Debes seleccionar un modelo para la API pública de Gemini.',
+          path: ['model_name'],
+        });
+      }
+    }
+  }
 });
 
 type ApiKeyFormValues = z.infer<typeof apiKeySchema>;
@@ -240,11 +294,11 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
           payload.json_key_content = undefined;
         }
       } else {
-        // If not using Vertex AI, ensure project_id, location_id, model_name, and json_key_content are null/undefined
+        // If not using Vertex AI, ensure project_id, location_id, and json_key_content are null/undefined
         payload.project_id = undefined;
         payload.location_id = undefined;
-        payload.model_name = undefined;
         payload.json_key_content = undefined;
+        // model_name is intentionally NOT cleared here, as it's used for public APIs too.
       }
 
       const response = await fetch('/api/ai-keys', {

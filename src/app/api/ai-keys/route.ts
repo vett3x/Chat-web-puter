@@ -157,12 +157,14 @@ export async function PUT(req: NextRequest) {
         updateData.model_name = model_name || null;
         updateData.json_key_content = json_key_content || null;
       }
-      // If switching from Vertex AI, clear Vertex AI specific fields
+      // If switching from Vertex AI, clear Vertex AI specific fields but keep model_name
       if (!use_vertex_ai) {
         updateData.project_id = null;
         updateData.location_id = null;
-        updateData.model_name = null;
         updateData.json_key_content = null;
+        if (model_name !== undefined) {
+          updateData.model_name = model_name || null;
+        }
       }
     } else { // If use_vertex_ai is not explicitly changed, update related fields based on its current value
       // This handles cases where only project_id/location_id/model_name/json_key_content are updated
