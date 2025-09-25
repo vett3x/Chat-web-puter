@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useSession } from '@/components/session-context-provider';
@@ -59,9 +59,13 @@ export interface Message {
   isNew?: boolean;
   isTyping?: boolean;
   type?: 'text' | 'multimodal';
-  isConstructionPlan?: boolean; // NEW: Flag for construction plans
-  planApproved?: boolean; // NEW: Flag to disable plan buttons
+  isConstructionPlan?: boolean;
+  planApproved?: boolean;
+  isCorrectionPlan?: boolean; // NEW: Flag for correction plans
+  correctionApproved?: boolean; // NEW: Flag to disable correction buttons
 }
+
+export type AutoFixStatus = 'idle' | 'analyzing' | 'plan_ready' | 'fixing' | 'failed';
 
 const DEFAULT_AI_MODEL_FALLBACK = 'puter:claude-sonnet-4';
 
@@ -76,10 +80,10 @@ interface UseChatProps {
   onSidebarDataRefresh: () => void;
   userApiKeys: ApiKey[];
   isLoadingApiKeys: boolean;
-  chatMode: ChatMode; // New prop for chat mode
+  chatMode: ChatMode;
 }
 
-const codeBlockRegex = /```(\w+)?(?::([\w./-]+))?\s*\n([\s\S]*?)\s*```/g;
+const codeBlockRegex = /```(\w+)?(?::([\w./-]+))?\s*\n([\sS]*?)\s*```/g;
 
 function parseAiResponseToRenderableParts(content: string): RenderablePart[] {
   const parts: RenderablePart[] = [];
@@ -201,6 +205,8 @@ export function useChat({
     }
     return DEFAULT_AI_MODEL_FALLBACK;
   });
+  const [autoFixStatus, setAutoFixStatus] = useState<AutoFixStatus>('idle');
+  const autoFixAttempts = useRef(0);
 
   useEffect(() => {
     const checkPuter = () => {
@@ -615,6 +621,7 @@ export function useChat({
     regenerateLastResponse,
     reapplyFilesFromMessage,
     clearChat,
-    approvePlan, // Expose the new function
+    approvePlan,
+    autoFixStatus,
   };
 }

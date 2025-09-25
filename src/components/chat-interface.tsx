@@ -7,6 +7,7 @@ import { ChatMessages } from '@/components/chat/chat-messages';
 import { ChatInput, ChatMode } from '@/components/chat/chat-input';
 import { ApiKey } from '@/hooks/use-user-api-keys';
 import { useSession } from './session-context-provider';
+import { AutoFixStatus } from './chat/auto-fix-status'; // NEW: Import AutoFixStatus
 
 interface ChatInterfaceProps {
   userId: string | undefined;
@@ -55,6 +56,7 @@ export function ChatInterface({
     reapplyFilesFromMessage,
     clearChat,
     approvePlan,
+    autoFixStatus, // NEW: Get autoFixStatus from hook
   } = useChat({
     userId,
     conversationId,
@@ -66,7 +68,7 @@ export function ChatInterface({
     onSidebarDataRefresh,
     userApiKeys,
     isLoadingApiKeys,
-    chatMode, // Pass the current chat mode to the hook
+    chatMode,
   });
 
   if (isAppProvisioning) {
@@ -124,6 +126,7 @@ export function ChatInterface({
           onClearChat={clearChat}
           onApprovePlan={approvePlan}
         />
+        <AutoFixStatus status={autoFixStatus} /> {/* NEW: Add AutoFixStatus component */}
         <ChatInput
           isLoading={isLoading}
           selectedModel={selectedModel}
