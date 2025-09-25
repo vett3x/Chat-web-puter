@@ -29,11 +29,12 @@ export async function POST(req: NextRequest) {
     const { messages, model } = await req.json();
 
     let genAI: GoogleGenAI;
+    let finalModel = model; // Default to the model passed from frontend
 
     // Fetch active API keys for the user and provider
     const { data: keys, error: keyError } = await supabase
       .from('user_api_keys')
-      .select('api_key, project_id, location_id, use_vertex_ai') // Select new fields
+      .select('api_key, project_id, location_id, use_vertex_ai, model_name') // Select new fields
       .eq('user_id', session.user.id)
       .eq('provider', 'google_gemini')
       .eq('is_active', true);
@@ -50,6 +51,9 @@ export async function POST(req: NextRequest) {
         throw new Error('Project ID y Location ID son requeridos para Vertex AI. Por favor, configúralos en la Gestión de API Keys.');
       }
       genAI = new GoogleGenAI({ vertexai: true, project, location });
+      if (activeKey.model_name) {
+        finalModel = activeKey.model_name; // Override model with user's selected Vertex AI model
+      }
     } else {
       const apiKey = activeKey.api_key;
       if (!apiKey) {
@@ -90,7 +94,7 @@ export async function POST(req: NextRequest) {
       parts: convertToGeminiParts(msg.content),
     }));
 
-    const result = await genAI.models.generateContent({ model, contents });
+    const result = await genAI.models.generateContent({ model: finalModel, contents }); // Use finalModel
     const text = result.text; // Access .text as a property
 
     return NextResponse.json({ message: { content: text } });

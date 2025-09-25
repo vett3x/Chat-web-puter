@@ -34,6 +34,7 @@ const apiKeySchema = z.object({
   project_id: z.string().optional(),
   location_id: z.string().optional(),
   use_vertex_ai: z.boolean().optional(),
+  model_name: z.string().optional(), // New: model_name for Vertex AI
 });
 
 type ApiKeyFormValues = z.infer<typeof apiKeySchema>;
@@ -47,11 +48,19 @@ interface ApiKey {
   project_id: string | null; // New
   location_id: string | null; // New
   use_vertex_ai: boolean; // New
+  model_name: string | null; // New
 }
 
 const providerOptions = [
   { value: 'google_gemini', label: 'Google Gemini' },
   { value: 'anthropic_claude', label: 'Anthropic Claude' },
+];
+
+const geminiVertexAIModels = [
+  { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+  { value: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite' },
+  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
 ];
 
 interface ApiManagementDialogProps {
@@ -74,6 +83,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       project_id: '',
       location_id: '',
       use_vertex_ai: false,
+      model_name: '', // Default for new field
     },
   });
 
@@ -104,6 +114,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         project_id: '',
         location_id: '',
         use_vertex_ai: false,
+        model_name: '',
       });
       setIsEditing(false);
     }
@@ -121,6 +132,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
           project_id: existingKey.project_id || '',
           location_id: existingKey.location_id || '',
           use_vertex_ai: existingKey.use_vertex_ai || false,
+          model_name: existingKey.model_name || '', // Set existing model_name
         });
       } else {
         setIsEditing(false);
@@ -131,6 +143,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
           project_id: '',
           location_id: '',
           use_vertex_ai: false,
+          model_name: '',
         });
       }
     } else {
@@ -151,6 +164,11 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         setIsSubmitting(false);
         return;
       }
+      if (values.use_vertex_ai && !values.model_name) {
+        toast.error('Debes seleccionar un modelo para usar Vertex AI.');
+        setIsSubmitting(false);
+        return;
+      }
 
       const method = isEditing ? 'PUT' : 'POST';
       const payload = { ...values };
@@ -163,9 +181,10 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       if (payload.use_vertex_ai) {
         payload.api_key = undefined; // Will be stored as NULL in DB
       } else {
-        // If not using Vertex AI, ensure project_id and location_id are null/undefined
+        // If not using Vertex AI, ensure project_id, location_id, and model_name are null/undefined
         payload.project_id = undefined;
         payload.location_id = undefined;
+        payload.model_name = undefined;
       }
 
       const response = await fetch('/api/ai-keys', {
@@ -183,6 +202,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         project_id: values.project_id,
         location_id: values.location_id,
         use_vertex_ai: values.use_vertex_ai,
+        model_name: values.model_name,
       });
       fetchKeys();
     } catch (error: any) {
@@ -206,6 +226,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         project_id: '',
         location_id: '',
         use_vertex_ai: false,
+        model_name: '',
       }); // Reset form if the deleted key was being edited
     } catch (error: any) {
       toast.error(`Error al eliminar la clave: ${error.message}`);
@@ -282,6 +303,20 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                               <FormMessage />
                             </FormItem>
                           )} />
+                          <FormField control={form.control} name="model_name" render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Modelo de Gemini (Vertex AI)</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                                <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
+                                <SelectContent>
+                                  {geminiVertexAIModels.map(model => (
+                                    <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
                         </>
                       ) : (
                         <FormField control={form.control} name="api_key" render={({ field }) => (
@@ -352,6 +387,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                               <span>Vertex AI (Activo)</span>
                               <span className="text-muted-foreground">Project: {key.project_id || 'N/A'}</span>
                               <span className="text-muted-foreground">Location: {key.location_id || 'N/A'}</span>
+                              <span className="text-muted-foreground">Modelo: {key.model_name || 'N/A'}</span>
                             </div>
                           ) : (
                             key.api_key
