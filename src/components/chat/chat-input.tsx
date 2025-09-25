@@ -160,6 +160,8 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
     setSelectedFiles(prev => prev.filter((_, index) => index !== indexToRemove));
   };
 
+  const filteredProviderGroups = AI_PROVIDERS.filter(providerGroup => !isAppChat || providerGroup.source === 'user_key');
+
   return (
     <div className="absolute bottom-0 left-0 right-0 flex justify-center px-4 pb-4 pt-2">
       <div className="w-full max-w-3xl bg-card rounded-xl border border-input p-2 flex flex-col gap-2 focus-within:ring-2 focus-within:ring-green-500 focus-within:ring-offset-2 focus-within:ring-offset-background transition-all duration-200">
@@ -197,7 +199,9 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
             <DropdownMenuContent side="top" align="end" className="w-64 bg-popover text-popover-foreground border-border rounded-lg">
               <DropdownMenuLabel className="text-sm font-semibold">Seleccionar Modelo de IA</DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-border" />
-              {AI_PROVIDERS.filter(providerGroup => !isAppChat || providerGroup.source === 'user_key').map((providerGroup, providerIndex) => {
+              {filteredProviderGroups.map((providerGroup, index) => {
+                const isLastFilteredProvider = index === filteredProviderGroups.length - 1;
+
                 if (providerGroup.source === 'puter') {
                   return (
                     <React.Fragment key={providerGroup.value}>
@@ -215,7 +219,7 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
                           {selectedModel === `puter:${model.value}` && <Check className="h-4 w-4 text-green-500" />}
                         </DropdownMenuItem>
                       ))}
-                      {providerIndex < AI_PROVIDERS.length - 1 && <DropdownMenuSeparator className="bg-border" />}
+                      {!isLastFilteredProvider && <DropdownMenuSeparator className="bg-border" />}
                     </React.Fragment>
                   );
                 } else if (providerGroup.source === 'user_key') {
@@ -264,7 +268,7 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
                           No hay claves configuradas.
                         </DropdownMenuItem>
                       )}
-                      {providerIndex < AI_PROVIDERS.length - 1 && <DropdownMenuSeparator className="bg-border" />}
+                      {!isLastFilteredProvider && <DropdownMenuSeparator className="bg-border" />}
                     </React.Fragment>
                   );
                 }
