@@ -119,7 +119,7 @@ export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialCha
         localStorage.setItem('selected_ai_model_note_chat', DEFAULT_AI_MODEL_FALLBACK);
       }
     }
-  }, [isLoadingApiKeys, userApiKeys, selectedModel]);
+  }, [isLoadingApiKeys, userApiKeys]);
 
   const handleSendMessage = async () => {
     if (!userInput.trim() || isLoading) return;
@@ -229,7 +229,7 @@ ${noteContent}
             onModelChange={setSelectedModel}
             isLoading={isLoading}
             userApiKeys={userApiKeys}
-            isAppChat={false} // This is a note chat, not an app chat
+            isAppChat={false}
             SelectedModelIcon={SelectedModelIcon}
           />
           <AlertDialog>

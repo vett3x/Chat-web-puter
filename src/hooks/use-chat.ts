@@ -221,7 +221,7 @@ export function useChat({
         localStorage.setItem('selected_ai_model', DEFAULT_AI_MODEL_FALLBACK);
       }
     }
-  }, [isLoadingApiKeys, userApiKeys, selectedModel]);
+  }, [isLoadingApiKeys, userApiKeys]);
 
 
   const getConversationDetails = useCallback(async (convId: string) => {
