@@ -159,11 +159,11 @@ export function useChat({
   const [isLoading, setIsLoading] = useState(false);
   const [isPuterReady, setIsPuterReady] = useState(false);
   const [isSendingFirstMessage, setIsSendingFirstMessage] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>(() => {
+  const [selectedApiKeyId, setSelectedApiKeyId] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL;
+      return localStorage.getItem('selected_api_key_id');
     }
-    return DEFAULT_AI_MODEL;
+    return null;
   });
 
   useEffect(() => {
@@ -179,9 +179,13 @@ export function useChat({
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('selected_ai_model', selectedModel);
+      if (selectedApiKeyId) {
+        localStorage.setItem('selected_api_key_id', selectedApiKeyId);
+      } else {
+        localStorage.removeItem('selected_api_key_id');
+      }
     }
-  }, [selectedModel]);
+  }, [selectedApiKeyId]);
 
   const getConversationDetails = useCallback(async (convId: string) => {
     const { data, error } = await supabase.from('conversations').select('id, title, model').eq('id', convId).eq('user_id', userId).single();
@@ -215,23 +219,19 @@ export function useChat({
     const loadConversationData = async () => {
       if (conversationId && userId) {
         setIsLoading(true);
-        const details = await getConversationDetails(conversationId);
-        if (details?.model) setSelectedModel(details.model);
-        else setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL);
         const fetchedMsgs = await getMessagesFromDB(conversationId);
         if (!isSendingFirstMessage || fetchedMsgs.length > 0) setMessages(fetchedMsgs);
         setIsLoading(false);
       } else {
         setMessages([]);
-        setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL);
       }
     };
     loadConversationData();
-  }, [conversationId, userId, getMessagesFromDB, getConversationDetails, isSendingFirstMessage]);
+  }, [conversationId, userId, getMessagesFromDB, isSendingFirstMessage]);
 
   const createNewConversationInDB = async () => {
     if (!userId) return null;
-    const { data, error } = await supabase.from('conversations').insert({ user_id: userId, title: 'Nueva conversación', model: selectedModel }).select('id, title').single();
+    const { data, error } = await supabase.from('conversations').insert({ user_id: userId, title: 'Nueva conversación' }).select('id, title').single();
     if (error) {
       toast.error('Error al crear una nueva conversación.');
       return null;
@@ -239,17 +239,6 @@ export function useChat({
     onNewConversationCreated(data.id);
     onConversationTitleUpdate(data.id, data.title);
     return data.id;
-  };
-
-  const updateConversationModelInDB = async (convId: string, model: string) => {
-    if (!userId) return;
-    const { error } = await supabase.from('conversations').update({ model }).eq('id', convId).eq('user_id', userId);
-    if (error) toast.error('Error al actualizar el modelo de la conversación.');
-  };
-
-  const handleModelChange = (modelValue: string) => {
-    setSelectedModel(modelValue);
-    if (conversationId) updateConversationModelInDB(conversationId, modelValue);
   };
 
   const saveMessageToDB = async (convId: string, msg: Omit<Message, 'timestamp' | 'id'>) => {
@@ -270,33 +259,16 @@ export function useChat({
     const userMessageToSave = history.findLast(m => m.role === 'user');
 
     try {
-      const modelProvider = AI_PROVIDERS.find(p => p.models.some(m => m.value === selectedModel));
-      let response: any;
-
-      if (modelProvider?.source === 'user_key') {
-        // Use our backend proxy for user-key models
-        const apiResponse = await fetch('/api/ai/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: history.map(m => ({ role: m.role, content: messageContentToApiFormat(m.content) })), model: selectedModel }),
-        });
-        response = await apiResponse.json();
-        if (!apiResponse.ok) throw new Error(response.message || 'Error en la API de IA.');
-      } else {
-        // Use Puter.js for other models
-        const puterMessages: PuterMessage[] = history.map(msg => ({
-          role: msg.role,
-          content: messageContentToApiFormat(msg.content) as string | PuterContentPart[],
-        }));
-        
-        let systemMessage: PuterMessage;
-        if (appPrompt) {
-          systemMessage = { role: 'system', content: `Eres un desarrollador experto en Next.js (App Router), TypeScript y Tailwind CSS. Tu tarea es generar los archivos necesarios para construir la aplicación que el usuario ha descrito: "${appPrompt}". REGLAS ESTRICTAS: 1. Responde ÚNICAMENTE con bloques de código. 2. Cada bloque de código DEBE representar un archivo completo. 3. Usa el formato \`\`\`language:ruta/del/archivo.tsx\`\`\` para cada bloque. 4. NO incluyas ningún texto conversacional, explicaciones, saludos o introducciones. Solo el código.` };
-        } else {
-          systemMessage = { role: 'system', content: "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante." };
-        }
-        response = await window.puter.ai.chat([systemMessage, ...puterMessages], { model: selectedModel });
-      }
+      const apiResponse = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: history.map(m => ({ role: m.role, content: messageContentToApiFormat(m.content) })),
+          apiKeyId: selectedApiKeyId,
+        }),
+      });
+      const response = await apiResponse.json();
+      if (!apiResponse.ok) throw new Error(response.message || 'Error en la API de IA.');
 
       if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
 
@@ -319,7 +291,7 @@ export function useChat({
       const assistantMessageData = {
         content: parts,
         role: 'assistant' as const,
-        model: selectedModel,
+        model: selectedApiKeyId || 'custom',
         type: 'multimodal' as const,
       };
       const tempId = `assistant-${Date.now()}`;
@@ -370,7 +342,11 @@ export function useChat({
   };
 
   const sendMessage = async (userContent: PuterContentPart[], messageText: string) => {
-    if (isLoading || !isPuterReady || !userId) return;
+    if (isLoading || !userId) return;
+    if (!selectedApiKeyId) {
+      toast.error('Por favor, selecciona una configuración de API desde el menú de modelos.');
+      return;
+    }
 
     let currentConvId = conversationId;
     if (!currentConvId) {
@@ -446,8 +422,8 @@ export function useChat({
     messages,
     isLoading,
     isPuterReady,
-    selectedModel,
-    handleModelChange,
+    selectedApiKeyId,
+    handleModelChange: setSelectedApiKeyId,
     sendMessage,
     regenerateLastResponse,
     reapplyFilesFromMessage,

@@ -6,15 +6,18 @@ import { cookies } from 'next/headers';
 import { z } from 'zod';
 
 const apiKeySchema = z.object({
-  provider: z.string().min(1),
+  name: z.string().min(1),
+  api_endpoint: z.string().url(),
   api_key: z.string().min(1),
-  nickname: z.string().optional(),
+  model_name: z.string().min(1),
 });
 
 const updateApiKeySchema = z.object({
-  provider: z.string().min(1),
-  api_key: z.string().min(10, { message: 'La API Key parece demasiado corta.' }).optional(),
-  nickname: z.string().optional(),
+  id: z.string().uuid(),
+  name: z.string().min(1).optional(),
+  api_endpoint: z.string().url().optional(),
+  api_key: z.string().min(10).optional(),
+  model_name: z.string().min(1).optional(),
 });
 
 async function getSupabaseClient() {
@@ -41,7 +44,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabase
     .from('user_api_keys')
-    .select('id, provider, api_key, is_active, created_at, nickname')
+    .select('id, name, api_endpoint, model_name, api_key, is_active, created_at')
     .eq('user_id', session.user.id)
     .order('created_at', { ascending: false });
 
@@ -49,7 +52,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
 
-  // Mask the API keys before sending them to the client
   const maskedData = data.map(key => ({
     ...key,
     api_key: `${key.api_key.substring(0, 4)}...${key.api_key.substring(key.api_key.length - 4)}`,
@@ -67,15 +69,16 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { provider, api_key, nickname } = apiKeySchema.parse(body);
+    const { name, api_endpoint, api_key, model_name } = apiKeySchema.parse(body);
 
     const { data, error } = await supabase
       .from('user_api_keys')
       .insert({
         user_id: session.user.id,
-        provider,
+        name,
+        api_endpoint,
         api_key,
-        nickname,
+        model_name,
       })
       .select()
       .single();
@@ -100,15 +103,7 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { provider, api_key, nickname } = updateApiKeySchema.parse(body);
-
-    const updateData: { api_key?: string; nickname?: string | null } = {};
-    if (api_key) {
-      updateData.api_key = api_key;
-    }
-    if (nickname !== undefined) {
-      updateData.nickname = nickname || null;
-    }
+    const { id, ...updateData } = updateApiKeySchema.parse(body);
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ message: 'No se proporcionaron datos para actualizar.' }, { status: 400 });
@@ -118,7 +113,7 @@ export async function PUT(req: NextRequest) {
       .from('user_api_keys')
       .update(updateData)
       .eq('user_id', session.user.id)
-      .eq('provider', provider)
+      .eq('id', id)
       .select()
       .single();
 

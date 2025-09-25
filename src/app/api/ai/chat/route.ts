@@ -3,7 +3,6 @@ export const runtime = 'nodejs';
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { GoogleGenerativeAI, Part } from '@google/generative-ai';
 
 async function getSupabaseClient() {
   const cookieStore = cookies() as any;
@@ -26,83 +25,53 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { messages, model } = await req.json();
+    const { messages, apiKeyId } = await req.json();
 
-    // Fetch active API keys for the user and provider
-    const { data: keys, error: keyError } = await supabase
-      .from('user_api_keys')
-      .select('api_key')
-      .eq('user_id', session.user.id)
-      .eq('provider', 'google_gemini')
-      .eq('is_active', true);
-
-    if (keyError || !keys || keys.length === 0) {
-      throw new Error('No se encontró una API key de Google Gemini activa. Por favor, añade una en la Gestión de API Keys.');
+    if (!apiKeyId) {
+      throw new Error('No se ha seleccionado una configuración de API Key.');
     }
 
-    // For now, use the first available key.
-    const apiKey = keys[0].api_key;
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const geminiModel = genAI.getGenerativeModel({ model });
+    // Fetch the selected API key configuration from the database
+    const { data: apiKeyConfig, error: keyError } = await supabase
+      .from('user_api_keys')
+      .select('api_endpoint, api_key, model_name')
+      .eq('id', apiKeyId)
+      .eq('user_id', session.user.id)
+      .single();
 
-    // Helper to convert our message format to Gemini's format
-    const convertToGeminiParts = (content: any) => {
-      if (typeof content === 'string') {
-        return [{ text: content }];
-      }
-      if (Array.isArray(content)) {
-        return content.map(part => {
-          if (part.type === 'text') {
-            return { text: part.text };
-          }
-          if (part.type === 'image_url') {
-            const url = part.image_url.url;
-            const match = url.match(/^data:(image\/\w+);base64,(.*)$/);
-            if (!match) {
-              console.warn("Skipping invalid image data URL format for Gemini:", url.substring(0, 50) + '...');
-              return { text: "[Unsupported Image]" };
-            }
-            const mimeType = match[1];
-            const data = match[2];
-            return { inlineData: { mimeType, data } };
-          }
-          // Ignore code blocks or other types not supported by Gemini API directly
-          return null;
-        }).filter((p): p is Part => p !== null); // Filter out nulls with a type guard
-      }
-      return [];
-    };
+    if (keyError || !apiKeyConfig) {
+      throw new Error('La configuración de API Key seleccionada no es válida o no se encontró.');
+    }
 
-    // Convert messages to Gemini format
-    const history = messages.slice(0, -1).map((msg: any) => ({
-      role: msg.role === 'assistant' ? 'model' : 'user',
-      parts: convertToGeminiParts(msg.content),
-    }));
-    const lastMessage = messages[messages.length - 1];
-    const lastMessageParts = convertToGeminiParts(lastMessage.content);
+    const { api_endpoint, api_key, model_name } = apiKeyConfig;
 
-    const chat = geminiModel.startChat({ history });
-    const result = await chat.sendMessage(lastMessageParts);
-    const response = await result.response;
-    const text = response.text();
+    // Prepare the request for an OpenAI-compatible API
+    const response = await fetch(api_endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${api_key}`,
+      },
+      body: JSON.stringify({
+        model: model_name,
+        messages: messages, // Assuming messages are already in the correct format
+        stream: false, // For simplicity, we are not using streaming responses for now
+      }),
+    });
 
-    return NextResponse.json({ message: { content: text } });
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error(`[API Proxy Error] Status: ${response.status}, Body: ${errorBody}`);
+      throw new Error(`Error de la API externa: ${response.statusText} - ${errorBody}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || 'No se recibió contenido en la respuesta.';
+
+    return NextResponse.json({ message: { content } });
 
   } catch (error: any) {
     console.error('[API /ai/chat] Error:', error);
-    
-    let userFriendlyMessage = 'Ocurrió un error inesperado con la API de Gemini.';
-    const errorMessage = error.message || '';
-
-    if (errorMessage.includes('503') || errorMessage.toLowerCase().includes('overloaded')) {
-      userFriendlyMessage = 'El modelo de IA de Google está sobrecargado en este momento. Por favor, intenta de nuevo en unos minutos o cambia a otro modelo.';
-    } else if (errorMessage.toLowerCase().includes('api key not valid')) {
-      userFriendlyMessage = 'Tu API Key de Google Gemini no es válida. Por favor, verifica que sea correcta en la Gestión de API Keys.';
-    } else {
-      // Keep a more generic but still helpful message for other errors
-      userFriendlyMessage = `Error en la API de Gemini: ${errorMessage}`;
-    }
-
-    return NextResponse.json({ message: userFriendlyMessage }, { status: 500 });
+    return NextResponse.json({ message: error.message }, { status: 500 });
   }
 }

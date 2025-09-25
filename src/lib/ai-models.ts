@@ -9,8 +9,8 @@ export const AI_PROVIDERS = [
     logo: GoogleGeminiLogo,
     source: 'user_key', // This provider requires a user-provided API key
     models: [
-      { value: 'gemini-1.5-flash-latest', label: 'Gemini 1.5 Flash' },
-      { value: 'gemini-1.5-pro-latest', label: 'Gemini 1.5 Pro' },
+      { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
+      { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
     ],
   },
   {

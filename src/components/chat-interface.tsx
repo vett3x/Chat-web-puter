@@ -37,7 +37,7 @@ export function ChatInterface({
     messages,
     isLoading,
     isPuterReady,
-    selectedModel,
+    selectedApiKeyId,
     handleModelChange,
     sendMessage,
     regenerateLastResponse,
@@ -106,7 +106,7 @@ export function ChatInterface({
         />
         <ChatInput
           isLoading={isLoading}
-          selectedModel={selectedModel}
+          selectedApiKeyId={selectedApiKeyId}
           onModelChange={handleModelChange}
           sendMessage={sendMessage}
           isAppChat={isAppChat}
