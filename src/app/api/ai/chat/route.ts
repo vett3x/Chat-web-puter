@@ -28,21 +28,31 @@ export async function POST(req: NextRequest) {
   try {
     const { messages, model } = await req.json();
 
-    // Fetch active API keys for the user and provider
-    const { data: keys, error: keyError } = await supabase
-      .from('user_api_keys')
-      .select('api_key')
-      .eq('user_id', session.user.id)
-      .eq('provider', 'google_gemini')
-      .eq('is_active', true);
+    const useVertexAI = process.env.GOOGLE_GENAI_USE_VERTEXAI === 'True';
+    let genAI: GoogleGenAI;
 
-    if (keyError || !keys || keys.length === 0) {
-      throw new Error('No se encontró una API key de Google Gemini activa. Por favor, añade una en la Gestión de API Keys.');
+    if (useVertexAI) {
+      const project = process.env.GOOGLE_CLOUD_PROJECT;
+      const location = process.env.GOOGLE_CLOUD_LOCATION;
+      if (!project || !location) {
+        throw new Error('Variables de entorno GOOGLE_CLOUD_PROJECT y GOOGLE_CLOUD_LOCATION son requeridas para Vertex AI.');
+      }
+      genAI = new GoogleGenAI({ vertexai: true, project, location });
+    } else {
+      // Fetch active API keys for the user and provider (only if not using Vertex AI)
+      const { data: keys, error: keyError } = await supabase
+        .from('user_api_keys')
+        .select('api_key')
+        .eq('user_id', session.user.id)
+        .eq('provider', 'google_gemini')
+        .eq('is_active', true);
+
+      if (keyError || !keys || keys.length === 0) {
+        throw new Error('No se encontró una API key de Google Gemini activa. Por favor, añade una en la Gestión de API Keys.');
+      }
+      const apiKey = keys[0].api_key;
+      genAI = new GoogleGenAI({ apiKey });
     }
-
-    // For now, use the first available key.
-    const apiKey = keys[0].api_key;
-    const genAI = new GoogleGenAI({ apiKey });
 
     // Helper to convert our message format to Gemini's format
     const convertToGeminiParts = (content: any): Part[] => {
@@ -77,7 +87,7 @@ export async function POST(req: NextRequest) {
     }));
 
     const result = await genAI.models.generateContent({ model, contents });
-    const text = result.response.text();
+    const text = result.text; // FIX: Access .text as a property
 
     return NextResponse.json({ message: { content: text } });
 
@@ -91,7 +101,10 @@ export async function POST(req: NextRequest) {
       userFriendlyMessage = 'El modelo de IA de Google está sobrecargado en este momento. Por favor, intenta de nuevo en unos minutos o cambia a otro modelo.';
     } else if (errorMessage.toLowerCase().includes('api key not valid')) {
       userFriendlyMessage = 'Tu API Key de Google Gemini no es válida. Por favor, verifica que sea correcta en la Gestión de API Keys.';
-    } else {
+    } else if (errorMessage.includes('GOOGLE_CLOUD_PROJECT') || errorMessage.includes('GOOGLE_CLOUD_LOCATION')) {
+      userFriendlyMessage = `Error de configuración de Vertex AI: ${errorMessage}`;
+    }
+    else {
       userFriendlyMessage = `Error en la API de Gemini: ${errorMessage}`;
     }
 
