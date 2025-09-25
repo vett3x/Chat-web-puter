@@ -3,14 +3,25 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Send, Bot, Loader2, Paperclip, KeyRound } from 'lucide-react';
+import { Send, Bot, Loader2, Paperclip, KeyRound, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AI_PROVIDERS } from '@/lib/ai-models';
 import { useUserApiKeys } from '@/hooks/use-user-api-keys';
-import { FileAttachmentPreview } from './file-attachment-preview'; // New import
-import { ModelSelectorDropdown } from './model-selector-dropdown'; // New import
-import GoogleGeminiLogo from '@/components/google-gemini-logo'; // Import explicitly for dynamic icon
-import ClaudeAILogo from '@/components/claude-ai-logo'; // Import explicitly for dynamic icon
+import { FileAttachmentPreview } from './file-attachment-preview';
+import { ModelSelectorDropdown } from './model-selector-dropdown';
+import GoogleGeminiLogo from '@/components/google-gemini-logo';
+import ClaudeAILogo from '@/components/claude-ai-logo';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface PuterTextContentPart { type: 'text'; text: string; }
 interface PuterImageContentPart { type: 'image_url'; image_url: { url: string; }; }
@@ -22,6 +33,7 @@ interface ChatInputProps {
   onModelChange: (model: string) => void;
   sendMessage: (content: PuterContentPart[], messageText: string) => void;
   isAppChat?: boolean;
+  onClearChat: () => void; // NEW: Add onClearChat prop
 }
 
 interface SelectedFile {
@@ -30,7 +42,7 @@ interface SelectedFile {
   type: 'image' | 'other';
 }
 
-export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage, isAppChat = false }: ChatInputProps) {
+export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage, isAppChat = false, onClearChat }: ChatInputProps) {
   const [inputMessage, setInputMessage] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const { userApiKeys } = useUserApiKeys();
@@ -172,6 +184,29 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
             isAppChat={isAppChat}
             SelectedModelIcon={SelectedModelIcon}
           />
+
+          {/* NEW: Clear Chat Button */}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive" disabled={isLoading} title="Limpiar chat">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Estás seguro de limpiar este chat?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta acción eliminará permanentemente todos los mensajes de esta conversación.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={onClearChat} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  Limpiar Chat
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           <Button onClick={handleSendMessage} disabled={isLoading || (!inputMessage.trim() && selectedFiles.length === 0)} className="flex-shrink-0 h-8 w-8 p-0">
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

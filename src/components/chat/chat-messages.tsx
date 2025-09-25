@@ -2,7 +2,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Bot, User, Loader2, Clipboard, RefreshCw, Upload, Trash2 } from 'lucide-react'; // Import Trash2
+import { Bot, User, Loader2, Clipboard, RefreshCw, Upload, Trash2 } from 'lucide-react';
 import { MessageContent } from '@/components/message-content';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -19,7 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"; // Import AlertDialog components
+} from "@/components/ui/alert-dialog";
 
 // Define unified part types
 interface TextPart {
@@ -42,7 +42,7 @@ type MessageContentPart = TextPart | ImagePart | CodePart;
 
 interface Message {
   id: string;
-  content: string | MessageContentPart[]; // Use the unified type
+  content: string | MessageContentPart[];
   role: 'user' | 'assistant';
   model?: string;
   isNew?: boolean;
@@ -175,32 +175,6 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
           })
         )}
       </div>
-      {/* NEW: Clear Chat Button */}
-      {messages.length > 0 && (
-        <div className="absolute top-4 right-4">
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="outline" size="icon" className="h-8 w-8" disabled={isLoading} title="Limpiar chat">
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>¿Estás seguro de limpiar este chat?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Esta acción eliminará permanentemente todos los mensajes de esta conversación.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={onClearChat} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                  Limpiar Chat
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      )}
     </ScrollArea>
   );
 }

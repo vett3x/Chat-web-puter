@@ -52,7 +52,7 @@ export function ChatInterface({
     sendMessage,
     regenerateLastResponse,
     reapplyFilesFromMessage,
-    clearChat, // NEW: Destructure clearChat
+    clearChat,
   } = useChat({
     userId,
     conversationId,
@@ -118,7 +118,7 @@ export function ChatInterface({
           onReapplyFiles={reapplyFilesFromMessage}
           appPrompt={appPrompt}
           userAvatarUrl={userAvatarUrl}
-          onClearChat={clearChat} // NEW: Pass clearChat
+          onClearChat={clearChat}
         />
         <ChatInput
           isLoading={isLoading}
@@ -126,6 +126,7 @@ export function ChatInterface({
           onModelChange={handleModelChange}
           sendMessage={sendMessage}
           isAppChat={isAppChat}
+          onClearChat={clearChat} // NEW: Pass clearChat
         />
       </div>
     </div>
