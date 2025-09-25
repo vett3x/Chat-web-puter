@@ -5,7 +5,8 @@ import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/integrations/supabase/client';
 import { Session } from '@supabase/supabase-js';
 import { Loader2 } from 'lucide-react';
-import { SUPERUSER_EMAILS, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada de PERMISSION_KEYS
+import { SUPERUSER_EMAILS, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
+import { toast } from 'sonner'; // Import toast
 
 type UserRole = 'user' | 'admin' | 'super_admin';
 type UserPermissions = Record<string, boolean>; // Define type for permissions
@@ -28,6 +29,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const pathname = usePathname();
 
   const fetchUserProfileAndRole = async (currentSession: Session | null) => {
+    console.log("[SessionContext] fetchUserProfileAndRole called with session:", currentSession?.user?.id);
     if (currentSession?.user?.id) {
       const { data: profile, error } = await supabase
         .from('profiles')
@@ -39,14 +41,16 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       let determinedPermissions: UserPermissions = {};
 
       if (error) {
-        console.error('Error fetching user profile role and permissions:', error);
+        console.error('[SessionContext] Error fetching user profile role and permissions:', error);
         // Fallback to email check if profile fetch fails
         determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
       } else if (profile) {
+        console.log("[SessionContext] Profile fetched:", profile);
         determinedRole = profile.role as UserRole;
         determinedPermissions = profile.permissions || {};
       } else {
         // Fallback if profile not found (shouldn't happen with trigger)
+        console.log("[SessionContext] Profile not found, falling back to email check.");
         determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
       }
 
@@ -69,44 +73,60 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       setUserPermissions(determinedPermissions);
 
     } else {
+      console.log("[SessionContext] No current session for profile fetch.");
       setUserRole(null);
       setUserPermissions({});
     }
   };
 
   useEffect(() => {
+    console.log("[SessionContext] useEffect started.");
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      console.log(`[SessionContext] onAuthStateChange event: ${event}, session: ${currentSession?.user?.id}`);
       setSession(currentSession);
-      setIsLoading(false);
-      await fetchUserProfileAndRole(currentSession); // Fetch role and permissions on auth state change
+      setIsLoading(false); // This is important: set to false after auth state change
+      await fetchUserProfileAndRole(currentSession);
 
       if (event === 'SIGNED_OUT' || !currentSession) {
         if (pathname !== '/login') {
+          console.log("[SessionContext] Redirecting to /login due to SIGNED_OUT or no session.");
           router.push('/login');
         }
       } else if (currentSession) {
         if (pathname === '/login') {
+          console.log("[SessionContext] Redirecting to / due to active session on /login page.");
           router.push('/');
         }
       }
     });
 
     supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
+      console.log(`[SessionContext] getSession().then() resolved. Initial session: ${initialSession?.user?.id}`);
       setSession(initialSession);
-      setIsLoading(false);
-      await fetchUserProfileAndRole(initialSession); // Fetch role and permissions on initial session load
+      setIsLoading(false); // This is also important: set to false after initial session load
+      await fetchUserProfileAndRole(initialSession);
 
       if (!initialSession && pathname !== '/login') {
+        console.log("[SessionContext] Redirecting to /login due to no initial session.");
         router.push('/login');
       } else if (initialSession && pathname === '/login') {
+        console.log("[SessionContext] Redirecting to / due to initial active session on /login page.");
         router.push('/');
       }
+    }).catch(error => {
+      console.error("[SessionContext] Error in getSession():", error);
+      setIsLoading(false); // Ensure loading is false even on error
+      toast.error("Error al cargar la sesión: " + error.message);
     });
 
-    return () => subscription.unsubscribe();
-  }, [router, pathname]);
+    return () => {
+      console.log("[SessionContext] useEffect cleanup.");
+      subscription.unsubscribe();
+    };
+  }, [router, pathname]); // Dependencies look correct
 
   if (isLoading) {
+    console.log("[SessionContext] Rendering loading state.");
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -114,7 +134,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       </div>
     );
   }
-
+  console.log("[SessionContext] Rendering children.");
   return (
     <SessionContext.Provider value={{ session, isLoading, userRole, userPermissions }}>
       {children}
