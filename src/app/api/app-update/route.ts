@@ -66,19 +66,35 @@ export async function GET(req: NextRequest) {
       const localPackageJson = JSON.parse(localPackageJsonContent);
       const localPackageVersion = localPackageJson.version;
 
-      // 2. Fetch remote package.json version from origin/main
+      // 2. Get local commit hash
+      const { stdout: localCommitHash } = await execAsync('git rev-parse HEAD');
+
+      // 3. Fetch remote and get remote package.json version and commit hash
       await execAsync('git fetch origin main');
       const { stdout: remotePackageJsonContent } = await execAsync('git show origin/main:package.json');
       const remotePackageJson = JSON.parse(remotePackageJsonContent);
       const remotePackageVersion = remotePackageJson.version;
+      const { stdout: remoteCommitHash } = await execAsync('git rev-parse origin/main');
 
-      // 3. Compare versions
+      // 4. Compare versions
       const updateAvailable = compareVersions(localPackageVersion, remotePackageVersion) < 0;
+
+      let newCommits: string[] = [];
+      if (updateAvailable) {
+        const { stdout: gitLogOutput } = await execAsync(`git log --pretty=format:"%h %s" ${localCommitHash.trim()}..${remoteCommitHash.trim()}`);
+        newCommits = gitLogOutput.split('\n')
+                                 .filter(line => line.trim() !== '')
+                                 .map(line => line.replace(/\[dyad\].*\s*-\s*wrote\s*\d+\s*file\(s\)/g, '').trim()) // Filter Dyad messages
+                                 .filter(line => line !== ''); // Remove empty lines after filtering
+      }
 
       return NextResponse.json({
         updateAvailable,
         localPackageVersion,
         remotePackageVersion,
+        localCommitHash: localCommitHash.trim(),
+        remoteCommitHash: remoteCommitHash.trim(),
+        newCommits,
       });
     } catch (error: any) {
       console.error('[API app-update/check] Error:', error);

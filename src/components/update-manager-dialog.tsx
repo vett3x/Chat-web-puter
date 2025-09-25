@@ -37,31 +37,37 @@ interface UpdateCheckResponse {
   updateAvailable: boolean;
   localPackageVersion: string;
   remotePackageVersion: string;
+  localCommitHash: string;
+  remoteCommitHash: string;
+  newCommits: string[];
 }
 
 export function UpdateManagerDialog({ open, onOpenChange }: UpdateManagerDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [logOutput, setLogOutput] = useState<string>('Listo para comprobar si hay actualizaciones...');
+  const [logOutput, setLogOutput] = useState<string>('Listo para comprobar si hay actualizaciones...'); // This will be for POST action
   const [updateInfo, setUpdateInfo] = useState<UpdateCheckResponse | null>(null);
 
   const handleCheckForUpdates = async () => {
     setIsLoading(true);
-    setLogOutput('Comprobando actualizaciones desde el repositorio de GitHub...');
+    setLogOutput('Comprobando actualizaciones desde el repositorio de GitHub...'); // Clear previous log
     setUpdateInfo(null);
     try {
       const response = await fetch('/api/app-update?action=check');
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message);
-
-      setUpdateInfo(result);
-      if (result.updateAvailable) {
-        setLogOutput(`¡Actualización disponible!\n\nVersión local (package.json): ${result.localPackageVersion}\nVersión remota (package.json): ${result.remotePackageVersion}`);
-      } else {
-        setLogOutput(`Ya estás en la última versión.\n\nVersión local (package.json): ${result.localPackageVersion}\nVersión remota (package.json): ${result.remotePackageVersion}`);
+      const result = await response.json(); // No cast here, let it be 'any' for initial check
+      if (!response.ok) {
+        // If response is not OK, it's an error object, not UpdateCheckResponse
+        throw new Error(result.message || `HTTP error! status: ${response.status}`);
       }
+
+      // Now that we know it's OK, we can cast
+      const typedResult: UpdateCheckResponse = result;
+      setUpdateInfo(typedResult);
+      // The logOutput for GET is now structured data, not a single string.
+      // We'll update the display directly from updateInfo.
+      setLogOutput(''); // Clear logOutput for GET check, as info is structured
     } catch (error: any) {
       toast.error('Error al comprobar las actualizaciones.');
-      setLogOutput(`Error: ${error.message}`);
+      setLogOutput(`Error: ${error.message}`); // Keep error in logOutput
     } finally {
       setIsLoading(false);
     }
@@ -75,7 +81,7 @@ export function UpdateManagerDialog({ open, onOpenChange }: UpdateManagerDialogP
       const result = await response.json();
       if (!response.ok) throw new Error(result.message);
 
-      setLogOutput(result.output);
+      setLogOutput(result.output); // This output is already filtered for Dyad commits
       toast.success('Actualización completada. La aplicación se reiniciará.');
       setTimeout(() => window.location.reload(), 5000);
     } catch (error: any) {
@@ -104,12 +110,27 @@ export function UpdateManagerDialog({ open, onOpenChange }: UpdateManagerDialogP
               <>
                 <p>Versión Local (package.json): <span className="font-mono text-xs bg-muted p-1 rounded">{updateInfo.localPackageVersion}</span></p>
                 <p>Versión Remota (package.json): <span className="font-mono text-xs bg-muted p-1 rounded">{updateInfo.remotePackageVersion}</span></p>
+                <p>Commit Local: <span className="font-mono text-xs bg-muted p-1 rounded">{updateInfo.localCommitHash}</span></p>
+                <p>Commit Remoto: <span className="font-mono text-xs bg-muted p-1 rounded">{updateInfo.remoteCommitHash}</span></p>
               </>
             )}
           </div>
-          <div className="w-full bg-black text-white font-mono text-xs rounded-md p-4 h-64 overflow-y-auto">
-            <pre className="whitespace-pre-wrap">{logOutput}</pre>
-          </div>
+          {updateInfo?.updateAvailable && updateInfo.newCommits.length > 0 && (
+            <div className="text-sm">
+              <p className="font-semibold mb-2">Nuevos commits:</p>
+              <div className="w-full bg-black text-white font-mono text-xs rounded-md p-4 max-h-48 overflow-y-auto">
+                <pre className="whitespace-pre-wrap">
+                  {updateInfo.newCommits.join('\n')}
+                </pre>
+              </div>
+            </div>
+          )}
+          {/* The logOutput is now primarily for POST action or GET errors */}
+          {logOutput && (
+            <div className="w-full bg-black text-white font-mono text-xs rounded-md p-4 h-64 overflow-y-auto">
+              <pre className="whitespace-pre-wrap">{logOutput}</pre>
+            </div>
+          )}
           <div className="flex gap-2">
             <Button onClick={handleCheckForUpdates} disabled={isLoading}>
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
