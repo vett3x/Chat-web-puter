@@ -20,8 +20,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ConstructionPlan } from './construction-plan';
-import { Message, MessageContentPart } from '@/types/chat';
+import { ConstructionPlan } from './construction-plan'; // NEW: Import ConstructionPlan
+import { Message } from '@/hooks/use-chat'; // NEW: Import Message type from hook
 
 interface ChatMessagesProps {
   messages: Message[];
@@ -32,7 +32,7 @@ interface ChatMessagesProps {
   appPrompt?: string | null;
   userAvatarUrl: string | null;
   onClearChat: () => void;
-  onApprovePlan: (messageId: string) => void;
+  onApprovePlan: (messageId: string) => void; // NEW: Add onApprovePlan prop
 }
 
 export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerate, onReapplyFiles, appPrompt, userAvatarUrl, onClearChat, onApprovePlan }: ChatMessagesProps) {
@@ -93,7 +93,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
             }
 
             const isLastMessage = index === messages.length - 1;
-            const hasFiles = Array.isArray(message.content) && message.content.some((part: MessageContentPart) => (part as any).type === 'code' && (part as any).filename);
+            const hasFiles = Array.isArray(message.content) && message.content.some(part => (part as any).type === 'code' && (part as any).filename);
 
             return (
               <div
