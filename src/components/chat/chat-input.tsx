@@ -258,8 +258,8 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
                       {hasAnyKey ? (
                         userKeysForProvider.map(key => {
                           const modelLabel = key.use_vertex_ai
-                            ? `(Vertex AI: ${key.model_name || 'Modelo no seleccionado'})`
-                            : `(${key.model_name || 'Modelo no seleccionado'})`; // Updated to show 'Modelo no seleccionado'
+                            ? `(Vertex AI: ${key.model_name || 'N/A'})`
+                            : `(${key.model_name || 'N/A'})`; // Changed from 'API Pública' to key.model_name
                           const displayLabel = key.nickname ? `${key.nickname} ${modelLabel}` : `${providerGroup.company} ${modelLabel}`;
                           const itemValue = `user_key:${key.id}`; // New format
 
