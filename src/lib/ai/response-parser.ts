@@ -1,5 +1,3 @@
-"use server";
-
 import { MessageContentPart } from '@/types/chat';
 
 export type RenderablePart = Extract<MessageContentPart, { type: 'text' | 'code' }>;
