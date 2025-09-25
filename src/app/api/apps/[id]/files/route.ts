@@ -101,24 +101,25 @@ export async function GET(req: NextRequest, context: any) {
     
     if (filePath) {
       const safeBasePath = '/app';
-      const resolvedPath = path.join(safeBasePath, filePath);
-      if (!resolvedPath.startsWith(safeBasePath + path.sep) && resolvedPath !== safeBasePath) {
+      const resolvedPath = path.posix.join(safeBasePath, filePath); // Use path.posix for consistency
+      if (!resolvedPath.startsWith(safeBasePath + path.posix.sep) && resolvedPath !== safeBasePath) {
         throw new Error(`Acceso denegado: La ruta '${filePath}' está fuera del directorio permitido.`);
       }
       const command = `cat '${resolvedPath}'`;
       const { stdout, stderr, code } = await executeSshCommand(server, `docker exec ${app.container_id} bash -c "${command}"`);
-      if (code !== 0) throw new Error(`Error al leer el archivo: ${stderr}`);
+      if (code !== 0) throw new Error(`Error al leer el archivo: ${stderr || stdout}`);
       return NextResponse.json({ content: stdout });
     } else {
       const command = `find /app -path /app/node_modules -prune -o -path /app/.next -prune -o -path /app/dev.log -prune -o -path /app/cloudflared.log -prune -o -print`;
       const { stdout, stderr, code } = await executeSshCommand(server, `docker exec ${app.container_id} bash -c "${command}"`);
-      if (code !== 0) throw new Error(`Error al listar archivos: ${stderr}`);
+      if (code !== 0) throw new Error(`Error al listar archivos: ${stderr || stdout}`);
       const paths = stdout.trim().split('\n').map(p => p.replace('/app/', '')).filter(p => p && p !== '/app');
       const fileTree = buildFileTree(paths);
       return NextResponse.json(fileTree);
     }
   } catch (error: any) {
-    return NextResponse.json({ message: error.message }, { status: 500 });
+    console.error(`[API /apps/${appId}/files] Error en GET:`, error);
+    return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
   }
 }
 
@@ -148,37 +149,54 @@ export async function POST(req: NextRequest, context: any) {
 
       const containerPath = path.posix.join('/app', filePath);
       const containerDir = path.posix.dirname(containerPath);
-      const tempHostPath = `/tmp/dyad-upload-${Date.now()}-${Math.random()}.tmp`;
+      const tempHostPath = `/tmp/dyad-upload-${Date.now()}-${Math.random().toString(36).substring(2, 15)}.tmp`; // More unique temp file name
 
       try {
         // 1. Escribir el contenido en un archivo temporal en el servidor anfitrión
         await writeRemoteFile(server, tempHostPath, content);
 
         // 2. Crear el directorio de destino dentro del contenedor
-        await executeSshCommand(server, `docker exec ${app.container_id} mkdir -p '${containerDir}'`);
+        const { stderr: mkdirStderr, code: mkdirCode } = await executeSshCommand(server, `docker exec ${app.container_id} mkdir -p '${containerDir}'`);
+        if (mkdirCode !== 0) {
+          throw new Error(`Error al crear el directorio '${containerDir}' en el contenedor: ${mkdirStderr}`);
+        }
 
         // 3. Copiar el archivo temporal del anfitrión al contenedor
         const { stderr: cpStderr, code: cpCode } = await executeSshCommand(server, `docker cp '${tempHostPath}' '${app.container_id}:${containerPath}'`);
         if (cpCode !== 0) {
-          throw new Error(`docker cp falló: ${cpStderr}`);
+          throw new Error(`Error al copiar el archivo '${filePath}' al contenedor: ${cpStderr}`);
         }
 
         // 4. Verificar el archivo dentro del contenedor
         const { stdout: wcStdout, stderr: wcStderr, code: wcCode } = await executeSshCommand(server, `docker exec ${app.container_id} cat '${containerPath}' | wc -c`);
         if (wcCode !== 0) {
-          throw new Error(`Error al verificar el archivo: ${wcStderr}`);
+          throw new Error(`Error al verificar el archivo '${filePath}' en el contenedor: ${wcStderr}`);
         }
         const fileSize = parseInt(wcStdout.trim(), 10);
         if (fileSize !== Buffer.byteLength(content, 'utf8')) {
-          throw new Error(`Error de verificación de tamaño para ${filePath}.`);
+          throw new Error(`Error de verificación de tamaño para '${filePath}'. Tamaño esperado: ${Buffer.byteLength(content, 'utf8')}, Tamaño real: ${fileSize}.`);
         }
 
         backups.push({ app_id: appId, user_id: userId, file_path: filePath, file_content: content });
         logEntries.push({ user_id: userId, server_id: server.id, event_type: 'file_written', description: `Archivo '${filePath}' escrito en el contenedor ${app.container_id.substring(0, 12)}.` });
 
+      } catch (stepError: any) {
+        const errorMessage = stepError.message || 'Error desconocido en el paso de archivo.';
+        // Log to Supabase with more detail
+        await supabaseAdmin.from('server_events_log').insert({
+          user_id: userId,
+          server_id: server.id,
+          event_type: 'file_write_failed',
+          description: `Fallo al escribir archivo '${filePath}' en contenedor ${app.container_id.substring(0, 12)}. Error: ${errorMessage}`,
+        });
+        throw new Error(`Fallo al procesar '${filePath}': ${errorMessage}`); // Re-throw to be caught by outer catch
       } finally {
         // 5. Limpiar el archivo temporal del anfitrión
-        await executeSshCommand(server, `rm -f '${tempHostPath}'`);
+        try {
+          await executeSshCommand(server, `rm -f '${tempHostPath}'`);
+        } catch (cleanupError: any) {
+          console.warn(`[API /apps/${appId}/files] Advertencia: Fallo al limpiar el archivo temporal '${tempHostPath}' en el host: ${cleanupError.message}`);
+        }
       }
     }
 
