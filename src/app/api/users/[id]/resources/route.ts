@@ -7,7 +7,8 @@ import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { parseMemoryString } from '@/lib/utils'; // Import the utility function
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
 import { executeSshCommand } from '@/lib/ssh-utils'; // Import SSH utilities
-import { Client, type ExecChannel } from 'ssh2'; // Import Client as value, ExecChannel as type
+import { Client } from 'ssh2'; // Import Client as value
+import type { ExecChannel } from 'ssh2'; // Import ExecChannel as type
 
 // Helper function to get the session and user role
 async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null; userPermissions: UserPermissions }> {
@@ -74,7 +75,7 @@ async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | '
   return { session, userRole, userPermissions };
 }
 
-function executeSshCommandForResources(conn: Client, command: string): Promise<{ stdout: string; stderr: string; code: number }> {
+function executeSshCommandForResources(conn: InstanceType<typeof Client>, command: string): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolve, reject) => {
     conn.exec(command, (err: Error | undefined, stream: ExecChannel) => { // Explicitly type err and stream
       if (err) return reject(err);

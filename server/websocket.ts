@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { createClient } from '@supabase/supabase-js';
-import { Client as SshClientType, type ClientChannel, type ExecChannel } from 'ssh2'; // Import Client as value, others as types
+import { Client } from 'ssh2'; // Import Client as a value for instantiation
+import type { ClientChannel, ExecChannel } from 'ssh2'; // Import types explicitly
 import type { IncomingMessage } from 'http';
 import { parse } from 'url';
 import dotenv from 'dotenv';
@@ -22,7 +23,8 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const activeConnections = new Map<string, { ws: WebSocket; ssh: SshClientType; stream: ClientChannel }>();
+// Use 'Client' as the type for the SSH client
+const activeConnections = new Map<string, { ws: WebSocket; ssh: InstanceType<typeof Client>; stream: ClientChannel }>();
 
 wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
   const connectionId = Math.random().toString(36).substring(7);
@@ -77,7 +79,7 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
     }
     console.log(`[WSS] ${connectionId} Server details fetched successfully. Attempting SSH connection to ${server.ip_address}:${server.ssh_port}`);
 
-    const ssh = new SshClientType(); // Use SshClientType
+    const ssh = new Client(); // Instantiate Client
     ssh.on('ready', () => {
       console.log(`[WSS] ${connectionId} SSH connection successful.`);
       

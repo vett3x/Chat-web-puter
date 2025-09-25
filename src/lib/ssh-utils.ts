@@ -1,4 +1,5 @@
-import { Client as SshClient, type ExecChannel, type SFTPStream } from 'ssh2'; // Import Client as value, others as types
+import { Client } from 'ssh2'; // Import Client as value
+import type * as ssh2 from 'ssh2'; // Import ssh2 as a namespace for types
 
 interface SshCommandResult {
   stdout: string;
@@ -23,7 +24,7 @@ export async function executeSshCommand(
   serverDetails: ServerDetails,
   command: string
 ): Promise<SshCommandResult> {
-  const conn = new SshClient();
+  const conn = new Client();
   let stdout = '';
   let stderr = '';
   let exitCode = 1; // Default to non-zero exit code for errors
@@ -31,7 +32,7 @@ export async function executeSshCommand(
   try {
     await new Promise<void>((resolve, reject) => {
       conn.on('ready', () => {
-        conn.exec(command, (err: Error | undefined, stream: ExecChannel) => { // Explicitly type err and stream
+        conn.exec(command, (err: Error | undefined, stream: ssh2.ExecChannel) => { // Use ssh2.ExecChannel
           if (err) {
             conn.end();
             return reject(new Error(`SSH exec error: ${err.message}`));
@@ -73,11 +74,11 @@ export async function writeRemoteFile(
   content: string,
   mode: string = '0600' // Keep as string for input, convert to number for sftp
 ): Promise<void> {
-  const conn = new SshClient();
+  const conn = new Client();
   try {
     await new Promise<void>((resolve, reject) => {
       conn.on('ready', () => {
-        conn.sftp((err: Error | undefined, sftp: SFTPStream) => { // Explicitly type err and sftp
+        conn.sftp((err: Error | undefined, sftp: ssh2.SFTPStream) => { // Use ssh2.SFTPStream
           if (err) {
             conn.end();
             return reject(new Error(`SFTP error: ${err.message}`));
