@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const APP_VERSION = "v0.4b Stable";
-const BUILD_NUMBER = "666"; // Updated build number
+const BUILD_NUMBER = "674"; // Updated build number
 
 interface UpdateManagerDialogProps {
   open: boolean;
