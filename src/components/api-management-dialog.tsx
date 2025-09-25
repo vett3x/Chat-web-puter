@@ -518,10 +518,10 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                               {key.json_key_content && <span className="text-muted-foreground">JSON Key: Subido</span>}
                             </div>
                           ) : (
-                            <>
+                            <div className="flex flex-col">
                               <span>{key.api_key}</span>
                               {key.model_name && <span className="text-muted-foreground">Modelo: {key.model_name}</span>}
-                            </>
+                            </div>
                           )}
                         </TableCell>
                         <TableCell className="text-right">
