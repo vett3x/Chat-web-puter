@@ -169,6 +169,8 @@ export default function Home() {
   };
 
   const handleNewConversationCreated = (conversationId: string) => {
+    // This function is called when a new conversation is created within the ChatInterface.
+    // It should update the selected item in the sidebar.
     handleSelectItem(conversationId, 'conversation');
   };
 
@@ -198,6 +200,8 @@ export default function Home() {
   const writeFilesToApp = async (files: { path: string; content: string }[]) => {
     if (!selectedAppDetails?.id || files.length === 0) return;
 
+    console.log("[Home] writeFilesToApp called with files:", files); // NEW: Log files being sent
+
     const toastId = toast.loading(`Aplicando ${files.length} archivo(s)...`);
     try {
       const response = await fetch(`/api/apps/${selectedAppDetails.id}/files`, {
@@ -226,7 +230,7 @@ export default function Home() {
       setTimeout(() => appBrowserRef.current?.refresh(), 2000); // Delay to allow server to restart
 
     } catch (error: any) {
-      console.error("Error writing files or restarting:", error);
+      console.error("[Home] Error writing files or restarting:", error);
       toast.error(`Error: ${error.message}`, { id: toastId });
       setRetryState({ isOpen: true, files: files });
     }

@@ -242,7 +242,7 @@ export async function POST(req: NextRequest, context: any) {
         writeStream.write(content);
         writeStream.end();
         writeStream.on('finish', resolve);
-        writeStream.on('error', (writeErr: Error) => {
+        writeStream.on('error', (writeErr: Error) => { // Explicitly type writeErr as Error
           console.error(`[API /apps/${appId}/files] SFTP write failed for ${filePath}:`, writeErr);
           reject(new Error(`Error writing file ${filePath} via SFTP: ${writeErr.message}`));
         });
@@ -289,6 +289,19 @@ export async function POST(req: NextRequest, context: any) {
       supabaseAdmin.from('server_events_log').insert(logEntries)
     ]);
     console.log(`[API /apps/${appId}/files] Supabase updates complete.`);
+
+    // Diagnostic: List files in /app and cat app/page.tsx
+    const diagnosticCommand = `ls -lR /app && cat /app/app/page.tsx`;
+    console.log(`[API /apps/${appId}/files] Running diagnostic command: ${diagnosticCommand}`);
+    const diagnosticResult = await executeSshOnExistingConnection(conn, `docker exec ${app.container_id} bash -c "${diagnosticCommand}"`);
+    console.log(`[API /apps/${appId}/files] Diagnostic Output:\nSTDOUT:\n${diagnosticResult.stdout}\nSTDERR:\n${diagnosticResult.stderr}\nCode: ${diagnosticResult.code}`);
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: userId,
+      server_id: server.id,
+      event_type: 'file_write_diagnostic',
+      description: `Diagnóstico de escritura de archivos para app ${appId}:\nSTDOUT:\n${diagnosticResult.stdout}\nSTDERR:\n${diagnosticResult.stderr}\nCode: ${diagnosticResult.code}`,
+    });
+
 
     return NextResponse.json({ message: 'Archivos guardados y respaldados correctamente.' });
   } catch (error: any) {
