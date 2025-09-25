@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { KeyRound, PlusCircle, Trash2, Loader2, RefreshCw, Edit } from 'lucide-react';
+import { KeyRound, PlusCircle, Trash2, Loader2, RefreshCw, Edit, Upload, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -35,6 +35,7 @@ const apiKeySchema = z.object({
   location_id: z.string().optional(),
   use_vertex_ai: z.boolean().optional(),
   model_name: z.string().optional(), // New: model_name for Vertex AI
+  json_key_file: z.any().optional(), // New: for file upload
 });
 
 type ApiKeyFormValues = z.infer<typeof apiKeySchema>;
@@ -73,6 +74,9 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const jsonKeyFileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedJsonKeyFile, setSelectedJsonKeyFile] = useState<File | null>(null);
+  const [jsonKeyFileName, setJsonKeyFileName] = useState<string | null>(null);
 
   const form = useForm<ApiKeyFormValues>({
     resolver: zodResolver(apiKeySchema),
@@ -84,6 +88,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       location_id: '',
       use_vertex_ai: false,
       model_name: '', // Default for new field
+      json_key_file: undefined,
     },
   });
 
@@ -115,8 +120,11 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         location_id: '',
         use_vertex_ai: false,
         model_name: '',
+        json_key_file: undefined,
       });
       setIsEditing(false);
+      setSelectedJsonKeyFile(null);
+      setJsonKeyFileName(null);
     }
   }, [open, fetchKeys, form]);
 
@@ -133,7 +141,10 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
           location_id: existingKey.location_id || '',
           use_vertex_ai: existingKey.use_vertex_ai || false,
           model_name: existingKey.model_name || '', // Set existing model_name
+          json_key_file: undefined, // Clear file input
         });
+        setSelectedJsonKeyFile(null);
+        setJsonKeyFileName(null);
       } else {
         setIsEditing(false);
         form.reset({
@@ -144,12 +155,40 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
           location_id: '',
           use_vertex_ai: false,
           model_name: '',
+          json_key_file: undefined,
         });
+        setSelectedJsonKeyFile(null);
+        setJsonKeyFileName(null);
       }
     } else {
       setIsEditing(false);
     }
   }, [selectedProvider, keys, form]);
+
+  const handleJsonKeyFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.type !== 'application/json') {
+        toast.error('Por favor, sube un archivo JSON válido.');
+        setSelectedJsonKeyFile(null);
+        setJsonKeyFileName(null);
+        return;
+      }
+      setSelectedJsonKeyFile(file);
+      setJsonKeyFileName(file.name);
+    } else {
+      setSelectedJsonKeyFile(null);
+      setJsonKeyFileName(null);
+    }
+  };
+
+  const handleRemoveJsonKeyFile = () => {
+    setSelectedJsonKeyFile(null);
+    setJsonKeyFileName(null);
+    if (jsonKeyFileInputRef.current) {
+      jsonKeyFileInputRef.current.value = '';
+    }
+  };
 
   const onSubmit = async (values: ApiKeyFormValues) => {
     setIsSubmitting(true);
@@ -169,6 +208,11 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         setIsSubmitting(false);
         return;
       }
+      if (values.use_vertex_ai && !selectedJsonKeyFile && !isEditing) {
+        toast.error('Debes subir el archivo JSON de la cuenta de servicio para Vertex AI.');
+        setIsSubmitting(false);
+        return;
+      }
 
       const method = isEditing ? 'PUT' : 'POST';
       const payload = { ...values };
@@ -180,11 +224,18 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       // If using Vertex AI, ensure api_key is null/undefined
       if (payload.use_vertex_ai) {
         payload.api_key = undefined; // Will be stored as NULL in DB
+        if (selectedJsonKeyFile) {
+          payload.json_key_content = await selectedJsonKeyFile.text(); // Read file content
+        } else if (isEditing) {
+          // If editing and no new file is selected, don't send json_key_content to keep existing
+          delete payload.json_key_content;
+        }
       } else {
-        // If not using Vertex AI, ensure project_id, location_id, and model_name are null/undefined
+        // If not using Vertex AI, ensure project_id, location_id, model_name, and json_key_content are null/undefined
         payload.project_id = undefined;
         payload.location_id = undefined;
         payload.model_name = undefined;
+        payload.json_key_content = undefined;
       }
 
       const response = await fetch('/api/ai-keys', {
@@ -203,7 +254,10 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         location_id: values.location_id,
         use_vertex_ai: values.use_vertex_ai,
         model_name: values.model_name,
+        json_key_file: undefined,
       });
+      setSelectedJsonKeyFile(null);
+      setJsonKeyFileName(null);
       fetchKeys();
     } catch (error: any) {
       toast.error(`Error: ${error.message}`);
@@ -227,7 +281,10 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         location_id: '',
         use_vertex_ai: false,
         model_name: '',
+        json_key_file: undefined,
       }); // Reset form if the deleted key was being edited
+      setSelectedJsonKeyFile(null);
+      setJsonKeyFileName(null);
     } catch (error: any) {
       toast.error(`Error al eliminar la clave: ${error.message}`);
     }
@@ -280,7 +337,17 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                           <FormControl>
                             <Switch
                               checked={field.value}
-                              onCheckedChange={field.onChange}
+                              onCheckedChange={(checked) => {
+                                field.onChange(checked);
+                                // Clear file selection if switching off Vertex AI
+                                if (!checked) {
+                                  setSelectedJsonKeyFile(null);
+                                  setJsonKeyFileName(null);
+                                  if (jsonKeyFileInputRef.current) {
+                                    jsonKeyFileInputRef.current.value = '';
+                                  }
+                                }
+                              }}
                               disabled={isSubmitting}
                             />
                           </FormControl>
@@ -323,6 +390,44 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                               <FormMessage />
                             </FormItem>
                           )} />
+                          <FormItem>
+                            <FormLabel>Archivo JSON de Cuenta de Servicio</FormLabel>
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                id="json_key_file"
+                                type="file"
+                                accept="application/json"
+                                onChange={handleJsonKeyFileChange}
+                                ref={jsonKeyFileInputRef}
+                                className="hidden"
+                                disabled={isSubmitting}
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => jsonKeyFileInputRef.current?.click()}
+                                disabled={isSubmitting}
+                                className="flex-1"
+                              >
+                                <Upload className="mr-2 h-4 w-4" /> {jsonKeyFileName ? jsonKeyFileName : "Subir archivo JSON"}
+                              </Button>
+                              {jsonKeyFileName && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={handleRemoveJsonKeyFile}
+                                  disabled={isSubmitting}
+                                >
+                                  <XCircle className="h-4 w-4 text-destructive" />
+                                </Button>
+                              )}
+                            </div>
+                            <FormDescription>
+                              Sube el archivo JSON de tu cuenta de servicio de Google Cloud.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
                         </>
                       ) : (
                         <FormField control={form.control} name="api_key" render={({ field }) => (

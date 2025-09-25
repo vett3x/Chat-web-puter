@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { GoogleGenAI, Part } from '@google/genai';
+import { GoogleAuth } from '@google-cloud/local-auth'; // Import GoogleAuth
 
 async function getSupabaseClient() {
   const cookieStore = cookies() as any;
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
     // Fetch active API key details for the user and the given key ID
     const { data: keyDetails, error: keyError } = await supabase
       .from('user_api_keys')
-      .select('api_key, project_id, location_id, use_vertex_ai, model_name')
+      .select('api_key, project_id, location_id, use_vertex_ai, model_name, json_key_content') // Fetch json_key_content
       .eq('id', selectedKeyId) // Filter by ID
       .eq('user_id', session.user.id)
       .eq('is_active', true)
@@ -51,70 +52,138 @@ export async function POST(req: NextRequest) {
     if (keyDetails.use_vertex_ai) {
       const project = keyDetails.project_id;
       const location = keyDetails.location_id;
+      const jsonKeyContent = keyDetails.json_key_content;
+
       if (!project || !location) {
         throw new Error('Project ID y Location ID son requeridos para Vertex AI. Por favor, configúralos en la Gestión de API Keys.');
       }
-      genAI = new GoogleGenAI({ vertexai: true, project, location });
+      if (!jsonKeyContent) {
+        throw new Error('El contenido del archivo JSON de la cuenta de servicio es requerido para Vertex AI. Por favor, súbelo en la Gestión de API Keys.');
+      }
       if (!finalModel) {
         throw new Error('Nombre de modelo no configurado para Vertex AI. Por favor, selecciona un modelo en la Gestión de API Keys.');
       }
+
+      // Authenticate using the provided JSON key content
+      const auth = new GoogleAuth();
+      const credentials = JSON.parse(jsonKeyContent);
+      const client = await auth.fromJSON(credentials);
+      const accessToken = (await client.getAccessToken()).token;
+
+      if (!accessToken) {
+        throw new Error('No se pudo obtener el token de acceso para Vertex AI.');
+      }
+
+      // Construct the raw Vertex AI API request
+      const vertexAiUrl = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${finalModel}:generateContent`;
+
+      // Convert messages to Vertex AI's `contents` format
+      const convertToVertexAIParts = (content: any): Part[] => {
+        const parts: Part[] = [];
+        if (typeof content === 'string') {
+          parts.push({ text: content });
+        } else if (Array.isArray(content)) {
+          for (const part of content) {
+            if (part.type === 'text') {
+              parts.push({ text: part.text });
+            } else if (part.type === 'image_url') {
+              const url = part.image_url.url;
+              const match = url.match(/^data:(image\/\w+);base64,(.*)$/);
+              if (!match) {
+                console.warn("Skipping invalid image data URL format for Vertex AI:", url.substring(0, 50) + '...');
+                parts.push({ text: "[Unsupported Image]" });
+              } else {
+                const mimeType = match[1];
+                const data = match[2];
+                parts.push({ inlineData: { mimeType, data } });
+              }
+            } else if (part.type === 'code') { // Convert code blocks to text for Vertex AI
+              const codePart = part as { language?: string; filename?: string; code?: string };
+              const lang = codePart.language ? `(${codePart.language})` : '';
+              const filename = codePart.filename ? `[${codePart.filename}]` : '';
+              parts.push({ text: `\`\`\`${lang}${filename}\n${codePart.code || ''}\n\`\`\`` });
+            }
+          }
+        }
+        return parts;
+      };
+
+      const contents = messages.map((msg: any) => ({
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: convertToVertexAIParts(msg.content),
+      }));
+
+      const vertexAiResponse = await fetch(vertexAiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ contents }),
+      });
+
+      const vertexAiResult = await vertexAiResponse.json();
+
+      if (!vertexAiResponse.ok || vertexAiResult.error) {
+        throw new Error(vertexAiResult.error?.message || `Error en la API de Vertex AI: ${JSON.stringify(vertexAiResult)}`);
+      }
+
+      // Extract text from Vertex AI response
+      const text = vertexAiResult.candidates?.[0]?.content?.parts?.[0]?.text || 'No se pudo obtener una respuesta de texto de Vertex AI.';
+      return NextResponse.json({ message: { content: text } });
+
     } else {
       const apiKey = keyDetails.api_key;
       if (!apiKey) {
         throw new Error('API Key no encontrada para Google Gemini. Por favor, configúrala en la Gestión de API Keys.');
       }
       genAI = new GoogleGenAI({ apiKey });
-      // For public API, if model_name is not set in keyDetails, use a default or require it.
-      // For now, let's assume the frontend sends a valid model string if not Vertex AI.
-      // Or, we can default to a public model if keyDetails.model_name is null.
-      // Let's stick to `finalModel` from `keyDetails.model_name` for consistency.
       if (!finalModel) {
-        // Fallback for older keys or if model_name wasn't explicitly set for public API
         finalModel = 'gemini-1.5-flash-latest'; // A reasonable default
       }
-    }
 
-    // Helper to convert our message format to Gemini's format
-    const convertToGeminiParts = (content: any): Part[] => {
-      const parts: Part[] = [];
-      if (typeof content === 'string') {
-        parts.push({ text: content });
-      } else if (Array.isArray(content)) {
-        for (const part of content) {
-          if (part.type === 'text') {
-            parts.push({ text: part.text });
-          } else if (part.type === 'image_url') {
-            const url = part.image_url.url;
-            const match = url.match(/^data:(image\/\w+);base64,(.*)$/);
-            if (!match) {
-              console.warn("Skipping invalid image data URL format for Gemini:", url.substring(0, 50) + '...');
-              parts.push({ text: "[Unsupported Image]" });
-            } else {
-              const mimeType = match[1];
-              const data = match[2];
-              parts.push({ inlineData: { mimeType, data } });
+      // Helper to convert our message format to Gemini's format (public API)
+      const convertToGeminiParts = (content: any): Part[] => {
+        const parts: Part[] = [];
+        if (typeof content === 'string') {
+          parts.push({ text: content });
+        } else if (Array.isArray(content)) {
+          for (const part of content) {
+            if (part.type === 'text') {
+              parts.push({ text: part.text });
+            } else if (part.type === 'image_url') {
+              const url = part.image_url.url;
+              const match = url.match(/^data:(image\/\w+);base64,(.*)$/);
+              if (!match) {
+                console.warn("Skipping invalid image data URL format for Gemini:", url.substring(0, 50) + '...');
+                parts.push({ text: "[Unsupported Image]" });
+              } else {
+                const mimeType = match[1];
+                const data = match[2];
+                parts.push({ inlineData: { mimeType, data } });
+              }
+            } else if (part.type === 'code') { // Convert code blocks to text for Gemini
+              const codePart = part as { language?: string; filename?: string; code?: string };
+              const lang = codePart.language ? `(${codePart.language})` : '';
+              const filename = codePart.filename ? `[${codePart.filename}]` : '';
+              parts.push({ text: `\`\`\`${lang}${filename}\n${codePart.code || ''}\n\`\`\`` });
             }
-          } else if (part.type === 'code') { // Convert code blocks to text for Gemini
-            const codePart = part as { language?: string; filename?: string; code?: string };
-            const lang = codePart.language ? `(${codePart.language})` : '';
-            const filename = codePart.filename ? `[${codePart.filename}]` : '';
-            parts.push({ text: `\`\`\`${lang}${filename}\n${codePart.code || ''}\n\`\`\`` });
           }
         }
-      }
-      return parts;
-    };
+        return parts;
+      };
 
-    // Convert messages to Gemini's `contents` format
-    const contents = messages.map((msg: any) => ({
-      role: msg.role === 'assistant' ? 'model' : 'user',
-      parts: convertToGeminiParts(msg.content),
-    }));
+      // Convert messages to Gemini's `contents` format
+      const contents = messages.map((msg: any) => ({
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: convertToGeminiParts(msg.content),
+      }));
 
-    const result = await genAI.models.generateContent({ model: finalModel, contents }); // Use finalModel
-    const text = result.text; // Access .text as a property
+      const result = await genAI.models.generateContent({ model: finalModel, contents }); // Use finalModel
+      const text = result.text; // Access .text as a property
 
-    return NextResponse.json({ message: { content: text } });
+      return NextResponse.json({ message: { content: text } });
+    }
 
   } catch (error: any) {
     console.error('[API /ai/chat] Error:', error);
