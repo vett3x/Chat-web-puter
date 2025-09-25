@@ -111,6 +111,11 @@ function parseAiResponseToRenderableParts(content: string): RenderablePart[] {
     lastIndex = match.index + match[0].length;
   }
 
+  if (lastIndex < content.length) {
+    const textPart = content.substring(lastIndex).trim();
+    if (textPart) parts.push({ type: 'text', text: textPart });
+  }
+
   return parts.length > 0 ? parts : [{ type: 'text', text: content }];
 }
 
@@ -446,7 +451,7 @@ export function useChat({
     } finally {
       setIsLoading(false);
     }
-  }, [appId, appPrompt, userRole, userApiKeys, onWriteFiles, selectedModel, userId, saveMessageToDB]);
+  }, [appId, appPrompt, userRole, onWriteFiles, selectedModel, userId, saveMessageToDB]);
 
   const sendMessage = useCallback(async (content: PuterContentPart[], messageText: string) => {
     if (!userId) {
