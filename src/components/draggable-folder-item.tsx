@@ -198,7 +198,7 @@ export function DraggableFolderItem({
               <span className="text-sm font-medium truncate flex-1">{folder.name}</span>
             )}
             {itemCount > 0 && (
-              <span className="ml-auto text-xs text-sidebar-foreground/60 group-hover:text-sidebar-accent-foreground/60 pr-2">
+              <span className="ml-auto flex h-4 w-4 items-center justify-center rounded-full bg-green-500 text-xs font-semibold text-white">
                 {itemCount}
               </span>
             )}
