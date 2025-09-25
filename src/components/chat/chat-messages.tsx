@@ -20,37 +20,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-
-// Define unified part types
-interface TextPart {
-  type: 'text';
-  text: string;
-}
-interface ImagePart {
-  type: 'image_url';
-  image_url: { url: string };
-}
-interface CodePart {
-  type: 'code';
-  language?: string;
-  filename?: string;
-  code?: string;
-}
-
-// Union of all possible content parts for our internal state
-type MessageContentPart = TextPart | ImagePart | CodePart;
-
-interface Message {
-  id: string;
-  content: string | MessageContentPart[];
-  role: 'user' | 'assistant';
-  model?: string;
-  isNew?: boolean;
-  isTyping?: boolean;
-  timestamp: Date;
-  conversation_id?: string;
-  type?: 'text' | 'multimodal';
-}
+import { ConstructionPlan } from './construction-plan'; // NEW: Import ConstructionPlan
+import { Message } from '@/hooks/use-chat'; // NEW: Import Message type from hook
 
 interface ChatMessagesProps {
   messages: Message[];
@@ -60,10 +31,11 @@ interface ChatMessagesProps {
   onReapplyFiles: (message: Message) => void;
   appPrompt?: string | null;
   userAvatarUrl: string | null;
-  onClearChat: () => void; // NEW: Add onClearChat prop
+  onClearChat: () => void;
+  onApprovePlan: (messageId: string) => void; // NEW: Add onApprovePlan prop
 }
 
-export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerate, onReapplyFiles, appPrompt, userAvatarUrl, onClearChat }: ChatMessagesProps) {
+export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerate, onReapplyFiles, appPrompt, userAvatarUrl, onClearChat, onApprovePlan }: ChatMessagesProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { userApiKeys } = useUserApiKeys();
 
@@ -76,7 +48,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
     }
   }, [messages, isLoading]);
 
-  const handleCopy = (content: string | MessageContentPart[]) => {
+  const handleCopy = (content: Message['content']) => {
     let textToCopy = '';
     if (typeof content === 'string') {
       textToCopy = content;
@@ -85,6 +57,10 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
     }
     navigator.clipboard.writeText(textToCopy);
     toast.success('Copiado al portapapeles.');
+  };
+
+  const handleRequestChanges = () => {
+    toast.info("Plan rechazado. Por favor, escribe tus cambios en el chat para que la IA genere un nuevo plan.");
   };
 
   return (
@@ -111,6 +87,11 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
           </div>
         ) : (
           messages.map((message, index) => {
+            // Skip rendering the hidden approval message
+            if (message.content === '[USER_APPROVED_PLAN]') {
+              return null;
+            }
+
             const isLastMessage = index === messages.length - 1;
             const hasFiles = Array.isArray(message.content) && message.content.some(part => (part as any).type === 'code' && (part as any).filename);
 
@@ -143,11 +124,18 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
                         <Loader2 className="h-4 w-4 animate-spin" />
                         <span className="text-sm">Pensando...</span>
                       </div>
+                    ) : message.isConstructionPlan ? (
+                      <ConstructionPlan
+                        content={message.content as string}
+                        onApprove={() => onApprovePlan(message.id)}
+                        onRequestChanges={handleRequestChanges}
+                        isApproved={!!message.planApproved}
+                      />
                     ) : (
                       <MessageContent content={message.content as any} isNew={!!message.isNew} aiResponseSpeed={aiResponseSpeed} />
                     )}
                   </div>
-                  {message.role === 'assistant' && !message.isTyping && (
+                  {message.role === 'assistant' && !message.isTyping && !message.isConstructionPlan && (
                     <div className="absolute top-1/2 -translate-y-1/2 left-full ml-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopy(message.content)} title="Copiar">
                         <Clipboard className="h-3.5 w-3.5" />

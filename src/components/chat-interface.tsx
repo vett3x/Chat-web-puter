@@ -54,6 +54,7 @@ export function ChatInterface({
     regenerateLastResponse,
     reapplyFilesFromMessage,
     clearChat,
+    approvePlan,
   } = useChat({
     userId,
     conversationId,
@@ -121,6 +122,7 @@ export function ChatInterface({
           appPrompt={appPrompt}
           userAvatarUrl={userAvatarUrl}
           onClearChat={clearChat}
+          onApprovePlan={approvePlan}
         />
         <ChatInput
           isLoading={isLoading}
