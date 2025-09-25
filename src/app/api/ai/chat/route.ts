@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { GoogleGenAI, Part } from '@google/genai';
-import { GoogleAuth } from '@google-cloud/local-auth'; // Import GoogleAuth
+import { GoogleAuth } from 'google-auth-library'; // Changed import from @google-cloud/local-auth
 
 async function getSupabaseClient() {
   const cookieStore = cookies() as any;
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
       // Authenticate using the provided JSON key content
       const auth = new GoogleAuth();
       const credentials = JSON.parse(jsonKeyContent);
-      const client = await auth.fromJSON(credentials);
+      const client = auth.fromJSON(credentials); // Use auth.fromJSON directly
       const accessToken = (await client.getAccessToken()).token;
 
       if (!accessToken) {

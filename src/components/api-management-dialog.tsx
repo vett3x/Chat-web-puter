@@ -36,6 +36,7 @@ const apiKeySchema = z.object({
   use_vertex_ai: z.boolean().optional(),
   model_name: z.string().optional(), // New: model_name for Vertex AI
   json_key_file: z.any().optional(), // New: for file upload
+  json_key_content: z.string().optional(), // Added for payload
 });
 
 type ApiKeyFormValues = z.infer<typeof apiKeySchema>;
@@ -89,6 +90,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       use_vertex_ai: false,
       model_name: '', // Default for new field
       json_key_file: undefined,
+      json_key_content: undefined, // Default for new field
     },
   });
 
@@ -121,6 +123,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         use_vertex_ai: false,
         model_name: '',
         json_key_file: undefined,
+        json_key_content: undefined,
       });
       setIsEditing(false);
       setSelectedJsonKeyFile(null);
@@ -142,6 +145,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
           use_vertex_ai: existingKey.use_vertex_ai || false,
           model_name: existingKey.model_name || '', // Set existing model_name
           json_key_file: undefined, // Clear file input
+          json_key_content: undefined, // Clear content
         });
         setSelectedJsonKeyFile(null);
         setJsonKeyFileName(null);
@@ -156,6 +160,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
           use_vertex_ai: false,
           model_name: '',
           json_key_file: undefined,
+          json_key_content: undefined,
         });
         setSelectedJsonKeyFile(null);
         setJsonKeyFileName(null);
@@ -215,7 +220,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       }
 
       const method = isEditing ? 'PUT' : 'POST';
-      const payload = { ...values };
+      const payload: ApiKeyFormValues = { ...values }; // Use ApiKeyFormValues type for payload
       
       // If editing and API key is empty, don't send it to avoid overwriting with empty string
       if (isEditing && !payload.api_key) {
@@ -255,6 +260,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         use_vertex_ai: values.use_vertex_ai,
         model_name: values.model_name,
         json_key_file: undefined,
+        json_key_content: undefined,
       });
       setSelectedJsonKeyFile(null);
       setJsonKeyFileName(null);
@@ -282,6 +288,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         use_vertex_ai: false,
         model_name: '',
         json_key_file: undefined,
+        json_key_content: undefined,
       }); // Reset form if the deleted key was being edited
       setSelectedJsonKeyFile(null);
       setJsonKeyFileName(null);
