@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { GoogleGenAI, Part } from '@google/genai';
-import { GoogleAuth } from 'google-auth-library'; // Changed import from @google-cloud/local-auth
+import { GoogleAuth } from 'google-auth-library';
 
 async function getSupabaseClient() {
   const cookieStore = cookies() as any;
@@ -27,17 +27,16 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { messages, selectedKeyId } = await req.json(); // Expect selectedKeyId
+    const { messages, selectedKeyId } = await req.json();
 
     if (!selectedKeyId) {
       return NextResponse.json({ message: 'ID de clave de API no proporcionado.' }, { status: 400 });
     }
 
-    // Fetch active API key details for the user and the given key ID
     const { data: keyDetails, error: keyError } = await supabase
       .from('user_api_keys')
-      .select('api_key, project_id, location_id, use_vertex_ai, model_name, json_key_content') // Fetch json_key_content
-      .eq('id', selectedKeyId) // Filter by ID
+      .select('api_key, project_id, location_id, use_vertex_ai, model_name, json_key_content')
+      .eq('id', selectedKeyId)
       .eq('user_id', session.user.id)
       .eq('is_active', true)
       .single();
@@ -47,7 +46,7 @@ export async function POST(req: NextRequest) {
     }
 
     let genAI: GoogleGenAI;
-    let finalModel = keyDetails.model_name; // Use model_name from keyDetails
+    let finalModel = keyDetails.model_name;
 
     if (keyDetails.use_vertex_ai) {
       const project = keyDetails.project_id;
@@ -65,19 +64,20 @@ export async function POST(req: NextRequest) {
       }
 
       // Authenticate using the provided JSON key content
-      const auth = new GoogleAuth();
       const credentials = JSON.parse(jsonKeyContent);
-      const client = auth.fromJSON(credentials); // Use auth.fromJSON directly
+      const auth = new GoogleAuth({
+        credentials,
+        scopes: ['https://www.googleapis.com/auth/cloud-platform'], // ADDED THIS LINE
+      });
+      const client = await auth.getClient(); // Get the authenticated client
       const accessToken = (await client.getAccessToken()).token;
 
       if (!accessToken) {
         throw new Error('No se pudo obtener el token de acceso para Vertex AI.');
       }
 
-      // Construct the raw Vertex AI API request
       const vertexAiUrl = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${finalModel}:generateContent`;
 
-      // Convert messages to Vertex AI's `contents` format
       const convertToVertexAIParts = (content: any): Part[] => {
         const parts: Part[] = [];
         if (typeof content === 'string') {
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
                 const data = match[2];
                 parts.push({ inlineData: { mimeType, data } });
               }
-            } else if (part.type === 'code') { // Convert code blocks to text for Vertex AI
+            } else if (part.type === 'code') {
               const codePart = part as { language?: string; filename?: string; code?: string };
               const lang = codePart.language ? `(${codePart.language})` : '';
               const filename = codePart.filename ? `[${codePart.filename}]` : '';
@@ -128,7 +128,6 @@ export async function POST(req: NextRequest) {
         throw new Error(vertexAiResult.error?.message || `Error en la API de Vertex AI: ${JSON.stringify(vertexAiResult)}`);
       }
 
-      // Extract text from Vertex AI response
       const text = vertexAiResult.candidates?.[0]?.content?.parts?.[0]?.text || 'No se pudo obtener una respuesta de texto de Vertex AI.';
       return NextResponse.json({ message: { content: text } });
 
@@ -139,10 +138,9 @@ export async function POST(req: NextRequest) {
       }
       genAI = new GoogleGenAI({ apiKey });
       if (!finalModel) {
-        finalModel = 'gemini-1.5-flash-latest'; // A reasonable default
+        finalModel = 'gemini-1.5-flash-latest';
       }
 
-      // Helper to convert our message format to Gemini's format (public API)
       const convertToGeminiParts = (content: any): Part[] => {
         const parts: Part[] = [];
         if (typeof content === 'string') {
@@ -162,7 +160,7 @@ export async function POST(req: NextRequest) {
                 const data = match[2];
                 parts.push({ inlineData: { mimeType, data } });
               }
-            } else if (part.type === 'code') { // Convert code blocks to text for Gemini
+            } else if (part.type === 'code') {
               const codePart = part as { language?: string; filename?: string; code?: string };
               const lang = codePart.language ? `(${codePart.language})` : '';
               const filename = codePart.filename ? `[${codePart.filename}]` : '';
@@ -173,14 +171,13 @@ export async function POST(req: NextRequest) {
         return parts;
       };
 
-      // Convert messages to Gemini's `contents` format
       const contents = messages.map((msg: any) => ({
         role: msg.role === 'assistant' ? 'model' : 'user',
         parts: convertToGeminiParts(msg.content),
       }));
 
-      const result = await genAI.models.generateContent({ model: finalModel, contents }); // Use finalModel
-      const text = result.text; // Access .text as a property
+      const result = await genAI.models.generateContent({ model: finalModel, contents });
+      const text = result.text;
 
       return NextResponse.json({ message: { content: text } });
     }
