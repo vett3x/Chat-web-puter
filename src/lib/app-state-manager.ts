@@ -11,33 +11,64 @@ const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, proces
 async function ensureServicesAreRunning(server: any, app: any) {
   if (!app.container_id) return;
 
-  const { data: tunnel } = await supabaseAdmin
-    .from('docker_tunnels')
-    .select('tunnel_id, tunnel_secret, container_port')
-    .eq('container_id', app.container_id)
-    .single();
+  // 1. Health Check: See if the npm run dev process is running.
+  const checkCommand = `docker exec ${app.container_id} pgrep -f "npm run dev"`;
+  const { code: checkCode } = await executeSshCommand(server, checkCommand);
 
-  const killAppCommand = "pkill -f 'npm run dev' || true";
-  const killTunnelCommand = "pkill cloudflared || true";
-  const restartAppCommand = `nohup npm run dev -- --hostname 0.0.0.0 -p ${tunnel?.container_port || 3000} > /app/dev.log 2>&1`;
+  // If checkCode is not 0, the process is not running. Time to start the "safe mode" recovery.
+  if (checkCode !== 0) {
+    console.log(`[Safe Mode] App ${app.id} services not running. Initiating recovery.`);
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: app.user_id,
+      server_id: app.server_id,
+      event_type: 'app_recovery_started',
+      description: `Servicios del contenedor ${app.container_id.substring(0, 12)} no detectados. Iniciando recuperación automática.`
+    });
 
-  let backgroundCommandList = [restartAppCommand];
+    // 2. Re-install dependencies just in case.
+    await executeSshCommand(server, `docker exec ${app.container_id} bash -c "cd /app && npm install"`);
 
-  if (tunnel && tunnel.tunnel_id && tunnel.tunnel_secret) {
-    const restartTunnelCommand = `nohup cloudflared tunnel run --token ${tunnel.tunnel_secret} ${tunnel.tunnel_id} > /app/cloudflared.log 2>&1`;
-    backgroundCommandList.push(restartTunnelCommand);
-  }
+    // 3. Restart all services.
+    const { data: tunnel } = await supabaseAdmin
+      .from('docker_tunnels')
+      .select('tunnel_id, tunnel_secret, container_port')
+      .eq('container_id', app.container_id)
+      .single();
 
-  const backgroundCommandString = backgroundCommandList.map(cmd => `(${cmd}) &`).join(' ');
-  const commandsToRunInShell = `${killAppCommand}; ${killTunnelCommand}; cd /app && ${backgroundCommandString}`;
-  const fullCommand = `docker exec ${app.container_id} bash -c "${commandsToRunInShell}"`;
+    const killAppCommand = "pkill -f 'npm run dev' || true";
+    const killTunnelCommand = "pkill cloudflared || true";
+    const restartAppCommand = `nohup npm run dev -- --hostname 0.0.0.0 -p ${tunnel?.container_port || 3000} > /app/dev.log 2>&1`;
 
-  const { stderr, code } = await executeSshCommand(server, fullCommand);
+    let backgroundCommandList = [restartAppCommand];
 
-  if (code !== 0 && stderr && !stderr.toLowerCase().includes('no process found')) {
-    console.error(`[ensureServicesAreRunning] Error restarting services for container ${app.container_id}: ${stderr}`);
-  } else {
-    console.log(`[ensureServicesAreRunning] Services checked/restarted for container ${app.container_id}`);
+    if (tunnel && tunnel.tunnel_id && tunnel.tunnel_secret) {
+      const restartTunnelCommand = `nohup cloudflared tunnel run --token ${tunnel.tunnel_secret} ${tunnel.tunnel_id} > /app/cloudflared.log 2>&1`;
+      backgroundCommandList.push(restartTunnelCommand);
+    }
+
+    const backgroundCommandString = backgroundCommandList.map(cmd => `(${cmd}) &`).join(' ');
+    const commandsToRunInShell = `${killAppCommand}; ${killTunnelCommand}; cd /app && ${backgroundCommandString}`;
+    const fullCommand = `docker exec ${app.container_id} bash -c "${commandsToRunInShell}"`;
+
+    const { stderr, code } = await executeSshCommand(server, fullCommand);
+
+    if (code !== 0 && stderr && !stderr.toLowerCase().includes('no process found')) {
+      console.error(`[Safe Mode] Error restarting services for container ${app.container_id}: ${stderr}`);
+      await supabaseAdmin.from('server_events_log').insert({
+        user_id: app.user_id,
+        server_id: app.server_id,
+        event_type: 'app_recovery_failed',
+        description: `Falló la recuperación automática para el contenedor ${app.container_id.substring(0, 12)}. Error: ${stderr}`
+      });
+    } else {
+      console.log(`[Safe Mode] Services recovered for container ${app.container_id}`);
+      await supabaseAdmin.from('server_events_log').insert({
+        user_id: app.user_id,
+        server_id: app.server_id,
+        event_type: 'app_recovery_succeeded',
+        description: `Servicios recuperados exitosamente para el contenedor ${app.container_id.substring(0, 12)}.`
+      });
+    }
   }
 }
 
