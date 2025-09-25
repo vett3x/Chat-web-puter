@@ -23,12 +23,10 @@ type PuterContentPart = PuterTextContentPart | PuterImageContentPart;
 
 interface ChatInputProps {
   isLoading: boolean;
-  selectedApiKeyId: string | null;
-  onModelChange: (apiKeyId: string | null) => void;
+  selectedModel: string;
+  onModelChange: (model: string) => void;
   sendMessage: (content: PuterContentPart[], messageText: string) => void;
   isAppChat?: boolean;
-  availableKeys: ApiKey[];
-  setAvailableKeys: (keys: ApiKey[]) => void;
 }
 
 interface SelectedFile {
@@ -37,16 +35,10 @@ interface SelectedFile {
   type: 'image' | 'other';
 }
 
-interface ApiKey {
-  id: string;
-  provider: string;
-  model_name: string | null;
-  nickname: string | null;
-}
-
-export function ChatInput({ isLoading, selectedApiKeyId, onModelChange, sendMessage, isAppChat = false, availableKeys, setAvailableKeys }: ChatInputProps) {
+export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage, isAppChat = false }: ChatInputProps) {
   const [inputMessage, setInputMessage] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
+  const [availableKeys, setAvailableKeys] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -55,28 +47,24 @@ export function ChatInput({ isLoading, selectedApiKeyId, onModelChange, sendMess
         const response = await fetch('/api/ai-keys');
         const data = await response.json();
         if (response.ok) {
-          setAvailableKeys(data);
-          // If no key is selected, or the selected one is no longer available, select the first available option.
-          const allOptions = [
-            ...AI_PROVIDERS.filter(p => p.source === 'puter').flatMap(p => p.models.map(m => m.value)),
-            ...data.map((k: ApiKey) => k.id)
-          ];
-          const currentSelectionIsValid = allOptions.includes(selectedApiKeyId || '');
-          
-          if (!currentSelectionIsValid && allOptions.length > 0) {
-            onModelChange(allOptions[0]);
-          } else if (!selectedApiKeyId && allOptions.length > 0) {
-            onModelChange(allOptions[0]);
-          }
+          const providers = [...new Set(data.map((key: any) => key.provider))] as string[];
+          setAvailableKeys(providers);
         }
       } catch (error) {
         console.error("Failed to fetch API keys", error);
       }
     };
     fetchKeys();
-  }, []); // Run once on mount
+  }, []);
 
-  const selectedKey = availableKeys.find(k => k.id === selectedApiKeyId);
+  const SelectedModelIcon = React.useMemo(() => {
+    for (const provider of AI_PROVIDERS) {
+      if (provider.models.some(model => model.value === selectedModel)) {
+        return provider.logo;
+      }
+    }
+    return Bot; // Fallback to the generic bot icon
+  }, [selectedModel]);
 
   const processFiles = (files: FileList | null) => {
     if (!files) return;
@@ -205,44 +193,37 @@ export function ChatInput({ isLoading, selectedApiKeyId, onModelChange, sendMess
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="default" className="rounded-full bg-info text-info-foreground shadow-avatar-user hover:shadow-avatar-user-hover transition-all duration-200 h-8 w-8 p-0" aria-label="Seleccionar modelo de IA">
-                <KeyRound className="h-4 w-4" />
+                <SelectedModelIcon className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="top" align="end" className="w-64 bg-popover text-popover-foreground border-border rounded-lg">
-              {AI_PROVIDERS.map((provider) => {
-                const userKeysForProvider = availableKeys.filter(key => key.provider === provider.providerKey);
-                const hasPuterModels = provider.source === 'puter' && provider.models.length > 0;
-                const hasUserKeys = provider.source === 'user_key' && userKeysForProvider.length > 0;
-
-                if (!hasPuterModels && !hasUserKeys) return null;
+              <DropdownMenuLabel className="text-sm font-semibold">Seleccionar Modelo de IA</DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-border" />
+              {AI_PROVIDERS.filter(provider => !isAppChat || provider.source === 'user_key').map((provider, providerIndex) => {
+                const requiresKey = provider.source === 'user_key';
+                const hasKey = availableKeys.includes('google_gemini'); // Assuming provider name in DB is 'google_gemini'
+                const isDisabled = requiresKey && !hasKey;
 
                 return (
                   <React.Fragment key={provider.company}>
-                    <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground flex items-center gap-2 pt-2">
-                      <provider.logo className="h-4 w-4" /> {provider.company}
+                    <DropdownMenuLabel className={cn("flex items-center gap-2 font-bold text-foreground px-2 py-1.5", isDisabled && "text-muted-foreground")}>
+                      <span>{provider.company}</span>
+                      <provider.logo className="h-4 w-4" />
+                      {isDisabled && <span title="Requiere API Key"><KeyRound className="h-4 w-4 text-muted-foreground" /></span>}
                     </DropdownMenuLabel>
-                    {hasPuterModels && provider.models.map(model => (
-                      <DropdownMenuItem key={model.value} onClick={() => onModelChange(model.value)} className={cn("flex items-center justify-between cursor-pointer", selectedApiKeyId === model.value && "bg-accent text-accent-foreground")}>
+                    {provider.models.map((model) => (
+                      <DropdownMenuItem key={model.value} onClick={() => onModelChange(model.value)} disabled={isDisabled} className={cn("flex items-center justify-between cursor-pointer pl-8", selectedModel === model.value && "bg-accent text-accent-foreground", isDisabled && "cursor-not-allowed")}>
                         <span>{model.label}</span>
-                        {selectedApiKeyId === model.value && <Check className="h-4 w-4 text-green-500" />}
+                        {selectedModel === model.value && <Check className="h-4 w-4 text-green-500" />}
                       </DropdownMenuItem>
                     ))}
-                    {hasUserKeys && userKeysForProvider.map(key => (
-                      <DropdownMenuItem key={key.id} onClick={() => onModelChange(key.id)} className={cn("flex items-center justify-between cursor-pointer", selectedApiKeyId === key.id && "bg-accent text-accent-foreground")}>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{key.nickname || key.model_name}</span>
-                          <span className="text-xs text-muted-foreground">{key.model_name}</span>
-                        </div>
-                        {selectedApiKeyId === key.id && <Check className="h-4 w-4 text-green-500" />}
-                      </DropdownMenuItem>
-                    ))}
-                    <DropdownMenuSeparator className="bg-border last:hidden" />
+                    {providerIndex < AI_PROVIDERS.length - 1 && <DropdownMenuSeparator className="bg-border" />}
                   </React.Fragment>
-                );
+                )
               })}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button onClick={handleSendMessage} disabled={isLoading || (!inputMessage.trim() && selectedFiles.length === 0)}>
+          <Button onClick={handleSendMessage} disabled={isLoading || (!inputMessage.trim() && selectedFiles.length === 0)} className="flex-shrink-0 h-8 w-8 p-0">
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>

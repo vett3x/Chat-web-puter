@@ -3,7 +3,7 @@ export const runtime = 'nodejs';
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { GoogleGenAI } from '@google/genai'; // Updated import
+import { GoogleGenerativeAI, Part } from '@google/generative-ai';
 
 async function getSupabaseClient() {
   const cookieStore = cookies() as any;
@@ -18,53 +18,6 @@ async function getSupabaseClient() {
   );
 }
 
-async function handleCustomOpenAI(config: any, messages: any[]) {
-  const { api_endpoint, api_key, model_name } = config;
-  const response = await fetch(api_endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${api_key}`,
-    },
-    body: JSON.stringify({
-      model: model_name,
-      messages: messages,
-      stream: false,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`Error de la API externa: ${response.statusText} - ${errorBody}`);
-  }
-
-  const data = await response.json();
-  return data.choices?.[0]?.message?.content || 'No se recibió contenido en la respuesta.';
-}
-
-async function handleGoogleGemini(config: any, messages: any[]) {
-  const { api_key, model_name } = config;
-  if (!model_name) {
-    throw new Error('El nombre del modelo de Gemini es requerido.');
-  }
-  
-  // Use the new SDK
-  const ai = new GoogleGenAI({ apiKey: api_key });
-
-  // Convert OpenAI message format to Gemini's `contents` format
-  const contents = messages.map(msg => ({
-    role: msg.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: msg.content }],
-  }));
-
-  const response = await ai.models.generateContent({
-    model: model_name,
-    contents: contents,
-  });
-
-  return response.text ?? 'No se recibió contenido en la respuesta.';
-}
-
 export async function POST(req: NextRequest) {
   const supabase = await getSupabaseClient();
   const { data: { session } } = await supabase.auth.getSession();
@@ -73,36 +26,83 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { messages, apiKeyId } = await req.json();
-    if (!apiKeyId) throw new Error('No se ha seleccionado una configuración de API Key.');
+    const { messages, model } = await req.json();
 
-    const { data: apiKeyConfig, error: keyError } = await supabase
+    // Fetch active API keys for the user and provider
+    const { data: keys, error: keyError } = await supabase
       .from('user_api_keys')
-      .select('*')
-      .eq('id', apiKeyId)
+      .select('api_key')
       .eq('user_id', session.user.id)
-      .single();
+      .eq('provider', 'google_gemini')
+      .eq('is_active', true);
 
-    if (keyError || !apiKeyConfig) {
-      throw new Error('La configuración de API Key seleccionada no es válida o no se encontró.');
+    if (keyError || !keys || keys.length === 0) {
+      throw new Error('No se encontró una API key de Google Gemini activa. Por favor, añade una en la Gestión de API Keys.');
     }
 
-    let content: string = '';
-    switch (apiKeyConfig.provider) {
-      case 'custom_openai':
-        content = await handleCustomOpenAI(apiKeyConfig, messages);
-        break;
-      case 'google_gemini':
-        content = await handleGoogleGemini(apiKeyConfig, messages);
-        break;
-      default:
-        throw new Error(`Proveedor de API no soportado: ${apiKeyConfig.provider}`);
-    }
+    // For now, use the first available key.
+    const apiKey = keys[0].api_key;
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const geminiModel = genAI.getGenerativeModel({ model });
 
-    return NextResponse.json({ message: { content } });
+    // Helper to convert our message format to Gemini's format
+    const convertToGeminiParts = (content: any) => {
+      if (typeof content === 'string') {
+        return [{ text: content }];
+      }
+      if (Array.isArray(content)) {
+        return content.map(part => {
+          if (part.type === 'text') {
+            return { text: part.text };
+          }
+          if (part.type === 'image_url') {
+            const url = part.image_url.url;
+            const match = url.match(/^data:(image\/\w+);base64,(.*)$/);
+            if (!match) {
+              console.warn("Skipping invalid image data URL format for Gemini:", url.substring(0, 50) + '...');
+              return { text: "[Unsupported Image]" };
+            }
+            const mimeType = match[1];
+            const data = match[2];
+            return { inlineData: { mimeType, data } };
+          }
+          // Ignore code blocks or other types not supported by Gemini API directly
+          return null;
+        }).filter((p): p is Part => p !== null); // Filter out nulls with a type guard
+      }
+      return [];
+    };
+
+    // Convert messages to Gemini format
+    const history = messages.slice(0, -1).map((msg: any) => ({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: convertToGeminiParts(msg.content),
+    }));
+    const lastMessage = messages[messages.length - 1];
+    const lastMessageParts = convertToGeminiParts(lastMessage.content);
+
+    const chat = geminiModel.startChat({ history });
+    const result = await chat.sendMessage(lastMessageParts);
+    const response = await result.response;
+    const text = response.text();
+
+    return NextResponse.json({ message: { content: text } });
 
   } catch (error: any) {
     console.error('[API /ai/chat] Error:', error);
-    return NextResponse.json({ message: error.message }, { status: 500 });
+    
+    let userFriendlyMessage = 'Ocurrió un error inesperado con la API de Gemini.';
+    const errorMessage = error.message || '';
+
+    if (errorMessage.includes('503') || errorMessage.toLowerCase().includes('overloaded')) {
+      userFriendlyMessage = 'El modelo de IA de Google está sobrecargado en este momento. Por favor, intenta de nuevo en unos minutos o cambia a otro modelo.';
+    } else if (errorMessage.toLowerCase().includes('api key not valid')) {
+      userFriendlyMessage = 'Tu API Key de Google Gemini no es válida. Por favor, verifica que sea correcta en la Gestión de API Keys.';
+    } else {
+      // Keep a more generic but still helpful message for other errors
+      userFriendlyMessage = `Error en la API de Gemini: ${errorMessage}`;
+    }
+
+    return NextResponse.json({ message: userFriendlyMessage }, { status: 500 });
   }
 }

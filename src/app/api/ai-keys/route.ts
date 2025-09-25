@@ -9,17 +9,12 @@ const apiKeySchema = z.object({
   provider: z.string().min(1),
   api_key: z.string().min(1),
   nickname: z.string().optional(),
-  api_endpoint: z.string().url().optional(),
-  model_name: z.string().min(1).optional(),
 });
 
 const updateApiKeySchema = z.object({
-  id: z.string().uuid().optional(), // Optional for update by provider
   provider: z.string().min(1),
-  api_key: z.string().min(10).optional(),
+  api_key: z.string().min(10, { message: 'La API Key parece demasiado corta.' }).optional(),
   nickname: z.string().optional(),
-  api_endpoint: z.string().url().optional(),
-  model_name: z.string().min(1).optional(),
 });
 
 async function getSupabaseClient() {
@@ -46,7 +41,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabase
     .from('user_api_keys')
-    .select('id, provider, api_key, is_active, created_at, nickname, api_endpoint, model_name')
+    .select('id, provider, api_key, is_active, created_at, nickname')
     .eq('user_id', session.user.id)
     .order('created_at', { ascending: false });
 
@@ -54,6 +49,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
 
+  // Mask the API keys before sending them to the client
   const maskedData = data.map(key => ({
     ...key,
     api_key: `${key.api_key.substring(0, 4)}...${key.api_key.substring(key.api_key.length - 4)}`,
@@ -71,13 +67,15 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const payload = apiKeySchema.parse(body);
+    const { provider, api_key, nickname } = apiKeySchema.parse(body);
 
     const { data, error } = await supabase
       .from('user_api_keys')
       .insert({
         user_id: session.user.id,
-        ...payload,
+        provider,
+        api_key,
+        nickname,
       })
       .select()
       .single();
@@ -102,7 +100,15 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { provider, ...updateData } = updateApiKeySchema.parse(body);
+    const { provider, api_key, nickname } = updateApiKeySchema.parse(body);
+
+    const updateData: { api_key?: string; nickname?: string | null } = {};
+    if (api_key) {
+      updateData.api_key = api_key;
+    }
+    if (nickname !== undefined) {
+      updateData.nickname = nickname || null;
+    }
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ message: 'No se proporcionaron datos para actualizar.' }, { status: 400 });

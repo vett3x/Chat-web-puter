@@ -1,1 +1,0 @@
-ALTER TABLE public.user_api_keys ALTER COLUMN nickname DROP NOT NULL;

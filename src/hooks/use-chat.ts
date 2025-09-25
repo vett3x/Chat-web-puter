@@ -59,12 +59,7 @@ interface Message {
   type?: 'text' | 'multimodal';
 }
 
-interface ApiKey {
-  id: string;
-  provider: string;
-  nickname: string | null;
-  model_name: string | null;
-}
+const DEFAULT_AI_MODEL = 'claude-sonnet-4';
 
 interface UseChatProps {
   userId: string | undefined;
@@ -164,13 +159,12 @@ export function useChat({
   const [isLoading, setIsLoading] = useState(false);
   const [isPuterReady, setIsPuterReady] = useState(false);
   const [isSendingFirstMessage, setIsSendingFirstMessage] = useState(false);
-  const [selectedApiConfigId, setSelectedApiConfigId] = useState<string | null>(() => {
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('selected_api_config_id');
+      return localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL;
     }
-    return null;
+    return DEFAULT_AI_MODEL;
   });
-  const [availableKeys, setAvailableKeys] = useState<ApiKey[]>([]);
 
   useEffect(() => {
     const checkPuter = () => {
@@ -185,13 +179,19 @@ export function useChat({
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      if (selectedApiConfigId) {
-        localStorage.setItem('selected_api_config_id', selectedApiConfigId);
-      } else {
-        localStorage.removeItem('selected_api_config_id');
-      }
+      localStorage.setItem('selected_ai_model', selectedModel);
     }
-  }, [selectedApiConfigId]);
+  }, [selectedModel]);
+
+  const getConversationDetails = useCallback(async (convId: string) => {
+    const { data, error } = await supabase.from('conversations').select('id, title, model').eq('id', convId).eq('user_id', userId).single();
+    if (error) {
+      console.error('Error fetching conversation details:', error);
+      toast.error('Error al cargar los detalles de la conversación.');
+      return null;
+    }
+    return data;
+  }, [userId]);
 
   const getMessagesFromDB = useCallback(async (convId: string) => {
     const { data, error } = await supabase.from('messages').select('id, content, role, model, created_at, conversation_id, type').eq('conversation_id', convId).eq('user_id', userId).order('created_at', { ascending: true });
@@ -215,19 +215,23 @@ export function useChat({
     const loadConversationData = async () => {
       if (conversationId && userId) {
         setIsLoading(true);
+        const details = await getConversationDetails(conversationId);
+        if (details?.model) setSelectedModel(details.model);
+        else setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL);
         const fetchedMsgs = await getMessagesFromDB(conversationId);
         if (!isSendingFirstMessage || fetchedMsgs.length > 0) setMessages(fetchedMsgs);
         setIsLoading(false);
       } else {
         setMessages([]);
+        setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL);
       }
     };
     loadConversationData();
-  }, [conversationId, userId, getMessagesFromDB, isSendingFirstMessage]);
+  }, [conversationId, userId, getMessagesFromDB, getConversationDetails, isSendingFirstMessage]);
 
   const createNewConversationInDB = async () => {
     if (!userId) return null;
-    const { data, error } = await supabase.from('conversations').insert({ user_id: userId, title: 'Nueva conversación' }).select('id, title').single();
+    const { data, error } = await supabase.from('conversations').insert({ user_id: userId, title: 'Nueva conversación', model: selectedModel }).select('id, title').single();
     if (error) {
       toast.error('Error al crear una nueva conversación.');
       return null;
@@ -235,6 +239,17 @@ export function useChat({
     onNewConversationCreated(data.id);
     onConversationTitleUpdate(data.id, data.title);
     return data.id;
+  };
+
+  const updateConversationModelInDB = async (convId: string, model: string) => {
+    if (!userId) return;
+    const { error } = await supabase.from('conversations').update({ model }).eq('id', convId).eq('user_id', userId);
+    if (error) toast.error('Error al actualizar el modelo de la conversación.');
+  };
+
+  const handleModelChange = (modelValue: string) => {
+    setSelectedModel(modelValue);
+    if (conversationId) updateConversationModelInDB(conversationId, modelValue);
   };
 
   const saveMessageToDB = async (convId: string, msg: Omit<Message, 'timestamp' | 'id'>) => {
@@ -247,73 +262,52 @@ export function useChat({
     return { id: data.id, timestamp: new Date(data.created_at) };
   };
 
-  const sendMessage = async (userContent: PuterContentPart[], messageText: string) => {
-    if (isLoading || !userId) return;
-    if (!selectedApiConfigId) {
-      toast.error('Por favor, selecciona un modelo o configuración de API.');
-      return;
-    }
-
-    let currentConvId = conversationId;
-    if (!currentConvId) {
-      setIsSendingFirstMessage(true);
-      currentConvId = await createNewConversationInDB();
-      if (!currentConvId) {
-        setIsLoading(false);
-        setIsSendingFirstMessage(false);
-        return;
-      }
-    }
-    const finalConvId = currentConvId;
-
-    const userMessage: Message = {
-      id: `user-${Date.now()}`,
-      conversation_id: finalConvId,
-      content: userContent.length > 1 || userContent.some(p => p.type === 'image_url') ? userContent : messageText,
-      role: 'user',
-      timestamp: new Date(),
-      type: userContent.some(p => p.type === 'image_url') ? 'multimodal' : 'text',
-    };
-    
-    const newMessages = [...messages, userMessage];
-    setMessages(newMessages);
-    await saveMessageToDB(finalConvId, userMessage);
-
+  const getAndStreamAIResponse = async (convId: string, history: Message[]) => {
     setIsLoading(true);
     const tempTypingId = `assistant-typing-${Date.now()}`;
     setMessages(prev => [...prev, { id: tempTypingId, role: 'assistant', content: '', isTyping: true, timestamp: new Date() }]);
+    
+    const userMessageToSave = history.findLast(m => m.role === 'user');
 
     try {
-      const puterProvider = AI_PROVIDERS.find(p => p.source === 'puter');
-      const isPuterModel = puterProvider?.models.some(m => m.value === selectedApiConfigId);
+      const modelProvider = AI_PROVIDERS.find(p => p.models.some(m => m.value === selectedModel));
+      let response: any;
 
-      let assistantMessageContent: string;
-      let modelUsedForDisplay: string = selectedApiConfigId;
-
-      if (isPuterModel) {
-        const puterMessages: PuterMessage[] = newMessages.map(m => ({ role: m.role, content: messageContentToApiFormat(m.content) }));
-        const response = await window.puter.ai.chat(puterMessages, { model: selectedApiConfigId });
-        if (!response || response.error) throw new Error(response?.error?.message || 'Error de la IA de Puter.');
-        assistantMessageContent = response?.message?.content || 'Sin contenido.';
-      } else {
+      if (modelProvider?.source === 'user_key') {
+        // Use our backend proxy for user-key models
         const apiResponse = await fetch('/api/ai/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: newMessages.map(m => ({ role: m.role, content: messageContentToApiFormat(m.content) })),
-            apiKeyId: selectedApiConfigId,
-          }),
+          body: JSON.stringify({ messages: history.map(m => ({ role: m.role, content: messageContentToApiFormat(m.content) })), model: selectedModel }),
         });
-        const response = await apiResponse.json();
+        response = await apiResponse.json();
         if (!apiResponse.ok) throw new Error(response.message || 'Error en la API de IA.');
-        if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
-        assistantMessageContent = response?.message?.content || 'Sin contenido.';
-        const keyConfig = availableKeys.find(k => k.id === selectedApiConfigId);
-        modelUsedForDisplay = keyConfig?.nickname || keyConfig?.model_name || selectedApiConfigId;
+      } else {
+        // Use Puter.js for other models
+        const puterMessages: PuterMessage[] = history.map(msg => ({
+          role: msg.role,
+          content: messageContentToApiFormat(msg.content) as string | PuterContentPart[],
+        }));
+        
+        let systemMessage: PuterMessage;
+        if (appPrompt) {
+          systemMessage = { role: 'system', content: `Eres un desarrollador experto en Next.js (App Router), TypeScript y Tailwind CSS. Tu tarea es generar los archivos necesarios para construir la aplicación que el usuario ha descrito: "${appPrompt}". REGLAS ESTRICTAS: 1. Responde ÚNICAMENTE con bloques de código. 2. Cada bloque de código DEBE representar un archivo completo. 3. Usa el formato \`\`\`language:ruta/del/archivo.tsx\`\`\` para cada bloque. 4. NO incluyas ningún texto conversacional, explicaciones, saludos o introducciones. Solo el código.` };
+        } else {
+          systemMessage = { role: 'system', content: "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante." };
+        }
+        response = await window.puter.ai.chat([systemMessage, ...puterMessages], { model: selectedModel });
       }
 
+      if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
+
+      if (userMessageToSave) {
+        await saveMessageToDB(convId, userMessageToSave);
+      }
+
+      const assistantMessageContent = response?.message?.content || 'Sin contenido.';
       const parts = parseAiResponseToRenderableParts(assistantMessageContent);
       const filesToWrite: { path: string; content: string }[] = [];
+
       parts.forEach(part => {
         if (part.type === 'code' && appId && part.filename && part.code) {
           filesToWrite.push({ path: part.filename, content: part.code });
@@ -325,13 +319,13 @@ export function useChat({
       const assistantMessageData = {
         content: parts,
         role: 'assistant' as const,
-        model: modelUsedForDisplay,
+        model: selectedModel,
         type: 'multimodal' as const,
       };
       const tempId = `assistant-${Date.now()}`;
       setMessages(prev => [...prev, { ...assistantMessageData, id: tempId, timestamp: new Date(), isNew: true }]);
       
-      const savedData = await saveMessageToDB(finalConvId, assistantMessageData);
+      const savedData = await saveMessageToDB(convId, assistantMessageData);
       if (savedData) {
         setMessages(prev => prev.map(msg => msg.id === tempId ? { ...msg, id: savedData.id, timestamp: savedData.timestamp } : msg));
       }
@@ -356,7 +350,7 @@ export function useChat({
         fetch('/api/error-tickets', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ error_message: rawError, conversation_id: finalConvId }),
+          body: JSON.stringify({ error_message: rawError, conversation_id: convId }),
         }).catch(apiError => console.error("Failed to submit error ticket:", apiError));
       }
 
@@ -372,8 +366,39 @@ export function useChat({
 
     } finally {
       setIsLoading(false);
-      if (!conversationId) setIsSendingFirstMessage(false);
     }
+  };
+
+  const sendMessage = async (userContent: PuterContentPart[], messageText: string) => {
+    if (isLoading || !isPuterReady || !userId) return;
+
+    let currentConvId = conversationId;
+    if (!currentConvId) {
+      setIsSendingFirstMessage(true);
+      currentConvId = await createNewConversationInDB();
+      if (!currentConvId) {
+        setIsLoading(false);
+        setIsSendingFirstMessage(false);
+        return;
+      }
+    }
+    const finalConvId = currentConvId;
+
+    const userMessage: Message = {
+      id: `user-${Date.now()}`,
+      conversation_id: finalConvId,
+      content: userContent.length > 1 || userContent.some(p => p.type === 'image_url') ? userContent : messageText,
+      role: 'user',
+      timestamp: new Date(),
+      type: userContent.some(p => p.type === 'image_url') ? 'multimodal' : 'text',
+    };
+    
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
+    
+    await getAndStreamAIResponse(finalConvId, newMessages);
+    
+    if (!conversationId) setIsSendingFirstMessage(false);
   };
 
   const regenerateLastResponse = useCallback(async () => {
@@ -387,26 +412,9 @@ export function useChat({
     setMessages(historyForRegen);
     const convId = historyForRegen[0]?.conversation_id;
     if (convId) {
-      // This needs to be adapted to the new sendMessage structure
-      // For now, we'll just re-send the last message
-      const lastUserMessage = historyForRegen[historyForRegen.length - 1];
-      const { content } = lastUserMessage;
-      let userContent: PuterContentPart[] = [];
-      let messageText = '';
-      if (typeof content === 'string') {
-        messageText = content;
-        userContent.push({ type: 'text', text: content });
-      } else {
-        userContent = content.filter(p => p.type !== 'code') as PuterContentPart[];
-        messageText = userContent.filter(p => p.type === 'text').map(p => (p as TextPart).text).join('\n');
-      }
-      // Re-sending will create a new user message, which is not ideal.
-      // A proper implementation would re-use the history.
-      // For now, this is a simplified approach.
-      // The best way is to call the internal logic directly.
-      await sendMessage(userContent, messageText);
+      await getAndStreamAIResponse(convId, historyForRegen);
     }
-  }, [isLoading, messages, sendMessage]);
+  }, [isLoading, messages]);
 
   const reapplyFilesFromMessage = async (message: Message) => {
     if (!appId) {
@@ -438,10 +446,8 @@ export function useChat({
     messages,
     isLoading,
     isPuterReady,
-    selectedApiKeyId: selectedApiConfigId,
-    availableKeys,
-    setAvailableKeys,
-    handleModelChange: setSelectedApiConfigId,
+    selectedModel,
+    handleModelChange,
     sendMessage,
     regenerateLastResponse,
     reapplyFilesFromMessage,
