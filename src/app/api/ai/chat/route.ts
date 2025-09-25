@@ -3,7 +3,7 @@ export const runtime = 'nodejs';
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai'; // Updated import
 
 async function getSupabaseClient() {
   const cookieStore = cookies() as any;
@@ -47,20 +47,22 @@ async function handleGoogleGemini(config: any, messages: any[]) {
   if (!model_name) {
     throw new Error('El nombre del modelo de Gemini es requerido.');
   }
-  const genAI = new GoogleGenerativeAI(api_key);
-  const model = genAI.getGenerativeModel({ model: model_name });
+  
+  // Use the new SDK
+  const ai = new GoogleGenAI({ apiKey: api_key });
 
-  // Convert OpenAI message format to Gemini format
-  const geminiHistory = messages.slice(0, -1).map(msg => ({
+  // Convert OpenAI message format to Gemini's `contents` format
+  const contents = messages.map(msg => ({
     role: msg.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: msg.content }],
   }));
-  const lastMessage = messages[messages.length - 1];
 
-  const chat = model.startChat({ history: geminiHistory });
-  const result = await chat.sendMessage(lastMessage.content);
-  const response = await result.response;
-  return response.text();
+  const response = await ai.models.generateContent({
+    model: model_name,
+    contents: contents,
+  });
+
+  return response.text;
 }
 
 export async function POST(req: NextRequest) {
