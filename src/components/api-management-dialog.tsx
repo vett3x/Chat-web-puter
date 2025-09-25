@@ -25,8 +25,10 @@ import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { AI_PROVIDERS } from '@/lib/ai-models'; // Import AI_PROVIDERS
 
 const apiKeySchema = z.object({
+  id: z.string().optional(), // Added for editing existing keys
   provider: z.string().min(1, { message: 'Debes seleccionar un proveedor.' }),
   api_key: z.string().optional(), // Make optional for Vertex AI
   nickname: z.string().optional(),
@@ -51,19 +53,14 @@ interface ApiKey {
   location_id: string | null; // New
   use_vertex_ai: boolean; // New
   model_name: string | null; // New
+  json_key_content: string | null; // New: to check if content exists
 }
 
-const providerOptions = [
-  { value: 'google_gemini', label: 'Google Gemini' },
-  { value: 'anthropic_claude', label: 'Anthropic Claude' },
-];
-
-const geminiVertexAIModels = [
-  { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
-  { value: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite' },
-  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
-  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-];
+const providerOptions = AI_PROVIDERS.filter(p => p.source === 'user_key').map(p => ({
+  value: p.value,
+  label: p.company,
+  models: p.models, // Include models for public API
+}));
 
 interface ApiManagementDialogProps {
   open: boolean;
@@ -74,7 +71,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  const [editingKeyId, setEditingKeyId] = useState<string | null>(null); // Track which key is being edited
   const jsonKeyFileInputRef = useRef<HTMLInputElement>(null);
   const [selectedJsonKeyFile, setSelectedJsonKeyFile] = useState<File | null>(null);
   const [jsonKeyFileName, setJsonKeyFileName] = useState<string | null>(null);
@@ -88,14 +85,16 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       project_id: '',
       location_id: '',
       use_vertex_ai: false,
-      model_name: '', // Default for new field
+      model_name: '',
       json_key_file: undefined,
-      json_key_content: undefined, // Default for new field
+      json_key_content: undefined,
     },
   });
 
   const selectedProvider = form.watch('provider');
   const useVertexAI = form.watch('use_vertex_ai');
+  const currentProviderModels = providerOptions.find(p => p.value === selectedProvider)?.models || [];
+  const isGoogleGemini = selectedProvider === 'google_gemini';
 
   const fetchKeys = useCallback(async () => {
     setIsLoading(true);
@@ -125,50 +124,46 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         json_key_file: undefined,
         json_key_content: undefined,
       });
-      setIsEditing(false);
+      setEditingKeyId(null);
       setSelectedJsonKeyFile(null);
       setJsonKeyFileName(null);
     }
   }, [open, fetchKeys, form]);
 
-  useEffect(() => {
-    if (selectedProvider) {
-      const existingKey = keys.find(k => k.provider === selectedProvider);
-      if (existingKey) {
-        setIsEditing(true);
-        form.reset({
-          provider: selectedProvider,
-          nickname: existingKey.nickname || '',
-          api_key: '', // API key is masked, so don't pre-fill
-          project_id: existingKey.project_id || '',
-          location_id: existingKey.location_id || '',
-          use_vertex_ai: existingKey.use_vertex_ai || false,
-          model_name: existingKey.model_name || '', // Set existing model_name
-          json_key_file: undefined, // Clear file input
-          json_key_content: undefined, // Clear content
-        });
-        setSelectedJsonKeyFile(null);
-        setJsonKeyFileName(null);
-      } else {
-        setIsEditing(false);
-        form.reset({
-          provider: selectedProvider,
-          nickname: '',
-          api_key: '',
-          project_id: '',
-          location_id: '',
-          use_vertex_ai: false,
-          model_name: '',
-          json_key_file: undefined,
-          json_key_content: undefined,
-        });
-        setSelectedJsonKeyFile(null);
-        setJsonKeyFileName(null);
-      }
-    } else {
-      setIsEditing(false);
-    }
-  }, [selectedProvider, keys, form]);
+  const handleEditKey = (key: ApiKey) => {
+    setEditingKeyId(key.id);
+    form.reset({
+      id: key.id,
+      provider: key.provider,
+      nickname: key.nickname || '',
+      api_key: '', // API key is masked, so don't pre-fill
+      project_id: key.project_id || '',
+      location_id: key.location_id || '',
+      use_vertex_ai: key.use_vertex_ai || false,
+      model_name: key.model_name || '',
+      json_key_file: undefined,
+      json_key_content: undefined, // Don't pre-fill content, user must re-upload if needed
+    });
+    setSelectedJsonKeyFile(null);
+    setJsonKeyFileName(key.use_vertex_ai && key.json_key_content ? 'Archivo JSON existente' : null); // Indicate if JSON key exists
+  };
+
+  const handleCancelEdit = () => {
+    setEditingKeyId(null);
+    form.reset({
+      provider: '',
+      api_key: '',
+      nickname: '',
+      project_id: '',
+      location_id: '',
+      use_vertex_ai: false,
+      model_name: '',
+      json_key_file: undefined,
+      json_key_content: undefined,
+    });
+    setSelectedJsonKeyFile(null);
+    setJsonKeyFileName(null);
+  };
 
   const handleJsonKeyFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -198,7 +193,8 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
   const onSubmit = async (values: ApiKeyFormValues) => {
     setIsSubmitting(true);
     try {
-      if (!isEditing && !values.use_vertex_ai && (!values.api_key || values.api_key.length < 10)) {
+      // Validation logic
+      if (!values.use_vertex_ai && (!values.api_key || values.api_key.length < 10) && !editingKeyId) {
         toast.error('La API Key es requerida y debe ser válida para un nuevo proveedor si no usas Vertex AI.');
         setIsSubmitting(false);
         return;
@@ -213,17 +209,21 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         setIsSubmitting(false);
         return;
       }
-      if (values.use_vertex_ai && !selectedJsonKeyFile && !isEditing) {
+      if (values.use_vertex_ai && !selectedJsonKeyFile && !editingKeyId) {
         toast.error('Debes subir el archivo JSON de la cuenta de servicio para Vertex AI.');
         setIsSubmitting(false);
         return;
       }
 
-      const method = isEditing ? 'PUT' : 'POST';
-      const payload: ApiKeyFormValues = { ...values }; // Use ApiKeyFormValues type for payload
+      const method = editingKeyId ? 'PUT' : 'POST';
+      const payload: ApiKeyFormValues = { ...values };
       
+      if (editingKeyId) {
+        payload.id = editingKeyId; // Ensure ID is in payload for PUT
+      }
+
       // If editing and API key is empty, don't send it to avoid overwriting with empty string
-      if (isEditing && !payload.api_key) {
+      if (editingKeyId && !payload.api_key) {
         delete payload.api_key;
       }
       // If using Vertex AI, ensure api_key is null/undefined
@@ -231,9 +231,13 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         payload.api_key = undefined; // Will be stored as NULL in DB
         if (selectedJsonKeyFile) {
           payload.json_key_content = await selectedJsonKeyFile.text(); // Read file content
-        } else if (isEditing) {
-          // If editing and no new file is selected, don't send json_key_content to keep existing
-          delete payload.json_key_content;
+        } else if (editingKeyId && !selectedJsonKeyFile && jsonKeyFileName === 'Archivo JSON existente') {
+          // If editing, using Vertex AI, no new file, and old file existed, keep existing content
+          // Do nothing, json_key_content will not be in payload, so it won't be updated to null
+        } else {
+          // If editing, using Vertex AI, no new file, and no old file, set to null
+          // Or if adding new and no file, set to null
+          payload.json_key_content = undefined;
         }
       } else {
         // If not using Vertex AI, ensure project_id, location_id, model_name, and json_key_content are null/undefined
@@ -250,20 +254,8 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message);
-      toast.success(`API Key ${isEditing ? 'actualizada' : 'guardada'}.`);
-      form.reset({
-        provider: selectedProvider,
-        api_key: '', // Clear API key field after submission
-        nickname: values.nickname,
-        project_id: values.project_id,
-        location_id: values.location_id,
-        use_vertex_ai: values.use_vertex_ai,
-        model_name: values.model_name,
-        json_key_file: undefined,
-        json_key_content: undefined,
-      });
-      setSelectedJsonKeyFile(null);
-      setJsonKeyFileName(null);
+      toast.success(`API Key ${editingKeyId ? 'actualizada' : 'guardada'}.`);
+      handleCancelEdit(); // Clear form and editing state
       fetchKeys();
     } catch (error: any) {
       toast.error(`Error: ${error.message}`);
@@ -279,19 +271,9 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       if (!response.ok) throw new Error(result.message);
       toast.success('API Key eliminada.');
       fetchKeys();
-      form.reset({
-        provider: '',
-        api_key: '',
-        nickname: '',
-        project_id: '',
-        location_id: '',
-        use_vertex_ai: false,
-        model_name: '',
-        json_key_file: undefined,
-        json_key_content: undefined,
-      }); // Reset form if the deleted key was being edited
-      setSelectedJsonKeyFile(null);
-      setJsonKeyFileName(null);
+      if (editingKeyId === keyId) {
+        handleCancelEdit();
+      }
     } catch (error: any) {
       toast.error(`Error al eliminar la clave: ${error.message}`);
     }
@@ -299,7 +281,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] p-6 max-h-[90vh] overflow-y-auto flex flex-col"> {/* Added max-h and overflow-y-auto */}
+      <DialogContent className="sm:max-w-[700px] p-6 max-h-[90vh] overflow-y-auto flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <KeyRound className="h-6 w-6" /> Gestión de API Keys de IA
@@ -308,10 +290,10 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
             Añade y gestiona tus API keys para diferentes proveedores de IA. Estas claves se usarán para las conversaciones.
           </DialogDescription>
         </DialogHeader>
-        <div className="py-4 space-y-6 flex-1 flex flex-col"> {/* Removed overflow-hidden */}
+        <div className="py-4 space-y-6 flex-1 flex flex-col">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">{isEditing ? 'Actualizar API Key' : 'Añadir Nueva API Key'}</CardTitle>
+              <CardTitle className="text-lg">{editingKeyId ? 'Actualizar API Key' : 'Añadir Nueva API Key'}</CardTitle>
             </CardHeader>
             <CardContent>
               <Form {...form}>
@@ -319,7 +301,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                   <FormField control={form.control} name="provider" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Proveedor</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || editingKeyId !== null}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un proveedor" /></SelectTrigger></FormControl>
                         <SelectContent>
                           {providerOptions.map(opt => (
@@ -331,7 +313,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                     </FormItem>
                   )} />
 
-                  {selectedProvider === 'google_gemini' && (
+                  {isGoogleGemini && (
                     <>
                       <FormField control={form.control} name="use_vertex_ai" render={({ field }) => (
                         <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
@@ -389,7 +371,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                               <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
                                 <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
                                 <SelectContent>
-                                  {geminiVertexAIModels.map(model => (
+                                  {currentProviderModels.filter(m => !m.label.includes('(API Pública)')).map(model => (
                                     <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>
                                   ))}
                                 </SelectContent>
@@ -437,13 +419,29 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                           </FormItem>
                         </>
                       ) : (
-                        <FormField control={form.control} name="api_key" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>API Key</FormLabel>
-                            <FormControl><Input type="password" placeholder={isEditing ? "Dejar en blanco para no cambiar" : "Pega tu API key aquí"} {...field} disabled={isSubmitting} /></FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
+                        <>
+                          <FormField control={form.control} name="api_key" render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>API Key</FormLabel>
+                              <FormControl><Input type="password" placeholder={editingKeyId ? "Dejar en blanco para no cambiar" : "Pega tu API key aquí"} {...field} disabled={isSubmitting} /></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                          <FormField control={form.control} name="model_name" render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Modelo de Gemini (API Pública)</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                                <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
+                                <SelectContent>
+                                  {currentProviderModels.filter(m => m.label.includes('(API Pública)')).map(model => (
+                                    <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                        </>
                       )}
                     </>
                   )}
@@ -452,7 +450,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                     <FormField control={form.control} name="api_key" render={({ field }) => (
                       <FormItem>
                         <FormLabel>API Key</FormLabel>
-                        <FormControl><Input type="password" placeholder={isEditing ? "Dejar en blanco para no cambiar" : "Pega tu API key aquí"} {...field} disabled={isSubmitting} /></FormControl>
+                        <FormControl><Input type="password" placeholder={editingKeyId ? "Dejar en blanco para no cambiar" : "Pega tu API key aquí"} {...field} disabled={isSubmitting} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
@@ -465,16 +463,23 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                       <FormMessage />
                     </FormItem>
                   )} />
-                  <Button type="submit" disabled={isSubmitting || !selectedProvider}>
-                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (isEditing ? <Edit className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />)}
-                    {isEditing ? 'Actualizar Clave' : 'Añadir Clave'}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button type="submit" disabled={isSubmitting || !selectedProvider}>
+                      {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingKeyId ? <Edit className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />)}
+                      {editingKeyId ? 'Actualizar Clave' : 'Añadir Clave'}
+                    </Button>
+                    {editingKeyId && (
+                      <Button type="button" variant="outline" onClick={handleCancelEdit} disabled={isSubmitting}>
+                        Cancelar Edición
+                      </Button>
+                    )}
+                  </div>
                 </form>
               </Form>
             </CardContent>
           </Card>
           <Separator />
-          <div className="flex-1 flex flex-col"> {/* Removed overflow-hidden */}
+          <div className="flex-1 flex flex-col">
             <div className="flex justify-between items-center mb-2">
               <h3 className="text-lg font-semibold">Claves Guardadas</h3>
               <Button variant="ghost" size="icon" onClick={fetchKeys} disabled={isLoading}><RefreshCw className="h-4 w-4" /></Button>
@@ -506,13 +511,24 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                               <span className="text-muted-foreground">Project: {key.project_id || 'N/A'}</span>
                               <span className="text-muted-foreground">Location: {key.location_id || 'N/A'}</span>
                               <span className="text-muted-foreground">Modelo: {key.model_name || 'N/A'}</span>
+                              {key.json_key_content && <span className="text-muted-foreground">JSON Key: Subido</span>}
                             </div>
                           ) : (
-                            key.api_key
+                            <>
+                              <span>{key.api_key}</span>
+                              {key.model_name && <span className="text-muted-foreground">Modelo: {key.model_name}</span>}
+                            </>
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button variant="destructive" size="icon" onClick={() => handleDelete(key.id)}><Trash2 className="h-4 w-4" /></Button>
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" size="icon" onClick={() => handleEditKey(key)} disabled={editingKeyId !== null}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="destructive" size="icon" onClick={() => handleDelete(key.id)} disabled={editingKeyId !== null}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))

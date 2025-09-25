@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { AI_PROVIDERS } from '@/lib/ai-models';
 import GoogleGeminiLogo from '@/components/google-gemini-logo'; // Import explicitly for dynamic icon
+import ClaudeAILogo from '@/components/claude-ai-logo'; // Import explicitly for dynamic icon
 
 interface PuterTextContentPart { type: 'text'; text: string; }
 interface PuterImageContentPart { type: 'image_url'; image_url: { url: string; }; }
@@ -78,12 +79,16 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
         }
       }
     } else if (selectedModel.startsWith('user_key:')) {
-      // For user_key models, we always use the Google Gemini logo for now,
-      // as it's the only user_key provider in AI_PROVIDERS with source 'user_key'.
-      return GoogleGeminiLogo;
+      const keyId = selectedModel.substring(9);
+      const key = userApiKeys.find(k => k.id === keyId);
+      if (key) {
+        const provider = AI_PROVIDERS.find(p => p.value === key.provider);
+        if (provider) return provider.logo;
+      }
+      return GoogleGeminiLogo; // Default for user_key if provider not found
     }
     return Bot; // Fallback
-  }, [selectedModel]);
+  }, [selectedModel, userApiKeys]);
 
   const processFiles = (files: FileList | null) => {
     if (!files) return;
