@@ -125,6 +125,7 @@ export function ChatInterface({
           userAvatarUrl={userAvatarUrl}
           onClearChat={clearChat}
           onApprovePlan={approvePlan}
+          isAppChat={isAppChat}
         />
         <AutoFixStatus status={autoFixStatus} /> {/* NEW: Add AutoFixStatus component */}
         <ChatInput

@@ -85,7 +85,7 @@ interface UseChatProps {
 
 const codeBlockRegex = /```(\w+)?(?::([\w./-]+))?\s*\n([\sS]*?)\s*```/g;
 
-function parseAiResponseToRenderableParts(content: string): RenderablePart[] {
+function parseAiResponseToRenderableParts(content: string, isAppChat: boolean): RenderablePart[] {
   const parts: RenderablePart[] = [];
   let lastIndex = 0;
   let match;
@@ -104,7 +104,8 @@ function parseAiResponseToRenderableParts(content: string): RenderablePart[] {
       code: (match[3] || '').trim(),
     };
 
-    if (!part.filename && part.code) {
+    // Only attempt to extract filename from code content if it's an app chat
+    if (isAppChat && !part.filename && part.code) {
       const lines = part.code.split('\n');
       const firstLine = lines[0].trim();
       const pathRegex = /^(?:\/\/|#|\/\*|\*)\s*([\w./-]+\.[a-zA-Z]+)\s*\*?\/?$/;
@@ -396,7 +397,7 @@ export function useChat({
       }
 
       const isConstructionPlan = chatMode === 'build' && fullResponseText.includes('### 1. Análisis del Requerimiento');
-      const finalParts = parseAiResponseToRenderableParts(fullResponseText);
+      const finalParts = parseAiResponseToRenderableParts(fullResponseText, chatMode === 'build');
       const filesToWrite: { path: string; content: string }[] = [];
 
       if (chatMode === 'build' && !isConstructionPlan) {

@@ -35,11 +35,12 @@ interface MessageContentProps {
   content: string | PuterContentPart[]; // Updated to allow array of parts
   isNew?: boolean;
   aiResponseSpeed: 'slow' | 'normal' | 'fast'; // New prop for AI response speed
+  isAppChat?: boolean; // New prop to determine context
 }
 
 const codeBlockRegex = /```(\w+)(?::([\w./-]+))?\n([\s\S]*?)\n```/g;
 
-export function MessageContent({ content, isNew, aiResponseSpeed }: MessageContentProps) {
+export function MessageContent({ content, isNew, aiResponseSpeed, isAppChat }: MessageContentProps) {
   const [animatedPartsCount, setAnimatedPartsCount] = useState(0);
 
   // Helper to render a single part
@@ -154,12 +155,26 @@ export function MessageContent({ content, isNew, aiResponseSpeed }: MessageConte
             value: content.substring(lastIndex, match.index),
           });
         }
-        parsedParts.push({
+        const codePart = {
           type: 'code' as const,
           language: match[1],
           filename: match[2],
           code: (match[3] || '').trim(),
-        });
+        };
+
+        // Only attempt to extract filename from code content if it's an app chat
+        if (isAppChat && !codePart.filename && codePart.code) {
+          const lines = codePart.code.split('\n');
+          const firstLine = lines[0].trim();
+          const pathRegex = /^(?:\/\/|#|\/\*|\*)\s*([\w./-]+\.[a-zA-Z]+)\s*\*?\/?$/;
+          const pathMatch = firstLine.match(pathRegex);
+          if (pathMatch && pathMatch[1]) {
+            codePart.filename = pathMatch[1];
+            codePart.code = lines.slice(1).join('\n').trim();
+          }
+        }
+
+        parsedParts.push(codePart);
         lastIndex = match.index + match[0].length;
       }
 
@@ -189,7 +204,7 @@ export function MessageContent({ content, isNew, aiResponseSpeed }: MessageConte
       return content;
     }
     return [];
-  }, [content]);
+  }, [content, isAppChat]);
 
   useEffect(() => {
     if (isNew) {

@@ -32,10 +32,11 @@ interface ChatMessagesProps {
   appPrompt?: string | null;
   userAvatarUrl: string | null;
   onClearChat: () => void;
-  onApprovePlan: (messageId: string) => void; // NEW: Add onApprovePlan prop
+  onApprovePlan: (messageId: string) => void;
+  isAppChat?: boolean;
 }
 
-export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerate, onReapplyFiles, appPrompt, userAvatarUrl, onClearChat, onApprovePlan }: ChatMessagesProps) {
+export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerate, onReapplyFiles, appPrompt, userAvatarUrl, onClearChat, onApprovePlan, isAppChat }: ChatMessagesProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { userApiKeys } = useUserApiKeys();
 
@@ -132,7 +133,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
                         isApproved={!!message.planApproved}
                       />
                     ) : (
-                      <MessageContent content={message.content as any} isNew={!!message.isNew} aiResponseSpeed={aiResponseSpeed} />
+                      <MessageContent content={message.content as any} isNew={!!message.isNew} aiResponseSpeed={aiResponseSpeed} isAppChat={isAppChat} />
                     )}
                   </div>
                   {message.role === 'assistant' && !message.isTyping && !message.isConstructionPlan && (
