@@ -183,6 +183,9 @@
 }
 
 @layer components {
+  .selected-indicator {
+    display: inline-block; /* Ensure it behaves like a block for positioning its pseudo-element */
+  }
   .selected-indicator::after {
     content: '';
     position: absolute;
