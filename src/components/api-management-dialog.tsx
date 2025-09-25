@@ -31,17 +31,32 @@ const apiKeySchema = z.object({
   nickname: z.string().optional(),
   api_endpoint: z.string().optional(),
   model_name: z.string().optional(),
-}).refine(data => {
+}).superRefine((data, ctx) => {
   if (data.provider === 'custom_openai') {
-    return !!data.api_endpoint && z.string().url().safeParse(data.api_endpoint).success && !!data.model_name;
+    if (!data.api_endpoint || !z.string().url().safeParse(data.api_endpoint).success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Se requiere un endpoint de API válido.',
+        path: ['api_endpoint'],
+      });
+    }
+    if (!data.model_name) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Se requiere un nombre de modelo.',
+        path: ['model_name'],
+      });
+    }
   }
   if (data.provider === 'google_gemini') {
-    return !!data.model_name;
+    if (!data.model_name) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Debes seleccionar un modelo de Gemini.',
+        path: ['model_name'],
+      });
+    }
   }
-  return true;
-}, {
-  message: 'Endpoint y Modelo son requeridos para APIs personalizadas, y el Modelo es requerido para Gemini.',
-  path: ['model_name'],
 });
 
 type ApiKeyFormValues = z.infer<typeof apiKeySchema>;
@@ -126,10 +141,18 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       }
 
       const method = isEditing ? 'PUT' : 'POST';
-      const payload = { ...values, id: editingKey?.id };
+      
+      // Clean up the payload before sending
+      const payload: { [key: string]: any } = { ...values, id: editingKey?.id };
       if (isEditing && !payload.api_key) {
         delete payload.api_key;
       }
+      // Remove empty optional fields to avoid validation errors for things like empty URLs
+      Object.keys(payload).forEach(key => {
+        if (payload[key] === '' || payload[key] === null || payload[key] === undefined) {
+          delete payload[key];
+        }
+      });
 
       const response = await fetch('/api/ai-keys', {
         method,
