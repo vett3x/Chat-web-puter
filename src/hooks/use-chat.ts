@@ -5,9 +5,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useSession } from '@/components/session-context-provider';
 import { AI_PROVIDERS } from '@/lib/ai-models';
-import { ApiKey } from '@/hooks/use-user-api-keys'; // NEW: Import ApiKey type
-import { GoogleGenerativeAI, Part } from '@google/generative-ai'; // Import GoogleGenerativeAI and Part
-import { GoogleAuth } from 'google-auth-library'; // Import GoogleAuth
+import { ApiKey } from '@/hooks/use-user-api-keys';
+import { GoogleGenerativeAI, Part } from '@google/generative-ai';
+import { GoogleAuth } from 'google-auth-library';
 
 // Define unified part types
 interface TextPart {
@@ -60,7 +60,7 @@ interface Message {
   type?: 'text' | 'multimodal';
 }
 
-const DEFAULT_AI_MODEL_FALLBACK = 'puter:claude-sonnet-4'; // Fallback if Gemini 2.5 Flash not found or configured
+const DEFAULT_AI_MODEL_FALLBACK = 'puter:claude-sonnet-4';
 
 interface UseChatProps {
   userId: string | undefined;
@@ -71,8 +71,8 @@ interface UseChatProps {
   appId?: string | null;
   onWriteFiles: (files: { path: string; content: string }[]) => Promise<void>;
   onSidebarDataRefresh: () => void;
-  userApiKeys: ApiKey[]; // NEW: Prop for user API keys
-  isLoadingApiKeys: boolean; // NEW: Prop for loading state of API keys
+  userApiKeys: ApiKey[];
+  isLoadingApiKeys: boolean;
 }
 
 const codeBlockRegex = /```(\w+)?(?::([\w./-]+))?\s*\n([\s\S]*?)\s*```/g;
@@ -138,7 +138,6 @@ function messageContentToApiFormat(content: Message['content']): string | PuterC
     return '';
 }
 
-// NEW: Helper to convert internal content parts to Gemini API parts
 const convertToGeminiParts = (content: Message['content']): Part[] => {
   const parts: Part[] = [];
   if (typeof content === 'string') {
@@ -159,7 +158,6 @@ const convertToGeminiParts = (content: Message['content']): Part[] => {
           parts.push({ inlineData: { mimeType, data } });
         }
       } else if (part.type === 'code') {
-        // Convert code blocks to text for Gemini API
         const codePart = part as CodePart;
         const lang = codePart.language || '';
         const filename = codePart.filename ? `:${codePart.filename}` : '';
@@ -179,8 +177,8 @@ export function useChat({
   appId,
   onWriteFiles,
   onSidebarDataRefresh,
-  userApiKeys, // NEW: Destructure
-  isLoadingApiKeys, // NEW: Destructure
+  userApiKeys,
+  isLoadingApiKeys,
 }: UseChatProps) {
   const { userRole } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -211,30 +209,27 @@ export function useChat({
     }
   }, [selectedModel]);
 
-  // NEW: Effect to determine default model based on userApiKeys
   useEffect(() => {
     if (!isLoadingApiKeys && userApiKeys.length > 0) {
       const storedModel = localStorage.getItem('selected_ai_model');
       let newDefaultModel = DEFAULT_AI_MODEL_FALLBACK;
 
-      // Check if the stored model is a user_key and if it's still valid
       if (storedModel && storedModel.startsWith('user_key:')) {
         const storedKeyId = storedModel.substring(9);
         const isValidStoredKey = userApiKeys.some(key => key.id === storedKeyId);
         if (isValidStoredKey) {
-          newDefaultModel = storedModel; // Keep the valid stored user_key model
+          newDefaultModel = storedModel;
         }
       } else if (storedModel && storedModel.startsWith('puter:')) {
-        newDefaultModel = storedModel; // Keep the valid puter model
+        newDefaultModel = storedModel;
       }
 
-      // If the current default is not Gemini 2.5 Flash, or if it's invalid, try to find Gemini 2.5 Flash
       const isCurrentDefaultGeminiFlash = newDefaultModel.includes('gemini-2.5-flash');
       
       if (!isCurrentDefaultGeminiFlash || !userApiKeys.some(key => `user_key:${key.id}` === newDefaultModel)) {
         const geminiFlashKey = userApiKeys.find(key => 
           key.provider === 'google_gemini' && 
-          (key.model_name === 'gemini-2.5-flash' || key.model_name === 'gemini-2.5-pro') // Prioritize 2.5 Flash, then 2.5 Pro
+          (key.model_name === 'gemini-2.5-flash' || key.model_name === 'gemini-2.5-pro')
         );
 
         if (geminiFlashKey) {
@@ -249,7 +244,6 @@ export function useChat({
         }
       }
     } else if (!isLoadingApiKeys && userApiKeys.length === 0 && selectedModel !== DEFAULT_AI_MODEL_FALLBACK) {
-      // If no API keys are configured, fall back to Puter.js default
       setSelectedModel(DEFAULT_AI_MODEL_FALLBACK);
       if (typeof window !== 'undefined') {
         localStorage.setItem('selected_ai_model', DEFAULT_AI_MODEL_FALLBACK);
@@ -292,13 +286,13 @@ export function useChat({
         setIsLoading(true);
         const details = await getConversationDetails(conversationId);
         if (details?.model) setSelectedModel(details.model);
-        else setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FALLBACK); // NEW: Use fallback
+        else setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FALLBACK);
         const fetchedMsgs = await getMessagesFromDB(conversationId);
         if (!isSendingFirstMessage || fetchedMsgs.length > 0) setMessages(fetchedMsgs);
         setIsLoading(false);
       } else {
         setMessages([]);
-        setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FALLBACK); // NEW: Use fallback
+        setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FALLBACK);
       }
     };
     loadConversationData();
@@ -338,40 +332,7 @@ export function useChat({
     return { id: data.id, timestamp: new Date(data.created_at) };
   };
 
-  const sendMessage = useCallback(async (content: PuterContentPart[], messageText: string) => {
-    if (!userId) {
-      toast.error('No hay usuario autenticado.');
-      return;
-    }
-
-    let currentConversationId = conversationId;
-    if (!currentConversationId) {
-      setIsSendingFirstMessage(true);
-      currentConversationId = await createNewConversationInDB();
-      if (!currentConversationId) {
-        setIsSendingFirstMessage(false);
-        return;
-      }
-    }
-
-    const newUserMessage: Message = {
-      id: `user-${Date.now()}`,
-      conversation_id: currentConversationId,
-      content: content,
-      role: 'user',
-      timestamp: new Date(),
-      type: content.some(part => part.type === 'image_url') ? 'multimodal' : 'text',
-    };
-
-    setMessages(prev => [...prev, newUserMessage]);
-    setIsLoading(true);
-
-    await getAndStreamAIResponse(currentConversationId, [...messages, newUserMessage]);
-    setIsSendingFirstMessage(false); // Reset after first message is sent
-  }, [userId, conversationId, messages, createNewConversationInDB, getAndStreamAIResponse]);
-
-
-  const getAndStreamAIResponse = async (convId: string, history: Message[]) => {
+  const getAndStreamAIResponse = useCallback(async (convId: string, history: Message[]) => {
     setIsLoading(true);
     const tempTypingId = `assistant-typing-${Date.now()}`;
     setMessages(prev => [...prev, { id: tempTypingId, role: 'assistant', content: '', isTyping: true, timestamp: new Date() }]);
@@ -466,8 +427,9 @@ export function useChat({
               throw new Error('API Key o modelo no configurado para Google Gemini. Revisa la Gestión de API Keys.');
             }
             const genAI = new GoogleGenerativeAI(apiKey);
-            const result = await genAI.getGenerativeModel(finalModel).generateContent({ contents: geminiMessages }); // FIXED: genAI.models.generateContent to genAI.getGenerativeModel(finalModel).generateContent
-            response = { message: { content: result.text } };
+            // Corrected: Pass ModelParams object and access text() method
+            const result = await genAI.getGenerativeModel({ model: finalModel }).generateContent({ contents: geminiMessages });
+            response = { message: { content: result.response.text() } };
           }
         } else if (keyDetails.provider === 'custom_endpoint') {
           const customApiKey = keyDetails.api_key;
@@ -479,7 +441,7 @@ export function useChat({
           }
 
           const customApiMessages = history.map(msg => ({
-            role: msg.role === 'assistant' ? 'assistant' : 'user', // Custom endpoints often expect 'assistant' for model responses
+            role: msg.role === 'assistant' ? 'assistant' : 'user',
             content: messageContentToApiFormat(msg.content),
           }));
 
@@ -579,7 +541,40 @@ export function useChat({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [appId, appPrompt, userRole, userApiKeys, onWriteFiles, selectedModel, userId, saveMessageToDB]); // Added all necessary dependencies
+
+  const sendMessage = useCallback(async (content: PuterContentPart[], messageText: string) => {
+    if (!userId) {
+      toast.error('No hay usuario autenticado.');
+      return;
+    }
+
+    let currentConversationId = conversationId;
+    if (!currentConversationId) {
+      setIsSendingFirstMessage(true);
+      currentConversationId = await createNewConversationInDB();
+      if (!currentConversationId) {
+        setIsSendingFirstMessage(false);
+        return;
+      }
+    }
+
+    const newUserMessage: Message = {
+      id: `user-${Date.now()}`,
+      conversation_id: currentConversationId,
+      content: content,
+      role: 'user',
+      timestamp: new Date(),
+      type: content.some(part => part.type === 'image_url') ? 'multimodal' : 'text',
+    };
+
+    setMessages(prev => [...prev, newUserMessage]);
+    setIsLoading(true);
+
+    await getAndStreamAIResponse(currentConversationId, [...messages, newUserMessage]);
+    setIsSendingFirstMessage(false);
+  }, [userId, conversationId, messages, createNewConversationInDB, getAndStreamAIResponse]);
+
 
   const regenerateLastResponse = useCallback(async () => {
     if (isLoading) return;
