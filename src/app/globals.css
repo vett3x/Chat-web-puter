@@ -186,16 +186,14 @@
   .selected-indicator::after {
     content: '';
     position: absolute;
-    bottom: 0; /* Ajustado a 0 para que sea visible */
+    bottom: -2px;
     left: 0;
     right: 0;
     height: 2px;
     background: linear-gradient(to right, transparent, hsl(var(--primary-light-purple)), transparent);
-    box-shadow: 0 0 6px 1px hsl(var(--primary-light-purple) / 0.7);
     border-radius: 2px;
     transform-origin: center;
-    transform: scaleX(0); /* Inicia oculto */
-    animation: lightsaber-on 0.7s ease-out forwards, lightsaber-pulse 2s ease-in-out infinite alternate; /* Animación más lenta */
-    animation-delay: 0s, 0.7s; /* El pulso empieza después del encendido */
+    animation: lightsaber-on 0.3s ease-out forwards, lightsaber-pulse 2s ease-in-out infinite alternate;
+    animation-delay: 0s, 0.3s; /* Start pulsing after the 'on' animation finishes */
   }
 }
