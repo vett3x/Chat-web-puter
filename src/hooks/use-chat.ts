@@ -1,71 +1,25 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useSession } from '@/components/session-context-provider';
-import { AI_PROVIDERS } from '@/lib/ai-models';
 import { ApiKey } from '@/hooks/use-user-api-keys';
-import { GoogleGenerativeAI, Part } from '@google/generative-ai';
-import { GoogleAuth } from 'google-auth-library';
 import { ChatMode } from '@/components/chat/chat-input';
-
-// Define unified part types
-interface TextPart {
-  type: 'text';
-  text: string;
-}
-interface ImagePart {
-  type: 'image_url';
-  image_url: { url: string };
-}
-interface CodePart {
-  type: 'code';
-  language?: string;
-  filename?: string;
-  code?: string;
-}
-
-// Union of all possible content parts for our internal state
-type MessageContentPart = TextPart | ImagePart | CodePart;
+import { fetchAiResponse } from '@/lib/ai/chat-service';
+import { buildSystemPrompt } from '@/lib/ai/prompt-builder';
+import { parseAiResponseToRenderableParts, type RenderablePart } from '@/lib/ai/response-parser';
+import {
+  fetchConversationDetails,
+  fetchMessages,
+  createConversationInDB,
+  updateConversationModelInDB,
+  saveMessageToDB,
+  clearChatInDB,
+} from '@/lib/supabase/chat-db';
+import { Message, AutoFixStatus, MessageContentPart } from '@/types/chat';
 
 // The format Puter.js API expects for content arrays
-type PuterContentPart = TextPart | ImagePart;
-
-interface PuterMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string | PuterContentPart[];
-}
-
-declare global {
-  interface Window {
-    puter: {
-      ai: {
-        chat: (messages: PuterMessage[], options: { model: string }) => Promise<any>;
-      };
-    };
-  }
-}
-
-type RenderablePart = TextPart | CodePart;
-
-export interface Message {
-  id: string;
-  conversation_id?: string;
-  content: string | MessageContentPart[];
-  role: 'user' | 'assistant';
-  model?: string;
-  timestamp: Date;
-  isNew?: boolean;
-  isTyping?: boolean;
-  type?: 'text' | 'multimodal';
-  isConstructionPlan?: boolean;
-  planApproved?: boolean;
-  isCorrectionPlan?: boolean; // NEW: Flag for correction plans
-  correctionApproved?: boolean; // NEW: Flag to disable correction buttons
-}
-
-export type AutoFixStatus = 'idle' | 'analyzing' | 'plan_ready' | 'fixing' | 'failed';
+type PuterContentPart = Extract<MessageContentPart, { type: 'text' | 'image_url' }>;
 
 const DEFAULT_AI_MODEL_FALLBACK = 'puter:claude-sonnet-4';
 
@@ -82,104 +36,6 @@ interface UseChatProps {
   isLoadingApiKeys: boolean;
   chatMode: ChatMode;
 }
-
-const codeBlockRegex = /```(\w+)?(?::([\w./-]+))?\s*\n([\sS]*?)\s*```/g;
-
-function parseAiResponseToRenderableParts(content: string): RenderablePart[] {
-  const parts: RenderablePart[] = [];
-  let lastIndex = 0;
-  let match;
-  codeBlockRegex.lastIndex = 0;
-
-  while ((match = codeBlockRegex.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      const textPart = content.substring(lastIndex, match.index).trim();
-      if (textPart) parts.push({ type: 'text', text: textPart });
-    }
-    
-    const part: RenderablePart = {
-      type: 'code',
-      language: match[1] || '',
-      filename: match[2],
-      code: (match[3] || '').trim(),
-    };
-
-    if (!part.filename && part.code) {
-      const lines = part.code.split('\n');
-      const firstLine = lines[0].trim();
-      const pathRegex = /^(?:\/\/|#|\/\*|\*)\s*([\w./-]+\.[a-zA-Z]+)\s*\*?\/?$/;
-      const pathMatch = firstLine.match(pathRegex);
-      if (pathMatch && pathMatch[1]) {
-        part.filename = pathMatch[1];
-        part.code = lines.slice(1).join('\n').trim();
-      }
-    }
-
-    parts.push(part);
-    lastIndex = match.index + match[0].length;
-  }
-
-  if (lastIndex < content.length) {
-    const textPart = content.substring(lastIndex).trim();
-    if (textPart) parts.push({ type: 'text', text: textPart });
-  }
-
-  return parts.length > 0 ? parts : [{ type: 'text', text: content }];
-}
-
-function messageContentToApiFormat(content: Message['content']): string | PuterContentPart[] {
-    if (typeof content === 'string') {
-        return content;
-    }
-
-    if (Array.isArray(content)) {
-        return content.map((part) => {
-            if (part.type === 'text') {
-                return { type: 'text', text: part.text };
-            } else if (part.type === 'code') {
-                const codePart = part as CodePart;
-                const lang = codePart.language || '';
-                const filename = codePart.filename ? `:${codePart.filename}` : '';
-                return { type: 'text', text: `\`\`\`${lang}${filename}\n${codePart.code || ''}\n\`\`\`` };
-            } else if (part.type === 'image_url') {
-                return part;
-            }
-            return { type: 'text', text: '' };
-        }).filter(Boolean) as PuterContentPart[];
-    }
-
-    return '';
-}
-
-const convertToGeminiParts = (content: Message['content']): Part[] => {
-  const parts: Part[] = [];
-  if (typeof content === 'string') {
-    parts.push({ text: content });
-  } else if (Array.isArray(content)) {
-    for (const part of content) {
-      if (part.type === 'text') {
-        parts.push({ text: part.text });
-      } else if (part.type === 'image_url') {
-        const url = part.image_url.url;
-        const match = url.match(/^data:(image\/\w+);base64,(.*)$/);
-        if (!match) {
-          console.warn("Skipping invalid image data URL format for Gemini:", url.substring(0, 50) + '...');
-          parts.push({ text: "[Unsupported Image]" });
-        } else {
-          const mimeType = match[1];
-          const data = match[2];
-          parts.push({ inlineData: { mimeType, data } });
-        }
-      } else if (part.type === 'code') {
-        const codePart = part as CodePart;
-        const lang = codePart.language || '';
-        const filename = codePart.filename ? `:${codePart.filename}` : '';
-        parts.push({ text: `\`\`\`${lang}${filename}\n${codePart.code || ''}\n\`\`\`` });
-      }
-    }
-  }
-  return parts;
-};
 
 export function useChat({
   userId,
@@ -199,111 +55,29 @@ export function useChat({
   const [isLoading, setIsLoading] = useState(false);
   const [isPuterReady, setIsPuterReady] = useState(false);
   const [isSendingFirstMessage, setIsSendingFirstMessage] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FALLBACK;
-    }
-    return DEFAULT_AI_MODEL_FALLBACK;
-  });
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_AI_MODEL_FALLBACK);
   const [autoFixStatus, setAutoFixStatus] = useState<AutoFixStatus>('idle');
   const autoFixAttempts = useRef(0);
 
   useEffect(() => {
     const checkPuter = () => {
-      if (typeof window !== 'undefined' && window.puter) {
-        setIsPuterReady(true);
-      } else {
-        setTimeout(checkPuter, 100);
-      }
+      if (typeof window !== 'undefined' && window.puter) setIsPuterReady(true);
+      else setTimeout(checkPuter, 100);
     };
     checkPuter();
   }, []);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('selected_ai_model', selectedModel);
-    }
+    if (typeof window !== 'undefined') localStorage.setItem('selected_ai_model', selectedModel);
   }, [selectedModel]);
-
-  useEffect(() => {
-    if (!isLoadingApiKeys && userApiKeys.length > 0) {
-      const storedModel = localStorage.getItem('selected_ai_model');
-      let newDefaultModel = DEFAULT_AI_MODEL_FALLBACK;
-
-      if (storedModel && storedModel.startsWith('user_key:')) {
-        const storedKeyId = storedModel.substring(9);
-        const isValidStoredKey = userApiKeys.some(key => key.id === storedKeyId);
-        if (isValidStoredKey) {
-          newDefaultModel = storedModel;
-        }
-      } else if (storedModel && storedModel.startsWith('puter:')) {
-        newDefaultModel = storedModel;
-      }
-
-      const isCurrentDefaultGeminiFlash = newDefaultModel.includes('gemini-2.5-flash');
-      
-      if (!isCurrentDefaultGeminiFlash || !userApiKeys.some(key => `user_key:${key.id}` === newDefaultModel)) {
-        const geminiFlashKey = userApiKeys.find(key => 
-          key.provider === 'google_gemini' && 
-          (key.model_name === 'gemini-2.5-flash' || key.model_name === 'gemini-2.5-pro')
-        );
-
-        if (geminiFlashKey) {
-          newDefaultModel = `user_key:${geminiFlashKey.id}`;
-        }
-      }
-      
-      if (newDefaultModel !== selectedModel) {
-        setSelectedModel(newDefaultModel);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('selected_ai_model', newDefaultModel);
-        }
-      }
-    } else if (!isLoadingApiKeys && userApiKeys.length === 0 && selectedModel !== DEFAULT_AI_MODEL_FALLBACK) {
-      setSelectedModel(DEFAULT_AI_MODEL_FALLBACK);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('selected_ai_model', DEFAULT_AI_MODEL_FALLBACK);
-      }
-    }
-  }, [isLoadingApiKeys, userApiKeys, selectedModel]);
-
-
-  const getConversationDetails = useCallback(async (convId: string) => {
-    const { data, error } = await supabase.from('conversations').select('id, title, model').eq('id', convId).eq('user_id', userId).single();
-    if (error) {
-      console.error('Error fetching conversation details:', error);
-      toast.error('Error al cargar los detalles de la conversación.');
-      return null;
-    }
-    return data;
-  }, [userId]);
-
-  const getMessagesFromDB = useCallback(async (convId: string) => {
-    const { data, error } = await supabase.from('messages').select('id, content, role, model, created_at, conversation_id, type').eq('conversation_id', convId).eq('user_id', userId).order('created_at', { ascending: true });
-    if (error) {
-      console.error('Error fetching messages:', error);
-      toast.error('Error al cargar los mensajes.');
-      return [];
-    }
-    return data.map((msg) => ({
-      id: msg.id,
-      conversation_id: msg.conversation_id,
-      content: msg.content as Message['content'],
-      role: msg.role as 'user' | 'assistant',
-      model: msg.model || undefined,
-      timestamp: new Date(msg.created_at),
-      type: msg.type as 'text' | 'multimodal',
-    }));
-  }, [userId]);
 
   useEffect(() => {
     const loadConversationData = async () => {
       if (conversationId && userId) {
         setIsLoading(true);
-        const details = await getConversationDetails(conversationId);
-        if (details?.model) setSelectedModel(details.model);
-        else setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FALLBACK);
-        const fetchedMsgs = await getMessagesFromDB(conversationId);
+        const details = await fetchConversationDetails(conversationId, userId);
+        setSelectedModel(details?.model || localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FALLBACK);
+        const fetchedMsgs = await fetchMessages(conversationId, userId);
         if (!isSendingFirstMessage || fetchedMsgs.length > 0) setMessages(fetchedMsgs);
         setIsLoading(false);
       } else {
@@ -312,40 +86,11 @@ export function useChat({
       }
     };
     loadConversationData();
-  }, [conversationId, userId, getMessagesFromDB, getConversationDetails, isSendingFirstMessage]);
-
-  const createNewConversationInDB = async () => {
-    if (!userId) return null;
-    const { data, error } = await supabase.from('conversations').insert({ user_id: userId, title: 'Nueva conversación', model: selectedModel }).select('id, title').single();
-    if (error) {
-      toast.error('Error al crear una nueva conversación.');
-      return null;
-    }
-    onNewConversationCreated(data.id);
-    onConversationTitleUpdate(data.id, data.title);
-    onSidebarDataRefresh();
-    return data.id;
-  };
-
-  const updateConversationModelInDB = async (convId: string, model: string) => {
-    if (!userId) return;
-    const { error } = await supabase.from('conversations').update({ model }).eq('id', convId).eq('user_id', userId);
-    if (error) toast.error('Error al actualizar el modelo de la conversación.');
-  };
+  }, [conversationId, userId, isSendingFirstMessage]);
 
   const handleModelChange = (modelValue: string) => {
     setSelectedModel(modelValue);
-    if (conversationId) updateConversationModelInDB(conversationId, modelValue);
-  };
-
-  const saveMessageToDB = async (convId: string, msg: Omit<Message, 'timestamp' | 'id'>) => {
-    if (!userId) return null;
-    const { data, error } = await supabase.from('messages').insert({ conversation_id: convId, user_id: userId, role: msg.role, content: msg.content as any, model: msg.model, type: msg.type }).select('id, created_at').single();
-    if (error) {
-      toast.error('Error al guardar el mensaje.');
-      return null;
-    }
-    return { id: data.id, timestamp: new Date(data.created_at) };
+    if (conversationId && userId) updateConversationModelInDB(conversationId, userId, modelValue);
   };
 
   const getAndStreamAIResponse = useCallback(async (convId: string, history: Message[]) => {
@@ -356,77 +101,21 @@ export function useChat({
     const userMessageToSave = history.findLast(m => m.role === 'user');
 
     try {
-      let response: any;
-      let modelUsedForResponse: string;
-      let systemPromptContent: string;
-
-      if (appPrompt) {
-        if (chatMode === 'build') {
-          systemPromptContent = `Eres un desarrollador experto en Next.js (App Router), TypeScript y Tailwind CSS. Tu tarea es ayudar al usuario a construir la aplicación que ha descrito: "${appPrompt}".
-          REGLAS DEL MODO BUILD:
-          1.  **PLANIFICAR PRIMERO:** Antes de escribir cualquier código, responde con un "Plan de Construcción" detallado usando este formato Markdown exacto:
-              ### 1. Análisis del Requerimiento
-              [Tu análisis aquí]
-              ### 2. Estructura de Archivos y Componentes
-              [Lista de archivos a crear/modificar aquí]
-              ### 3. Lógica de Componentes
-              [Breve descripción de la lógica de cada componente aquí]
-              ### 4. Dependencias Necesarias
-              [Lista de dependencias npm aquí, si las hay]
-              ### 5. Resumen y Confirmación
-              [Resumen y pregunta de confirmación aquí]
-          2.  **ESPERAR APROBACIÓN:** Después de enviar el plan, detente y espera. NO generes código. El usuario te responderá con un mensaje especial: "[USER_APPROVED_PLAN]".
-          3.  **GENERAR CÓDIGO:** SOLO cuando recibas el mensaje "[USER_APPROVED_PLAN]", responde ÚNICAMENTE con los bloques de código para los archivos completos. Usa el formato \`\`\`language:ruta/del/archivo.tsx\`\`\` para cada bloque. NO incluyas texto conversacional en esta respuesta final de código.`;
-        } else { // chatMode === 'chat'
-          systemPromptContent = `Eres un asistente de código experto y depurador para un proyecto Next.js. Estás en 'Modo Chat'. Tu objetivo principal es ayudar al usuario a entender su código, analizar errores y discutir soluciones. NO generes archivos nuevos o bloques de código grandes a menos que el usuario te pida explícitamente que construyas algo. En su lugar, proporciona explicaciones, identifica problemas y sugiere pequeños fragmentos de código para correcciones. Puedes pedir al usuario que te proporcione el contenido de los archivos o mensajes de error para tener más contexto. El proyecto es: "${appPrompt}".`;
-        }
-      } else {
-        systemPromptContent = "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante.";
-      }
-
-      const systemMessage: PuterMessage = { role: 'system', content: systemPromptContent };
-      const messagesForApi = history.map(msg => ({
-        role: msg.role,
-        content: messageContentToApiFormat(msg.content),
-      }));
-
-      if (selectedModel.startsWith('puter:')) {
-        const actualModelForPuter = selectedModel.substring(6);
-        modelUsedForResponse = selectedModel;
-        response = await window.puter.ai.chat([systemMessage, ...messagesForApi], { model: actualModelForPuter });
-
-      } else if (selectedModel.startsWith('user_key:')) {
-        modelUsedForResponse = selectedModel;
-        const apiResponse = await fetch('/api/ai/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: [systemMessage, ...messagesForApi],
-            selectedKeyId: selectedModel.substring(9),
-          }),
-        });
-        response = await apiResponse.json();
-        if (!apiResponse.ok) throw new Error(response.message || 'Error en la API de IA.');
-      } else {
-        throw new Error('Modelo de IA no válido seleccionado.');
-      }
-
-      if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
+      const systemPrompt = buildSystemPrompt({ appPrompt, chatMode });
+      const { content: assistantMessageContent, modelUsed: modelUsedForResponse } = await fetchAiResponse(history, systemPrompt, selectedModel, userApiKeys);
 
       if (userMessageToSave) {
-        await saveMessageToDB(convId, userMessageToSave);
+        await saveMessageToDB(convId, userId!, userMessageToSave);
       }
 
-      const assistantMessageContent = response?.message?.content || 'Sin contenido.';
       const isConstructionPlan = chatMode === 'build' && assistantMessageContent.includes('### 1. Análisis del Requerimiento');
-      
       const parts = parseAiResponseToRenderableParts(assistantMessageContent);
       const filesToWrite: { path: string; content: string }[] = [];
 
-      if (chatMode === 'build' && !isConstructionPlan) { // Only write files in build mode and if it's not a plan
-        parts.forEach(part => {
-          if (part.type === 'code' && appId && part.filename && part.code) {
-            filesToWrite.push({ path: part.filename, content: part.code });
+      if (chatMode === 'build' && !isConstructionPlan) {
+        parts.forEach((part: RenderablePart) => {
+          if (part.type === 'code' && appId && (part as any).filename && (part as any).code) {
+            filesToWrite.push({ path: (part as any).filename, content: (part as any).code });
           }
         });
       }
@@ -443,7 +132,7 @@ export function useChat({
       const tempId = `assistant-${Date.now()}`;
       setMessages(prev => [...prev, { ...assistantMessageData, id: tempId, timestamp: new Date(), isNew: true }]);
       
-      const savedData = await saveMessageToDB(convId, assistantMessageData);
+      const savedData = await saveMessageToDB(convId, userId!, assistantMessageData);
       if (savedData) {
         setMessages(prev => prev.map(msg => msg.id === tempId ? { ...msg, id: savedData.id, timestamp: savedData.timestamp } : msg));
       }
@@ -453,80 +142,58 @@ export function useChat({
       }
 
     } catch (error: any) {
-      let errorMessage = 'Ocurrió un error desconocido.';
-      if (error instanceof Error) errorMessage = error.message;
-      else if (typeof error === 'string') errorMessage = error;
-      else if (error && typeof error === 'object' && error.message) errorMessage = String(error.message);
-      
-      let rawError = error;
-      try { rawError = JSON.parse(errorMessage); } catch (e) { /* Not a JSON string */ }
-
       const isAdmin = userRole === 'admin' || userRole === 'super_admin';
-      const errorMessageForDisplay = isAdmin ? `Error: ${errorMessage}` : 'Error con la IA, se ha enviado un ticket automático.';
-      
+      const errorMessageForDisplay = isAdmin ? `Error: ${error.message}` : 'Error con la IA, se ha enviado un ticket automático.';
       if (!isAdmin) {
         fetch('/api/error-tickets', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ error_message: rawError, conversation_id: convId }),
+          body: JSON.stringify({ error_message: error, conversation_id: convId }),
         }).catch(apiError => console.error("Failed to submit error ticket:", apiError));
       }
-
       toast.error(errorMessageForDisplay);
-      
-      setMessages(prev => {
-        const withoutTyping = prev.filter(m => m.id !== tempTypingId);
-        if (withoutTyping.length > 0 && withoutTyping[withoutTyping.length - 1].role === 'user') {
-            return withoutTyping.slice(0, -1);
-        }
-        return withoutTyping;
-      });
-
+      setMessages(prev => prev.filter(m => m.id !== tempTypingId && m.id !== userMessageToSave?.id));
     } finally {
       setIsLoading(false);
     }
-  }, [appId, appPrompt, userRole, onWriteFiles, selectedModel, userId, saveMessageToDB, chatMode]);
+  }, [appId, appPrompt, chatMode, selectedModel, userApiKeys, onWriteFiles, userId, userRole]);
 
   const sendMessage = useCallback(async (content: PuterContentPart[], messageText: string) => {
-    if (!userId) {
-      toast.error('No hay usuario autenticado.');
-      return;
-    }
-
+    if (!userId) return;
     let currentConversationId = conversationId;
     if (!currentConversationId) {
       setIsSendingFirstMessage(true);
-      currentConversationId = await createNewConversationInDB();
-      if (!currentConversationId) {
+      const newConv = await createConversationInDB(userId, selectedModel);
+      if (!newConv) {
         setIsSendingFirstMessage(false);
         return;
       }
+      currentConversationId = newConv.id;
+      onNewConversationCreated(newConv.id);
+      onConversationTitleUpdate(newConv.id, newConv.title);
+      onSidebarDataRefresh();
     }
 
     const newUserMessage: Message = {
       id: `user-${Date.now()}`,
-      conversation_id: currentConversationId,
-      content: content,
+      conversation_id: currentConversationId || undefined,
+      content,
       role: 'user',
       timestamp: new Date(),
       type: content.some(part => part.type === 'image_url') ? 'multimodal' : 'text',
     };
-
     setMessages(prev => [...prev, newUserMessage]);
-    setIsLoading(true);
-
-    await getAndStreamAIResponse(currentConversationId, [...messages, newUserMessage]);
+    
+    if (currentConversationId) {
+      await getAndStreamAIResponse(currentConversationId, [...messages, newUserMessage]);
+    }
+    
     setIsSendingFirstMessage(false);
-  }, [userId, conversationId, messages, createNewConversationInDB, getAndStreamAIResponse]);
+  }, [userId, conversationId, messages, selectedModel, getAndStreamAIResponse, onNewConversationCreated, onConversationTitleUpdate, onSidebarDataRefresh]);
 
   const approvePlan = useCallback(async (messageId: string) => {
-    const planMessage = messages.find(m => m.id === messageId);
-    if (!planMessage || !conversationId) return;
-
-    // Disable buttons on the plan message
+    if (!conversationId) return;
     setMessages(prev => prev.map(m => m.id === messageId ? { ...m, planApproved: true } : m));
-
-    // Send the approval message to the AI
     const approvalMessage: Message = {
       id: `user-approval-${Date.now()}`,
       conversation_id: conversationId,
@@ -535,76 +202,40 @@ export function useChat({
       timestamp: new Date(),
       type: 'text',
     };
-
-    // We don't display the approval message, but we need it in the history for the AI
-    const historyWithApproval = [...messages, approvalMessage];
-    
-    await getAndStreamAIResponse(conversationId, historyWithApproval);
-
+    await getAndStreamAIResponse(conversationId, [...messages, approvalMessage]);
   }, [messages, conversationId, getAndStreamAIResponse]);
 
-
   const regenerateLastResponse = useCallback(async () => {
-    if (isLoading) return;
+    if (isLoading || !conversationId) return;
     const lastUserMessageIndex = messages.findLastIndex(m => m.role === 'user');
-    if (lastUserMessageIndex === -1) {
-      toast.info("No hay nada que regenerar.");
-      return;
-    }
+    if (lastUserMessageIndex === -1) return;
     const historyForRegen = messages.slice(0, lastUserMessageIndex + 1);
     setMessages(historyForRegen);
-    const convId = historyForRegen[0]?.conversation_id;
-    if (convId) {
-      await getAndStreamAIResponse(convId, historyForRegen);
-    }
-  }, [isLoading, messages, getAndStreamAIResponse]);
+    await getAndStreamAIResponse(conversationId, historyForRegen);
+  }, [isLoading, messages, conversationId, getAndStreamAIResponse]);
 
   const reapplyFilesFromMessage = async (message: Message) => {
-    if (!appId) {
-      toast.error("No hay un proyecto seleccionado para aplicar los archivos.");
-      return;
-    }
-
-    const content = message.content;
+    if (!appId) return;
     const filesToWrite: { path: string; content: string }[] = [];
-
-    if (Array.isArray(content)) {
-      content.forEach(part => {
-        if (part.type === 'code') {
-          if (part.filename && part.code) {
-            filesToWrite.push({ path: part.filename, content: part.code });
-          }
+    if (Array.isArray(message.content)) {
+      message.content.forEach(part => {
+        if (part.type === 'code' && (part as any).filename && (part as any).code) {
+          filesToWrite.push({ path: (part as any).filename, content: (part as any).code });
         }
       });
     }
-
-    if (filesToWrite.length > 0) {
-      await onWriteFiles(filesToWrite);
-    } else {
-      toast.info("No se encontraron archivos para aplicar en este mensaje.");
-    }
+    if (filesToWrite.length > 0) await onWriteFiles(filesToWrite);
+    else toast.info("No se encontraron archivos para aplicar en este mensaje.");
   };
 
   const clearChat = useCallback(async () => {
-    if (!conversationId || !userId) {
-      toast.error('No hay una conversación seleccionada o usuario autenticado.');
-      return;
-    }
+    if (!conversationId || !userId) return;
     setIsLoading(true);
     try {
-      const { error } = await supabase
-        .from('messages')
-        .delete()
-        .eq('conversation_id', conversationId)
-        .eq('user_id', userId);
-
-      if (error) {
-        throw new Error(error.message);
-      }
-      setMessages([]); // Clear local messages
+      await clearChatInDB(conversationId, userId);
+      setMessages([]);
       toast.success('Chat limpiado correctamente.');
     } catch (error: any) {
-      console.error('Error clearing chat:', error);
       toast.error(`Error al limpiar el chat: ${error.message}`);
     } finally {
       setIsLoading(false);
