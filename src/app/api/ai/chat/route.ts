@@ -43,33 +43,31 @@ export async function POST(req: NextRequest) {
     // For now, use the first available key.
     const apiKey = keys[0].api_key;
     const genAI = new GoogleGenAI({ apiKey });
-    const geminiModel = genAI.getGenerativeModel({ model });
 
     // Helper to convert our message format to Gemini's format
     const convertToGeminiParts = (content: any): Part[] => {
+      const parts: Part[] = [];
       if (typeof content === 'string') {
-        return [{ text: content }];
-      }
-      if (Array.isArray(content)) {
-        return content.map(part => {
+        parts.push({ text: content });
+      } else if (Array.isArray(content)) {
+        for (const part of content) {
           if (part.type === 'text') {
-            return { text: part.text };
-          }
-          if (part.type === 'image_url') {
+            parts.push({ text: part.text });
+          } else if (part.type === 'image_url') {
             const url = part.image_url.url;
             const match = url.match(/^data:(image\/\w+);base64,(.*)$/);
             if (!match) {
               console.warn("Skipping invalid image data URL format for Gemini:", url.substring(0, 50) + '...');
-              return { text: "[Unsupported Image]" };
+              parts.push({ text: "[Unsupported Image]" });
+            } else {
+              const mimeType = match[1];
+              const data = match[2];
+              parts.push({ inlineData: { mimeType, data } });
             }
-            const mimeType = match[1];
-            const data = match[2];
-            return { inlineData: { mimeType, data } };
           }
-          return null;
-        }).filter((p): p is Part => p !== null);
+        }
       }
-      return [];
+      return parts;
     };
 
     // Convert messages to Gemini's `contents` format
@@ -78,9 +76,8 @@ export async function POST(req: NextRequest) {
       parts: convertToGeminiParts(msg.content),
     }));
 
-    const result = await geminiModel.generateContent({ contents });
-    const response = result.response;
-    const text = response.text();
+    const result = await genAI.models.generateContent({ model, contents });
+    const text = result.response.text();
 
     return NextResponse.json({ message: { content: text } });
 
