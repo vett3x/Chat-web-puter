@@ -299,7 +299,7 @@ export async function POST(req: NextRequest, context: any) {
       user_id: userId,
       server_id: server.id,
       event_type: 'file_write_diagnostic',
-      description: `Diagnóstico de escritura de archivos para app ${appId}:\nSTDOUT:\n${diagnosticResult.stdout}\nSTDERR:\n${diagnosticResult.stderr}\nCode: ${diagnosticResult.code}`,
+      description: `--- DIAGNÓSTICO DE ESCRITURA DE ARCHIVOS PARA APP ${appId} ---\nSTDOUT:\n${diagnosticResult.stdout}\nSTDERR:\n${diagnosticResult.stderr}\nCode: ${diagnosticResult.code}`,
     });
 
 
