@@ -115,6 +115,20 @@ export default {
             boxShadow: '0 0 0 6px hsl(var(--destructive) / 0)',
           },
         },
+        'lightsaber-on': {
+          from: { transform: 'scaleX(0)' },
+          to: { transform: 'scaleX(1)' },
+        },
+        'lightsaber-pulse': {
+          '0%, 100%': {
+            boxShadow: '0 0 6px 1px hsl(var(--primary-light-purple) / 0.7)',
+            opacity: '1',
+          },
+          '50%': {
+            boxShadow: '0 0 10px 2px hsl(var(--primary-light-purple) / 0.9)',
+            opacity: '0.85',
+          },
+        },
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
@@ -122,6 +136,8 @@ export default {
         'pulse-glow': 'pulse-glow 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'pulse-purple': 'pulse-purple 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'pulse-red': 'pulse-red 2s cubic-bezier(0.4, 0, 0.6, 1) infinite', // New animation
+        'lightsaber-on': 'lightsaber-on 0.3s ease-out forwards',
+        'lightsaber-pulse': 'lightsaber-pulse 2s ease-in-out infinite alternate',
   		},
       boxShadow: {
         'avatar-user': '0 0 8px 2px hsl(var(--user-avatar-shadow))',
