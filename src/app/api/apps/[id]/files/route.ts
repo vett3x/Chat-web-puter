@@ -150,23 +150,21 @@ export async function GET(req: NextRequest, context: any) {
   }
 }
 
-// POST: Escribir MÚLTIPLES archivos en una sola conexión usando SFTP
+// POST: Escribir MÚLTIPLES archivos en una sola conexión usando `docker exec`
 export async function POST(req: NextRequest, context: any) {
   const appId = context.params.id;
   
   const conn = new SshClient();
-  let sftp: SFTPWrapper | undefined; // Declare sftp variable
   try {
     const { session, userRole, userPermissions } = await getSessionAndRole();
     if (!session || !userRole) {
       return NextResponse.json({ message: 'Acceso denegado. No autenticado.' }, { status: 401 });
     }
-    // Check for granular permission: can_manage_docker_containers
     if (!userPermissions[PERMISSION_KEYS.CAN_MANAGE_DOCKER_CONTAINERS]) {
       return NextResponse.json({ message: 'Acceso denegado. No tienes permiso para gestionar contenedores Docker.' }, { status: 403 });
     }
 
-    const userId = session.user.id; // Use userId from session
+    const userId = session.user.id;
     const { app, server } = await getAppAndServerForFileOps(appId, userId);
     const { files } = await req.json();
 
@@ -175,22 +173,8 @@ export async function POST(req: NextRequest, context: any) {
     }
 
     // --- Conexión SSH Única ---
-    console.log(`[API /apps/${appId}/files] Establishing SSH connection to ${server.ip_address}...`);
     await new Promise<void>((resolve, reject) => {
-      conn.on('ready', () => {
-        console.log(`[API /apps/${appId}/files] SSH connection ready.`);
-        conn.sftp((err, sftpClient) => {
-          if (err) {
-            conn.end();
-            return reject(new Error(`SFTP error: ${err.message}`));
-          }
-          sftp = sftpClient;
-          resolve();
-        });
-      }).on('error', (err) => {
-        console.error(`[API /apps/${appId}/files] SSH connection error:`, err);
-        reject(err);
-      }).connect({
+      conn.on('ready', resolve).on('error', reject).connect({
         host: server.ip_address,
         port: server.ssh_port || 22,
         username: server.ssh_username,
@@ -199,118 +183,57 @@ export async function POST(req: NextRequest, context: any) {
       });
     });
 
-    if (!sftp) {
-      throw new Error('Failed to establish SFTP connection.');
-    }
-
     const backups = [];
     const logEntries = [];
 
     for (const file of files) {
       const { filePath, content } = file;
-      if (!filePath || content === undefined) {
-        console.warn(`[API /apps/${appId}/files] Skipping file due to missing path or content:`, file);
-        continue;
-      }
+      if (!filePath || content === undefined) continue;
 
       const safeBasePath = '/app';
-      const resolvedPath = path.join(safeBasePath, filePath);
-      if (!resolvedPath.startsWith(safeBasePath + path.sep) && resolvedPath !== safeBasePath) {
+      const resolvedPath = path.posix.join(safeBasePath, filePath); // Use path.posix for consistent separators
+      if (!resolvedPath.startsWith(safeBasePath + '/')) {
         console.warn(`[API /apps/${appId}/files] Skipping unsafe file path: ${filePath}`);
         continue;
       }
-      const directoryInContainer = path.dirname(resolvedPath);
+      const directoryInContainer = path.posix.dirname(resolvedPath);
 
-      console.log(`[API /apps/${appId}/files] Processing file: ${filePath}`);
-
-      // 1. Crear directorios dentro del contenedor (SFTP no crea directorios recursivamente por defecto)
+      // 1. Crear directorios dentro del contenedor
       const mkdirCommand = `mkdir -p '${directoryInContainer}'`;
-      console.log(`[API /apps/${appId}/files] Executing mkdir: ${mkdirCommand}`);
       const mkdirResult = await executeSshOnExistingConnection(conn, `docker exec ${app.container_id} bash -c "${mkdirCommand}"`);
-      if (mkdirResult.code !== 0) {
-        console.error(`[API /apps/${appId}/files] mkdir failed for ${filePath}: STDERR: ${mkdirResult.stderr}`);
-        throw new Error(`Error creating directory for ${filePath}: ${mkdirResult.stderr}`);
-      }
-      console.log(`[API /apps/${appId}/files] mkdir successful for ${filePath}.`);
+      if (mkdirResult.code !== 0) throw new Error(`Error creating directory for ${filePath}: ${mkdirResult.stderr}`);
 
-      // 2. Escribir archivo usando SFTP
-      const containerFilePath = `/proc/${app.container_id}/root${resolvedPath}`; // Path to file inside host's /proc/container_id/root
-      console.log(`[API /apps/${appId}/files] Writing file via SFTP to host path: ${containerFilePath}. Content length: ${content.length}`);
-      
-      await new Promise<void>((resolve, reject) => {
-        const writeStream = sftp!.createWriteStream(containerFilePath, { mode: 0o644 }); // Use sftp! to assert non-null
-        writeStream.write(content);
-        writeStream.end();
-        writeStream.on('finish', resolve);
-        writeStream.on('error', (writeErr: Error) => { // Explicitly type writeErr as Error
-          console.error(`[API /apps/${appId}/files] SFTP write failed for ${filePath}:`, writeErr);
-          reject(new Error(`Error writing file ${filePath} via SFTP: ${writeErr.message}`));
-        });
-      });
-      console.log(`[API /apps/${appId}/files] SFTP write successful for ${filePath}.`);
+      // 2. Escribir archivo usando `docker exec` con Base64
+      const encodedContent = Buffer.from(content).toString('base64');
+      const writeCommand = `echo '${encodedContent}' | base64 -d > '${resolvedPath}'`;
+      const writeResult = await executeSshOnExistingConnection(conn, `docker exec ${app.container_id} bash -c "${writeCommand}"`);
+      if (writeResult.code !== 0) throw new Error(`Error writing file ${filePath}: ${writeResult.stderr}`);
 
       // 3. Verificar que el archivo se escribió correctamente
-      const verifyCommand = `ls -l '${resolvedPath}' && cat '${resolvedPath}' | wc -c`;
-      console.log(`[API /apps/${appId}/files] Verifying file: ${verifyCommand}`);
+      const verifyCommand = `cat '${resolvedPath}' | wc -c`;
       const verifyResult = await executeSshOnExistingConnection(conn, `docker exec ${app.container_id} bash -c "${verifyCommand}"`);
-      if (verifyResult.code !== 0) {
-        console.error(`[API /apps/${appId}/files] Verification failed for ${filePath}: STDERR: ${verifyResult.stderr}`);
-        throw new Error(`Error verifying file ${filePath}: ${verifyResult.stderr}`);
+      if (verifyResult.code !== 0) throw new Error(`Error verifying file ${filePath}: ${verifyResult.stderr}`);
+      const fileSize = parseInt(verifyResult.stdout.trim(), 10);
+      if (fileSize !== Buffer.byteLength(content, 'utf8')) {
+        throw new Error(`Error de verificación: el tamaño del archivo ${filePath} no coincide. Esperado: ${Buffer.byteLength(content, 'utf8')}, Real: ${fileSize}`);
       }
-      const [lsOutput, wcOutput] = verifyResult.stdout.split('\n');
-      const fileSize = parseInt(wcOutput.trim(), 10);
-      if (fileSize !== content.length) {
-        console.error(`[API /apps/${appId}/files] File size mismatch for ${filePath}. Expected: ${content.length}, Actual: ${fileSize}`);
-        throw new Error(`Error de verificación: el tamaño del archivo ${filePath} no coincide. Esperado: ${content.length}, Real: ${fileSize}`);
-      }
-      console.log(`[API /apps/${appId}/files] File ${filePath} verified. Size: ${fileSize} bytes.`);
       
-      // 4. Preparar para respaldo en DB
-      backups.push({
-        app_id: appId,
-        user_id: userId,
-        file_path: filePath,
-        file_content: content,
-      });
-
-      // 5. Preparar entrada de log
-      logEntries.push({
-        user_id: userId,
-        server_id: server.id,
-        event_type: 'file_written',
-        description: `Archivo '${filePath}' escrito en el contenedor ${app.container_id.substring(0, 12)}.`,
-      });
+      backups.push({ app_id: appId, user_id: userId, file_path: filePath, file_content: content });
+      logEntries.push({ user_id: userId, server_id: server.id, event_type: 'file_written', description: `Archivo '${filePath}' escrito en el contenedor ${app.container_id.substring(0, 12)}.` });
     }
 
-    // 6. Insertar logs y respaldos en paralelo
-    console.log(`[API /apps/${appId}/files] Inserting ${backups.length} backups and ${logEntries.length} log entries into Supabase.`);
+    // 4. Insertar logs y respaldos en paralelo
     await Promise.all([
       supabaseAdmin.from('app_file_backups').upsert(backups, { onConflict: 'app_id, file_path' }),
       supabaseAdmin.from('server_events_log').insert(logEntries)
     ]);
-    console.log(`[API /apps/${appId}/files] Supabase updates complete.`);
-
-    // Diagnostic: List files in /app and cat app/page.tsx
-    const diagnosticCommand = `ls -lR /app && cat /app/app/page.tsx`;
-    console.log(`[API /apps/${appId}/files] Running diagnostic command: ${diagnosticCommand}`);
-    const diagnosticResult = await executeSshOnExistingConnection(conn, `docker exec ${app.container_id} bash -c "${diagnosticCommand}"`);
-    console.log(`[API /apps/${appId}/files] Diagnostic Output:\nSTDOUT:\n${diagnosticResult.stdout}\nSTDERR:\n${diagnosticResult.stderr}\nCode: ${diagnosticResult.code}`);
-    await supabaseAdmin.from('server_events_log').insert({
-      user_id: userId,
-      server_id: server.id,
-      event_type: 'file_write_diagnostic',
-      description: `--- DIAGNÓSTICO DE ESCRITURA DE ARCHIVOS PARA APP ${appId} ---\nSTDOUT:\n${diagnosticResult.stdout}\nSTDERR:\n${diagnosticResult.stderr}\nCode: ${diagnosticResult.code}`,
-    });
-
 
     return NextResponse.json({ message: 'Archivos guardados y respaldados correctamente.' });
   } catch (error: any) {
     console.error(`[API /apps/${appId}/files] Unhandled error in POST:`, error);
     return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
   } finally {
-    console.log(`[API /apps/${appId}/files] Closing SSH connection.`);
-    if (sftp) sftp.end(); // Close SFTP session
-    conn.end(); // Asegurarse de cerrar la conexión
+    conn.end();
   }
 }
 
@@ -321,7 +244,7 @@ function executeSshOnExistingConnection(conn: SshClient, command: string): Promi
       if (err) return reject(err);
       let stdout = '';
       let stderr = '';
-      let exitCode = 1; // Default to non-zero exit code for errors
+      let exitCode = 1;
 
       stream.on('data', (data: Buffer) => { stdout += data.toString(); });
       stream.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
