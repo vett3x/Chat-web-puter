@@ -49,8 +49,8 @@ interface DraggableConversationCardProps {
   conversation: Conversation;
   selectedConversationId: string | null;
   onSelectConversation: (conversationId: string | null) => void;
-  onConversationUpdated: () => void;
-  onConversationDeleted: () => void;
+  onConversationUpdated: (id: string, updatedData: Partial<Conversation>) => void; // Changed prop
+  onConversationDeleted: (id: string) => void; // Changed prop
   onConversationMoved: (conversationId: string, targetFolderId: string | null) => void;
   onConversationReordered: (draggedId: string, targetId: string, position: 'before' | 'after') => void; // New prop for reordering
   allFolders: Folder[];
@@ -101,7 +101,7 @@ export function DraggableConversationCard({
       toast.error('Error al actualizar el título de la conversación.');
     } else {
       toast.success('Título de conversación actualizado.');
-      onConversationUpdated();
+      onConversationUpdated(conversation.id, { title: editingTitle }); // Use new prop
       setIsEditing(false);
     }
   };
@@ -123,7 +123,7 @@ export function DraggableConversationCard({
       toast.error('Error al eliminar la conversación.');
     } else {
       toast.success('Conversación eliminada.');
-      onConversationDeleted();
+      onConversationDeleted(conversation.id); // Use new prop
       if (selectedConversationId === conversation.id) {
         onSelectConversation(null);
       }

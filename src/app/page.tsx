@@ -68,6 +68,8 @@ export default function Home() {
     createFolder,
     createNote,
     moveItem,
+    updateLocalItem,
+    removeLocalItem,
   } = useSidebarData();
 
   const { userApiKeys, isLoadingApiKeys } = useUserApiKeys(); // NEW: Get user API keys
@@ -298,6 +300,8 @@ export default function Home() {
           onDeleteApp={handleDeleteApp}
           isDeletingAppId={isDeletingAppId}
           fileTreeRefreshKey={fileTreeRefreshKey}
+          updateLocalItem={updateLocalItem}
+          removeLocalItem={removeLocalItem}
         />
       </div>
       <div className="flex-1 min-w-0">

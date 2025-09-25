@@ -69,7 +69,7 @@ export function useSidebarData() {
       ]);
 
       const { data: appData, error: appError } = appsRes;
-      const { data: convData, error: convError } = convRes;
+      const { data: convData, error: convError } = convRes; // Corrected from folderRes to convRes
       const { data: folderData, error: folderError } = folderRes;
       const { data: noteData, error: noteError } = notesRes; // Destructure notes response
 
@@ -192,6 +192,35 @@ export function useSidebarData() {
     }
   };
 
+  // NEW: Functions to update local state without full refresh
+  const updateLocalItem = (itemId: string, itemType: 'conversation' | 'note' | 'folder', updatedData: Partial<Conversation | Note | Folder>) => {
+    switch (itemType) {
+      case 'conversation':
+        setConversations(prev => prev.map(c => c.id === itemId ? { ...c, ...updatedData } : c));
+        break;
+      case 'note':
+        setNotes(prev => prev.map(n => n.id === itemId ? { ...n, ...updatedData } : n));
+        break;
+      case 'folder':
+        setFolders(prev => prev.map(f => f.id === itemId ? { ...f, ...updatedData } : f));
+        break;
+    }
+  };
+
+  const removeLocalItem = (itemId: string, itemType: 'conversation' | 'note' | 'folder') => {
+    switch (itemType) {
+      case 'conversation':
+        setConversations(prev => prev.filter(c => c.id !== itemId));
+        break;
+      case 'note':
+        setNotes(prev => prev.filter(n => n.id !== itemId));
+        break;
+      case 'folder':
+        setFolders(prev => prev.filter(f => f.id !== itemId));
+        break;
+    }
+  };
+
   return {
     apps,
     conversations,
@@ -203,5 +232,7 @@ export function useSidebarData() {
     createFolder,
     createNote,
     moveItem,
+    updateLocalItem,
+    removeLocalItem,
   };
 }

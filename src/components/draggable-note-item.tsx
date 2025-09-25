@@ -39,8 +39,8 @@ interface DraggableNoteItemProps {
   onSelect: () => void;
   onDragStart: (e: React.DragEvent) => void;
   level: number;
-  onNoteUpdated: () => void;
-  onNoteDeleted: () => void;
+  onNoteUpdated: (id: string, updatedData: Partial<Note>) => void; // Changed prop
+  onNoteDeleted: (id: string) => void; // Changed prop
 }
 
 export function DraggableNoteItem({ note, selected, onSelect, onDragStart, level, onNoteUpdated, onNoteDeleted }: DraggableNoteItemProps) {
@@ -70,7 +70,7 @@ export function DraggableNoteItem({ note, selected, onSelect, onDragStart, level
       toast.error('Error al actualizar el título de la nota.');
     } else {
       toast.success('Título de la nota actualizado.');
-      onNoteUpdated();
+      onNoteUpdated(note.id, { title: editingTitle }); // Use new prop
       setIsEditing(false);
     }
   };
@@ -88,7 +88,7 @@ export function DraggableNoteItem({ note, selected, onSelect, onDragStart, level
       toast.error('Error al eliminar la nota.');
     } else {
       toast.success('Nota eliminada.');
-      onNoteDeleted();
+      onNoteDeleted(note.id); // Use new prop
     }
     setIsDeleting(false);
   };

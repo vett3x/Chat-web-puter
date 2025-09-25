@@ -65,8 +65,8 @@ interface DraggableFolderItemProps {
   conversations: Conversation[];
   notes: Note[]; // Add notes prop
   subfolders: Folder[];
-  onFolderUpdated: () => void;
-  onFolderDeleted: () => void;
+  onFolderUpdated: (id: string, updatedData: Partial<Folder>) => void; // Changed prop
+  onFolderDeleted: (id: string, refreshNeeded: boolean) => void; // Changed prop
   onItemMoved: (itemId: string, itemType: 'conversation' | 'note' | 'folder', targetFolderId: string | null) => void;
   onCreateSubfolder: (parentId: string) => void;
   onDragStart: (e: React.DragEvent, id: string, type: 'conversation' | 'folder' | 'note') => void;
@@ -75,6 +75,10 @@ interface DraggableFolderItemProps {
   onDragEnter: (e: React.DragEvent, folderId: string | null) => void;
   onDragLeave: (e: React.DragEvent, folderId: string | null) => void;
   draggedItemType: 'conversation' | 'folder' | 'note' | null;
+  onConversationUpdated: (id: string, updatedData: Partial<Conversation>) => void;
+  onConversationDeleted: (id: string) => void;
+  onNoteUpdated: (id: string, updatedData: Partial<Note>) => void;
+  onNoteDeleted: (id: string) => void;
 }
 
 export function DraggableFolderItem({
@@ -95,6 +99,10 @@ export function DraggableFolderItem({
   onDragEnter,
   onDragLeave,
   draggedItemType,
+  onConversationUpdated,
+  onConversationDeleted,
+  onNoteUpdated,
+  onNoteDeleted,
 }: DraggableFolderItemProps) {
   const { session } = useSession();
   const userId = session?.user?.id;
@@ -121,7 +129,7 @@ export function DraggableFolderItem({
       toast.error('Error al actualizar el nombre de la carpeta.');
     } else {
       toast.success('Nombre de carpeta actualizado.');
-      onFolderUpdated();
+      onFolderUpdated(folder.id, { name: editingName }); // Use new prop
       setIsEditing(false);
     }
   };
@@ -141,7 +149,7 @@ export function DraggableFolderItem({
       toast.error('Error al eliminar la carpeta.');
     } else {
       toast.success('Carpeta eliminada y contenido movido a la raíz.');
-      onFolderDeleted();
+      onFolderDeleted(folder.id, true); // Use new prop, indicate refresh needed
     }
     setIsDeleting(false);
   };
@@ -203,13 +211,13 @@ export function DraggableFolderItem({
       {isExpanded && (
         <div className="space-y-1">
           {filteredSubfolders.map((subfolder) => (
-            <DraggableFolderItem key={subfolder.id} folder={subfolder} level={level + 1} selectedItem={selectedItem} onSelectItem={onSelectItem} conversations={conversations} notes={notes} subfolders={subfolders} onFolderUpdated={onFolderUpdated} onFolderDeleted={onFolderDeleted} onItemMoved={onItemMoved} onCreateSubfolder={onCreateSubfolder} onDragStart={onDragStart} onDrop={onDrop} isDraggingOver={false} onDragEnter={onDragEnter} onDragLeave={onDragLeave} draggedItemType={draggedItemType} />
+            <DraggableFolderItem key={subfolder.id} folder={subfolder} level={level + 1} selectedItem={selectedItem} onSelectItem={onSelectItem} conversations={conversations} notes={notes} subfolders={subfolders} onFolderUpdated={onFolderUpdated} onFolderDeleted={onFolderDeleted} onItemMoved={onItemMoved} onCreateSubfolder={onCreateSubfolder} onDragStart={onDragStart} onDrop={onDrop} isDraggingOver={false} onDragEnter={onDragEnter} onDragLeave={onDragLeave} draggedItemType={draggedItemType} onConversationUpdated={onConversationUpdated} onConversationDeleted={onConversationDeleted} onNoteUpdated={onNoteUpdated} onNoteDeleted={onNoteDeleted} />
           ))}
           {filteredConversations.map((conversation) => (
-            <DraggableConversationCard key={conversation.id} conversation={conversation} selectedConversationId={selectedItem?.type === 'conversation' ? selectedItem.id : null} onSelectConversation={(id) => onSelectItem(id!, 'conversation')} onConversationUpdated={onFolderUpdated} onConversationDeleted={onFolderUpdated} onConversationMoved={() => {}} onConversationReordered={() => {}} allFolders={[]} level={level + 1} onDragStart={(e) => onDragStart(e, conversation.id, 'conversation')} isDraggingOver={false} dropPosition={null} />
+            <DraggableConversationCard key={conversation.id} conversation={conversation} selectedConversationId={selectedItem?.type === 'conversation' ? selectedItem.id : null} onSelectConversation={(id) => onSelectItem(id!, 'conversation')} onConversationUpdated={onConversationUpdated} onConversationDeleted={onConversationDeleted} onConversationMoved={() => {}} onConversationReordered={() => {}} allFolders={[]} level={level + 1} onDragStart={(e) => onDragStart(e, conversation.id, 'conversation')} isDraggingOver={false} dropPosition={null} />
           ))}
           {filteredNotes.map((note) => (
-            <DraggableNoteItem key={note.id} note={note} selected={selectedItem?.type === 'note' && selectedItem.id === note.id} onSelect={() => onSelectItem(note.id, 'note')} onDragStart={(e) => onDragStart(e, note.id, 'note')} level={level + 1} onNoteUpdated={onFolderUpdated} onNoteDeleted={onFolderDeleted} />
+            <DraggableNoteItem key={note.id} note={note} selected={selectedItem?.type === 'note' && selectedItem.id === note.id} onSelect={() => onSelectItem(note.id, 'note')} onDragStart={(e) => onDragStart(e, note.id, 'note')} level={level + 1} onNoteUpdated={onNoteUpdated} onNoteDeleted={onNoteDeleted} />
           ))}
         </div>
       )}

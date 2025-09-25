@@ -69,6 +69,8 @@ interface ConversationSidebarProps {
   onDeleteApp: (appId: string) => void;
   isDeletingAppId: string | null;
   fileTreeRefreshKey: number;
+  updateLocalItem: (itemId: string, itemType: 'conversation' | 'note' | 'folder', updatedData: Partial<Conversation | Note | Folder>) => void;
+  removeLocalItem: (itemId: string, itemType: 'conversation' | 'note' | 'folder') => void;
 }
 
 export function ConversationSidebar({
@@ -95,6 +97,8 @@ export function ConversationSidebar({
   onDeleteApp,
   isDeletingAppId,
   fileTreeRefreshKey,
+  updateLocalItem,
+  removeLocalItem,
 }: ConversationSidebarProps) {
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
@@ -208,15 +212,15 @@ export function ConversationSidebar({
               }))}
               <Separator className="my-4 bg-sidebar-border" />
               {renderSection("Notas", <FileText className="h-4 w-4" />, "notes", notes.filter(n => !n.folder_id).map(note => (
-                <DraggableNoteItem key={note.id} note={note} selected={selectedItem?.type === 'note' && selectedItem.id === note.id} onSelect={() => onSelectItem(note.id, 'note')} onDragStart={(e) => handleDragStart(e, note.id, 'note')} level={0} onNoteUpdated={refreshData} onNoteDeleted={refreshData} />
+                <DraggableNoteItem key={note.id} note={note} selected={selectedItem?.type === 'note' && selectedItem.id === note.id} onSelect={() => onSelectItem(note.id, 'note')} onDragStart={(e) => handleDragStart(e, note.id, 'note')} level={0} onNoteUpdated={(id, data) => updateLocalItem(id, 'note', data)} onNoteDeleted={(id) => removeLocalItem(id, 'note')} />
               )))}
               <Separator className="my-4 bg-sidebar-border" />
               {renderSection("Chats", <MessageSquare className="h-4 w-4" />, "chats", conversations.filter(c => !c.folder_id).map(conv => (
-                <DraggableConversationCard key={conv.id} conversation={conv} selectedConversationId={selectedItem?.type === 'conversation' ? selectedItem.id : null} onSelectConversation={(id) => onSelectItem(id!, 'conversation')} onConversationUpdated={refreshData} onConversationDeleted={refreshData} onConversationMoved={() => {}} onConversationReordered={() => {}} allFolders={[]} level={0} onDragStart={(e) => handleDragStart(e, conv.id, 'conversation')} isDraggingOver={false} dropPosition={null} />
+                <DraggableConversationCard key={conv.id} conversation={conv} selectedConversationId={selectedItem?.type === 'conversation' ? selectedItem.id : null} onSelectConversation={(id) => onSelectItem(id!, 'conversation')} onConversationUpdated={(id, data) => updateLocalItem(id, 'conversation', data)} onConversationDeleted={(id) => removeLocalItem(id, 'conversation')} onConversationMoved={() => {}} onConversationReordered={() => {}} allFolders={[]} level={0} onDragStart={(e) => handleDragStart(e, conv.id, 'conversation')} isDraggingOver={false} dropPosition={null} />
               )))}
               <Separator className="my-4 bg-sidebar-border" />
               {renderSection("Carpetas", <FolderIcon className="h-4 w-4" />, "folders", folders.filter(f => !f.parent_id).map(folder => (
-                <DraggableFolderItem key={folder.id} folder={folder} level={0} selectedItem={selectedItem} onSelectItem={(id, type) => onSelectItem(id, type)} conversations={conversations} notes={notes} subfolders={folders} onFolderUpdated={refreshData} onFolderDeleted={refreshData} onItemMoved={moveItem} onCreateSubfolder={handleCreateFolder} onDragStart={handleDragStart} onDrop={handleDrop} isDraggingOver={draggedOverFolder === folder.id} onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} draggedItemType={draggedItem?.type || null} />
+                <DraggableFolderItem key={folder.id} folder={folder} level={0} selectedItem={selectedItem} onSelectItem={(id, type) => onSelectItem(id, type)} conversations={conversations} notes={notes} subfolders={folders} onFolderUpdated={(id, data) => updateLocalItem(id, 'folder', data)} onFolderDeleted={(id, refresh) => refresh ? refreshData() : removeLocalItem(id, 'folder')} onItemMoved={moveItem} onCreateSubfolder={handleCreateFolder} onDragStart={handleDragStart} onDrop={handleDrop} isDraggingOver={draggedOverFolder === folder.id} onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} draggedItemType={draggedItem?.type || null} onConversationUpdated={(id, data) => updateLocalItem(id, 'conversation', data)} onConversationDeleted={(id) => removeLocalItem(id, 'conversation')} onNoteUpdated={(id, data) => updateLocalItem(id, 'note', data)} onNoteDeleted={(id) => removeLocalItem(id, 'note')} />
               )))}
             </>
           )}
