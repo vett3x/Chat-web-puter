@@ -141,7 +141,7 @@ export function UpdateManagerDialog({ open, onOpenChange }: UpdateManagerDialogP
             </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="destructive" disabled={isLoading || !updateInfo?.updateAvailable}>
+                <Button variant="destructive" disabled={isLoading}> {/* Removed !updateInfo?.updateAvailable */}
                   <GitPullRequest className="mr-2 h-4 w-4" /> Forzar Actualización
                 </Button>
               </AlertDialogTrigger>
