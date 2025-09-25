@@ -51,8 +51,11 @@ export async function POST(req: NextRequest, context: any) {
 
     const { stderr, code } = await executeSshCommand(server, fullCommand);
 
-    if (code !== 0 && stderr && !stderr.toLowerCase().includes('no process found')) {
-      throw new Error(`Error al reiniciar los servicios: ${stderr}`);
+    // Filter out the harmless "known_hosts" warning from stderr
+    const filteredStderr = stderr.split('\n').filter(line => !line.toLowerCase().includes('permanently added')).join('\n').trim();
+
+    if (code !== 0 && filteredStderr && !filteredStderr.toLowerCase().includes('no process found')) {
+      throw new Error(`Error al reiniciar los servicios: ${filteredStderr}`);
     }
 
     const restartDescription = `Servicios reiniciados para el contenedor ${app.container_id.substring(0, 12)}.`;
