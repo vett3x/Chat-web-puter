@@ -6,8 +6,8 @@ import { toast } from 'sonner';
 import { useSession } from '@/components/session-context-provider';
 import { AI_PROVIDERS } from '@/lib/ai-models';
 import { ApiKey } from '@/hooks/use-user-api-keys';
-// REMOVED: import { GoogleGenerativeAI, Part } from '@google/generative-ai';
-// REMOVED: import { GoogleAuth } from 'google-auth-library';
+import { GoogleGenerativeAI, Part } from '@google/generative-ai';
+import { GoogleAuth } from 'google-auth-library';
 
 // Define unified part types
 interface TextPart {
@@ -138,7 +138,35 @@ function messageContentToApiFormat(content: Message['content']): string | PuterC
     return '';
 }
 
-// REMOVED: convertToGeminiParts is now in the API route
+const convertToGeminiParts = (content: Message['content']): Part[] => {
+  const parts: Part[] = [];
+  if (typeof content === 'string') {
+    parts.push({ text: content });
+  } else if (Array.isArray(content)) {
+    for (const part of content) {
+      if (part.type === 'text') {
+        parts.push({ text: part.text });
+      } else if (part.type === 'image_url') {
+        const url = part.image_url.url;
+        const match = url.match(/^data:(image\/\w+);base64,(.*)$/);
+        if (!match) {
+          console.warn("Skipping invalid image data URL format for Gemini:", url.substring(0, 50) + '...');
+          parts.push({ text: "[Unsupported Image]" });
+        } else {
+          const mimeType = match[1];
+          const data = match[2];
+          parts.push({ inlineData: { mimeType, data } });
+        }
+      } else if (part.type === 'code') {
+        const codePart = part as CodePart;
+        const lang = codePart.language || '';
+        const filename = codePart.filename ? `:${codePart.filename}` : '';
+        parts.push({ text: `\`\`\`${lang}${filename}\n${codePart.code || ''}\n\`\`\`` });
+      }
+    }
+  }
+  return parts;
+};
 
 export function useChat({
   userId,
@@ -221,7 +249,8 @@ export function useChat({
         localStorage.setItem('selected_ai_model', DEFAULT_AI_MODEL_FALLBACK);
       }
     }
-  }, [isLoadingApiKeys, userApiKeys, selectedModel]); // Added selectedModel to dependencies
+  }, [isLoadingApiKeys, userApiKeys, selectedModel]);
+
 
   const getConversationDetails = useCallback(async (convId: string) => {
     const { data, error } = await supabase.from('conversations').select('id, title, model').eq('id', convId).eq('user_id', userId).single();
@@ -333,14 +362,13 @@ export function useChat({
         response = await window.puter.ai.chat([systemMessage, ...messagesForApi], { model: actualModelForPuter });
 
       } else if (selectedModel.startsWith('user_key:')) {
-        // NEW: Call the unified API route for user_key models
         modelUsedForResponse = selectedModel;
         const apiResponse = await fetch('/api/ai/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            messages: [systemMessage, ...messagesForApi], // Pass all messages including system prompt
-            selectedKeyId: selectedModel.substring(9), // Extract key ID
+            messages: [systemMessage, ...messagesForApi],
+            selectedKeyId: selectedModel.substring(9),
           }),
         });
         response = await apiResponse.json();
@@ -494,6 +522,32 @@ export function useChat({
     }
   };
 
+  const clearChat = useCallback(async () => {
+    if (!conversationId || !userId) {
+      toast.error('No hay una conversación seleccionada o usuario autenticado.');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .eq('conversation_id', conversationId)
+        .eq('user_id', userId);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+      setMessages([]); // Clear local messages
+      toast.success('Chat limpiado correctamente.');
+    } catch (error: any) {
+      console.error('Error clearing chat:', error);
+      toast.error(`Error al limpiar el chat: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [conversationId, userId]);
+
   return {
     messages,
     isLoading,
@@ -503,5 +557,6 @@ export function useChat({
     sendMessage,
     regenerateLastResponse,
     reapplyFilesFromMessage,
+    clearChat, // NEW: Return clearChat
   };
 }

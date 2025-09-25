@@ -2,13 +2,24 @@
 
 import React, { useRef, useEffect } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Bot, User, Loader2, Clipboard, RefreshCw, Upload } from 'lucide-react';
+import { Bot, User, Loader2, Clipboard, RefreshCw, Upload, Trash2 } from 'lucide-react'; // Import Trash2
 import { MessageContent } from '@/components/message-content';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { getModelLabel } from '@/lib/ai-models'; // Import the helper function
+import { getModelLabel } from '@/lib/ai-models';
 import { useUserApiKeys } from '@/hooks/use-user-api-keys';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'; // NEW: Import Avatar components
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"; // Import AlertDialog components
 
 // Define unified part types
 interface TextPart {
@@ -48,10 +59,11 @@ interface ChatMessagesProps {
   onRegenerate: () => void;
   onReapplyFiles: (message: Message) => void;
   appPrompt?: string | null;
-  userAvatarUrl: string | null; // NEW: Prop for user avatar URL
+  userAvatarUrl: string | null;
+  onClearChat: () => void; // NEW: Add onClearChat prop
 }
 
-export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerate, onReapplyFiles, appPrompt, userAvatarUrl }: ChatMessagesProps) {
+export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerate, onReapplyFiles, appPrompt, userAvatarUrl, onClearChat }: ChatMessagesProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { userApiKeys } = useUserApiKeys();
 
@@ -110,7 +122,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
                 <div className={`group relative flex gap-3 max-w-[80%] ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                   <div className="flex-shrink-0">
                     {message.role === 'user' ? (
-                      <Avatar className="w-8 h-8 shadow-avatar-user"> {/* NEW: Use Avatar component */}
+                      <Avatar className="w-8 h-8 shadow-avatar-user">
                         {userAvatarUrl && userAvatarUrl !== '' ? (
                           <AvatarImage src={userAvatarUrl} alt="User Avatar" />
                         ) : (
@@ -163,6 +175,32 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
           })
         )}
       </div>
+      {/* NEW: Clear Chat Button */}
+      {messages.length > 0 && (
+        <div className="absolute top-4 right-4">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="icon" className="h-8 w-8" disabled={isLoading} title="Limpiar chat">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Estás seguro de limpiar este chat?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta acción eliminará permanentemente todos los mensajes de esta conversación.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={onClearChat} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  Limpiar Chat
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      )}
     </ScrollArea>
   );
 }

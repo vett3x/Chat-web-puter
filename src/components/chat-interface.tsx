@@ -5,8 +5,8 @@ import { Loader2 } from 'lucide-react';
 import { useChat } from '@/hooks/use-chat';
 import { ChatMessages } from '@/components/chat/chat-messages';
 import { ChatInput } from '@/components/chat/chat-input';
-import { ApiKey } from '@/hooks/use-user-api-keys'; // NEW: Import ApiKey type
-import { useSession } from './session-context-provider'; // NEW: Import useSession
+import { ApiKey } from '@/hooks/use-user-api-keys';
+import { useSession } from './session-context-provider';
 
 interface ChatInterfaceProps {
   userId: string | undefined;
@@ -21,8 +21,8 @@ interface ChatInterfaceProps {
   onWriteFiles: (files: { path: string; content: string }[]) => Promise<void>;
   isAppChat?: boolean;
   onSidebarDataRefresh: () => void;
-  userApiKeys: ApiKey[]; // NEW: Prop for user API keys
-  isLoadingApiKeys: boolean; // NEW: Prop for loading state of API keys
+  userApiKeys: ApiKey[];
+  isLoadingApiKeys: boolean;
 }
 
 export function ChatInterface({
@@ -38,10 +38,10 @@ export function ChatInterface({
   onWriteFiles,
   isAppChat = false,
   onSidebarDataRefresh,
-  userApiKeys, // NEW: Destructure
-  isLoadingApiKeys, // NEW: Destructure
+  userApiKeys,
+  isLoadingApiKeys,
 }: ChatInterfaceProps) {
-  const { userAvatarUrl } = useSession(); // NEW: Get userAvatarUrl from session
+  const { userAvatarUrl } = useSession();
 
   const {
     messages,
@@ -52,6 +52,7 @@ export function ChatInterface({
     sendMessage,
     regenerateLastResponse,
     reapplyFilesFromMessage,
+    clearChat, // NEW: Destructure clearChat
   } = useChat({
     userId,
     conversationId,
@@ -61,8 +62,8 @@ export function ChatInterface({
     appId,
     onWriteFiles,
     onSidebarDataRefresh,
-    userApiKeys, // NEW: Pass to useChat
-    isLoadingApiKeys, // NEW: Pass to useChat
+    userApiKeys,
+    isLoadingApiKeys,
   });
 
   if (isAppProvisioning) {
@@ -85,12 +86,12 @@ export function ChatInterface({
     );
   }
 
-  if (!isPuterReady || isLoadingApiKeys) { // NEW: Check isLoadingApiKeys
+  if (!isPuterReady || isLoadingApiKeys) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Cargando IA y claves...</p> {/* NEW: Updated message */}
+          <p className="text-muted-foreground">Cargando IA y claves...</p>
         </div>
       </div>
     );
@@ -116,7 +117,8 @@ export function ChatInterface({
           onRegenerate={regenerateLastResponse}
           onReapplyFiles={reapplyFilesFromMessage}
           appPrompt={appPrompt}
-          userAvatarUrl={userAvatarUrl} // NEW: Pass userAvatarUrl
+          userAvatarUrl={userAvatarUrl}
+          onClearChat={clearChat} // NEW: Pass clearChat
         />
         <ChatInput
           isLoading={isLoading}
