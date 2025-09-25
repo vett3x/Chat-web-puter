@@ -5,18 +5,10 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { X, Send, Loader2, Bot, User, Trash2, Check } from 'lucide-react';
+import { X, Send, Loader2, Bot, User, Trash2, KeyRound } from 'lucide-react'; // Import KeyRound
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel, // NEW: Import DropdownMenuLabel
-} from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,8 +22,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import ClaudeAILogo from '@/components/claude-ai-logo';
+import GoogleGeminiLogo from '@/components/google-gemini-logo'; // Import GoogleGeminiLogo
 import { AI_PROVIDERS } from '@/lib/ai-models';
 import { ApiKey } from '@/hooks/use-user-api-keys';
+import { ModelSelectorDropdown } from '@/components/chat/model-selector-dropdown'; // NEW: Import ModelSelectorDropdown
 
 interface PuterMessage {
   role: 'user' | 'assistant' | 'system';
@@ -43,11 +37,6 @@ export interface ChatMessage {
   content: string;
 }
 
-const AI_MODELS = [
-  { value: 'claude-sonnet-4', label: 'Claude Sonnet 4' },
-  { value: 'claude-opus-4', label: 'Claude Opus 4' },
-];
-
 const DEFAULT_AI_MODEL_FALLBACK = 'puter:claude-sonnet-4'; // Fallback if Gemini 2.5 Flash not found or configured
 
 interface NoteAiChatProps {
@@ -57,15 +46,15 @@ interface NoteAiChatProps {
   noteContent: string;
   initialChatHistory: ChatMessage[] | null;
   onSaveHistory: (history: ChatMessage[]) => void;
-  userApiKeys: ApiKey[]; // NEW: Prop for user API keys
-  isLoadingApiKeys: boolean; // NEW: Prop for loading state of API keys
+  userApiKeys: ApiKey[];
+  isLoadingApiKeys: boolean;
 }
 
 export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialChatHistory, onSaveHistory, userApiKeys, isLoadingApiKeys }: NoteAiChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_AI_MODEL_FALLBACK); // NEW: Default to fallback
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_AI_MODEL_FALLBACK);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const defaultWelcomeMessage: ChatMessage = { role: 'assistant', content: 'Hola, soy tu asistente. Pregúntame cualquier cosa sobre esta nota.' };
@@ -86,7 +75,7 @@ export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialCha
     }
   }, [messages]);
 
-  // NEW: Effect to determine default model based on userApiKeys
+  // Effect to determine default model based on userApiKeys
   useEffect(() => {
     if (!isLoadingApiKeys && userApiKeys.length > 0) {
       const storedModel = localStorage.getItem('selected_ai_model_note_chat'); // Separate storage key
@@ -207,6 +196,27 @@ ${noteContent}
     toast.success('Historial del chat limpiado.');
   };
 
+  // Determine the icon for the ModelSelectorDropdown trigger
+  const SelectedModelIcon = React.useMemo(() => {
+    if (selectedModel.startsWith('puter:')) {
+      const modelValue = selectedModel.substring(6);
+      for (const provider of AI_PROVIDERS) {
+        if (provider.source === 'puter' && provider.models.some(model => model.value === modelValue)) {
+          return provider.logo;
+        }
+      }
+    } else if (selectedModel.startsWith('user_key:')) {
+      const keyId = selectedModel.substring(9);
+      const key = userApiKeys.find(k => k.id === keyId);
+      if (key) {
+        const provider = AI_PROVIDERS.find(p => p.value === key.provider);
+        if (provider) return provider.logo;
+      }
+      return KeyRound; // Default for user_key if provider not found, or for custom_endpoint
+    }
+    return Bot; // Fallback
+  }, [selectedModel, userApiKeys]);
+
   if (!isOpen) return null;
 
   return (
@@ -214,49 +224,14 @@ ${noteContent}
       <CardHeader className="flex flex-row items-center justify-between p-3 border-b">
         <CardTitle className="text-base font-semibold">Asistente de Nota</CardTitle>
         <div className="flex items-center gap-1">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-6 w-6" title="Cambiar modelo de IA">
-                <ClaudeAILogo className="h-4 w-4" /> {/* Placeholder, ideally dynamic based on selectedModel */}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {AI_PROVIDERS.filter(p => p.source === 'puter' || p.source === 'user_key').map(providerGroup => (
-                <React.Fragment key={providerGroup.value}>
-                  <DropdownMenuLabel className="flex items-center gap-2 font-bold text-foreground px-2 py-1.5">
-                    <span>{providerGroup.company}</span>
-                    <providerGroup.logo className="h-4 w-4" />
-                  </DropdownMenuLabel>
-                  {providerGroup.source === 'puter' ? (
-                    providerGroup.models.map(model => (
-                      <DropdownMenuItem
-                        key={model.value}
-                        onClick={() => setSelectedModel(`puter:${model.value}`)}
-                        className={cn("flex items-center justify-between cursor-pointer pl-8", selectedModel === `puter:${model.value}` && "bg-accent text-accent-foreground")}
-                      >
-                        <span>{model.label}</span>
-                        {selectedModel === `puter:${model.value}` && <Check className="h-4 w-4 text-green-500" />}
-                      </DropdownMenuItem>
-                    ))
-                  ) : (
-                    userApiKeys.filter(key => key.provider === providerGroup.value).map(key => {
-                      const itemValue = `user_key:${key.id}`;
-                      return (
-                        <DropdownMenuItem
-                          key={key.id}
-                          onClick={() => setSelectedModel(itemValue)}
-                          className={cn("flex items-center justify-between cursor-pointer pl-8", selectedModel === itemValue && "bg-accent text-accent-foreground")}
-                        >
-                          <span>{key.nickname || key.model_name || `${providerGroup.company} Key`}</span>
-                          {selectedModel === itemValue && <Check className="h-4 w-4 text-green-500" />}
-                        </DropdownMenuItem>
-                      );
-                    })
-                  )}
-                </React.Fragment>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <ModelSelectorDropdown
+            selectedModel={selectedModel}
+            onModelChange={setSelectedModel}
+            isLoading={isLoading}
+            userApiKeys={userApiKeys}
+            isAppChat={false} // This is a note chat, not an app chat
+            SelectedModelIcon={SelectedModelIcon}
+          />
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="ghost" size="icon" className="h-6 w-6" title="Limpiar chat">
