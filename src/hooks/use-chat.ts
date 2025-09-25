@@ -155,7 +155,6 @@ export function useChat({
     }
     return DEFAULT_AI_MODEL_FORMAT;
   });
-  const [userApiKeys, setUserApiKeys] = useState<any[]>([]); // State to hold user API keys
 
   useEffect(() => {
     const checkPuter = () => {
@@ -173,68 +172,6 @@ export function useChat({
       localStorage.setItem('selected_ai_model', selectedModel);
     }
   }, [selectedModel]);
-
-  // Fetch user API keys
-  const fetchUserApiKeys = useCallback(async () => {
-    if (!userId) return;
-    try {
-      const response = await fetch('/api/ai-keys');
-      const data = await response.json();
-      if (response.ok) {
-        setUserApiKeys(data);
-      } else {
-        console.error("Error fetching user API keys:", data.message);
-      }
-    } catch (error) {
-      console.error("Failed to fetch user API keys:", error);
-    }
-  }, [userId]);
-
-  useEffect(() => {
-    fetchUserApiKeys();
-  }, [fetchUserApiKeys]);
-
-  // Validate selectedModel against available keys
-  useEffect(() => {
-    if (!userId || isLoading || !isPuterReady) return;
-
-    let currentSelectedModel = selectedModel;
-    let isValid = false;
-
-    if (currentSelectedModel.startsWith('puter:')) {
-      const modelValue = currentSelectedModel.substring(6);
-      isValid = AI_PROVIDERS.some(p => p.source === 'puter' && p.models.some(m => m.value === modelValue));
-    } else if (currentSelectedModel.startsWith('user_key:')) {
-      const keyId = currentSelectedModel.substring(9);
-      isValid = userApiKeys.some(key => key.id === keyId && key.is_active);
-    }
-
-    if (!isValid) {
-      // Fallback to default or first available Puter model
-      const defaultPuterModel = AI_PROVIDERS.find(p => p.source === 'puter')?.models[0]?.value;
-      if (defaultPuterModel) {
-        const newDefault = `puter:${defaultPuterModel}`;
-        setSelectedModel(newDefault);
-        localStorage.setItem('selected_ai_model', newDefault);
-        toast.info("El modelo de IA seleccionado no es válido. Se ha cambiado al modelo por defecto.");
-      } else {
-        // If no Puter models, try to find any valid user key
-        const firstValidUserKey = userApiKeys.find(key => key.is_active);
-        if (firstValidUserKey) {
-          const newDefault = `user_key:${firstValidUserKey.id}`;
-          setSelectedModel(newDefault);
-          localStorage.setItem('selected_ai_model', newDefault);
-          toast.info("El modelo de IA seleccionado no es válido. Se ha cambiado a la primera clave de usuario disponible.");
-        } else {
-          // If absolutely no valid models, set to a placeholder and inform user
-          setSelectedModel('no-valid-model');
-          localStorage.removeItem('selected_ai_model');
-          toast.error("No hay modelos de IA válidos disponibles. Por favor, configura una API Key o espera a que Puter.js esté listo.");
-        }
-      }
-    }
-  }, [userId, selectedModel, userApiKeys, isLoading, isPuterReady]);
-
 
   const getConversationDetails = useCallback(async (convId: string) => {
     const { data, error } = await supabase.from('conversations').select('id, title, model').eq('id', convId).eq('user_id', userId).single();
@@ -434,10 +371,6 @@ export function useChat({
 
   const sendMessage = async (userContent: PuterContentPart[], messageText: string) => {
     if (isLoading || !isPuterReady || !userId) return;
-    if (selectedModel === 'no-valid-model') {
-      toast.error("No hay modelos de IA válidos disponibles. Por favor, configura una API Key o espera a que Puter.js esté listo.");
-      return;
-    }
 
     let currentConvId = conversationId;
     if (!currentConvId) {
