@@ -15,7 +15,7 @@ import {
 import Image from 'next/image';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { AI_PROVIDERS } from '@/lib/ai-models';
+import { AI_PROVIDERS, getModelLabel } from '@/lib/ai-models'; // Import getModelLabel
 import GoogleGeminiLogo from '@/components/google-gemini-logo'; // Import explicitly for dynamic icon
 import ClaudeAILogo from '@/components/claude-ai-logo'; // Import explicitly for dynamic icon
 
@@ -186,6 +186,8 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
     setSelectedFiles(prev => prev.filter((_, index) => index !== indexToRemove));
   };
 
+  const currentModelLabel = getModelLabel(selectedModel); // Get the label for the selected model
+
   return (
     <div className="absolute bottom-0 left-0 right-0 flex justify-center px-4 pb-4 pt-2">
       <div className="w-full max-w-3xl bg-card rounded-xl border border-input p-2 flex flex-col gap-2 focus-within:ring-2 focus-within:ring-green-500 focus-within:ring-offset-2 focus-within:ring-offset-background transition-all duration-200">
@@ -216,8 +218,9 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
           <Textarea value={inputMessage} onChange={(e) => setInputMessage(e.target.value)} onKeyPress={handleKeyPress} onPaste={handlePaste} placeholder="Pregunta a la IA..." disabled={isLoading} className="flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none max-h-[200px] overflow-y-auto bg-transparent px-3 py-1.5 min-h-8" />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="default" className="rounded-full bg-info text-info-foreground shadow-avatar-user hover:shadow-avatar-user-hover transition-all duration-200 h-8 w-8 p-0" aria-label="Seleccionar modelo de IA">
+              <Button variant="default" className="flex items-center gap-2 bg-info text-info-foreground shadow-avatar-user hover:shadow-avatar-user-hover transition-all duration-200 h-8 px-3" aria-label="Seleccionar modelo de IA">
                 <SelectedModelIcon className="h-4 w-4" />
+                <span className="text-sm font-medium">{currentModelLabel}</span> {/* Display the selected model's label */}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="top" align="end" className="w-64 bg-popover text-popover-foreground border-border rounded-lg">
