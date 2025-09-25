@@ -235,7 +235,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] p-6 h-[80vh] flex flex-col">
+      <DialogContent className="sm:max-w-[700px] p-6 max-h-[90vh] overflow-y-auto flex flex-col"> {/* Added max-h and overflow-y-auto */}
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <KeyRound className="h-6 w-6" /> Gestión de API Keys de IA
@@ -244,7 +244,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
             Añade y gestiona tus API keys para diferentes proveedores de IA. Estas claves se usarán para las conversaciones.
           </DialogDescription>
         </DialogHeader>
-        <div className="py-4 space-y-6 flex-1 overflow-hidden flex flex-col">
+        <div className="py-4 space-y-6 flex-1 flex flex-col"> {/* Removed overflow-hidden */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">{isEditing ? 'Actualizar API Key' : 'Añadir Nueva API Key'}</CardTitle>
@@ -362,7 +362,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
             </CardContent>
           </Card>
           <Separator />
-          <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="flex-1 flex flex-col"> {/* Removed overflow-hidden */}
             <div className="flex justify-between items-center mb-2">
               <h3 className="text-lg font-semibold">Claves Guardadas</h3>
               <Button variant="ghost" size="icon" onClick={fetchKeys} disabled={isLoading}><RefreshCw className="h-4 w-4" /></Button>
