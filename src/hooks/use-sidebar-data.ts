@@ -39,6 +39,8 @@ interface Note {
   updated_at: string;
 }
 
+const DEFAULT_AI_MODEL_FALLBACK = 'puter:claude-sonnet-4';
+
 export function useSidebarData() {
   const { session, isLoading: isSessionLoading } = useSession();
   const userId = session?.user?.id;
@@ -69,7 +71,7 @@ export function useSidebarData() {
       ]);
 
       const { data: appData, error: appError } = appsRes;
-      const { data: convData, error: convError } = convRes; // Corrected from folderRes to convRes
+      const { data: convData, error: convError } = convRes;
       const { data: folderData, error: folderError } = folderRes;
       const { data: noteData, error: noteError } = notesRes; // Destructure notes response
 
@@ -123,7 +125,19 @@ export function useSidebarData() {
 
   const createConversation = async (onSuccess: (newConversation: Conversation) => void) => {
     if (!userId) return null;
-    const { data, error } = await supabase.from('conversations').insert({ user_id: userId, title: 'Nueva conversación' }).select().single();
+    
+    const selectedModel = (typeof window !== 'undefined' ? localStorage.getItem('selected_ai_model') : null) || DEFAULT_AI_MODEL_FALLBACK;
+
+    const { data, error } = await supabase
+      .from('conversations')
+      .insert({ 
+        user_id: userId, 
+        title: 'Nueva conversación',
+        model: selectedModel 
+      })
+      .select()
+      .single();
+
     if (error) {
       toast.error('Error al crear una nueva conversación.');
       return null;
