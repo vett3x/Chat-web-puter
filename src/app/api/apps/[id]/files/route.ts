@@ -149,8 +149,7 @@ export async function POST(req: NextRequest, context: any) {
     // 1. Create local temporary directory and write files
     await fs.mkdir(localTempDir, { recursive: true });
     for (const file of files) {
-      // FIX: The client sends `file.path`, but the server was expecting `file.filePath`.
-      const localFilePath = path.join(localTempDir, file.path); 
+      const localFilePath = path.join(localTempDir, file.path);
       await fs.mkdir(path.dirname(localFilePath), { recursive: true });
       await fs.writeFile(localFilePath, file.content);
     }
@@ -162,14 +161,16 @@ export async function POST(req: NextRequest, context: any) {
     await transferDirectoryScp(server, localTempDir, remoteTempDir);
 
     // 4. Copy files from remote temp dir to Docker container
-    const { stderr: cpStderr, code: cpCode } = await executeSshCommand(server, `docker cp '${remoteTempDir}/.' '${app.container_id}:/app/'`);
+    const localDirName = path.basename(localTempDir);
+    const remoteSourcePath = `${remoteTempDir}/${localDirName}/.`; // Correct path to copy CONTENTS
+    const { stderr: cpStderr, code: cpCode } = await executeSshCommand(server, `docker cp '${remoteSourcePath}' '${app.container_id}:/app/'`);
     if (cpCode !== 0) {
       throw new Error(`Error al copiar archivos al contenedor: ${cpStderr}`);
     }
 
     // 5. Backup and log
-    const backups = files.map(file => ({ app_id: appId, user_id: userId, file_path: file.path, file_content: file.content })); // FIX: use file.path
-    const logEntries = files.map(file => ({ user_id: userId, server_id: server.id, event_type: 'file_written', description: `Archivo '${file.path}' escrito en el contenedor ${app.container_id.substring(0, 12)}.` })); // FIX: use file.path
+    const backups = files.map(file => ({ app_id: appId, user_id: userId, file_path: file.path, file_content: file.content }));
+    const logEntries = files.map(file => ({ user_id: userId, server_id: server.id, event_type: 'file_written', description: `Archivo '${file.path}' escrito en el contenedor ${app.container_id.substring(0, 12)}.` }));
     
     await Promise.all([
       supabaseAdmin.from('app_file_backups').upsert(backups, { onConflict: 'app_id, file_path' }),
@@ -189,7 +190,6 @@ export async function POST(req: NextRequest, context: any) {
       console.warn(`[API /apps/${appId}/files] Advertencia: Fallo al limpiar el directorio temporal local '${localTempDir}':`, cleanupError);
     }
     try {
-      // FIX: Use the server details captured earlier for cleanup.
       if (serverDetailsForCleanup) {
         await executeSshCommand(serverDetailsForCleanup, `rm -rf ${remoteTempDir}`);
       }
