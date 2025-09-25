@@ -197,46 +197,41 @@ export function useChat({
   }, [selectedModel]);
 
   useEffect(() => {
-    if (!isLoadingApiKeys && userApiKeys.length > 0) {
-      const storedModel = localStorage.getItem('selected_ai_model');
-      let newDefaultModel = DEFAULT_AI_MODEL_FALLBACK;
+    if (isLoadingApiKeys) return;
 
-      if (storedModel && storedModel.startsWith('user_key:')) {
-        const storedKeyId = storedModel.substring(9);
-        const isValidStoredKey = userApiKeys.some(key => key.id === storedKeyId);
-        if (isValidStoredKey) {
-          newDefaultModel = storedModel;
-        }
-      } else if (storedModel && storedModel.startsWith('puter:')) {
-        newDefaultModel = storedModel;
-      }
+    const storedModel = localStorage.getItem('selected_ai_model');
+    let currentModelIsValid = false;
 
-      const isCurrentDefaultGeminiFlash = newDefaultModel.includes('gemini-2.5-flash');
-      
-      if (!isCurrentDefaultGeminiFlash || !userApiKeys.some(key => `user_key:${key.id}` === newDefaultModel)) {
-        const geminiFlashKey = userApiKeys.find(key => 
-          key.provider === 'google_gemini' && 
-          (key.model_name === 'gemini-2.5-flash' || key.model_name === 'gemini-2.5-pro')
-        );
-
-        if (geminiFlashKey) {
-          newDefaultModel = `user_key:${geminiFlashKey.id}`;
+    if (storedModel) {
+      if (storedModel.startsWith('user_key:')) {
+        const keyId = storedModel.substring(9);
+        if (userApiKeys.some(key => key.id === keyId)) {
+          currentModelIsValid = true;
         }
-      }
-      
-      if (newDefaultModel !== selectedModel) {
-        setSelectedModel(newDefaultModel);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('selected_ai_model', newDefaultModel);
-        }
-      }
-    } else if (!isLoadingApiKeys && userApiKeys.length === 0 && selectedModel !== DEFAULT_AI_MODEL_FALLBACK) {
-      setSelectedModel(DEFAULT_AI_MODEL_FALLBACK);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('selected_ai_model', DEFAULT_AI_MODEL_FALLBACK);
+      } else if (storedModel.startsWith('puter:')) {
+        currentModelIsValid = true;
       }
     }
-  }, [isLoadingApiKeys, userApiKeys, selectedModel]);
+
+    if (!currentModelIsValid) {
+      let newDefaultModel = DEFAULT_AI_MODEL_FALLBACK;
+      const geminiFlashKey = userApiKeys.find(key => 
+        key.provider === 'google_gemini' && 
+        (key.model_name === 'gemini-2.5-flash' || key.model_name === 'gemini-2.5-pro')
+      );
+
+      if (geminiFlashKey) {
+        newDefaultModel = `user_key:${geminiFlashKey.id}`;
+      }
+      
+      setSelectedModel(newDefaultModel);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('selected_ai_model', newDefaultModel);
+      }
+    } else {
+      setSelectedModel(storedModel || DEFAULT_AI_MODEL_FALLBACK);
+    }
+  }, [isLoadingApiKeys, userApiKeys]);
 
 
   const getConversationDetails = useCallback(async (convId: string) => {
@@ -272,14 +267,14 @@ export function useChat({
       if (conversationId && userId) {
         setIsLoading(true);
         const details = await getConversationDetails(conversationId);
-        if (details?.model) setSelectedModel(details.model);
-        else setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FALLBACK);
+        if (details?.model) {
+          setSelectedModel(details.model);
+        }
         const fetchedMsgs = await getMessagesFromDB(conversationId);
         if (!isSendingFirstMessage || fetchedMsgs.length > 0) setMessages(fetchedMsgs);
         setIsLoading(false);
       } else {
         setMessages([]);
-        setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FALLBACK);
       }
     };
     loadConversationData();

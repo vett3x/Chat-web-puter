@@ -79,47 +79,39 @@ export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialCha
 
   // Effect to determine default model based on userApiKeys
   useEffect(() => {
-    if (!isLoadingApiKeys && userApiKeys.length > 0) {
-      const storedModel = localStorage.getItem('selected_ai_model_note_chat'); // Separate storage key
+    if (isLoadingApiKeys) return;
+
+    const storedModel = localStorage.getItem('selected_ai_model_note_chat');
+    let currentModelIsValid = false;
+
+    if (storedModel) {
+      if (storedModel.startsWith('user_key:')) {
+        const keyId = storedModel.substring(9);
+        if (userApiKeys.some(key => key.id === keyId)) {
+          currentModelIsValid = true;
+        }
+      } else if (storedModel.startsWith('puter:')) {
+        currentModelIsValid = true;
+      }
+    }
+
+    if (!currentModelIsValid) {
       let newDefaultModel = DEFAULT_AI_MODEL_FALLBACK;
+      const geminiFlashKey = userApiKeys.find(key => 
+        key.provider === 'google_gemini' && 
+        (key.model_name === 'gemini-2.5-flash' || key.model_name === 'gemini-2.5-pro')
+      );
 
-      // Check if the stored model is a user_key and if it's still valid
-      if (storedModel && storedModel.startsWith('user_key:')) {
-        const storedKeyId = storedModel.substring(9);
-        const isValidStoredKey = userApiKeys.some(key => key.id === storedKeyId);
-        if (isValidStoredKey) {
-          newDefaultModel = storedModel; // Keep the valid stored user_key model
-        }
-      } else if (storedModel && storedModel.startsWith('puter:')) {
-        newDefaultModel = storedModel; // Keep the valid puter model
-      }
-
-      // If the current default is not Gemini 2.5 Flash, or if it's invalid, try to find Gemini 2.5 Flash
-      const isCurrentDefaultGeminiFlash = newDefaultModel.includes('gemini-2.5-flash');
-      
-      if (!isCurrentDefaultGeminiFlash || !userApiKeys.some(key => `user_key:${key.id}` === newDefaultModel)) {
-        const geminiFlashKey = userApiKeys.find(key => 
-          key.provider === 'google_gemini' && 
-          (key.model_name === 'gemini-2.5-flash' || key.model_name === 'gemini-2.5-pro') // Prioritize 2.5 Flash, then 2.5 Pro
-        );
-
-        if (geminiFlashKey) {
-          newDefaultModel = `user_key:${geminiFlashKey.id}`;
-        }
+      if (geminiFlashKey) {
+        newDefaultModel = `user_key:${geminiFlashKey.id}`;
       }
       
-      if (newDefaultModel !== selectedModel) {
-        setSelectedModel(newDefaultModel);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('selected_ai_model_note_chat', newDefaultModel);
-        }
-      }
-    } else if (!isLoadingApiKeys && userApiKeys.length === 0 && selectedModel !== DEFAULT_AI_MODEL_FALLBACK) {
-      // If no API keys are configured, fall back to Puter.js default
-      setSelectedModel(DEFAULT_AI_MODEL_FALLBACK);
+      setSelectedModel(newDefaultModel);
       if (typeof window !== 'undefined') {
-        localStorage.setItem('selected_ai_model_note_chat', DEFAULT_AI_MODEL_FALLBACK);
+        localStorage.setItem('selected_ai_model_note_chat', newDefaultModel);
       }
+    } else {
+      setSelectedModel(storedModel || DEFAULT_AI_MODEL_FALLBACK);
     }
   }, [isLoadingApiKeys, userApiKeys]);
 
