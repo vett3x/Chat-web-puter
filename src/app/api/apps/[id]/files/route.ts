@@ -129,6 +129,7 @@ export async function POST(req: NextRequest, context: any) {
   const appId = context.params.id;
   const localTempDir = path.join(os.tmpdir(), `dyad-upload-${crypto.randomBytes(16).toString('hex')}`);
   const remoteTempDir = `/tmp/dyad-upload-${crypto.randomBytes(16).toString('hex')}`;
+  let serverDetailsForCleanup: any = null; // Variable to hold server details for the finally block
 
   try {
     const { session, userPermissions } = await getSessionAndRole();
@@ -138,6 +139,7 @@ export async function POST(req: NextRequest, context: any) {
 
     const userId = session.user.id;
     const { app, server } = await getAppAndServerWithStateCheck(appId, userId);
+    serverDetailsForCleanup = server; // Store server details for cleanup
     const { files } = await req.json();
 
     if (!Array.isArray(files) || files.length === 0) {
@@ -147,7 +149,8 @@ export async function POST(req: NextRequest, context: any) {
     // 1. Create local temporary directory and write files
     await fs.mkdir(localTempDir, { recursive: true });
     for (const file of files) {
-      const localFilePath = path.join(localTempDir, file.filePath);
+      // FIX: The client sends `file.path`, but the server was expecting `file.filePath`.
+      const localFilePath = path.join(localTempDir, file.path); 
       await fs.mkdir(path.dirname(localFilePath), { recursive: true });
       await fs.writeFile(localFilePath, file.content);
     }
@@ -165,8 +168,8 @@ export async function POST(req: NextRequest, context: any) {
     }
 
     // 5. Backup and log
-    const backups = files.map(file => ({ app_id: appId, user_id: userId, file_path: file.filePath, file_content: file.content }));
-    const logEntries = files.map(file => ({ user_id: userId, server_id: server.id, event_type: 'file_written', description: `Archivo '${file.filePath}' escrito en el contenedor ${app.container_id.substring(0, 12)}.` }));
+    const backups = files.map(file => ({ app_id: appId, user_id: userId, file_path: file.path, file_content: file.content })); // FIX: use file.path
+    const logEntries = files.map(file => ({ user_id: userId, server_id: server.id, event_type: 'file_written', description: `Archivo '${file.path}' escrito en el contenedor ${app.container_id.substring(0, 12)}.` })); // FIX: use file.path
     
     await Promise.all([
       supabaseAdmin.from('app_file_backups').upsert(backups, { onConflict: 'app_id, file_path' }),
@@ -186,9 +189,9 @@ export async function POST(req: NextRequest, context: any) {
       console.warn(`[API /apps/${appId}/files] Advertencia: Fallo al limpiar el directorio temporal local '${localTempDir}':`, cleanupError);
     }
     try {
-      const { data: server } = await supabaseAdmin.from('user_servers').select('ip_address, ssh_port, ssh_username, ssh_password').eq('id', appId).single();
-      if (server) {
-        await executeSshCommand(server, `rm -rf ${remoteTempDir}`);
+      // FIX: Use the server details captured earlier for cleanup.
+      if (serverDetailsForCleanup) {
+        await executeSshCommand(serverDetailsForCleanup, `rm -rf ${remoteTempDir}`);
       }
     } catch (cleanupError) {
       console.warn(`[API /apps/${appId}/files] Advertencia: Fallo al limpiar el directorio temporal remoto '${remoteTempDir}':`, cleanupError);
