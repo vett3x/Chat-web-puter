@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -110,6 +110,14 @@ export function DraggableFolderItem({
   const [isEditing, setIsEditing] = useState(false);
   const [editingName, setEditingName] = useState(folder.name);
   const [isDeleting, setIsDeleting] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
 
   const filteredConversations = conversations.filter(conv => conv.folder_id === folder.id).sort((a, b) => a.order_index - b.order_index);
   const filteredNotes = notes.filter(note => note.folder_id === folder.id); // Filter notes
@@ -176,7 +184,15 @@ export function DraggableFolderItem({
             </Button>
             <Folder className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
             {isEditing ? (
-              <Input value={editingName} onChange={(e) => setEditingName(e.target.value)} onClick={(e) => e.stopPropagation()} onKeyPress={(e) => e.key === 'Enter' && handleSaveEdit()} onBlur={handleSaveEdit} className="flex-1 bg-sidebar-background text-sidebar-foreground h-7 text-sm" />
+              <Input
+                ref={inputRef}
+                value={editingName}
+                onChange={(e) => setEditingName(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                onKeyPress={(e) => e.key === 'Enter' && handleSaveEdit()}
+                onBlur={handleSaveEdit}
+                className="flex-1 bg-sidebar-background text-sidebar-foreground h-7 text-sm"
+              />
             ) : (
               <span className="text-sm font-medium truncate flex-1" onClick={(e) => { e.stopPropagation(); onSelectItem(folder.id, 'folder'); }}>{folder.name}</span>
             )}

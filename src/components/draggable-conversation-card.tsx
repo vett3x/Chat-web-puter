@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -79,6 +79,14 @@ export function DraggableConversationCard({
   const [isEditing, setIsEditing] = useState(false);
   const [editingTitle, setEditingTitle] = useState(conversation.title);
   const [isDeleting, setIsDeleting] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
 
   const handleSaveEdit = async () => {
     if (!editingTitle.trim()) {
@@ -187,6 +195,7 @@ export function DraggableConversationCard({
       <CardContent className="py-1 px-1.5 flex items-center justify-between gap-1"> {/* Reduced vertical padding, adjusted horizontal */}
         {isEditing ? (
           <Input
+            ref={inputRef}
             value={editingTitle}
             onChange={(e) => setEditingTitle(e.target.value)}
             onClick={(e) => e.stopPropagation()}

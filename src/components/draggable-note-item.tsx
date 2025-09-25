@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -49,6 +49,14 @@ export function DraggableNoteItem({ note, selected, onSelect, onDragStart, level
   const [isEditing, setIsEditing] = useState(false);
   const [editingTitle, setEditingTitle] = useState(note.title);
   const [isDeleting, setIsDeleting] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
 
   const handleSaveEdit = async () => {
     if (!editingTitle.trim()) {
@@ -109,6 +117,7 @@ export function DraggableNoteItem({ note, selected, onSelect, onDragStart, level
       <CardContent className="py-1 px-1.5 flex items-center justify-between gap-1">
         {isEditing ? (
           <Input
+            ref={inputRef}
             value={editingTitle}
             onChange={(e) => setEditingTitle(e.target.value)}
             onClick={(e) => e.stopPropagation()}
