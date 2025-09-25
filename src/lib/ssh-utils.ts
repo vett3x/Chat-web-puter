@@ -48,6 +48,27 @@ export async function executeSshCommand(
 }
 
 /**
+ * Transfers a local directory to a remote server using scp.
+ * @param serverDetails Details for connecting to the SSH server.
+ * @param localPath The local directory path to transfer.
+ * @param remotePath The destination path on the remote server.
+ */
+export async function transferDirectoryScp(
+  serverDetails: ServerDetails,
+  localPath: string,
+  remotePath: string
+): Promise<void> {
+  const scpCommand = `sshpass -p '${serverDetails.ssh_password}' scp ${SSH_OPTIONS} -r -P ${serverDetails.ssh_port || 22} '${localPath}' ${serverDetails.ssh_username}@${serverDetails.ip_address}:'${remotePath}'`;
+
+  try {
+    await execAsync(scpCommand);
+  } catch (error: any) {
+    throw new Error(`Failed to transfer directory via scp. Stderr: ${error.stderr || error.message}`);
+  }
+}
+
+
+/**
  * Writes content to a file on the remote server by piping base64 encoded content
  * directly over SSH, avoiding local temp files and scp.
  * @param serverDetails Details for connecting to the SSH server.

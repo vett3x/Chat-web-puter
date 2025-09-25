@@ -4,9 +4,12 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
-import { executeSshCommand, writeRemoteFile } from '@/lib/ssh-utils';
+import { executeSshCommand, transferDirectoryScp } from '@/lib/ssh-utils';
 import { getAppAndServerWithStateCheck } from '@/lib/app-state-manager';
 import path from 'path';
+import fs from 'fs/promises';
+import os from 'os';
+import crypto from 'crypto';
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants';
 
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
@@ -124,7 +127,9 @@ export async function GET(req: NextRequest, context: any) {
 
 export async function POST(req: NextRequest, context: any) {
   const appId = context.params.id;
-  
+  const localTempDir = path.join(os.tmpdir(), `dyad-upload-${crypto.randomBytes(16).toString('hex')}`);
+  const remoteTempDir = `/tmp/dyad-upload-${crypto.randomBytes(16).toString('hex')}`;
+
   try {
     const { session, userPermissions } = await getSessionAndRole();
     if (!session || !userPermissions[PERMISSION_KEYS.CAN_MANAGE_DOCKER_CONTAINERS]) {
@@ -139,63 +144,54 @@ export async function POST(req: NextRequest, context: any) {
       return NextResponse.json({ message: 'Se requiere una lista de archivos.' }, { status: 400 });
     }
 
-    const backups = [];
-    const logEntries = [];
-
+    // 1. Create local temporary directory and write files
+    await fs.mkdir(localTempDir, { recursive: true });
     for (const file of files) {
-      const { filePath, content } = file;
-      if (!filePath || content === undefined) continue;
-
-      const containerPath = path.posix.join('/app', filePath);
-      const containerDir = path.posix.dirname(containerPath);
-      const tempHostPath = `/tmp/dyad-upload-${Date.now()}-${Math.random().toString(36).substring(2, 15)}.tmp`;
-
-      try {
-        // 1. Escribir el contenido en un archivo temporal en el servidor remoto usando el nuevo writeRemoteFile
-        await writeRemoteFile(server, tempHostPath, content);
-
-        // 2. Crear el directorio de destino dentro del contenedor
-        const { stderr: mkdirStderr, code: mkdirCode } = await executeSshCommand(server, `docker exec ${app.container_id} mkdir -p '${containerDir}'`);
-        if (mkdirCode !== 0) {
-          throw new Error(`Error al crear el directorio '${containerDir}' en el contenedor: ${mkdirStderr}`);
-        }
-
-        // 3. Copiar el archivo temporal del host remoto al contenedor
-        const { stderr: cpStderr, code: cpCode } = await executeSshCommand(server, `docker cp '${tempHostPath}' '${app.container_id}:${containerPath}'`);
-        if (cpCode !== 0) {
-          throw new Error(`Error al copiar el archivo '${filePath}' al contenedor: ${cpStderr}`);
-        }
-
-        backups.push({ app_id: appId, user_id: userId, file_path: filePath, file_content: content });
-        logEntries.push({ user_id: userId, server_id: server.id, event_type: 'file_written', description: `Archivo '${filePath}' escrito en el contenedor ${app.container_id.substring(0, 12)}.` });
-
-      } catch (stepError: any) {
-        const errorMessage = stepError.message || 'Error desconocido en el paso de archivo.';
-        await supabaseAdmin.from('server_events_log').insert({
-          user_id: userId,
-          server_id: server.id,
-          event_type: 'file_write_failed',
-          description: `Fallo al escribir archivo '${filePath}' en contenedor ${app.container_id.substring(0, 12)}. Error: ${errorMessage}`,
-        });
-        throw new Error(`Fallo al procesar '${filePath}': ${errorMessage}`);
-      } finally {
-        // 4. Limpiar el archivo temporal del host remoto
-        try {
-          await executeSshCommand(server, `rm -f '${tempHostPath}'`);
-        } catch (cleanupError: any) {
-          console.warn(`[API /apps/${appId}/files] Advertencia: Fallo al limpiar el archivo temporal '${tempHostPath}' en el host: ${cleanupError.message}`);
-        }
-      }
+      const localFilePath = path.join(localTempDir, file.filePath);
+      await fs.mkdir(path.dirname(localFilePath), { recursive: true });
+      await fs.writeFile(localFilePath, file.content);
     }
 
+    // 2. Create remote temporary directory
+    await executeSshCommand(server, `mkdir -p ${remoteTempDir}`);
+
+    // 3. Transfer files using scp
+    await transferDirectoryScp(server, localTempDir, remoteTempDir);
+
+    // 4. Copy files from remote temp dir to Docker container
+    const { stderr: cpStderr, code: cpCode } = await executeSshCommand(server, `docker cp '${remoteTempDir}/.' '${app.container_id}:/app/'`);
+    if (cpCode !== 0) {
+      throw new Error(`Error al copiar archivos al contenedor: ${cpStderr}`);
+    }
+
+    // 5. Backup and log
+    const backups = files.map(file => ({ app_id: appId, user_id: userId, file_path: file.filePath, file_content: file.content }));
+    const logEntries = files.map(file => ({ user_id: userId, server_id: server.id, event_type: 'file_written', description: `Archivo '${file.filePath}' escrito en el contenedor ${app.container_id.substring(0, 12)}.` }));
+    
     await Promise.all([
       supabaseAdmin.from('app_file_backups').upsert(backups, { onConflict: 'app_id, file_path' }),
       supabaseAdmin.from('server_events_log').insert(logEntries)
     ]);
 
     return NextResponse.json({ message: 'Archivos guardados y respaldados correctamente.' });
+
   } catch (error: any) {
     console.error(`[API /apps/${appId}/files] Error en POST:`, error);
     return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
+  } finally {
+    // 6. Cleanup both local and remote temporary directories
+    try {
+      await fs.rm(localTempDir, { recursive: true, force: true });
+    } catch (cleanupError) {
+      console.warn(`[API /apps/${appId}/files] Advertencia: Fallo al limpiar el directorio temporal local '${localTempDir}':`, cleanupError);
+    }
+    try {
+      const { data: server } = await supabaseAdmin.from('user_servers').select('ip_address, ssh_port, ssh_username, ssh_password').eq('id', appId).single();
+      if (server) {
+        await executeSshCommand(server, `rm -rf ${remoteTempDir}`);
+      }
+    } catch (cleanupError) {
+      console.warn(`[API /apps/${appId}/files] Advertencia: Fallo al limpiar el directorio temporal remoto '${remoteTempDir}':`, cleanupError);
+    }
   }
 }
