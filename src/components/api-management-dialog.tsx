@@ -17,17 +17,23 @@ import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 const apiKeySchema = z.object({
   provider: z.string().min(1, { message: 'Debes seleccionar un proveedor.' }),
-  api_key: z.string().optional(),
+  api_key: z.string().optional(), // Make optional for Vertex AI
   nickname: z.string().optional(),
+  // New fields for Vertex AI
+  project_id: z.string().optional(),
+  location_id: z.string().optional(),
+  use_vertex_ai: z.boolean().optional(),
 });
 
 type ApiKeyFormValues = z.infer<typeof apiKeySchema>;
@@ -38,6 +44,9 @@ interface ApiKey {
   api_key: string; // Masked
   nickname: string | null;
   created_at: string;
+  project_id: string | null; // New
+  location_id: string | null; // New
+  use_vertex_ai: boolean; // New
 }
 
 const providerOptions = [
@@ -58,10 +67,18 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
 
   const form = useForm<ApiKeyFormValues>({
     resolver: zodResolver(apiKeySchema),
-    defaultValues: { provider: '', api_key: '', nickname: '' },
+    defaultValues: {
+      provider: '',
+      api_key: '',
+      nickname: '',
+      project_id: '',
+      location_id: '',
+      use_vertex_ai: false,
+    },
   });
 
   const selectedProvider = form.watch('provider');
+  const useVertexAI = form.watch('use_vertex_ai');
 
   const fetchKeys = useCallback(async () => {
     setIsLoading(true);
@@ -80,7 +97,14 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
   useEffect(() => {
     if (open) {
       fetchKeys();
-      form.reset();
+      form.reset({
+        provider: '',
+        api_key: '',
+        nickname: '',
+        project_id: '',
+        location_id: '',
+        use_vertex_ai: false,
+      });
       setIsEditing(false);
     }
   }, [open, fetchKeys, form]);
@@ -93,7 +117,10 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         form.reset({
           provider: selectedProvider,
           nickname: existingKey.nickname || '',
-          api_key: '',
+          api_key: '', // API key is masked, so don't pre-fill
+          project_id: existingKey.project_id || '',
+          location_id: existingKey.location_id || '',
+          use_vertex_ai: existingKey.use_vertex_ai || false,
         });
       } else {
         setIsEditing(false);
@@ -101,6 +128,9 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
           provider: selectedProvider,
           nickname: '',
           api_key: '',
+          project_id: '',
+          location_id: '',
+          use_vertex_ai: false,
         });
       }
     } else {
@@ -111,16 +141,31 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
   const onSubmit = async (values: ApiKeyFormValues) => {
     setIsSubmitting(true);
     try {
-      if (!isEditing && (!values.api_key || values.api_key.length < 10)) {
-        toast.error('La API Key es requerida y debe ser válida para un nuevo proveedor.');
+      if (!isEditing && !values.use_vertex_ai && (!values.api_key || values.api_key.length < 10)) {
+        toast.error('La API Key es requerida y debe ser válida para un nuevo proveedor si no usas Vertex AI.');
+        setIsSubmitting(false);
+        return;
+      }
+      if (values.use_vertex_ai && (!values.project_id || !values.location_id)) {
+        toast.error('Project ID y Location ID son requeridos para usar Vertex AI.');
         setIsSubmitting(false);
         return;
       }
 
       const method = isEditing ? 'PUT' : 'POST';
       const payload = { ...values };
+      
+      // If editing and API key is empty, don't send it to avoid overwriting with empty string
       if (isEditing && !payload.api_key) {
         delete payload.api_key;
+      }
+      // If using Vertex AI, ensure api_key is null/undefined
+      if (payload.use_vertex_ai) {
+        payload.api_key = undefined; // Will be stored as NULL in DB
+      } else {
+        // If not using Vertex AI, ensure project_id and location_id are null/undefined
+        payload.project_id = undefined;
+        payload.location_id = undefined;
       }
 
       const response = await fetch('/api/ai-keys', {
@@ -131,7 +176,14 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       const result = await response.json();
       if (!response.ok) throw new Error(result.message);
       toast.success(`API Key ${isEditing ? 'actualizada' : 'guardada'}.`);
-      form.reset({ provider: selectedProvider, api_key: '', nickname: values.nickname });
+      form.reset({
+        provider: selectedProvider,
+        api_key: '', // Clear API key field after submission
+        nickname: values.nickname,
+        project_id: values.project_id,
+        location_id: values.location_id,
+        use_vertex_ai: values.use_vertex_ai,
+      });
       fetchKeys();
     } catch (error: any) {
       toast.error(`Error: ${error.message}`);
@@ -147,7 +199,14 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       if (!response.ok) throw new Error(result.message);
       toast.success('API Key eliminada.');
       fetchKeys();
-      form.reset(); // Reset form if the deleted key was being edited
+      form.reset({
+        provider: '',
+        api_key: '',
+        nickname: '',
+        project_id: '',
+        location_id: '',
+        use_vertex_ai: false,
+      }); // Reset form if the deleted key was being edited
     } catch (error: any) {
       toast.error(`Error al eliminar la clave: ${error.message}`);
     }
@@ -175,7 +234,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                   <FormField control={form.control} name="provider" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Proveedor</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un proveedor" /></SelectTrigger></FormControl>
                         <SelectContent>
                           {providerOptions.map(opt => (
@@ -186,17 +245,70 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                       <FormMessage />
                     </FormItem>
                   )} />
-                  <FormField control={form.control} name="api_key" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>API Key</FormLabel>
-                      <FormControl><Input type="password" placeholder={isEditing ? "Dejar en blanco para no cambiar" : "Pega tu API key aquí"} {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
+
+                  {selectedProvider === 'google_gemini' && (
+                    <>
+                      <FormField control={form.control} name="use_vertex_ai" render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                          <div className="space-y-0.5">
+                            <FormLabel>Usar Vertex AI</FormLabel>
+                            <FormDescription>
+                              Habilita esta opción para usar Google Vertex AI en lugar de la API pública de Gemini.
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              disabled={isSubmitting}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )} />
+
+                      {useVertexAI ? (
+                        <>
+                          <FormField control={form.control} name="project_id" render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Google Cloud Project ID</FormLabel>
+                              <FormControl><Input placeholder="tu-id-de-proyecto" {...field} disabled={isSubmitting} /></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                          <FormField control={form.control} name="location_id" render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Google Cloud Location ID</FormLabel>
+                              <FormControl><Input placeholder="ej: us-central1 o global" {...field} disabled={isSubmitting} /></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                        </>
+                      ) : (
+                        <FormField control={form.control} name="api_key" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>API Key</FormLabel>
+                            <FormControl><Input type="password" placeholder={isEditing ? "Dejar en blanco para no cambiar" : "Pega tu API key aquí"} {...field} disabled={isSubmitting} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                      )}
+                    </>
+                  )}
+
+                  {selectedProvider !== 'google_gemini' && (
+                    <FormField control={form.control} name="api_key" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>API Key</FormLabel>
+                        <FormControl><Input type="password" placeholder={isEditing ? "Dejar en blanco para no cambiar" : "Pega tu API key aquí"} {...field} disabled={isSubmitting} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  )}
+
                   <FormField control={form.control} name="nickname" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Apodo (Opcional)</FormLabel>
-                      <FormControl><Input placeholder="Ej: Clave personal, Clave de equipo" {...field} /></FormControl>
+                      <FormControl><Input placeholder="Ej: Clave personal, Clave de equipo" {...field} disabled={isSubmitting} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
@@ -220,7 +332,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                   <TableRow>
                     <TableHead>Apodo</TableHead>
                     <TableHead>Proveedor</TableHead>
-                    <TableHead>Clave</TableHead>
+                    <TableHead>Clave / Configuración Vertex AI</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -234,7 +346,17 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                       <TableRow key={key.id}>
                         <TableCell>{key.nickname || 'N/A'}</TableCell>
                         <TableCell>{providerOptions.find(p => p.value === key.provider)?.label || key.provider}</TableCell>
-                        <TableCell className="font-mono text-xs">{key.api_key}</TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {key.use_vertex_ai ? (
+                            <div className="flex flex-col">
+                              <span>Vertex AI (Activo)</span>
+                              <span className="text-muted-foreground">Project: {key.project_id || 'N/A'}</span>
+                              <span className="text-muted-foreground">Location: {key.location_id || 'N/A'}</span>
+                            </div>
+                          ) : (
+                            key.api_key
+                          )}
+                        </TableCell>
                         <TableCell className="text-right">
                           <Button variant="destructive" size="icon" onClick={() => handleDelete(key.id)}><Trash2 className="h-4 w-4" /></Button>
                         </TableCell>

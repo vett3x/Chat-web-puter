@@ -7,14 +7,20 @@ import { z } from 'zod';
 
 const apiKeySchema = z.object({
   provider: z.string().min(1),
-  api_key: z.string().min(1),
+  api_key: z.string().optional(), // Make optional
   nickname: z.string().optional(),
+  project_id: z.string().optional(),
+  location_id: z.string().optional(),
+  use_vertex_ai: z.boolean().optional(),
 });
 
 const updateApiKeySchema = z.object({
   provider: z.string().min(1),
   api_key: z.string().min(10, { message: 'La API Key parece demasiado corta.' }).optional(),
   nickname: z.string().optional(),
+  project_id: z.string().optional(),
+  location_id: z.string().optional(),
+  use_vertex_ai: z.boolean().optional(),
 });
 
 async function getSupabaseClient() {
@@ -41,7 +47,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabase
     .from('user_api_keys')
-    .select('id, provider, api_key, is_active, created_at, nickname')
+    .select('id, provider, api_key, is_active, created_at, nickname, project_id, location_id, use_vertex_ai')
     .eq('user_id', session.user.id)
     .order('created_at', { ascending: false });
 
@@ -52,7 +58,7 @@ export async function GET(req: NextRequest) {
   // Mask the API keys before sending them to the client
   const maskedData = data.map(key => ({
     ...key,
-    api_key: `${key.api_key.substring(0, 4)}...${key.api_key.substring(key.api_key.length - 4)}`,
+    api_key: key.api_key ? `${key.api_key.substring(0, 4)}...${key.api_key.substring(key.api_key.length - 4)}` : null,
   }));
 
   return NextResponse.json(maskedData);
@@ -67,15 +73,18 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { provider, api_key, nickname } = apiKeySchema.parse(body);
+    const { provider, api_key, nickname, project_id, location_id, use_vertex_ai } = apiKeySchema.parse(body);
 
     const { data, error } = await supabase
       .from('user_api_keys')
       .insert({
         user_id: session.user.id,
         provider,
-        api_key,
+        api_key: use_vertex_ai ? null : api_key, // Store null if using Vertex AI
         nickname,
+        project_id: use_vertex_ai ? project_id : null,
+        location_id: use_vertex_ai ? location_id : null,
+        use_vertex_ai: use_vertex_ai || false,
       })
       .select()
       .single();
@@ -100,14 +109,31 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { provider, api_key, nickname } = updateApiKeySchema.parse(body);
+    const { provider, api_key, nickname, project_id, location_id, use_vertex_ai } = updateApiKeySchema.parse(body);
 
-    const updateData: { api_key?: string; nickname?: string | null } = {};
-    if (api_key) {
-      updateData.api_key = api_key;
+    const updateData: { api_key?: string | null; nickname?: string | null; project_id?: string | null; location_id?: string | null; use_vertex_ai?: boolean } = {};
+    
+    if (api_key !== undefined) {
+      updateData.api_key = use_vertex_ai ? null : api_key;
     }
     if (nickname !== undefined) {
       updateData.nickname = nickname || null;
+    }
+    if (project_id !== undefined) {
+      updateData.project_id = use_vertex_ai ? project_id : null;
+    }
+    if (location_id !== undefined) {
+      updateData.location_id = use_vertex_ai ? location_id : null;
+    }
+    if (use_vertex_ai !== undefined) {
+      updateData.use_vertex_ai = use_vertex_ai;
+      // If switching to Vertex AI, clear api_key
+      if (use_vertex_ai) updateData.api_key = null;
+      // If switching from Vertex AI, clear project/location
+      if (!use_vertex_ai) {
+        updateData.project_id = null;
+        updateData.location_id = null;
+      }
     }
 
     if (Object.keys(updateData).length === 0) {
