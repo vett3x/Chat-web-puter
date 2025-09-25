@@ -1,0 +1,4 @@
+ALTER TABLE public.user_api_keys
+ADD COLUMN project_id TEXT NULL,
+ADD COLUMN location_id TEXT NULL,
+ADD COLUMN use_vertex_ai BOOLEAN NOT NULL DEFAULT FALSE;
