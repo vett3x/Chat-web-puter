@@ -6,6 +6,7 @@ import { useChat } from '@/hooks/use-chat';
 import { ChatMessages } from '@/components/chat/chat-messages';
 import { ChatInput } from '@/components/chat/chat-input';
 import { ApiKey } from '@/hooks/use-user-api-keys'; // NEW: Import ApiKey type
+import { useSession } from './session-context-provider'; // NEW: Import useSession
 
 interface ChatInterfaceProps {
   userId: string | undefined;
@@ -40,6 +41,8 @@ export function ChatInterface({
   userApiKeys, // NEW: Destructure
   isLoadingApiKeys, // NEW: Destructure
 }: ChatInterfaceProps) {
+  const { userAvatarUrl } = useSession(); // NEW: Get userAvatarUrl from session
+
   const {
     messages,
     isLoading,
@@ -113,6 +116,7 @@ export function ChatInterface({
           onRegenerate={regenerateLastResponse}
           onReapplyFiles={reapplyFilesFromMessage}
           appPrompt={appPrompt}
+          userAvatarUrl={userAvatarUrl} // NEW: Pass userAvatarUrl
         />
         <ChatInput
           isLoading={isLoading}

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getModelLabel } from '@/lib/ai-models'; // Import the helper function
 import { useUserApiKeys } from '@/hooks/use-user-api-keys';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'; // NEW: Import Avatar components
 
 // Define unified part types
 interface TextPart {
@@ -47,9 +48,10 @@ interface ChatMessagesProps {
   onRegenerate: () => void;
   onReapplyFiles: (message: Message) => void;
   appPrompt?: string | null;
+  userAvatarUrl: string | null; // NEW: Prop for user avatar URL
 }
 
-export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerate, onReapplyFiles, appPrompt }: ChatMessagesProps) {
+export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerate, onReapplyFiles, appPrompt, userAvatarUrl }: ChatMessagesProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { userApiKeys } = useUserApiKeys();
 
@@ -108,9 +110,15 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
                 <div className={`group relative flex gap-3 max-w-[80%] ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                   <div className="flex-shrink-0">
                     {message.role === 'user' ? (
-                      <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center shadow-avatar-user">
-                        <User className="h-4 w-4 text-primary-foreground" />
-                      </div>
+                      <Avatar className="w-8 h-8 shadow-avatar-user"> {/* NEW: Use Avatar component */}
+                        {userAvatarUrl && userAvatarUrl !== '' ? (
+                          <AvatarImage src={userAvatarUrl} alt="User Avatar" />
+                        ) : (
+                          <AvatarFallback className="bg-primary text-primary-foreground">
+                            <User className="h-4 w-4" />
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
                     ) : (
                       <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center shadow-avatar-ai">
                         <Bot className="h-4 w-4 text-secondary-foreground" />

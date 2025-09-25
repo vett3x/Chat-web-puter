@@ -16,6 +16,7 @@ interface SessionContextType {
   isLoading: boolean;
   userRole: UserRole | null;
   userPermissions: UserPermissions; // Add userPermissions to context
+  userAvatarUrl: string | null; // NEW: Add userAvatarUrl to context
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -25,6 +26,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const [isLoading, setIsLoading] = useState(true);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [userPermissions, setUserPermissions] = useState<UserPermissions>({}); // State for userPermissions
+  const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null); // NEW: State for userAvatarUrl
   const router = useRouter();
   const pathname = usePathname();
 
@@ -33,21 +35,23 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     if (currentSession?.user?.id) {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('role, permissions') // Select permissions
+        .select('role, permissions, avatar_url') // NEW: Select avatar_url
         .eq('id', currentSession.user.id)
         .single();
 
       let determinedRole: UserRole | null = null;
       let determinedPermissions: UserPermissions = {};
+      let determinedAvatarUrl: string | null = null; // NEW: Variable for avatar URL
 
       if (error) {
-        console.error('[SessionContext] Error fetching user profile role and permissions:', error);
+        console.error('[SessionContext] Error fetching user profile role, permissions, and avatar:', error);
         // Fallback to email check if profile fetch fails
         determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
       } else if (profile) {
         console.log("[SessionContext] Profile fetched:", profile);
         determinedRole = profile.role as UserRole;
         determinedPermissions = profile.permissions || {};
+        determinedAvatarUrl = profile.avatar_url; // NEW: Set avatar URL
       } else {
         // Fallback if profile not found (shouldn't happen with trigger)
         console.log("[SessionContext] Profile not found, falling back to email check.");
@@ -71,11 +75,13 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       
       setUserRole(determinedRole);
       setUserPermissions(determinedPermissions);
+      setUserAvatarUrl(determinedAvatarUrl); // NEW: Set user avatar URL state
 
     } else {
       console.log("[SessionContext] No current session for profile fetch.");
       setUserRole(null);
       setUserPermissions({});
+      setUserAvatarUrl(null); // NEW: Clear avatar URL
     }
   };
 
@@ -136,7 +142,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   }
   console.log("[SessionContext] Rendering children.");
   return (
-    <SessionContext.Provider value={{ session, isLoading, userRole, userPermissions }}>
+    <SessionContext.Provider value={{ session, isLoading, userRole, userPermissions, userAvatarUrl }}>
       {children}
     </SessionContext.Provider>
   );
