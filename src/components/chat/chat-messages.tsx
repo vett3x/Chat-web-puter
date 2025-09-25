@@ -7,6 +7,7 @@ import { MessageContent } from '@/components/message-content';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getModelLabel } from '@/lib/ai-models'; // Import the helper function
+import { useUserApiKeys } from '@/hooks/use-user-api-keys';
 
 // Define unified part types
 interface TextPart {
@@ -50,6 +51,7 @@ interface ChatMessagesProps {
 
 export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerate, onReapplyFiles, appPrompt }: ChatMessagesProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const { userApiKeys } = useUserApiKeys();
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -145,7 +147,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
                 </div>
                 {message.role === 'assistant' && !message.isTyping && message.model && (
                   <p className="text-xs text-muted-foreground px-12">
-                    ✓ Generado con {getModelLabel(message.model)}
+                    ✓ Generado con {getModelLabel(message.model, userApiKeys)}
                   </p>
                 )}
               </div>

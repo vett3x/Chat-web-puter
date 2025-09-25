@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { AI_PROVIDERS, getModelLabel } from '@/lib/ai-models'; // Import getModelLabel
 import GoogleGeminiLogo from '@/components/google-gemini-logo'; // Import explicitly for dynamic icon
 import ClaudeAILogo from '@/components/claude-ai-logo'; // Import explicitly for dynamic icon
+import { useUserApiKeys } from '@/hooks/use-user-api-keys';
 
 interface PuterTextContentPart { type: 'text'; text: string; }
 interface PuterImageContentPart { type: 'image_url'; image_url: { url: string; }; }
@@ -37,38 +38,11 @@ interface SelectedFile {
   type: 'image' | 'other';
 }
 
-// Define the ApiKey interface to match what /api/ai-keys returns
-interface ApiKey {
-  id: string;
-  provider: string;
-  api_key: string | null; // Masked
-  nickname: string | null;
-  project_id: string | null;
-  location_id: string | null;
-  use_vertex_ai: boolean;
-  model_name: string | null;
-}
-
 export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage, isAppChat = false }: ChatInputProps) {
   const [inputMessage, setInputMessage] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
-  const [userApiKeys, setUserApiKeys] = useState<ApiKey[]>([]); // Changed to store full ApiKey objects
+  const { userApiKeys } = useUserApiKeys();
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const fetchKeys = async () => {
-      try {
-        const response = await fetch('/api/ai-keys');
-        const data = await response.json();
-        if (response.ok) {
-          setUserApiKeys(data);
-        }
-      } catch (error) {
-        console.error("Failed to fetch API keys", error);
-      }
-    };
-    fetchKeys();
-  }, []);
 
   const SelectedModelIcon = React.useMemo(() => {
     if (selectedModel.startsWith('puter:')) {

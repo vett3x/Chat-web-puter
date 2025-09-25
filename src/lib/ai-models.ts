@@ -36,18 +36,25 @@ export const AI_PROVIDERS = [
   },
 ];
 
-export const getModelLabel = (modelValue?: string): string => {
+export const getModelLabel = (modelValue?: string, userApiKeys: { id: string; provider: string; model_name: string | null }[] = []): string => {
     if (!modelValue) return '';
 
-    // Handle new format: puter:model-name or user_key:key-id
-    let actualModelValue = modelValue;
-    if (modelValue.startsWith('puter:')) {
-      actualModelValue = modelValue.substring(6);
-    } else if (modelValue.startsWith('user_key:')) {
-      // For user_key, we can't get the exact model label without fetching the key details.
-      // For now, return a generic label or the key ID.
-      return `Clave de Usuario (${modelValue.substring(9, 17)}...)`;
+    if (modelValue.startsWith('user_key:')) {
+        const keyId = modelValue.substring(9);
+        const key = userApiKeys.find(k => k.id === keyId);
+        if (key && key.model_name) {
+            for (const provider of AI_PROVIDERS) {
+                if (provider.value === key.provider) {
+                    const model = provider.models.find(m => m.value === key.model_name);
+                    if (model) return model.label;
+                }
+            }
+            return key.model_name; // Fallback to raw model name if no label found
+        }
+        return `Clave de Usuario (${keyId.substring(0, 8)}...)`;
     }
+
+    const actualModelValue = modelValue.startsWith('puter:') ? modelValue.substring(6) : modelValue;
 
     for (const provider of AI_PROVIDERS) {
         const model = provider.models.find(m => m.value === actualModelValue);
