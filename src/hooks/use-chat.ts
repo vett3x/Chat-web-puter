@@ -75,11 +75,16 @@ export function useChat({
     const loadConversationData = async () => {
       if (conversationId && userId) {
         setIsLoading(true);
-        const details = await fetchConversationDetails(conversationId, userId);
-        setSelectedModel(details?.model || localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FALLBACK);
-        const fetchedMsgs = await fetchMessages(conversationId, userId);
-        if (!isSendingFirstMessage || fetchedMsgs.length > 0) setMessages(fetchedMsgs);
-        setIsLoading(false);
+        try {
+          const details = await fetchConversationDetails(conversationId, userId);
+          setSelectedModel(details?.model || localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FALLBACK);
+          const fetchedMsgs = await fetchMessages(conversationId, userId);
+          if (!isSendingFirstMessage || fetchedMsgs.length > 0) setMessages(fetchedMsgs);
+        } catch (error: any) {
+          toast.error(error.message);
+        } finally {
+          setIsLoading(false);
+        }
       } else {
         setMessages([]);
         setSelectedModel(localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FALLBACK);
@@ -88,9 +93,15 @@ export function useChat({
     loadConversationData();
   }, [conversationId, userId, isSendingFirstMessage]);
 
-  const handleModelChange = (modelValue: string) => {
+  const handleModelChange = async (modelValue: string) => {
     setSelectedModel(modelValue);
-    if (conversationId && userId) updateConversationModelInDB(conversationId, userId, modelValue);
+    if (conversationId && userId) {
+      try {
+        await updateConversationModelInDB(conversationId, userId, modelValue);
+      } catch (error: any) {
+        toast.error(error.message);
+      }
+    }
   };
 
   const getAndStreamAIResponse = useCallback(async (convId: string, history: Message[]) => {
@@ -163,15 +174,21 @@ export function useChat({
     let currentConversationId = conversationId;
     if (!currentConversationId) {
       setIsSendingFirstMessage(true);
-      const newConv = await createConversationInDB(userId, selectedModel);
-      if (!newConv) {
+      try {
+        const newConv = await createConversationInDB(userId, selectedModel);
+        if (!newConv) {
+          setIsSendingFirstMessage(false);
+          return;
+        }
+        currentConversationId = newConv.id;
+        onNewConversationCreated(newConv.id);
+        onConversationTitleUpdate(newConv.id, newConv.title);
+        onSidebarDataRefresh();
+      } catch (error: any) {
+        toast.error(error.message);
         setIsSendingFirstMessage(false);
         return;
       }
-      currentConversationId = newConv.id;
-      onNewConversationCreated(newConv.id);
-      onConversationTitleUpdate(newConv.id, newConv.title);
-      onSidebarDataRefresh();
     }
 
     const newUserMessage: Message = {
