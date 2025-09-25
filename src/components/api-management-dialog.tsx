@@ -25,7 +25,7 @@ import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { AI_PROVIDERS } from '@/lib/ai-models'; // Import AI_PROVIDERS
+import { AI_PROVIDERS, getModelLabel } from '@/lib/ai-models'; // Import AI_PROVIDERS
 
 const apiKeySchema = z.object({
   id: z.string().optional(), // Added for editing existing keys
@@ -368,7 +368,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                           <FormField control={form.control} name="model_name" render={({ field }) => (
                             <FormItem>
                               <FormLabel>Modelo de Gemini (Vertex AI)</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}> {/* Added || '' to value */}
+                              <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
                                 <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
                                 <SelectContent>
                                   {currentProviderModels.filter(m => !m.value.includes('-public-api')).map(model => (
@@ -430,7 +430,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                           <FormField control={form.control} name="model_name" render={({ field }) => (
                             <FormItem>
                               <FormLabel>Modelo de Gemini</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}> {/* Added || '' to value */}
+                              <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
                                 <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
                                 <SelectContent>
                                   {currentProviderModels.filter(m => m.value.includes('-public-api')).map(model => (
@@ -514,13 +514,13 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                               <span>Vertex AI (Activo)</span>
                               <span className="text-muted-foreground">Project: {key.project_id || 'N/A'}</span>
                               <span className="text-muted-foreground">Location: {key.location_id || 'N/A'}</span>
-                              <span className="text-muted-foreground">Modelo: {key.model_name || 'N/A'}</span>
+                              <span className="text-muted-foreground">Modelo: {getModelLabel(key.model_name ?? undefined) || 'N/A'}</span>
                               {key.json_key_content && <span className="text-muted-foreground">JSON Key: Subido</span>}
                             </div>
                           ) : (
                             <div className="flex flex-col">
                               <span>{key.api_key}</span>
-                              {key.model_name && <span className="text-muted-foreground">Modelo: {key.model_name}</span>}
+                              <span className="text-muted-foreground">Modelo: {getModelLabel(key.model_name ?? undefined) || 'N/A'}</span>
                             </div>
                           )}
                         </TableCell>
