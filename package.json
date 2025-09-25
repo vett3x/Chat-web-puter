@@ -79,7 +79,8 @@
     "tailwindcss-animate": "^1.0.7",
     "ts-node": "^10.9.2",
     "vaul": "^1.1.2",
-    "ws": "^8.18.3"
+    "ws": "^8.18.3",
+    "zod": "^3.25.28"
   },
   "devDependencies": {
     "@dyad-sh/nextjs-webpack-component-tagger": "latest",
@@ -94,7 +95,6 @@
     "express": "^5.1.0",
     "postcss": "latest",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5",
-    "zod": "^3.25.28"
+    "typescript": "^5"
   }
 }
