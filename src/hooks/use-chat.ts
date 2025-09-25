@@ -6,8 +6,8 @@ import { toast } from 'sonner';
 import { useSession } from '@/components/session-context-provider';
 import { AI_PROVIDERS } from '@/lib/ai-models';
 import { ApiKey } from '@/hooks/use-user-api-keys';
-import { GoogleGenerativeAI, Part } from '@google/generative-ai';
-import { GoogleAuth } from 'google-auth-library';
+// REMOVED: import { GoogleGenerativeAI, Part } from '@google/generative-ai';
+// REMOVED: import { GoogleAuth } from 'google-auth-library';
 
 // Define unified part types
 interface TextPart {
@@ -138,35 +138,7 @@ function messageContentToApiFormat(content: Message['content']): string | PuterC
     return '';
 }
 
-const convertToGeminiParts = (content: Message['content']): Part[] => {
-  const parts: Part[] = [];
-  if (typeof content === 'string') {
-    parts.push({ text: content });
-  } else if (Array.isArray(content)) {
-    for (const part of content) {
-      if (part.type === 'text') {
-        parts.push({ text: part.text });
-      } else if (part.type === 'image_url') {
-        const url = part.image_url.url;
-        const match = url.match(/^data:(image\/\w+);base64,(.*)$/);
-        if (!match) {
-          console.warn("Skipping invalid image data URL format for Gemini:", url.substring(0, 50) + '...');
-          parts.push({ text: "[Unsupported Image]" });
-        } else {
-          const mimeType = match[1];
-          const data = match[2];
-          parts.push({ inlineData: { mimeType, data } });
-        }
-      } else if (part.type === 'code') {
-        const codePart = part as CodePart;
-        const lang = codePart.language || '';
-        const filename = codePart.filename ? `:${codePart.filename}` : '';
-        parts.push({ text: `\`\`\`${lang}${filename}\n${codePart.code || ''}\n\`\`\`` });
-      }
-    }
-  }
-  return parts;
-};
+// REMOVED: convertToGeminiParts is now in the API route
 
 export function useChat({
   userId,
@@ -249,8 +221,7 @@ export function useChat({
         localStorage.setItem('selected_ai_model', DEFAULT_AI_MODEL_FALLBACK);
       }
     }
-  }, [isLoadingApiKeys, userApiKeys]);
-
+  }, [isLoadingApiKeys, userApiKeys, selectedModel]); // Added selectedModel to dependencies
 
   const getConversationDetails = useCallback(async (convId: string) => {
     const { data, error } = await supabase.from('conversations').select('id, title, model').eq('id', convId).eq('user_id', userId).single();
@@ -362,112 +333,18 @@ export function useChat({
         response = await window.puter.ai.chat([systemMessage, ...messagesForApi], { model: actualModelForPuter });
 
       } else if (selectedModel.startsWith('user_key:')) {
-        const selectedKeyId = selectedModel.substring(9);
+        // NEW: Call the unified API route for user_key models
         modelUsedForResponse = selectedModel;
-
-        const keyDetails = userApiKeys.find(key => key.id === selectedKeyId);
-        if (!keyDetails) {
-          throw new Error('No se encontró una API key activa con el ID proporcionado para este usuario. Por favor, verifica la Gestión de API Keys.');
-        }
-
-        if (keyDetails.provider === 'google_gemini') {
-          const geminiMessages = history.map(msg => ({
-            role: msg.role === 'assistant' ? 'model' : 'user',
-            parts: convertToGeminiParts(msg.content),
-          }));
-
-          if (keyDetails.use_vertex_ai) {
-            const project = keyDetails.project_id;
-            const location = keyDetails.location_id;
-            const jsonKeyContent = keyDetails.json_key_content;
-            const finalModel = keyDetails.model_name;
-
-            if (!project || !location || !jsonKeyContent || !finalModel) {
-              throw new Error('Configuración incompleta para Google Vertex AI. Revisa la Gestión de API Keys.');
-            }
-
-            const credentials = JSON.parse(jsonKeyContent);
-            const auth = new GoogleAuth({
-              credentials,
-              scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-            });
-            const client = await auth.getClient();
-            const accessToken = (await client.getAccessToken()).token;
-
-            if (!accessToken) {
-              throw new Error('No se pudo obtener el token de acceso para Vertex AI.');
-            }
-
-            const vertexAiUrl = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${finalModel}:generateContent`;
-
-            const vertexAiResponse = await fetch(vertexAiUrl, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ contents: geminiMessages }),
-            });
-
-            if (!vertexAiResponse.ok) {
-              const errorText = await vertexAiResponse.text();
-              throw new Error(`Vertex AI API returned an error: ${vertexAiResponse.status} - ${errorText.substring(0, 200)}...`);
-            }
-
-            const vertexAiResult = await vertexAiResponse.json();
-            if (vertexAiResult.error) {
-              throw new Error(vertexAiResult.error?.message || `Error en la API de Vertex AI: ${JSON.stringify(vertexAiResult)}`);
-            }
-            response = { message: { content: vertexAiResult.candidates?.[0]?.content?.parts?.[0]?.text || 'No se pudo obtener una respuesta de texto de Vertex AI.' } };
-
-          } else { // Public Gemini API
-            const apiKey = keyDetails.api_key;
-            const finalModel = keyDetails.model_name;
-            if (!apiKey || !finalModel) {
-              throw new Error('API Key o modelo no configurado para Google Gemini. Revisa la Gestión de API Keys.');
-            }
-            const genAI = new GoogleGenerativeAI(apiKey);
-            // Corrected: Pass ModelParams object and access text() method
-            const result = await genAI.getGenerativeModel({ model: finalModel }).generateContent({ contents: geminiMessages });
-            response = { message: { content: result.response.text() } };
-          }
-        } else if (keyDetails.provider === 'custom_endpoint') {
-          const customApiKey = keyDetails.api_key;
-          const customEndpointUrl = keyDetails.api_endpoint;
-          const customModelId = keyDetails.model_name;
-
-          if (!customEndpointUrl || !customApiKey || !customModelId) {
-            throw new Error('Configuración incompleta para el endpoint personalizado. Revisa la Gestión de API Keys.');
-          }
-
-          const customApiMessages = history.map(msg => ({
-            role: msg.role === 'assistant' ? 'assistant' : 'user',
-            content: messageContentToApiFormat(msg.content),
-          }));
-
-          const customEndpointResponse = await fetch(customEndpointUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${customApiKey}`,
-            },
-            body: JSON.stringify({
-              model: customModelId,
-              messages: customApiMessages,
-            }),
-          });
-
-          if (!customEndpointResponse.ok) {
-            const errorText = await customEndpointResponse.text();
-            throw new Error(`Custom Endpoint API returned an error: ${customEndpointResponse.status} - ${errorText.substring(0, 200)}...`);
-          }
-
-          const customEndpointResult = await customEndpointResponse.json();
-          response = { message: { content: customEndpointResult.choices?.[0]?.message?.content || 'No se pudo obtener una respuesta del endpoint personalizado.' } };
-
-        } else {
-          throw new Error('Proveedor de IA no válido seleccionado.');
-        }
+        const apiResponse = await fetch('/api/ai/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [systemMessage, ...messagesForApi], // Pass all messages including system prompt
+            selectedKeyId: selectedModel.substring(9), // Extract key ID
+          }),
+        });
+        response = await apiResponse.json();
+        if (!apiResponse.ok) throw new Error(response.message || 'Error en la API de IA.');
       } else {
         throw new Error('Modelo de IA no válido seleccionado.');
       }
@@ -541,7 +418,7 @@ export function useChat({
     } finally {
       setIsLoading(false);
     }
-  }, [appId, appPrompt, userRole, userApiKeys, onWriteFiles, selectedModel, userId, saveMessageToDB]); // Added all necessary dependencies
+  }, [appId, appPrompt, userRole, userApiKeys, onWriteFiles, selectedModel, userId, saveMessageToDB]);
 
   const sendMessage = useCallback(async (content: PuterContentPart[], messageText: string) => {
     if (!userId) {
