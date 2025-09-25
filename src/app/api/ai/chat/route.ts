@@ -62,7 +62,7 @@ async function handleGoogleGemini(config: any, messages: any[]) {
     contents: contents,
   });
 
-  return response.text;
+  return response.text ?? 'No se recibió contenido en la respuesta.';
 }
 
 export async function POST(req: NextRequest) {
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
       throw new Error('La configuración de API Key seleccionada no es válida o no se encontró.');
     }
 
-    let content = '';
+    let content: string = '';
     switch (apiKeyConfig.provider) {
       case 'custom_openai':
         content = await handleCustomOpenAI(apiKeyConfig, messages);
