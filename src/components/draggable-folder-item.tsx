@@ -122,6 +122,7 @@ export function DraggableFolderItem({
   const filteredConversations = conversations.filter(conv => conv.folder_id === folder.id).sort((a, b) => a.order_index - b.order_index);
   const filteredNotes = notes.filter(note => note.folder_id === folder.id); // Filter notes
   const filteredSubfolders = subfolders.filter(sub => sub.parent_id === folder.id);
+  const itemCount = filteredConversations.length + filteredNotes.length + filteredSubfolders.length;
 
   const handleSaveEdit = async () => {
     if (!editingName.trim()) {
@@ -178,8 +179,8 @@ export function DraggableFolderItem({
         onDragLeave={(e) => onDragLeave(e, folder.id)}
       >
         <CardContent className="py-1.5 px-2 flex items-center justify-between gap-1">
-          <div className="flex items-center flex-1 overflow-hidden" onClick={() => setIsExpanded(!isExpanded)}>
-            <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}>
+          <div className="flex items-center flex-1 overflow-hidden" onClick={() => { setIsExpanded(!isExpanded); onSelectItem(folder.id, 'folder'); }}>
+            <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0">
               {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
             </Button>
             <Folder className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
@@ -194,7 +195,12 @@ export function DraggableFolderItem({
                 className="flex-1 bg-sidebar-background text-sidebar-foreground h-7 text-sm"
               />
             ) : (
-              <span className="text-sm font-medium truncate flex-1" onClick={(e) => { e.stopPropagation(); onSelectItem(folder.id, 'folder'); }}>{folder.name}</span>
+              <span className="text-sm font-medium truncate flex-1">{folder.name}</span>
+            )}
+            {itemCount > 0 && (
+              <span className="ml-auto text-xs text-sidebar-foreground/60 group-hover:text-sidebar-accent-foreground/60 pr-2">
+                {itemCount}
+              </span>
             )}
           </div>
           <div className="flex-shrink-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
