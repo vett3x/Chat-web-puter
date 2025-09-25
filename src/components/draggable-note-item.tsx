@@ -105,8 +105,7 @@ export function DraggableNoteItem({ note, selected, onSelect, onDragStart, level
   return (
     <div
       className={cn(
-        "cursor-pointer hover:bg-sidebar-accent transition-colors group relative rounded-md flex items-center justify-between gap-1 py-1 px-1.5",
-        selected && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary selected-indicator"
+        "cursor-pointer hover:bg-sidebar-accent transition-colors group relative rounded-md flex items-center justify-between gap-1 py-1 px-1.5"
       )}
       onClick={onSelect}
       draggable="true"
@@ -126,7 +125,14 @@ export function DraggableNoteItem({ note, selected, onSelect, onDragStart, level
       ) : (
         <div className="flex items-center gap-1 flex-1 overflow-hidden">
           <FileText className="h-3 w-3 flex-shrink-0" />
-          <span className="text-xs truncate">{note.title}</span>
+          <div className="truncate">
+            <span className={cn(
+              "text-xs relative",
+              selected && "selected-indicator"
+            )}>
+              {note.title}
+            </span>
+          </div>
         </div>
       )}
       <div className="flex-shrink-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">

@@ -179,7 +179,6 @@ export function DraggableConversationCard({
     <div
       className={cn(
         "cursor-pointer hover:bg-sidebar-accent transition-colors group relative rounded-md flex items-center justify-between gap-1 py-1 px-1.5",
-        selectedConversationId === conversation.id && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary selected-indicator",
         isDraggingOver && dropPosition === 'before' && "border-t-2 border-blue-500",
         isDraggingOver && dropPosition === 'after' && "border-b-2 border-blue-500"
       )}
@@ -208,7 +207,14 @@ export function DraggableConversationCard({
       ) : (
         <div className="flex items-center gap-1 flex-1 overflow-hidden"> {/* Reduced gap */}
           <MessageSquare className="h-3 w-3 flex-shrink-0" /> {/* Smaller icon */}
-          <span className="text-xs truncate">{conversation.title}</span> {/* Smaller font size */}
+          <div className="truncate">
+            <span className={cn(
+              "text-xs relative",
+              selectedConversationId === conversation.id && "selected-indicator"
+            )}>
+              {conversation.title}
+            </span>
+          </div>
         </div>
       )}
       <div className="flex-shrink-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"> {/* Reduced gap */}
