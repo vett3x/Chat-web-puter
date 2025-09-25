@@ -2,13 +2,14 @@
 
 import ClaudeAILogo from '@/components/claude-ai-logo';
 import GoogleGeminiLogo from '@/components/google-gemini-logo';
+import { KeyRound } from 'lucide-react'; // Import a generic icon for custom endpoint
 
 export const AI_PROVIDERS = [
   {
     company: 'Google',
     logo: GoogleGeminiLogo,
-    source: 'user_key', // This provider requires a user-provided API key
-    value: 'google_gemini', // Added value for provider identification
+    source: 'user_key',
+    value: 'google_gemini',
     models: [
       // Vertex AI Models
       { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', apiType: 'vertex' },
@@ -25,8 +26,8 @@ export const AI_PROVIDERS = [
   {
     company: 'Anthropic (Puter.js)',
     logo: ClaudeAILogo,
-    source: 'puter', // This provider uses the integrated Puter.js service
-    value: 'anthropic_claude', // Added value for provider identification
+    source: 'puter',
+    value: 'anthropic_claude',
     models: [
       { value: 'claude-sonnet-4', label: 'Claude Sonnet 4', apiType: 'puter' },
       { value: 'claude-opus-4', label: 'Claude Opus 4', apiType: 'puter' },
@@ -34,22 +35,36 @@ export const AI_PROVIDERS = [
       { value: 'claude-3-7-opus', label: 'Claude 3.7 Opus', apiType: 'puter' },
     ],
   },
+  {
+    company: 'Endpoint Personalizado', // New provider
+    logo: KeyRound, // Generic icon
+    source: 'user_key',
+    value: 'custom_endpoint',
+    models: [], // User defines model_name
+  },
 ];
 
-export const getModelLabel = (modelValue?: string, userApiKeys: { id: string; provider: string; model_name: string | null }[] = []): string => {
+export const getModelLabel = (modelValue?: string, userApiKeys: { id: string; provider: string; model_name: string | null; nickname: string | null }[] = []): string => {
     if (!modelValue) return '';
 
     if (modelValue.startsWith('user_key:')) {
         const keyId = modelValue.substring(9);
         const key = userApiKeys.find(k => k.id === keyId);
-        if (key && key.model_name) {
-            for (const provider of AI_PROVIDERS) {
-                if (provider.value === key.provider) {
-                    const model = provider.models.find(m => m.value === key.model_name);
-                    if (model) return model.label;
-                }
+        if (key) {
+            if (key.provider === 'custom_endpoint') {
+                return key.nickname || `Endpoint Personalizado (${keyId.substring(0, 8)}...)`;
             }
-            return key.model_name; // Fallback to raw model name if no label found
+            // For other user_key providers, use model_name if available, else nickname
+            if (key.model_name) {
+                for (const provider of AI_PROVIDERS) {
+                    if (provider.value === key.provider) {
+                        const model = provider.models.find(m => m.value === key.model_name);
+                        if (model) return model.label;
+                    }
+                }
+                return key.model_name; // Fallback to raw model name
+            }
+            return key.nickname || `Clave de Usuario (${keyId.substring(0, 8)}...)`;
         }
         return `Clave de Usuario (${keyId.substring(0, 8)}...)`;
     }

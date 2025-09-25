@@ -59,7 +59,7 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
         const provider = AI_PROVIDERS.find(p => p.value === key.provider);
         if (provider) return provider.logo;
       }
-      return GoogleGeminiLogo; // Default for user_key if provider not found
+      return KeyRound; // Default for user_key if provider not found, or for custom_endpoint
     }
     return Bot; // Fallback
   }, [selectedModel, userApiKeys]);
@@ -233,10 +233,12 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
                         userKeysForProvider.map(key => {
                           // Determine the display label based on nickname and Vertex AI usage
                           let displayLabelContent: string;
-                          if (key.nickname) {
+                          if (key.provider === 'custom_endpoint') {
+                            displayLabelContent = key.nickname || `Endpoint Personalizado (${key.id.substring(0, 8)}...)`;
+                          } else if (key.nickname) {
                             displayLabelContent = key.nickname;
                           } else {
-                            const modelLabel = key.model_name ? getModelLabel(key.model_name) : '';
+                            const modelLabel = key.model_name ? getModelLabel(key.model_name, userApiKeys) : ''; // Pass userApiKeys
                             if (key.use_vertex_ai) {
                               displayLabelContent = `Vertex AI: ${modelLabel || 'Modelo no seleccionado'}`;
                             } else {

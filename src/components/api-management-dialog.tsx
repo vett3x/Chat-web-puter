@@ -39,6 +39,7 @@ const apiKeySchema = z.object({
   model_name: z.string().optional(), // This needs to be conditional
   json_key_file: z.any().optional(), // New: for file upload
   json_key_content: z.string().optional(), // Added for payload
+  api_endpoint: z.string().url({ message: 'URL de endpoint inválida.' }).optional(), // New: for custom endpoint
 }).superRefine((data, ctx) => {
   if (data.provider === 'google_gemini') {
     if (data.use_vertex_ai) {
@@ -49,6 +50,20 @@ const apiKeySchema = z.object({
           path: ['model_name'],
         });
       }
+      if (!data.project_id) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Project ID es requerido para usar Vertex AI.',
+          path: ['project_id'],
+        });
+      }
+      if (!data.location_id) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Location ID es requerido para usar Vertex AI.',
+          path: ['location_id'],
+        });
+      }
     } else { // Public API
       if (!data.model_name || data.model_name === '') {
         ctx.addIssue({
@@ -57,6 +72,42 @@ const apiKeySchema = z.object({
           path: ['model_name'],
         });
       }
+      if (!data.api_key || data.api_key === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'API Key es requerida para la API pública de Gemini.',
+          path: ['api_key'],
+        });
+      }
+    }
+  } else if (data.provider === 'custom_endpoint') { // New validation for custom_endpoint
+    if (!data.api_endpoint || data.api_endpoint === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El link del endpoint es requerido para un endpoint personalizado.',
+        path: ['api_endpoint'],
+      });
+    }
+    if (!data.api_key || data.api_key === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'La API Key es requerida para un endpoint personalizado.',
+        path: ['api_key'],
+      });
+    }
+    if (!data.model_name || data.model_name === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El ID del modelo es requerido para un endpoint personalizado.',
+        path: ['model_name'],
+      });
+    }
+    if (!data.nickname || data.nickname === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El apodo es obligatorio para un endpoint personalizado.',
+        path: ['nickname'],
+      });
     }
   }
 });
@@ -73,6 +124,7 @@ const updateApiKeySchema = z.object({
   model_name: z.string().optional(),
   json_key_file: z.any().optional(),
   json_key_content: z.string().optional(),
+  api_endpoint: z.string().url({ message: 'URL de endpoint inválida.' }).optional(), // New: for custom endpoint
 }).superRefine((data, ctx) => {
   if (data.provider === 'google_gemini') {
     if (data.use_vertex_ai) {
@@ -83,6 +135,20 @@ const updateApiKeySchema = z.object({
           path: ['model_name'],
         });
       }
+      if (!data.project_id) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Project ID es requerido para usar Vertex AI.',
+          path: ['project_id'],
+        });
+      }
+      if (!data.location_id) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Location ID es requerido para usar Vertex AI.',
+          path: ['location_id'],
+        });
+      }
     } else { // Public API
       if (!data.model_name || data.model_name === '') {
         ctx.addIssue({
@@ -91,6 +157,43 @@ const updateApiKeySchema = z.object({
           path: ['model_name'],
         });
       }
+      // API Key is optional for update if not changing
+      // if (!data.api_key || data.api_key === '') {
+      //   ctx.addIssue({
+      //     code: z.ZodIssueCode.custom,
+      //     message: 'API Key es requerida para la API pública de Gemini.',
+      //     path: ['api_key'],
+      //   });
+      // }
+    }
+  } else if (data.provider === 'custom_endpoint') { // New validation for custom_endpoint
+    if (!data.api_endpoint || data.api_endpoint === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El link del endpoint es requerido para un endpoint personalizado.',
+        path: ['api_endpoint'],
+      });
+    }
+    if (!data.api_key || data.api_key === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'La API Key es requerida para un endpoint personalizado.',
+        path: ['api_key'],
+      });
+    }
+    if (!data.model_name || data.model_name === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El ID del modelo es requerido para un endpoint personalizado.',
+        path: ['model_name'],
+      });
+    }
+    if (!data.nickname || data.nickname === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El apodo es obligatorio para un endpoint personalizado.',
+        path: ['nickname'],
+      });
     }
   }
 });
@@ -108,6 +211,7 @@ interface ApiKey {
   use_vertex_ai: boolean; // New
   model_name: string | null; // New
   json_key_content: string | null; // New: to check if content exists
+  api_endpoint: string | null; // New: for custom endpoint
 }
 
 const providerOptions = AI_PROVIDERS.filter(p => p.source === 'user_key').map(p => ({
@@ -142,6 +246,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       model_name: '',
       json_key_file: undefined,
       json_key_content: undefined,
+      api_endpoint: '', // Default for new field
     },
   });
 
@@ -149,6 +254,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
   const useVertexAI = form.watch('use_vertex_ai');
   const currentProviderModels = providerOptions.find(p => p.value === selectedProvider)?.models || [];
   const isGoogleGemini = selectedProvider === 'google_gemini';
+  const isCustomEndpoint = selectedProvider === 'custom_endpoint';
 
   const fetchKeys = useCallback(async () => {
     setIsLoading(true);
@@ -177,6 +283,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         model_name: '',
         json_key_file: undefined,
         json_key_content: undefined,
+        api_endpoint: '',
       });
       setEditingKeyId(null);
       setSelectedJsonKeyFile(null);
@@ -197,6 +304,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       model_name: key.model_name || '', // Pre-fill model_name
       json_key_file: undefined,
       json_key_content: undefined, // Don't pre-fill content, user must re-upload if needed
+      api_endpoint: key.api_endpoint || '', // Pre-fill api_endpoint
     });
     setSelectedJsonKeyFile(null);
     setJsonKeyFileName(key.use_vertex_ai && key.json_key_content ? 'Archivo JSON existente' : null); // Indicate if JSON key exists
@@ -214,6 +322,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       model_name: '',
       json_key_file: undefined,
       json_key_content: undefined,
+      api_endpoint: '',
     });
     setSelectedJsonKeyFile(null);
     setJsonKeyFileName(null);
@@ -247,28 +356,6 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
   const onSubmit = async (values: ApiKeyFormValues) => {
     setIsSubmitting(true);
     try {
-      // Validation logic
-      if (!values.use_vertex_ai && (!values.api_key || values.api_key.length < 10) && !editingKeyId) {
-        toast.error('La API Key es requerida y debe ser válida para un nuevo proveedor si no usas Vertex AI.');
-        setIsSubmitting(false);
-        return;
-      }
-      if (values.use_vertex_ai && (!values.project_id || !values.location_id)) {
-        toast.error('Project ID y Location ID son requeridos para usar Vertex AI.');
-        setIsSubmitting(false);
-        return;
-      }
-      if (values.use_vertex_ai && !values.model_name) {
-        toast.error('Debes seleccionar un modelo para usar Vertex AI.');
-        setIsSubmitting(false);
-        return;
-      }
-      if (values.use_vertex_ai && !selectedJsonKeyFile && !editingKeyId) {
-        toast.error('Debes subir el archivo JSON de la cuenta de servicio para Vertex AI.');
-        setIsSubmitting(false);
-        return;
-      }
-
       const method = editingKeyId ? 'PUT' : 'POST';
       const payload: ApiKeyFormValues = { ...values };
       
@@ -289,16 +376,28 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
           // If editing, using Vertex AI, no new file, and old file existed, keep existing content
           // Do nothing, json_key_content will not be in payload, so it won't be updated to null
         } else {
-          // If editing, using Vertex AI, no new file, and no old file, set to null
-          // Or if adding new and no file, set to null
+          // If editing, using Vertex AI, no new file, and no old file, set to undefined
           payload.json_key_content = undefined;
         }
-      } else {
-        // If not using Vertex AI, ensure project_id, location_id, and json_key_content are null/undefined
+        // Clear custom endpoint fields if switching to Vertex AI
+        payload.api_endpoint = undefined;
+      } else if (isCustomEndpoint) {
+        // If using custom endpoint, clear Vertex AI specific fields and api_key
+        payload.api_key = values.api_key; // API key is required for custom endpoint
         payload.project_id = undefined;
         payload.location_id = undefined;
         payload.json_key_content = undefined;
-        // model_name is intentionally NOT cleared here, as it's used for public APIs too.
+        payload.use_vertex_ai = false;
+        // Ensure nickname and model_name are present for custom endpoint
+        if (!payload.nickname) payload.nickname = 'Endpoint Personalizado';
+        if (!payload.model_name) payload.model_name = 'custom-model';
+      } else {
+        // If not using Vertex AI or custom endpoint, clear Vertex AI specific fields and custom endpoint fields
+        payload.project_id = undefined;
+        payload.location_id = undefined;
+        payload.json_key_content = undefined;
+        payload.use_vertex_ai = false;
+        payload.api_endpoint = undefined;
       }
 
       const response = await fetch('/api/ai-keys', {
@@ -500,7 +599,49 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                     </>
                   )}
 
-                  {selectedProvider !== 'google_gemini' && (
+                  {isCustomEndpoint && (
+                    <>
+                      <FormField control={form.control} name="nickname" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Apodo</FormLabel>
+                          <FormControl><Input placeholder="Ej: Mi LLM Personalizado" {...field} disabled={isSubmitting} /></FormControl>
+                          <FormDescription>
+                            Este apodo se mostrará en el selector de modelos del chat.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={form.control} name="api_endpoint" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Link del Endpoint</FormLabel>
+                          <FormControl><Input placeholder="https://tu-api.com/v1/chat/completions" {...field} disabled={isSubmitting} /></FormControl>
+                          <FormDescription>
+                            La URL completa de tu endpoint de chat (ej. compatible con OpenAI API).
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={form.control} name="api_key" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>API Key</FormLabel>
+                          <FormControl><Input type="password" placeholder={editingKeyId ? "Dejar en blanco para no cambiar" : "Pega tu API key aquí"} {...field} disabled={isSubmitting} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={form.control} name="model_name" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>ID del Modelo</FormLabel>
+                          <FormControl><Input placeholder="Ej: gpt-4o, llama3-8b-chat" {...field} disabled={isSubmitting} /></FormControl>
+                          <FormDescription>
+                            El ID del modelo que tu endpoint espera (ej. 'gpt-4o').
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    </>
+                  )}
+
+                  {!isGoogleGemini && !isCustomEndpoint && (
                     <FormField control={form.control} name="api_key" render={({ field }) => (
                       <FormItem>
                         <FormLabel>API Key</FormLabel>
@@ -510,8 +651,8 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                     )} />
                   )}
 
-                  {/* Conditional rendering for Nickname field */}
-                  {!isGoogleGemini && (
+                  {/* Conditional rendering for Nickname field (only for non-Google Gemini and non-Custom Endpoint) */}
+                  {!isGoogleGemini && !isCustomEndpoint && (
                     <FormField control={form.control} name="nickname" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Apodo (Opcional)</FormLabel>
@@ -548,7 +689,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                   <TableRow>
                     <TableHead>Apodo</TableHead>
                     <TableHead>Proveedor</TableHead>
-                    <TableHead>Clave / Configuración Vertex AI</TableHead>
+                    <TableHead>Clave / Configuración</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -563,7 +704,13 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                         <TableCell>{key.nickname || 'N/A'}</TableCell>
                         <TableCell>{providerOptions.find(p => p.value === key.provider)?.label || key.provider}</TableCell>
                         <TableCell className="font-mono text-xs">
-                          {key.use_vertex_ai ? (
+                          {key.provider === 'custom_endpoint' ? (
+                            <div className="flex flex-col">
+                              <span>Endpoint: {key.api_endpoint || 'N/A'}</span>
+                              <span className="text-muted-foreground">Modelo ID: {key.model_name || 'N/A'}</span>
+                              <span className="text-muted-foreground">API Key: {key.api_key ? `${key.api_key.substring(0, 4)}...${key.api_key.substring(key.api_key.length - 4)}` : 'N/A'}</span>
+                            </div>
+                          ) : key.use_vertex_ai ? (
                             <div className="flex flex-col">
                               <span>Vertex AI (Activo)</span>
                               <span className="text-muted-foreground">Project: {key.project_id || 'N/A'}</span>

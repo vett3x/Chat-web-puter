@@ -12,6 +12,7 @@ export interface ApiKey {
   location_id: string | null;
   use_vertex_ai: boolean;
   model_name: string | null;
+  api_endpoint: string | null; // New
 }
 
 export function useUserApiKeys() {
