@@ -293,6 +293,9 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                             <FormItem>
                               <FormLabel>Google Cloud Project ID</FormLabel>
                               <FormControl><Input placeholder="tu-id-de-proyecto" {...field} disabled={isSubmitting} /></FormControl>
+                              <FormDescription>
+                                Puedes encontrar tu Project ID en el <a href="https://console.cloud.google.com/home/dashboard" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Dashboard de Google Cloud Console</a>.
+                              </FormDescription>
                               <FormMessage />
                             </FormItem>
                           )} />
@@ -300,6 +303,9 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                             <FormItem>
                               <FormLabel>Google Cloud Location ID</FormLabel>
                               <FormControl><Input placeholder="ej: us-central1 o global" {...field} disabled={isSubmitting} /></FormControl>
+                              <FormDescription>
+                                Consulta las <a href="https://cloud.google.com/vertex-ai/docs/general/locations" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">ubicaciones disponibles para Vertex AI</a>.
+                              </FormDescription>
                               <FormMessage />
                             </FormItem>
                           )} />
