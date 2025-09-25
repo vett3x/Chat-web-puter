@@ -13,6 +13,7 @@ export interface ApiKey {
   use_vertex_ai: boolean;
   model_name: string | null;
   api_endpoint: string | null; // New
+  json_key_content: string | null; // FIXED: Added json_key_content
 }
 
 export function useUserApiKeys() {

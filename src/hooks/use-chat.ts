@@ -6,6 +6,8 @@ import { toast } from 'sonner';
 import { useSession } from '@/components/session-context-provider';
 import { AI_PROVIDERS } from '@/lib/ai-models';
 import { ApiKey } from '@/hooks/use-user-api-keys'; // NEW: Import ApiKey type
+import { GoogleGenerativeAI, Part } from '@google/generative-ai'; // Import GoogleGenerativeAI and Part
+import { GoogleAuth } from 'google-auth-library'; // Import GoogleAuth
 
 // Define unified part types
 interface TextPart {
@@ -135,6 +137,38 @@ function messageContentToApiFormat(content: Message['content']): string | PuterC
 
     return '';
 }
+
+// NEW: Helper to convert internal content parts to Gemini API parts
+const convertToGeminiParts = (content: Message['content']): Part[] => {
+  const parts: Part[] = [];
+  if (typeof content === 'string') {
+    parts.push({ text: content });
+  } else if (Array.isArray(content)) {
+    for (const part of content) {
+      if (part.type === 'text') {
+        parts.push({ text: part.text });
+      } else if (part.type === 'image_url') {
+        const url = part.image_url.url;
+        const match = url.match(/^data:(image\/\w+);base64,(.*)$/);
+        if (!match) {
+          console.warn("Skipping invalid image data URL format for Gemini:", url.substring(0, 50) + '...');
+          parts.push({ text: "[Unsupported Image]" });
+        } else {
+          const mimeType = match[1];
+          const data = match[2];
+          parts.push({ inlineData: { mimeType, data } });
+        }
+      } else if (part.type === 'code') {
+        // Convert code blocks to text for Gemini API
+        const codePart = part as CodePart;
+        const lang = codePart.language || '';
+        const filename = codePart.filename ? `:${codePart.filename}` : '';
+        parts.push({ text: `\`\`\`${lang}${filename}\n${codePart.code || ''}\n\`\`\`` });
+      }
+    }
+  }
+  return parts;
+};
 
 export function useChat({
   userId,
@@ -304,6 +338,39 @@ export function useChat({
     return { id: data.id, timestamp: new Date(data.created_at) };
   };
 
+  const sendMessage = useCallback(async (content: PuterContentPart[], messageText: string) => {
+    if (!userId) {
+      toast.error('No hay usuario autenticado.');
+      return;
+    }
+
+    let currentConversationId = conversationId;
+    if (!currentConversationId) {
+      setIsSendingFirstMessage(true);
+      currentConversationId = await createNewConversationInDB();
+      if (!currentConversationId) {
+        setIsSendingFirstMessage(false);
+        return;
+      }
+    }
+
+    const newUserMessage: Message = {
+      id: `user-${Date.now()}`,
+      conversation_id: currentConversationId,
+      content: content,
+      role: 'user',
+      timestamp: new Date(),
+      type: content.some(part => part.type === 'image_url') ? 'multimodal' : 'text',
+    };
+
+    setMessages(prev => [...prev, newUserMessage]);
+    setIsLoading(true);
+
+    await getAndStreamAIResponse(currentConversationId, [...messages, newUserMessage]);
+    setIsSendingFirstMessage(false); // Reset after first message is sent
+  }, [userId, conversationId, messages, createNewConversationInDB, getAndStreamAIResponse]);
+
+
   const getAndStreamAIResponse = async (convId: string, history: Message[]) => {
     setIsLoading(true);
     const tempTypingId = `assistant-typing-${Date.now()}`;
@@ -314,36 +381,131 @@ export function useChat({
     try {
       let response: any;
       let modelUsedForResponse: string;
+      let systemPromptContent: string;
+
+      if (appPrompt) {
+        systemPromptContent = `Eres un desarrollador experto en Next.js (App Router), TypeScript y Tailwind CSS. Tu tarea es generar los archivos necesarios para construir la aplicación que el usuario ha descrito: "${appPrompt}". REGLAS ESTRICTAS: 1. Responde ÚNICAMENTE con bloques de código. 2. Cada bloque de código DEBE representar un archivo completo. 3. Usa el formato \`\`\`language:ruta/del/archivo.tsx\`\`\` para cada bloque. 4. NO incluyas ningún texto conversacional, explicaciones, saludos o introducciones. Solo el código.`;
+      } else {
+        systemPromptContent = "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante.";
+      }
+
+      const systemMessage: PuterMessage = { role: 'system', content: systemPromptContent };
+      const messagesForApi = history.map(msg => ({
+        role: msg.role,
+        content: messageContentToApiFormat(msg.content),
+      }));
 
       if (selectedModel.startsWith('puter:')) {
         const actualModelForPuter = selectedModel.substring(6);
         modelUsedForResponse = selectedModel;
-        const puterMessages: PuterMessage[] = history.map(msg => ({
-          role: msg.role,
-          content: messageContentToApiFormat(msg.content),
-        }));
-        
-        let systemMessage: PuterMessage;
-        if (appPrompt) {
-          systemMessage = { role: 'system', content: `Eres un desarrollador experto en Next.js (App Router), TypeScript y Tailwind CSS. Tu tarea es generar los archivos necesarios para construir la aplicación que el usuario ha descrito: "${appPrompt}". REGLAS ESTRICTAS: 1. Responde ÚNICAMENTE con bloques de código. 2. Cada bloque de código DEBE representar un archivo completo. 3. Usa el formato \`\`\`language:ruta/del/archivo.tsx\`\`\` para cada bloque. 4. NO incluyas ningún texto conversacional, explicaciones, saludos o introducciones. Solo el código.` };
-        } else {
-          systemMessage = { role: 'system', content: "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante." };
-        }
-        response = await window.puter.ai.chat([systemMessage, ...puterMessages], { model: actualModelForPuter });
+        response = await window.puter.ai.chat([systemMessage, ...messagesForApi], { model: actualModelForPuter });
 
       } else if (selectedModel.startsWith('user_key:')) {
         const selectedKeyId = selectedModel.substring(9);
         modelUsedForResponse = selectedModel;
-        const apiResponse = await fetch('/api/ai/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: history.map(m => ({ role: m.role, content: messageContentToApiFormat(m.content) })),
-            selectedKeyId: selectedKeyId,
-          }),
-        });
-        response = await apiResponse.json();
-        if (!apiResponse.ok) throw new Error(response.message || 'Error en la API de IA.');
+
+        const keyDetails = userApiKeys.find(key => key.id === selectedKeyId);
+        if (!keyDetails) {
+          throw new Error('No se encontró una API key activa con el ID proporcionado para este usuario. Por favor, verifica la Gestión de API Keys.');
+        }
+
+        if (keyDetails.provider === 'google_gemini') {
+          const geminiMessages = history.map(msg => ({
+            role: msg.role === 'assistant' ? 'model' : 'user',
+            parts: convertToGeminiParts(msg.content),
+          }));
+
+          if (keyDetails.use_vertex_ai) {
+            const project = keyDetails.project_id;
+            const location = keyDetails.location_id;
+            const jsonKeyContent = keyDetails.json_key_content;
+            const finalModel = keyDetails.model_name;
+
+            if (!project || !location || !jsonKeyContent || !finalModel) {
+              throw new Error('Configuración incompleta para Google Vertex AI. Revisa la Gestión de API Keys.');
+            }
+
+            const credentials = JSON.parse(jsonKeyContent);
+            const auth = new GoogleAuth({
+              credentials,
+              scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+            });
+            const client = await auth.getClient();
+            const accessToken = (await client.getAccessToken()).token;
+
+            if (!accessToken) {
+              throw new Error('No se pudo obtener el token de acceso para Vertex AI.');
+            }
+
+            const vertexAiUrl = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${finalModel}:generateContent`;
+
+            const vertexAiResponse = await fetch(vertexAiUrl, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ contents: geminiMessages }),
+            });
+
+            if (!vertexAiResponse.ok) {
+              const errorText = await vertexAiResponse.text();
+              throw new Error(`Vertex AI API returned an error: ${vertexAiResponse.status} - ${errorText.substring(0, 200)}...`);
+            }
+
+            const vertexAiResult = await vertexAiResponse.json();
+            if (vertexAiResult.error) {
+              throw new Error(vertexAiResult.error?.message || `Error en la API de Vertex AI: ${JSON.stringify(vertexAiResult)}`);
+            }
+            response = { message: { content: vertexAiResult.candidates?.[0]?.content?.parts?.[0]?.text || 'No se pudo obtener una respuesta de texto de Vertex AI.' } };
+
+          } else { // Public Gemini API
+            const apiKey = keyDetails.api_key;
+            const finalModel = keyDetails.model_name;
+            if (!apiKey || !finalModel) {
+              throw new Error('API Key o modelo no configurado para Google Gemini. Revisa la Gestión de API Keys.');
+            }
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const result = await genAI.getGenerativeModel(finalModel).generateContent({ contents: geminiMessages }); // FIXED: genAI.models.generateContent to genAI.getGenerativeModel(finalModel).generateContent
+            response = { message: { content: result.text } };
+          }
+        } else if (keyDetails.provider === 'custom_endpoint') {
+          const customApiKey = keyDetails.api_key;
+          const customEndpointUrl = keyDetails.api_endpoint;
+          const customModelId = keyDetails.model_name;
+
+          if (!customEndpointUrl || !customApiKey || !customModelId) {
+            throw new Error('Configuración incompleta para el endpoint personalizado. Revisa la Gestión de API Keys.');
+          }
+
+          const customApiMessages = history.map(msg => ({
+            role: msg.role === 'assistant' ? 'assistant' : 'user', // Custom endpoints often expect 'assistant' for model responses
+            content: messageContentToApiFormat(msg.content),
+          }));
+
+          const customEndpointResponse = await fetch(customEndpointUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${customApiKey}`,
+            },
+            body: JSON.stringify({
+              model: customModelId,
+              messages: customApiMessages,
+            }),
+          });
+
+          if (!customEndpointResponse.ok) {
+            const errorText = await customEndpointResponse.text();
+            throw new Error(`Custom Endpoint API returned an error: ${customEndpointResponse.status} - ${errorText.substring(0, 200)}...`);
+          }
+
+          const customEndpointResult = await customEndpointResponse.json();
+          response = { message: { content: customEndpointResult.choices?.[0]?.message?.content || 'No se pudo obtener una respuesta del endpoint personalizado.' } };
+
+        } else {
+          throw new Error('Proveedor de IA no válido seleccionado.');
+        }
       } else {
         throw new Error('Modelo de IA no válido seleccionado.');
       }
@@ -419,38 +581,6 @@ export function useChat({
     }
   };
 
-  const sendMessage = async (userContent: PuterContentPart[], messageText: string) => {
-    if (isLoading || !isPuterReady || !userId) return;
-
-    let currentConvId = conversationId;
-    if (!currentConvId) {
-      setIsSendingFirstMessage(true);
-      currentConvId = await createNewConversationInDB();
-      if (!currentConvId) {
-        setIsLoading(false);
-        setIsSendingFirstMessage(false);
-        return;
-      }
-    }
-    const finalConvId = currentConvId;
-
-    const userMessage: Message = {
-      id: `user-${Date.now()}`,
-      conversation_id: finalConvId,
-      content: userContent.length > 1 || userContent.some(p => p.type === 'image_url') ? userContent : messageText,
-      role: 'user',
-      timestamp: new Date(),
-      type: userContent.some(p => p.type === 'image_url') ? 'multimodal' : 'text',
-    };
-    
-    const newMessages = [...messages, userMessage];
-    setMessages(newMessages);
-    
-    await getAndStreamAIResponse(finalConvId, newMessages);
-    
-    if (!conversationId) setIsSendingFirstMessage(false);
-  };
-
   const regenerateLastResponse = useCallback(async () => {
     if (isLoading) return;
     const lastUserMessageIndex = messages.findLastIndex(m => m.role === 'user');
@@ -464,7 +594,7 @@ export function useChat({
     if (convId) {
       await getAndStreamAIResponse(convId, historyForRegen);
     }
-  }, [isLoading, messages]);
+  }, [isLoading, messages, getAndStreamAIResponse]);
 
   const reapplyFilesFromMessage = async (message: Message) => {
     if (!appId) {
