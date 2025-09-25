@@ -12,6 +12,10 @@ export const AI_PROVIDERS = [
     models: [ // These are fallback/example models, actual models will come from user keys
       { value: 'gemini-1.5-flash-latest', label: 'Gemini 1.5 Flash' },
       { value: 'gemini-1.5-pro-latest', label: 'Gemini 1.5 Pro' },
+      { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+      { value: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite' },
+      { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+      { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
       // Add public API models for Gemini here
       { value: 'gemini-pro', label: 'Gemini Pro (API Pública)' },
       { value: 'gemini-pro-vision', label: 'Gemini Pro Vision (API Pública)' },
