@@ -19,6 +19,11 @@ async function getSupabaseClient() {
   );
 }
 
+// Define unified part types for internal API handling
+interface TextPart { type: 'text'; text: string; }
+interface ImagePart { type: 'image_url'; image_url: { url: string }; }
+type PuterContentPart = TextPart | ImagePart; // This is what messageContentToApiFormat now returns in an array
+
 export async function POST(req: NextRequest) {
   const supabase = await getSupabaseClient();
   const { data: { session } } = await supabase.auth.getSession();
@@ -47,6 +52,32 @@ export async function POST(req: NextRequest) {
 
     let genAI: GoogleGenAI;
     let finalModel = keyDetails.model_name;
+
+    const convertToGeminiParts = (content: string | PuterContentPart[]): Part[] => { // MODIFIED: Expect string or PuterContentPart[]
+      const parts: Part[] = [];
+      if (typeof content === 'string') {
+        parts.push({ text: content });
+      } else if (Array.isArray(content)) {
+        for (const part of content) {
+          if (part.type === 'text') {
+            parts.push({ text: part.text });
+          } else if (part.type === 'image_url') {
+            const url = part.image_url.url;
+            const match = url.match(/^data:(image\/\w+);base64,(.*)$/);
+            if (!match) {
+              console.warn("Skipping invalid image data URL format for Gemini:", url.substring(0, 50) + '...');
+              parts.push({ text: "[Unsupported Image]" });
+            } else {
+              const mimeType = match[1];
+              const data = match[2];
+              parts.push({ inlineData: { mimeType, data } });
+            }
+          }
+          // No need for 'code' type here, as it's converted to 'text' in use-chat.ts
+        }
+      }
+      return parts;
+    };
 
     if (keyDetails.use_vertex_ai) {
       const project = keyDetails.project_id;
@@ -78,39 +109,9 @@ export async function POST(req: NextRequest) {
 
       const vertexAiUrl = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${finalModel}:generateContent`;
 
-      const convertToVertexAIParts = (content: any): Part[] => {
-        const parts: Part[] = [];
-        if (typeof content === 'string') {
-          parts.push({ text: content });
-        } else if (Array.isArray(content)) {
-          for (const part of content) {
-            if (part.type === 'text') {
-              parts.push({ text: part.text });
-            } else if (part.type === 'image_url') {
-              const url = part.image_url.url;
-              const match = url.match(/^data:(image\/\w+);base64,(.*)$/);
-              if (!match) {
-                console.warn("Skipping invalid image data URL format for Vertex AI:", url.substring(0, 50) + '...');
-                parts.push({ text: "[Unsupported Image]" });
-              } else {
-                const mimeType = match[1];
-                const data = match[2];
-                parts.push({ inlineData: { mimeType, data } });
-              }
-            } else if (part.type === 'code') {
-              const codePart = part as { language?: string; filename?: string; code?: string };
-              const lang = codePart.language ? `(${codePart.language})` : '';
-              const filename = codePart.filename ? `[${codePart.filename}]` : '';
-              parts.push({ text: `\`\`\`${lang}${filename}\n${codePart.code || ''}\n\`\`\`` });
-            }
-          }
-        }
-        return parts;
-      };
-
       const contents = messages.map((msg: any) => ({
         role: msg.role === 'assistant' ? 'model' : 'user',
-        parts: convertToVertexAIParts(msg.content),
+        parts: convertToGeminiParts(msg.content), // Use the unified converter
       }));
 
       const vertexAiResponse = await fetch(vertexAiUrl, {
@@ -146,42 +147,12 @@ export async function POST(req: NextRequest) {
       }
       genAI = new GoogleGenAI({ apiKey });
       if (!finalModel) {
-        finalModel = 'gemini-1.5-flash-latest';
+        finalModel = 'gemini-1.5-flash-latest'; // Fallback to a default if not set
       }
-
-      const convertToGeminiParts = (content: any): Part[] => {
-        const parts: Part[] = [];
-        if (typeof content === 'string') {
-          parts.push({ text: content });
-        } else if (Array.isArray(content)) {
-          for (const part of content) {
-            if (part.type === 'text') {
-              parts.push({ text: part.text });
-            } else if (part.type === 'image_url') {
-              const url = part.image_url.url;
-              const match = url.match(/^data:(image\/\w+);base64,(.*)$/);
-              if (!match) {
-                console.warn("Skipping invalid image data URL format for Gemini:", url.substring(0, 50) + '...');
-                parts.push({ text: "[Unsupported Image]" });
-              } else {
-                const mimeType = match[1];
-                const data = match[2];
-                parts.push({ inlineData: { mimeType, data } });
-              }
-            } else if (part.type === 'code') {
-              const codePart = part as { language?: string; filename?: string; code?: string };
-              const lang = codePart.language ? `(${codePart.language})` : '';
-              const filename = codePart.filename ? `[${codePart.filename}]` : '';
-              parts.push({ text: `\`\`\`${lang}${filename}\n${codePart.code || ''}\n\`\`\`` });
-            }
-          }
-        }
-        return parts;
-      };
 
       const contents = messages.map((msg: any) => ({
         role: msg.role === 'assistant' ? 'model' : 'user',
-        parts: convertToGeminiParts(msg.content),
+        parts: convertToGeminiParts(msg.content), // Use the unified converter
       }));
 
       const result = await genAI.models.generateContent({ model: finalModel, contents });

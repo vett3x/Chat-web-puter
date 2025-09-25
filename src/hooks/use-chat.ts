@@ -30,7 +30,7 @@ type PuterContentPart = TextPart | ImagePart;
 
 interface PuterMessage {
   role: 'user' | 'assistant' | 'system';
-  content: string | (string | PuterContentPart)[]; // MODIFIED: Allow array to contain strings (for code blocks)
+  content: string | PuterContentPart[]; // MODIFIED: Content is now string or array of PuterContentPart objects
 }
 
 // Add global declaration for window.puter to fix TypeScript errors
@@ -110,29 +110,29 @@ function parseAiResponseToRenderableParts(content: string): RenderablePart[] {
   return parts.length > 0 ? parts : [{ type: 'text', text: content }];
 }
 
-function messageContentToApiFormat(content: Message['content']): string | (string | PuterContentPart)[] { // MODIFIED return type
+function messageContentToApiFormat(content: Message['content']): string | PuterContentPart[] { // MODIFIED return type
     if (typeof content === 'string') {
-        return content;
+        return content; // If it's a simple string, return it as is.
     }
 
     if (Array.isArray(content)) {
-        // The map function will produce an array of (string | PuterContentPart)
         return content.map((part) => {
-            switch (part.type) {
-                case 'text':
-                    return (part as TextPart).text;
-                case 'code':
-                    const codePart = part as CodePart;
-                    const lang = codePart.language || '';
-                    const filename = codePart.filename ? `:${codePart.filename}` : '';
-                    return `\`\`\`${lang}${filename}\n${codePart.code || ''}\n\`\`\``;
-                case 'image_url':
-                    return part; // Keep image_url parts as objects for multimodal APIs
+            if (part.type === 'text') {
+                return { type: 'text', text: part.text };
+            } else if (part.type === 'code') {
+                const codePart = part as CodePart;
+                const lang = codePart.language || '';
+                const filename = codePart.filename ? `:${codePart.filename}` : '';
+                // Convert code block to a text part with markdown formatting
+                return { type: 'text', text: `\`\`\`${lang}${filename}\n${codePart.code || ''}\n\`\`\`` };
+            } else if (part.type === 'image_url') {
+                return part; // Image parts are already in the correct format
             }
-        }).filter(Boolean) as (string | PuterContentPart)[]; // Filter out null/undefined and cast
+            return { type: 'text', text: '' }; // Fallback for unknown part types
+        }).filter(Boolean) as PuterContentPart[];
     }
 
-    return '';
+    return ''; // Fallback for unexpected content type
 }
 
 export function useChat({
