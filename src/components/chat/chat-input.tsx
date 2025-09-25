@@ -220,17 +220,18 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
             </DropdownMenuTrigger>
             <DropdownMenuContent side="top" align="end" className="w-64 bg-popover text-popover-foreground border-border rounded-lg">
               <DropdownMenuLabel className="text-sm font-semibold">Seleccionar Modelo de IA</DropdownMenuLabel>
-              <div className="p-2" onPointerDown={(e) => e.preventDefault()}>
-                <div className="relative">
+              <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="p-0 focus:bg-transparent focus:text-current">
+                <div className="relative mx-2 my-1 w-full">
                   <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Buscar modelo o clave..."
                     className="pl-8 h-8 text-sm"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
+                    onKeyDown={(e) => e.stopPropagation()}
                   />
                 </div>
-              </div>
+              </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-border" />
               {filteredProviderGroups.length === 0 ? (
                 <DropdownMenuItem disabled className="pl-8 cursor-not-allowed text-muted-foreground">
