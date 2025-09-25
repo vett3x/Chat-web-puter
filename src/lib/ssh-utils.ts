@@ -1,5 +1,4 @@
-import { Client } from 'ssh2'; // Import Client as value
-import type * as ssh2 from 'ssh2'; // Import ssh2 as a namespace for types
+import { Client as SshClient } from 'ssh2';
 
 interface SshCommandResult {
   stdout: string;
@@ -24,7 +23,7 @@ export async function executeSshCommand(
   serverDetails: ServerDetails,
   command: string
 ): Promise<SshCommandResult> {
-  const conn = new Client();
+  const conn = new SshClient();
   let stdout = '';
   let stderr = '';
   let exitCode = 1; // Default to non-zero exit code for errors
@@ -32,7 +31,7 @@ export async function executeSshCommand(
   try {
     await new Promise<void>((resolve, reject) => {
       conn.on('ready', () => {
-        conn.exec(command, (err: Error | undefined, stream: ssh2.ExecChannel) => { // Use ssh2.ExecChannel
+        conn.exec(command, (err, stream) => {
           if (err) {
             conn.end();
             return reject(new Error(`SSH exec error: ${err.message}`));
@@ -44,7 +43,7 @@ export async function executeSshCommand(
             resolve();
           });
         });
-      }).on('error', (err: Error) => { // Explicitly type err
+      }).on('error', (err) => {
         reject(new Error(`SSH connection error: ${err.message}`));
       }).connect({
         host: serverDetails.ip_address,
@@ -74,11 +73,11 @@ export async function writeRemoteFile(
   content: string,
   mode: string = '0600' // Keep as string for input, convert to number for sftp
 ): Promise<void> {
-  const conn = new Client();
+  const conn = new SshClient();
   try {
     await new Promise<void>((resolve, reject) => {
       conn.on('ready', () => {
-        conn.sftp((err: Error | undefined, sftp: ssh2.SFTPStream) => { // Use ssh2.SFTPStream
+        conn.sftp((err, sftp) => {
           if (err) {
             conn.end();
             return reject(new Error(`SFTP error: ${err.message}`));
@@ -97,7 +96,7 @@ export async function writeRemoteFile(
             reject(new Error(`Error writing file to remote server: ${writeErr.message}`));
           });
         });
-      }).on('error', (err: Error) => { // Explicitly type err
+      }).on('error', (err) => {
         reject(new Error(`SSH connection error for file write: ${err.message}`));
       }).connect({
         host: serverDetails.ip_address,

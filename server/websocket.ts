@@ -1,7 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { createClient } from '@supabase/supabase-js';
-import { Client } from 'ssh2'; // Import Client as a value for instantiation
-import type { ClientChannel, ExecChannel } from 'ssh2'; // Import types explicitly
+import { Client as SshClient } from 'ssh2';
+import type { ClientChannel } from 'ssh2';
 import type { IncomingMessage } from 'http';
 import { parse } from 'url';
 import dotenv from 'dotenv';
@@ -23,8 +23,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Use 'Client' as the type for the SSH client
-const activeConnections = new Map<string, { ws: WebSocket; ssh: InstanceType<typeof Client>; stream: ClientChannel }>();
+const activeConnections = new Map<string, { ws: WebSocket; ssh: SshClient; stream: ClientChannel }>();
 
 wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
   const connectionId = Math.random().toString(36).substring(7);
@@ -79,7 +78,7 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
     }
     console.log(`[WSS] ${connectionId} Server details fetched successfully. Attempting SSH connection to ${server.ip_address}:${server.ssh_port}`);
 
-    const ssh = new Client(); // Instantiate Client
+    const ssh = new SshClient();
     ssh.on('ready', () => {
       console.log(`[WSS] ${connectionId} SSH connection successful.`);
       
@@ -97,7 +96,7 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
       }
       
       console.log(`[WSS] ${connectionId} Executing command: "${command}"`);
-      ssh.exec(command, { pty }, (err: Error | undefined, stream: ExecChannel) => { // Explicitly type err and stream
+      ssh.exec(command, { pty }, (err, stream) => {
         if (err) {
           console.error(`[WSS] ${connectionId} ERROR: SSH exec error:`, err);
           ws.send(`\r\n\x1b[31m[SERVER] Error al ejecutar comando en SSH: ${err.message}\x1b[0m\r\n`);
@@ -137,7 +136,7 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
           ws.send(`\r\n\x1b[31m[SERVER ERROR] ${data.toString()}\x1b[0m\r\n`);
         });
       });
-    }).on('error', (err: Error) => { // Explicitly type err
+    }).on('error', (err) => {
       console.error(`[WSS] ${connectionId} ERROR: SSH connection error:`, err);
       ws.send(`\r\n\x1b[31m[SERVER] Error de conexión SSH: ${err.message}\x1b[0m\r\n`);
       ws.close();
