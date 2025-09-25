@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const APP_VERSION = "v0.4b Stable";
-const BUILD_NUMBER = "665"; // Updated build number
+const BUILD_NUMBER = "666"; // Updated build number
 
 interface UpdateManagerDialogProps {
   open: boolean;
@@ -35,9 +35,8 @@ interface UpdateManagerDialogProps {
 
 interface UpdateCheckResponse {
   updateAvailable: boolean;
-  localPackageVersion: string; // Changed from localCommit
-  remotePackageVersion: string; // Changed from remoteCommit
-  // Removed newCommits
+  localPackageVersion: string;
+  remotePackageVersion: string;
 }
 
 export function UpdateManagerDialog({ open, onOpenChange }: UpdateManagerDialogProps) {
@@ -78,8 +77,6 @@ export function UpdateManagerDialog({ open, onOpenChange }: UpdateManagerDialogP
 
       setLogOutput(result.output);
       toast.success('Actualización completada. La aplicación se reiniciará.');
-      // The app will likely restart, so we might not see the final state.
-      // We can try to reload the page after a delay.
       setTimeout(() => window.location.reload(), 5000);
     } catch (error: any) {
       toast.error('Error durante la actualización.');
