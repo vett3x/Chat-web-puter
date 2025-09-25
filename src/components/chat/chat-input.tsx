@@ -259,7 +259,7 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
                         userKeysForProvider.map(key => {
                           const modelLabel = key.use_vertex_ai
                             ? `(Vertex AI: ${key.model_name || 'N/A'})`
-                            : `(${key.model_name || 'API Pública'})`;
+                            : `(${key.model_name || 'N/A'})`; // Changed from 'API Pública' to key.model_name
                           const displayLabel = key.nickname ? `${key.nickname} ${modelLabel}` : `${providerGroup.company} ${modelLabel}`;
                           const itemValue = `user_key:${key.id}`; // New format
 
