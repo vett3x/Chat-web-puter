@@ -9,18 +9,15 @@ export const AI_PROVIDERS = [
     logo: GoogleGeminiLogo,
     source: 'user_key', // This provider requires a user-provided API key
     value: 'google_gemini', // Added value for provider identification
-    models: [ // These are fallback/example models, actual models will come from user keys
-      { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
-      { value: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite' },
-      { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
-      { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-      // Public API models for Gemini
-      { value: 'gemini-2.0-flash-public-api', label: 'Gemini 2.0 Flash' },
-      { value: 'gemini-2.0-flash-lite-public-api', label: 'Gemini 2.0 Flash Lite' },
-      { value: 'gemini-2.5-pro-public-api', label: 'Gemini 2.5 Pro' },
-      { value: 'gemini-2.5-flash-public-api', label: 'Gemini 2.5 Flash' },
-      { value: 'gemini-pro-public-api', label: 'Gemini Pro' },
-      { value: 'gemini-pro-vision-public-api', label: 'Gemini Pro Vision' },
+    models: [
+      // Vertex AI Models
+      { value: 'gemini-1.5-flash-001', label: 'Gemini 1.5 Flash', apiType: 'vertex' },
+      { value: 'gemini-1.5-pro-001', label: 'Gemini 1.5 Pro', apiType: 'vertex' },
+      // Public API Models
+      { value: 'gemini-1.5-flash-latest', label: 'Gemini 1.5 Flash', apiType: 'public' },
+      { value: 'gemini-1.5-pro-latest', label: 'Gemini 1.5 Pro', apiType: 'public' },
+      { value: 'gemini-pro', label: 'Gemini Pro (Legacy)', apiType: 'public' },
+      { value: 'gemini-pro-vision', label: 'Gemini Pro Vision (Legacy)', apiType: 'public' },
     ],
   },
   {
@@ -29,10 +26,10 @@ export const AI_PROVIDERS = [
     source: 'puter', // This provider uses the integrated Puter.js service
     value: 'anthropic_claude', // Added value for provider identification
     models: [
-      { value: 'claude-sonnet-4', label: 'Claude Sonnet 4' },
-      { value: 'claude-opus-4', label: 'Claude Opus 4' },
-      { value: 'claude-3-7-sonnet', label: 'Claude 3.7 Sonnet' },
-      { value: 'claude-3-7-opus', label: 'Claude 3.7 Opus' },
+      { value: 'claude-sonnet-4', label: 'Claude Sonnet 4', apiType: 'puter' },
+      { value: 'claude-opus-4', label: 'Claude Opus 4', apiType: 'puter' },
+      { value: 'claude-3-7-sonnet', label: 'Claude 3.7 Sonnet', apiType: 'puter' },
+      { value: 'claude-3-7-opus', label: 'Claude 3.7 Opus', apiType: 'puter' },
     ],
   },
 ];

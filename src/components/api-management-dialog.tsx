@@ -425,7 +425,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                               <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
                                 <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
                                 <SelectContent>
-                                  {currentProviderModels.filter(m => !m.value.includes('-public-api')).map(model => (
+                                  {currentProviderModels.filter(m => m.apiType === 'vertex').map(model => (
                                     <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>
                                   ))}
                                 </SelectContent>
@@ -487,7 +487,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                               <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
                                 <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
                                 <SelectContent>
-                                  {currentProviderModels.filter(m => m.value.includes('-public-api')).map(model => (
+                                  {currentProviderModels.filter(m => m.apiType === 'public').map(model => (
                                     <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>
                                   ))}
                                 </SelectContent>
