@@ -1,5 +1,3 @@
-"use server";
-
 import { ChatMode } from '@/components/chat/chat-input';
 
 interface BuildSystemPromptArgs {
