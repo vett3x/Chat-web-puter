@@ -140,7 +140,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       project_id: key.project_id || '',
       location_id: key.location_id || '',
       use_vertex_ai: key.use_vertex_ai || false,
-      model_name: key.model_name || '',
+      model_name: key.model_name || '', // Pre-fill model_name
       json_key_file: undefined,
       json_key_content: undefined, // Don't pre-fill content, user must re-upload if needed
     });
@@ -368,7 +368,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                           <FormField control={form.control} name="model_name" render={({ field }) => (
                             <FormItem>
                               <FormLabel>Modelo de Gemini (Vertex AI)</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                              <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}> {/* Added || '' to value */}
                                 <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
                                 <SelectContent>
                                   {currentProviderModels.filter(m => !m.value.includes('-public-api')).map(model => (
@@ -429,8 +429,8 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                           )} />
                           <FormField control={form.control} name="model_name" render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Modelo de Gemini</FormLabel> {/* Removed (API Pública) */}
-                              <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                              <FormLabel>Modelo de Gemini</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}> {/* Added || '' to value */}
                                 <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
                                 <SelectContent>
                                   {currentProviderModels.filter(m => m.value.includes('-public-api')).map(model => (
