@@ -6,17 +6,19 @@ import { cookies } from 'next/headers';
 import { z } from 'zod';
 
 const apiKeySchema = z.object({
-  name: z.string().min(1),
-  api_endpoint: z.string().url(),
+  provider: z.string().min(1),
   api_key: z.string().min(1),
-  model_name: z.string().min(1),
+  nickname: z.string().optional(),
+  api_endpoint: z.string().url().optional(),
+  model_name: z.string().min(1).optional(),
 });
 
 const updateApiKeySchema = z.object({
-  id: z.string().uuid(),
-  name: z.string().min(1).optional(),
-  api_endpoint: z.string().url().optional(),
+  id: z.string().uuid().optional(), // Optional for update by provider
+  provider: z.string().min(1),
   api_key: z.string().min(10).optional(),
+  nickname: z.string().optional(),
+  api_endpoint: z.string().url().optional(),
   model_name: z.string().min(1).optional(),
 });
 
@@ -44,7 +46,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabase
     .from('user_api_keys')
-    .select('id, name, api_endpoint, model_name, api_key, is_active, created_at')
+    .select('id, provider, api_key, is_active, created_at, nickname, api_endpoint, model_name')
     .eq('user_id', session.user.id)
     .order('created_at', { ascending: false });
 
@@ -69,16 +71,13 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { name, api_endpoint, api_key, model_name } = apiKeySchema.parse(body);
+    const payload = apiKeySchema.parse(body);
 
     const { data, error } = await supabase
       .from('user_api_keys')
       .insert({
         user_id: session.user.id,
-        name,
-        api_endpoint,
-        api_key,
-        model_name,
+        ...payload,
       })
       .select()
       .single();
@@ -103,7 +102,7 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { id, ...updateData } = updateApiKeySchema.parse(body);
+    const { provider, ...updateData } = updateApiKeySchema.parse(body);
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ message: 'No se proporcionaron datos para actualizar.' }, { status: 400 });
@@ -113,7 +112,7 @@ export async function PUT(req: NextRequest) {
       .from('user_api_keys')
       .update(updateData)
       .eq('user_id', session.user.id)
-      .eq('id', id)
+      .eq('provider', provider)
       .select()
       .single();
 
