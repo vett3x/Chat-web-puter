@@ -6,6 +6,8 @@ import { cookies } from 'next/headers';
 import { SUPERUSER_EMAILS } from '@/lib/constants';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import path from 'path';
+import fs from 'fs/promises';
 
 const execAsync = promisify(exec);
 
@@ -32,6 +34,21 @@ async function getIsSuperAdmin(): Promise<boolean> {
   return profile?.role === 'super_admin';
 }
 
+// Simple semantic version comparison function
+function compareVersions(v1: string, v2: string): number {
+  const parts1 = v1.split('.').map(Number);
+  const parts2 = v2.split('.').map(Number);
+
+  for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+    const p1 = parts1[i] || 0;
+    const p2 = parts2[i] || 0;
+
+    if (p1 > p2) return 1;
+    if (p1 < p2) return -1;
+  }
+  return 0;
+}
+
 export async function GET(req: NextRequest) {
   const isSuperAdmin = await getIsSuperAdmin();
   if (!isSuperAdmin) {
@@ -43,19 +60,25 @@ export async function GET(req: NextRequest) {
 
   if (action === 'check') {
     try {
-      await execAsync('git fetch origin main');
-      const { stdout: localCommit } = await execAsync('git rev-parse HEAD');
-      const { stdout: remoteCommit } = await execAsync('git rev-parse origin/main');
-      const { stdout: newCommitsLog } = await execAsync('git log HEAD..origin/main --oneline');
+      // 1. Get local package.json version
+      const packageJsonPath = path.join(process.cwd(), 'package.json');
+      const localPackageJsonContent = await fs.readFile(packageJsonPath, 'utf-8');
+      const localPackageJson = JSON.parse(localPackageJsonContent);
+      const localPackageVersion = localPackageJson.version;
 
-      const updateAvailable = localCommit.trim() !== remoteCommit.trim();
-      const newCommits = newCommitsLog.trim().split('\n').filter(Boolean);
+      // 2. Fetch remote package.json version from origin/main
+      await execAsync('git fetch origin main');
+      const { stdout: remotePackageJsonContent } = await execAsync('git show origin/main:package.json');
+      const remotePackageJson = JSON.parse(remotePackageJsonContent);
+      const remotePackageVersion = remotePackageJson.version;
+
+      // 3. Compare versions
+      const updateAvailable = compareVersions(localPackageVersion, remotePackageVersion) < 0;
 
       return NextResponse.json({
         updateAvailable,
-        localCommit: localCommit.trim().substring(0, 7),
-        remoteCommit: remoteCommit.trim().substring(0, 7),
-        newCommits,
+        localPackageVersion,
+        remotePackageVersion,
       });
     } catch (error: any) {
       console.error('[API app-update/check] Error:', error);

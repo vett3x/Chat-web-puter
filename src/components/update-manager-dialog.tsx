@@ -11,7 +11,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, GitPullRequest, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react'; // Corrected icon import
+import { Loader2, GitPullRequest, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const APP_VERSION = "v0.4b Stable";
-const BUILD_NUMBER = "553";
+const BUILD_NUMBER = "665"; // Updated build number
 
 interface UpdateManagerDialogProps {
   open: boolean;
@@ -35,9 +35,9 @@ interface UpdateManagerDialogProps {
 
 interface UpdateCheckResponse {
   updateAvailable: boolean;
-  localCommit: string;
-  remoteCommit: string;
-  newCommits: string[];
+  localPackageVersion: string; // Changed from localCommit
+  remotePackageVersion: string; // Changed from remoteCommit
+  // Removed newCommits
 }
 
 export function UpdateManagerDialog({ open, onOpenChange }: UpdateManagerDialogProps) {
@@ -56,9 +56,9 @@ export function UpdateManagerDialog({ open, onOpenChange }: UpdateManagerDialogP
 
       setUpdateInfo(result);
       if (result.updateAvailable) {
-        setLogOutput(`¡Actualización disponible!\n\nVersión local: ${result.localCommit}\nVersión remota: ${result.remoteCommit}\n\nNuevos commits:\n${result.newCommits.join('\n')}`);
+        setLogOutput(`¡Actualización disponible!\n\nVersión local (package.json): ${result.localPackageVersion}\nVersión remota (package.json): ${result.remotePackageVersion}`);
       } else {
-        setLogOutput('Ya estás en la última versión.');
+        setLogOutput(`Ya estás en la última versión.\n\nVersión local (package.json): ${result.localPackageVersion}\nVersión remota (package.json): ${result.remotePackageVersion}`);
       }
     } catch (error: any) {
       toast.error('Error al comprobar las actualizaciones.');
@@ -104,7 +104,10 @@ export function UpdateManagerDialog({ open, onOpenChange }: UpdateManagerDialogP
           <div className="text-sm">
             <p>Versión Actual: <span className="font-semibold">{APP_VERSION} (Compilación {BUILD_NUMBER})</span></p>
             {updateInfo && (
-              <p>Commit Local: <span className="font-mono text-xs bg-muted p-1 rounded">{updateInfo.localCommit}</span></p>
+              <>
+                <p>Versión Local (package.json): <span className="font-mono text-xs bg-muted p-1 rounded">{updateInfo.localPackageVersion}</span></p>
+                <p>Versión Remota (package.json): <span className="font-mono text-xs bg-muted p-1 rounded">{updateInfo.remotePackageVersion}</span></p>
+              </>
             )}
           </div>
           <div className="w-full bg-black text-white font-mono text-xs rounded-md p-4 h-64 overflow-y-auto">
