@@ -350,7 +350,7 @@ export function useChat({
       let systemPromptContent: string;
 
       if (appPrompt) {
-        systemPromptContent = `Eres un desarrollador experto en Next.js (App Router), TypeScript y Tailwind CSS. Tu tarea es generar los archivos necesarios para construir la aplicación que el usuario ha descrito: "${appPrompt}". REGLAS ESTRICTAS: 1. Responde ÚNICAMENTE con bloques de código. 2. Cada bloque de código DEBE representar un archivo completo. 3. Usa el formato \`\`\`language:ruta/del/archivo.tsx\`\`\` para cada bloque. 4. NO incluyas ningún texto conversacional, explicaciones, saludos o introducciones. Solo el código.`;
+        systemPromptContent = `Eres un desarrollador experto en Next.js (App Router), TypeScript y Tailwind CSS. Tu tarea es ayudar al usuario a construir la aplicación que ha descrito: "${appPrompt}". REGLAS: 1. Primero, explica tu plan de acción en texto normal. 2. Después de tu explicación, pregunta al usuario si está de acuerdo antes de generar cualquier código. 3. Si el usuario aprueba, genera ÚNICAMENTE los bloques de código necesarios para los archivos completos. 4. Usa el formato \`\`\`language:ruta/del/archivo.tsx\`\`\` para cada bloque. 5. NO incluyas texto conversacional junto con los bloques de código en la respuesta final de código.`;
       } else {
         systemPromptContent = "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante.";
       }
