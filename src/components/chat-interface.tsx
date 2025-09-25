@@ -38,6 +38,8 @@ export function ChatInterface({
     isLoading,
     isPuterReady,
     selectedApiKeyId,
+    availableKeys,
+    setAvailableKeys,
     handleModelChange,
     sendMessage,
     regenerateLastResponse,
@@ -110,6 +112,8 @@ export function ChatInterface({
           onModelChange={handleModelChange}
           sendMessage={sendMessage}
           isAppChat={isAppChat}
+          availableKeys={availableKeys}
+          setAvailableKeys={setAvailableKeys}
         />
       </div>
     </div>

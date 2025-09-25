@@ -15,6 +15,7 @@ import {
 import Image from 'next/image';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { AI_PROVIDERS } from '@/lib/ai-models';
 
 interface PuterTextContentPart { type: 'text'; text: string; }
 interface PuterImageContentPart { type: 'image_url'; image_url: { url: string; }; }
@@ -23,9 +24,11 @@ type PuterContentPart = PuterTextContentPart | PuterImageContentPart;
 interface ChatInputProps {
   isLoading: boolean;
   selectedApiKeyId: string | null;
-  onModelChange: (apiKeyId: string) => void;
+  onModelChange: (apiKeyId: string | null) => void;
   sendMessage: (content: PuterContentPart[], messageText: string) => void;
   isAppChat?: boolean;
+  availableKeys: ApiKey[];
+  setAvailableKeys: (keys: ApiKey[]) => void;
 }
 
 interface SelectedFile {
@@ -36,14 +39,14 @@ interface SelectedFile {
 
 interface ApiKey {
   id: string;
-  name: string;
-  model_name: string;
+  provider: string;
+  model_name: string | null;
+  nickname: string | null;
 }
 
-export function ChatInput({ isLoading, selectedApiKeyId, onModelChange, sendMessage, isAppChat = false }: ChatInputProps) {
+export function ChatInput({ isLoading, selectedApiKeyId, onModelChange, sendMessage, isAppChat = false, availableKeys, setAvailableKeys }: ChatInputProps) {
   const [inputMessage, setInputMessage] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
-  const [availableKeys, setAvailableKeys] = useState<ApiKey[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -53,11 +56,17 @@ export function ChatInput({ isLoading, selectedApiKeyId, onModelChange, sendMess
         const data = await response.json();
         if (response.ok) {
           setAvailableKeys(data);
-          // If no key is selected, or the selected one is no longer available, select the first one.
-          if (!selectedApiKeyId || !data.some((k: ApiKey) => k.id === selectedApiKeyId)) {
-            if (data.length > 0) {
-              onModelChange(data[0].id);
-            }
+          // If no key is selected, or the selected one is no longer available, select the first available option.
+          const allOptions = [
+            ...AI_PROVIDERS.filter(p => p.source === 'puter').flatMap(p => p.models.map(m => m.value)),
+            ...data.map((k: ApiKey) => k.id)
+          ];
+          const currentSelectionIsValid = allOptions.includes(selectedApiKeyId || '');
+          
+          if (!currentSelectionIsValid && allOptions.length > 0) {
+            onModelChange(allOptions[0]);
+          } else if (!selectedApiKeyId && allOptions.length > 0) {
+            onModelChange(allOptions[0]);
           }
         }
       } catch (error) {
@@ -200,21 +209,37 @@ export function ChatInput({ isLoading, selectedApiKeyId, onModelChange, sendMess
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="top" align="end" className="w-64 bg-popover text-popover-foreground border-border rounded-lg">
-              <DropdownMenuLabel className="text-sm font-semibold">Seleccionar Configuración de API</DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-border" />
-              {availableKeys.length === 0 ? (
-                <DropdownMenuItem disabled>No hay claves configuradas</DropdownMenuItem>
-              ) : (
-                availableKeys.map((key) => (
-                  <DropdownMenuItem key={key.id} onClick={() => onModelChange(key.id)} className={cn("flex items-center justify-between cursor-pointer", selectedApiKeyId === key.id && "bg-accent text-accent-foreground")}>
-                    <div className="flex flex-col">
-                      <span className="font-medium">{key.name}</span>
-                      <span className="text-xs text-muted-foreground">{key.model_name}</span>
-                    </div>
-                    {selectedApiKeyId === key.id && <Check className="h-4 w-4 text-green-500" />}
-                  </DropdownMenuItem>
-                ))
-              )}
+              {AI_PROVIDERS.map((provider) => {
+                const userKeysForProvider = availableKeys.filter(key => key.provider === provider.providerKey);
+                const hasPuterModels = provider.source === 'puter' && provider.models.length > 0;
+                const hasUserKeys = provider.source === 'user_key' && userKeysForProvider.length > 0;
+
+                if (!hasPuterModels && !hasUserKeys) return null;
+
+                return (
+                  <React.Fragment key={provider.company}>
+                    <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground flex items-center gap-2 pt-2">
+                      <provider.logo className="h-4 w-4" /> {provider.company}
+                    </DropdownMenuLabel>
+                    {hasPuterModels && provider.models.map(model => (
+                      <DropdownMenuItem key={model.value} onClick={() => onModelChange(model.value)} className={cn("flex items-center justify-between cursor-pointer", selectedApiKeyId === model.value && "bg-accent text-accent-foreground")}>
+                        <span>{model.label}</span>
+                        {selectedApiKeyId === model.value && <Check className="h-4 w-4 text-green-500" />}
+                      </DropdownMenuItem>
+                    ))}
+                    {hasUserKeys && userKeysForProvider.map(key => (
+                      <DropdownMenuItem key={key.id} onClick={() => onModelChange(key.id)} className={cn("flex items-center justify-between cursor-pointer", selectedApiKeyId === key.id && "bg-accent text-accent-foreground")}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{key.nickname || key.model_name}</span>
+                          <span className="text-xs text-muted-foreground">{key.model_name}</span>
+                        </div>
+                        {selectedApiKeyId === key.id && <Check className="h-4 w-4 text-green-500" />}
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator className="bg-border last:hidden" />
+                  </React.Fragment>
+                );
+              })}
             </DropdownMenuContent>
           </DropdownMenu>
           <Button onClick={handleSendMessage} disabled={isLoading || (!inputMessage.trim() && selectedFiles.length === 0)}>
