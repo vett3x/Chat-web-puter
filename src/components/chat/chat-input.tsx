@@ -257,10 +257,16 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
                       </DropdownMenuLabel>
                       {hasAnyKey ? (
                         userKeysForProvider.map(key => {
-                          const modelLabel = key.use_vertex_ai
-                            ? `(Vertex AI: ${key.model_name || 'N/A'})`
-                            : `(${key.model_name || 'N/A'})`; // Changed from 'API Pública' to key.model_name
-                          const displayLabel = key.nickname ? `${key.nickname} ${modelLabel}` : `${providerGroup.company} ${modelLabel}`;
+                          // Determine the display label based on nickname and Vertex AI usage
+                          let displayLabelContent: string;
+                          if (key.nickname) {
+                            displayLabelContent = key.nickname;
+                          } else if (key.use_vertex_ai) {
+                            displayLabelContent = `Vertex AI: ${key.model_name || 'N/A'}`;
+                          } else {
+                            displayLabelContent = key.model_name || 'N/A';
+                          }
+                          
                           const itemValue = `user_key:${key.id}`; // New format
 
                           return (
@@ -269,7 +275,7 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
                               onClick={() => onModelChange(itemValue)}
                               className={cn("flex items-center justify-between cursor-pointer pl-8", selectedModel === itemValue && "bg-accent text-accent-foreground")}
                             >
-                              <span>{displayLabel}</span>
+                              <span>{displayLabelContent}</span>
                               {selectedModel === itemValue && <Check className="h-4 w-4 text-green-500" />}
                             </DropdownMenuItem>
                           );
