@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
@@ -177,9 +176,9 @@ export function DraggableConversationCard({
   };
 
   return (
-    <Card
+    <div
       className={cn(
-        "cursor-pointer hover:bg-sidebar-accent transition-colors group relative",
+        "cursor-pointer hover:bg-sidebar-accent transition-colors group relative rounded-md flex items-center justify-between gap-1 py-1 px-1.5",
         selectedConversationId === conversation.id && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary",
         isDraggingOver && dropPosition === 'before' && "border-t-2 border-blue-500",
         isDraggingOver && dropPosition === 'after' && "border-b-2 border-blue-500"
@@ -192,78 +191,76 @@ export function DraggableConversationCard({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <CardContent className="py-1 px-1.5 flex items-center justify-between gap-1"> {/* Reduced vertical padding, adjusted horizontal */}
-        {isEditing ? (
-          <Input
-            ref={inputRef}
-            value={editingTitle}
-            onChange={(e) => setEditingTitle(e.target.value)}
-            onClick={(e) => e.stopPropagation()}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter') {
-                handleSaveEdit();
-              }
-            }}
-            onBlur={handleSaveEdit}
-            className="flex-1 bg-sidebar-background text-sidebar-foreground h-6 text-xs" // Reduced height
-          />
-        ) : (
-          <div className="flex items-center gap-1 flex-1 overflow-hidden"> {/* Reduced gap */}
-            <MessageSquare className="h-3 w-3 flex-shrink-0" /> {/* Smaller icon */}
-            <span className="text-xs truncate">{conversation.title}</span> {/* Smaller font size */}
-          </div>
-        )}
-        <div className="flex-shrink-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"> {/* Reduced gap */}
-          {isEditing ? (
-            <>
-              <Button variant="ghost" size="icon" onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleSaveEdit(); }} className="h-5 w-5"> {/* Smaller buttons */}
-                <Save className="h-3 w-3" /> {/* Smaller icon */}
-              </Button>
-              <Button variant="ghost" size="icon" onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsEditing(false); setEditingTitle(conversation.title); }} className="h-5 w-5"> {/* Smaller buttons */}
-                <X className="h-3 w-3" /> {/* Smaller icon */}
-              </Button>
-            </>
-          ) : (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-5 w-5"> {/* Smaller button */}
-                  <MoreVertical className="h-3 w-3" /> {/* Smaller icon */}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 bg-popover text-popover-foreground border-border">
-                <DropdownMenuItem onClick={(e: React.MouseEvent) => { e.stopPropagation(); onSelectConversation(conversation.id); }}>
-                  <MessageSquare className="mr-2 h-4 w-4" /> Abrir
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsEditing(true); }}>
-                  <Edit className="mr-2 h-4 w-4" /> Renombrar
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <AlertDialog open={isDeleting} onOpenChange={setIsDeleting}>
-                  <AlertDialogTrigger asChild>
-                    <DropdownMenuItem onSelect={(e: Event) => e.preventDefault()} className="text-destructive focus:text-destructive">
-                      <Trash2 className="mr-2 h-4 w-4" /> Eliminar
-                    </DropdownMenuItem>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Esta acción no se puede deshacer. Esto eliminará permanentemente tu conversación y todos sus mensajes.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleDeleteConversation(); }}>
-                        Eliminar
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+      {isEditing ? (
+        <Input
+          ref={inputRef}
+          value={editingTitle}
+          onChange={(e) => setEditingTitle(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+          onKeyPress={(e) => {
+            if (e.key === 'Enter') {
+              handleSaveEdit();
+            }
+          }}
+          onBlur={handleSaveEdit}
+          className="flex-1 bg-sidebar-background text-sidebar-foreground h-6 text-xs" // Reduced height
+        />
+      ) : (
+        <div className="flex items-center gap-1 flex-1 overflow-hidden"> {/* Reduced gap */}
+          <MessageSquare className="h-3 w-3 flex-shrink-0" /> {/* Smaller icon */}
+          <span className="text-xs truncate">{conversation.title}</span> {/* Smaller font size */}
         </div>
-      </CardContent>
-    </Card>
+      )}
+      <div className="flex-shrink-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"> {/* Reduced gap */}
+        {isEditing ? (
+          <>
+            <Button variant="ghost" size="icon" onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleSaveEdit(); }} className="h-5 w-5"> {/* Smaller buttons */}
+              <Save className="h-3 w-3" /> {/* Smaller icon */}
+            </Button>
+            <Button variant="ghost" size="icon" onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsEditing(false); setEditingTitle(conversation.title); }} className="h-5 w-5"> {/* Smaller buttons */}
+              <X className="h-3 w-3" /> {/* Smaller icon */}
+            </Button>
+          </>
+        ) : (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-5 w-5"> {/* Smaller button */}
+                <MoreVertical className="h-3 w-3" /> {/* Smaller icon */}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48 bg-popover text-popover-foreground border-border">
+              <DropdownMenuItem onClick={(e: React.MouseEvent) => { e.stopPropagation(); onSelectConversation(conversation.id); }}>
+                <MessageSquare className="mr-2 h-4 w-4" /> Abrir
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={(e: React.MouseEvent) => { e.stopPropagation(); setIsEditing(true); }}>
+                <Edit className="mr-2 h-4 w-4" /> Renombrar
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <AlertDialog open={isDeleting} onOpenChange={setIsDeleting}>
+                <AlertDialogTrigger asChild>
+                  <DropdownMenuItem onSelect={(e: Event) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                    <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                  </DropdownMenuItem>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta acción no se puede deshacer. Esto eliminará permanentemente tu conversación y todos sus mensajes.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleDeleteConversation(); }}>
+                      Eliminar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+    </div>
   );
 }

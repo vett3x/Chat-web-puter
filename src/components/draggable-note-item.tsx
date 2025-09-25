@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
@@ -104,9 +103,9 @@ export function DraggableNoteItem({ note, selected, onSelect, onDragStart, level
   const paddingLeft = `${level * 1.25 + 0.5}rem`;
 
   return (
-    <Card
+    <div
       className={cn(
-        "cursor-pointer hover:bg-sidebar-accent transition-colors group relative",
+        "cursor-pointer hover:bg-sidebar-accent transition-colors group relative rounded-md flex items-center justify-between gap-1 py-1 px-1.5",
         selected && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary"
       )}
       onClick={onSelect}
@@ -114,74 +113,72 @@ export function DraggableNoteItem({ note, selected, onSelect, onDragStart, level
       onDragStart={onDragStart}
       style={{ paddingLeft }}
     >
-      <CardContent className="py-1 px-1.5 flex items-center justify-between gap-1">
-        {isEditing ? (
-          <Input
-            ref={inputRef}
-            value={editingTitle}
-            onChange={(e) => setEditingTitle(e.target.value)}
-            onClick={(e) => e.stopPropagation()}
-            onKeyPress={(e) => e.key === 'Enter' && handleSaveEdit()}
-            onBlur={handleSaveEdit}
-            className="flex-1 bg-sidebar-background text-sidebar-foreground h-6 text-xs"
-          />
-        ) : (
-          <div className="flex items-center gap-1 flex-1 overflow-hidden">
-            <FileText className="h-3 w-3 flex-shrink-0" />
-            <span className="text-xs truncate">{note.title}</span>
-          </div>
-        )}
-        <div className="flex-shrink-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          {isEditing ? (
-            <>
-              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleSaveEdit(); }} className="h-5 w-5">
-                <Save className="h-3 w-3" />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setIsEditing(false); setEditingTitle(note.title); }} className="h-5 w-5">
-                <X className="h-3 w-3" />
-              </Button>
-            </>
-          ) : (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-5 w-5">
-                  <MoreVertical className="h-3 w-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 bg-popover text-popover-foreground border-border">
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelect(); }}>
-                  <FileText className="mr-2 h-4 w-4" /> Abrir
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}>
-                  <Edit className="mr-2 h-4 w-4" /> Renombrar
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <AlertDialog open={isDeleting} onOpenChange={setIsDeleting}>
-                  <AlertDialogTrigger asChild>
-                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
-                      <Trash2 className="mr-2 h-4 w-4" /> Eliminar
-                    </DropdownMenuItem>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Esta acción no se puede deshacer. Esto eliminará permanentemente tu nota.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={(e) => { e.stopPropagation(); handleDeleteNote(); }}>
-                        Eliminar
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+      {isEditing ? (
+        <Input
+          ref={inputRef}
+          value={editingTitle}
+          onChange={(e) => setEditingTitle(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+          onKeyPress={(e) => e.key === 'Enter' && handleSaveEdit()}
+          onBlur={handleSaveEdit}
+          className="flex-1 bg-sidebar-background text-sidebar-foreground h-6 text-xs"
+        />
+      ) : (
+        <div className="flex items-center gap-1 flex-1 overflow-hidden">
+          <FileText className="h-3 w-3 flex-shrink-0" />
+          <span className="text-xs truncate">{note.title}</span>
         </div>
-      </CardContent>
-    </Card>
+      )}
+      <div className="flex-shrink-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        {isEditing ? (
+          <>
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleSaveEdit(); }} className="h-5 w-5">
+              <Save className="h-3 w-3" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setIsEditing(false); setEditingTitle(note.title); }} className="h-5 w-5">
+              <X className="h-3 w-3" />
+            </Button>
+          </>
+        ) : (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-5 w-5">
+                <MoreVertical className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48 bg-popover text-popover-foreground border-border">
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelect(); }}>
+                <FileText className="mr-2 h-4 w-4" /> Abrir
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}>
+                <Edit className="mr-2 h-4 w-4" /> Renombrar
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <AlertDialog open={isDeleting} onOpenChange={setIsDeleting}>
+                <AlertDialogTrigger asChild>
+                  <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                    <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                  </DropdownMenuItem>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta acción no se puede deshacer. Esto eliminará permanentemente tu nota.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={(e) => { e.stopPropagation(); handleDeleteNote(); }}>
+                      Eliminar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+    </div>
   );
 }
