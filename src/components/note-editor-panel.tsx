@@ -11,7 +11,8 @@ import { NoteAiChat, ChatMessage } from './note-ai-chat';
 import { ApiKey } from '@/hooks/use-user-api-keys';
 
 // BlockNote imports
-import { BlockNoteView, useBlockNote } from "@blocknote/core";
+import { BlockNoteView, useBlockNote } from "@blocknote/react";
+import { BlockNoteEditor, Block } from "@blocknote/core"; // Corrected import for types
 import "@blocknote/core/style.css";
 import { useTheme } from 'next-themes';
 
@@ -42,7 +43,7 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
   const [showAiHint, setShowAiHint] = useState(false);
 
   const editor = useBlockNote({
-    onEditorContentChange: (editor) => {
+    onEditorContentChange: (editor: BlockNoteEditor) => {
       // For auto-saving, you could trigger a save here.
       // For now, we'll rely on the manual save button and title change.
     },
@@ -126,7 +127,7 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
   const noteContentForChat = useMemo(() => {
     if (!editor) return '';
     // Convert blocks to a plain text representation for the AI context
-    return editor.topLevelBlocks.map(block => editor.blockToMarkdown(block)).join('\n');
+    return editor.topLevelBlocks.map((block: Block) => editor.blockToMarkdown(block)).join('\n');
   }, [editor, editor?.topLevelBlocks]);
 
   if (isLoading || isLoadingApiKeys) {
