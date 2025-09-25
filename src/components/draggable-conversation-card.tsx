@@ -179,7 +179,7 @@ export function DraggableConversationCard({
     <div
       className={cn(
         "cursor-pointer hover:bg-sidebar-accent transition-colors group relative rounded-md flex items-center justify-between gap-1 py-1 px-1.5",
-        selectedConversationId === conversation.id && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary",
+        selectedConversationId === conversation.id && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary selected-indicator",
         isDraggingOver && dropPosition === 'before' && "border-t-2 border-blue-500",
         isDraggingOver && dropPosition === 'after' && "border-b-2 border-blue-500"
       )}

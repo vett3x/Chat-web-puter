@@ -181,3 +181,17 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  .selected-indicator::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 10%;
+    right: 10%;
+    height: 2px;
+    background: linear-gradient(to right, transparent, hsl(var(--primary-light-purple)), transparent);
+    box-shadow: 0 0 6px 1px hsl(var(--primary-light-purple) / 0.7);
+    border-radius: 2px;
+  }
+}
