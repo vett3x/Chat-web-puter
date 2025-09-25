@@ -184,7 +184,7 @@ export function ConversationSidebar({
         <div className="space-y-2">
           {isLoading ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />) : (
             <>
-              {renderSection("Proyectos", <Wand2 className="h-4 w-4" />, "apps", apps.map(app => {
+              {renderSection("PROYECTOS DeepAI CODER", <Wand2 className="h-4 w-4" />, "apps", apps.map(app => {
                 const isSelected = selectedItem?.type === 'app' && selectedItem.id === app.id;
                 return (
                   <div key={app.id}>
