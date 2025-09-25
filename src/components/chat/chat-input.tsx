@@ -15,7 +15,7 @@ import {
 import Image from 'next/image';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { AI_PROVIDERS } from '@/lib/ai-models';
+import { AI_PROVIDERS, getModelLabel } from '@/lib/ai-models'; // Import getModelLabel
 import GoogleGeminiLogo from '@/components/google-gemini-logo'; // Import explicitly for dynamic icon
 import ClaudeAILogo from '@/components/claude-ai-logo'; // Import explicitly for dynamic icon
 
@@ -261,10 +261,13 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
                           let displayLabelContent: string;
                           if (key.nickname) {
                             displayLabelContent = key.nickname;
-                          } else if (key.use_vertex_ai) {
-                            displayLabelContent = `Vertex AI: ${key.model_name || 'N/A'}`;
                           } else {
-                            displayLabelContent = key.model_name || 'N/A';
+                            const modelLabel = key.model_name ? getModelLabel(key.model_name) : '';
+                            if (key.use_vertex_ai) {
+                              displayLabelContent = `Vertex AI: ${modelLabel || 'Modelo no seleccionado'}`;
+                            } else {
+                              displayLabelContent = modelLabel || `${providerGroup.company} API Key`;
+                            }
                           }
                           
                           const itemValue = `user_key:${key.id}`; // New format
