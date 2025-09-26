@@ -91,8 +91,10 @@ export function ConstructionPlan({ content, onApprove, onRequestChanges, isAppro
             {section.icon}
             <h4>{section.title}</h4>
           </div>
-          <div className="prose prose-sm dark:prose-invert max-w-none pl-7 text-muted-foreground">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{section.content}</ReactMarkdown>
+          <div className="pl-7 text-muted-foreground">
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{section.content}</ReactMarkdown>
+            </div>
           </div>
         </div>
       ))}
