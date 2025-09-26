@@ -87,28 +87,32 @@ export function AlertsDialog({ open, onOpenChange }: AlertsDialogProps) {
                 <p>No hay alertas críticas.</p>
               </div>
             ) : (
-              <Table>
+              <Table className="table-fixed w-full">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[180px]">Fecha</TableHead>
-                    <TableHead className="w-[200px]">Tipo de Alerta</TableHead>
+                    <TableHead className="w-[220px]">Tipo de Alerta</TableHead>
                     <TableHead className="w-[150px]">Servidor</TableHead>
                     <TableHead>Descripción</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {alerts.map((alert) => (
-                    <TableRow key={alert.id} className="text-destructive/90">
-                      <TableCell className="text-xs font-mono">{format(new Date(alert.created_at), 'dd/MM/yyyy HH:mm:ss', { locale: es })}</TableCell>
-                      <TableCell className="font-medium text-xs flex items-center gap-1">
-                        <AlertTriangle className="h-3 w-3" />
-                        {alert.event_type}
+                    <TableRow key={alert.id} className="bg-destructive/10 hover:bg-destructive/20 text-destructive-foreground">
+                      <TableCell className="text-xs font-mono align-top">
+                        {format(new Date(alert.created_at), 'dd/MM/yyyy HH:mm:ss', { locale: es })}
                       </TableCell>
-                      <TableCell className="text-xs">{alert.server_name}</TableCell>
-                      <TableCell className="text-sm">
-                        {alert.description}
+                      <TableCell className="font-medium text-xs align-top">
+                        <div className="flex items-start gap-1">
+                          <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                          <span className="break-words">{alert.event_type}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs align-top">{alert.server_name}</TableCell>
+                      <TableCell className="text-sm align-top">
+                        <p className="break-words">{alert.description}</p>
                         {alert.command_details && (
-                          <pre className="mt-2 p-2 bg-muted/50 rounded-md font-mono text-xs whitespace-pre-wrap">
+                          <pre className="mt-2 p-2 bg-black/20 rounded-md font-mono text-xs whitespace-pre-wrap break-all">
                             {alert.command_details}
                           </pre>
                         )}
