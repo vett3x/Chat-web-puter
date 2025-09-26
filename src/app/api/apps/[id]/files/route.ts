@@ -149,8 +149,16 @@ export async function POST(req: NextRequest, context: any) {
     await fs.mkdir(localTempDir, { recursive: true });
     for (const file of files) {
       const localFilePath = path.join(localTempDir, file.path);
-      await fs.mkdir(path.dirname(localFilePath), { recursive: true });
-      await fs.writeFile(localFilePath, file.content);
+      
+      // Check if the path is likely a directory (ends with / or has no extension)
+      const isDirectory = file.path.endsWith('/') || !path.extname(file.path);
+
+      if (isDirectory) {
+        await fs.mkdir(localFilePath, { recursive: true });
+      } else {
+        await fs.mkdir(path.dirname(localFilePath), { recursive: true });
+        await fs.writeFile(localFilePath, file.content);
+      }
     }
 
     await executeSshCommand(server, `mkdir -p ${remoteTempDir}`);
