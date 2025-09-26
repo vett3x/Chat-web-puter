@@ -1,19 +1,41 @@
 "use server";
 
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { cookies } from 'next/headers';
-import { toast } from 'sonner';
+import { createServerClient, type CookieOptions, type CookieMethodsServer } from '@supabase/ssr';
+import { cookies, type ReadonlyRequestCookies, type Cookie } from 'next/headers'; // Importar ReadonlyRequestCookies y Cookie
 import { Message } from '@/types/chat';
 
 // Helper para obtener un cliente de Supabase para Server Actions
 async function getSupabaseServerClient() {
-  // Pasamos directamente la instancia de cookies() de next/headers.
-  // createServerClient sabe cómo usar los métodos get, set, remove de esta instancia.
+  const cookieStore: ReadonlyRequestCookies = cookies(); // Obtener la instancia de ReadonlyRequestCookies
+
+  const cookieMethods: CookieMethodsServer = {
+    get(name: string): string | undefined {
+      // Acceder al valor de la cookie, que es un string o undefined
+      return cookieStore.get(name)?.value;
+    },
+    getAll(): { name: string; value: string }[] {
+      // Mapear Cookie[] a { name: string, value: string }[]
+      return cookieStore.getAll().map((cookie: Cookie) => ({
+        name: cookie.name,
+        value: cookie.value,
+      }));
+    },
+    set(name: string, value: string, options: CookieOptions): void {
+      // En Server Actions, no se suelen establecer cookies de respuesta directamente de esta manera.
+      // Supabase maneja la configuración de cookies de autenticación implícitamente.
+      // Esta función es requerida por la interfaz, pero puede ser una operación nula aquí.
+    },
+    remove(name: string, options: CookieOptions): void {
+      // Similar a 'set', la eliminación directa de cookies de respuesta no es típica en Server Actions.
+      // Operación nula aquí.
+    },
+  };
+
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      cookies: cookies()
+      cookies: cookieMethods
     }
   );
 }
@@ -23,8 +45,6 @@ export const fetchConversationDetails = async (convId: string, userId: string) =
   const { data, error } = await supabase.from('conversations').select('id, title, model').eq('id', convId).eq('user_id', userId).single();
   if (error) {
     console.error('Error fetching conversation details:', error);
-    // No usar toast directamente en Server Actions, ya que no se ejecutan en el cliente.
-    // El error se propagará al cliente que llamó a esta acción.
     throw new Error('Error al cargar los detalles de la conversación.');
   }
   return data;
