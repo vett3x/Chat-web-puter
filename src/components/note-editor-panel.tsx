@@ -47,20 +47,30 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
   const editor = useCreateBlockNote();
 
   // Effect to update the markdown representation for the AI chat
-  // whenever the editor content changes.
+  // whenever the editor content changes, including on initial load.
   useEffect(() => {
     if (!editor) {
       return;
     }
-    const updateMarkdownContent = async () => {
-      const markdown = await editor.blocksToMarkdownLossy();
-      setNoteContentForChat(markdown);
-    };
-    
-    const debouncedUpdate = setTimeout(updateMarkdownContent, 500); // Debounce to avoid running on every keystroke
-    return () => clearTimeout(debouncedUpdate);
 
-  }, [editor, editor?.topLevelBlocks]);
+    let debounceTimeout: NodeJS.Timeout;
+
+    const handleContentChange = async () => {
+      clearTimeout(debounceTimeout);
+      debounceTimeout = setTimeout(async () => {
+        const markdown = await editor.blocksToMarkdownLossy();
+        setNoteContentForChat(markdown);
+      }, 500); // 500ms debounce
+    };
+
+    editor.onEditorContentChange(handleContentChange);
+
+    return () => {
+      // The user's previous errors indicate there's no standard way to unsubscribe.
+      // We will just clear our own timeout.
+      clearTimeout(debounceTimeout);
+    };
+  }, [editor]);
 
   const fetchNote = useCallback(async () => {
     if (!session?.user?.id || !noteId || !editor) return;
