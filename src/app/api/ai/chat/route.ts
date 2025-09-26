@@ -45,6 +45,47 @@ async function getSupabaseClient() {
   );
 }
 
+// Helper to convert internal content parts to a string for token counting and custom endpoints
+function messageContentToString(content: string | MessageContentPart[]): string {
+  if (typeof content === 'string') {
+    return content;
+  }
+  return content.map(part => {
+    if (part.type === 'text') return part.text;
+    if (part.type === 'code') return `\`\`\`${part.language || ''}${part.filename ? `:${part.filename}` : ''}\n${part.code || ''}\n\`\`\``;
+    if (part.type === 'image_url') return `[Imagen: ${part.image_url.url.substring(0, 30)}...]`;
+    return '';
+  }).join('\n\n');
+}
+
+// Helper to estimate token count (simple heuristic)
+const estimateTokens = (text: string) => Math.ceil(text.length / 4);
+
+// Helper to truncate message history based on token limit
+function truncateMessagesByTokenLimit(messages: any[], limit: number, systemPrompt: string) {
+  let totalTokens = estimateTokens(systemPrompt);
+  const truncatedMessages = [];
+
+  // Iterate backwards from the most recent message
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i];
+    const contentString = messageContentToString(message.content);
+    const messageTokens = estimateTokens(contentString);
+
+    if (totalTokens + messageTokens > limit) {
+      // Stop if adding the next message would exceed the limit
+      break;
+    }
+
+    truncatedMessages.unshift(message); // Add to the beginning to maintain order
+    totalTokens += messageTokens;
+  }
+
+  console.log(`[AI Context] Truncated context to ${totalTokens} tokens (limit: ${limit}). Kept ${truncatedMessages.length} of ${messages.length} messages.`);
+  return truncatedMessages;
+}
+
+
 // Helper to convert internal content parts to Gemini API parts
 const convertToGeminiParts = (content: string | MessageContentPart[]): Part[] => {
   const parts: Part[] = [];
@@ -76,20 +117,6 @@ const convertToGeminiParts = (content: string | MessageContentPart[]): Part[] =>
   return parts;
 };
 
-// Helper to convert internal content parts to a string for custom endpoints
-function messageContentToString(content: string | MessageContentPart[]): string {
-  if (typeof content === 'string') {
-    return content;
-  }
-  return content.map(part => {
-    if (part.type === 'text') return part.text;
-    if (part.type === 'code') return `\`\`\`${part.language || ''}${part.filename ? `:${part.filename}` : ''}\n${part.code || ''}\n\`\`\``;
-    if (part.type === 'image_url') return `[Imagen: ${part.image_url.url.substring(0, 30)}...]`;
-    return '';
-  }).join('\n\n');
-}
-
-
 export async function POST(req: NextRequest) {
   const supabase = await getSupabaseClient();
   const { data: { session } } = await supabase.auth.getSession();
@@ -115,20 +142,24 @@ export async function POST(req: NextRequest) {
 
     let finalModel = keyDetails.model_name;
     
+    // Determine token limit based on provider
+    const tokenLimit = keyDetails.provider === 'google_gemini' ? 1000000 : 200000;
+
+    // The system prompt is handled separately and always included
+    const systemPromptMessage = rawMessages.find(m => m.role === 'system');
+    const systemPrompt = systemPromptMessage ? messageContentToString(systemPromptMessage.content) : '';
+    const conversationMessages = rawMessages.filter(m => m.role !== 'system');
+
+    // Truncate conversation history
+    const truncatedMessages = truncateMessagesByTokenLimit(conversationMessages, tokenLimit, systemPrompt);
+
     if (keyDetails.provider === 'google_gemini') {
-      const messagesCopy = [...rawMessages]; // Create a mutable copy
-      let systemPrompt = '';
-
-      if (messagesCopy.length > 0 && messagesCopy[0].role === 'system') {
-        systemPrompt = typeof messagesCopy[0].content === 'string' ? messagesCopy[0].content : messageContentToString(messagesCopy[0].content);
-        messagesCopy.shift();
-      }
-
       const geminiFormattedMessages: { role: 'user' | 'model'; parts: Part[] }[] = [];
-      for (let i = 0; i < messagesCopy.length; i++) {
-        const msg = messagesCopy[i];
+      for (let i = 0; i < truncatedMessages.length; i++) {
+        const msg = truncatedMessages[i];
         if (msg.role === 'user') {
           let userParts = convertToGeminiParts(msg.content);
+          // Prepend system prompt to the first user message
           if (i === 0 && systemPrompt) {
             userParts = [{ text: systemPrompt + "\n\n" }, ...userParts];
           }
@@ -172,10 +203,13 @@ export async function POST(req: NextRequest) {
         throw new Error('Configuración incompleta para el endpoint personalizado.');
       }
 
-      const customApiMessages = rawMessages.map((msg: any) => ({
-        role: msg.role === 'assistant' ? 'assistant' : 'user',
-        content: messageContentToString(msg.content),
-      }));
+      const customApiMessages = [
+        { role: 'system', content: systemPrompt },
+        ...truncatedMessages.map((msg: any) => ({
+          role: msg.role === 'assistant' ? 'assistant' : 'user',
+          content: messageContentToString(msg.content),
+        })),
+      ];
 
       const customEndpointResponse = await fetch(customEndpointUrl, {
         method: 'POST',

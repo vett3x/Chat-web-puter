@@ -93,6 +93,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
   ];
 
   const suggestions = isAppChat ? appSuggestions : generalSuggestions;
+  const displayedMessages = messages.slice(-30); // Show only the last 30 messages
 
   return (
     <ScrollArea className="h-full" ref={scrollAreaRef}>
@@ -118,7 +119,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
             </div>
           </div>
         ) : (
-          messages.map((message: Message, index: number) => {
+          displayedMessages.map((message: Message, index: number) => {
             // Skip rendering the hidden internal user messages
             if (typeof message.content === 'string' && 
                 (message.content.endsWith('[USER_APPROVED_PLAN]') || 
@@ -127,7 +128,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
               return null;
             }
 
-            const isLastMessage = index === messages.length - 1;
+            const isLastMessage = index === displayedMessages.length - 1 && messages.length === displayedMessages.length;
             const hasFiles = Array.isArray(message.content) && message.content.some(part => (part as any).type === 'code' && (part as any).filename);
 
             return (
