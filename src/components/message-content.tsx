@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { CodeBlock } from './code-block';
 import { TextAnimator } from './text-animator';
-import Image from 'next/image'; // Importar el componente Image de Next.js
+import Image from 'next/image';
 
 // New types for multimodal content
 interface PuterTextContentPart {
@@ -18,8 +18,6 @@ interface PuterImageContentPart {
   };
 }
 
-type PuterContentPart = PuterTextContentPart | PuterImageContentPart;
-
 // Define a specific type for code block parts
 interface CodeBlockPart {
   type: 'code';
@@ -32,13 +30,11 @@ interface CodeBlockPart {
 type RenderablePart = PuterTextContentPart | PuterImageContentPart | CodeBlockPart;
 
 interface MessageContentProps {
-  content: string | PuterContentPart[]; // Updated to allow array of parts
+  content: string | RenderablePart[]; // Updated to allow array of parts
   isNew?: boolean;
-  aiResponseSpeed: 'slow' | 'normal' | 'fast'; // New prop for AI response speed
-  isAppChat?: boolean; // New prop to determine context
+  aiResponseSpeed: 'slow' | 'normal' | 'fast';
+  isAppChat?: boolean;
 }
-
-const codeBlockRegex = /```(\w+)(?::([\w./-]+))?\n([\s\S]*?)\n```/g;
 
 export function MessageContent({ content, isNew, aiResponseSpeed, isAppChat }: MessageContentProps) {
   const [animatedPartsCount, setAnimatedPartsCount] = useState(0);
@@ -69,7 +65,7 @@ export function MessageContent({ content, isNew, aiResponseSpeed, isAppChat }: M
           />
         </div>
       );
-    } else if (part.type === 'code') { // Handle CodeBlockPart directly
+    } else if (part.type === 'code') {
       return (
         <CodeBlock
           key={index}
@@ -85,72 +81,17 @@ export function MessageContent({ content, isNew, aiResponseSpeed, isAppChat }: M
     return null;
   };
 
-  // Parse content into a flat array of renderable parts
+  // The component now expects pre-parsed parts. The string parsing is done in the useChat hook.
   const renderableParts = React.useMemo(() => {
-    if (typeof content === 'string') {
-      const parsedParts: Array<{ type: 'text' | 'code'; value?: string; language?: string; filename?: string; code?: string; }> = [];
-      let lastIndex = 0;
-      let match;
-      
-      codeBlockRegex.lastIndex = 0;
-
-      while ((match = codeBlockRegex.exec(content)) !== null) {
-        if (match.index > lastIndex) {
-          parsedParts.push({
-            type: 'text' as const,
-            value: content.substring(lastIndex, match.index),
-          });
-        }
-        const codePart = {
-          type: 'code' as const,
-          language: match[1],
-          filename: match[2],
-          code: (match[3] || '').trim(),
-        };
-
-        // Only attempt to extract filename from code content if it's an app chat
-        if (isAppChat && !codePart.filename && codePart.code) {
-          const lines = codePart.code.split('\n');
-          const firstLine = lines[0].trim();
-          const pathRegex = /^(?:\/\/|#|\/\*|\*)\s*([\w./-]+\.[a-zA-Z]+)\s*\*?\/?$/;
-          const pathMatch = firstLine.match(pathRegex);
-          if (pathMatch && pathMatch[1]) {
-            codePart.filename = pathMatch[1];
-            codePart.code = lines.slice(1).join('\n').trim();
-          }
-        }
-
-        parsedParts.push(codePart);
-        lastIndex = match.index + match[0].length;
-      }
-
-      if (lastIndex < content.length) {
-        parsedParts.push({
-          type: 'text' as const,
-          value: content.substring(lastIndex),
-        });
-      }
-
-      if (parsedParts.length === 0 && content) {
-        parsedParts.push({ type: 'text' as const, value: content });
-      }
-      // Map to the RenderablePart union type
-      return parsedParts.map(p => {
-        if (p.type === 'text') {
-          return { type: 'text', text: p.value || '' } as PuterTextContentPart;
-        }
-        return {
-          type: 'code',
-          language: p.language,
-          filename: p.filename,
-          code: p.code || '',
-        } as CodeBlockPart;
-      });
-    } else if (Array.isArray(content)) {
+    if (Array.isArray(content)) {
       return content;
     }
+    // If it's a string, it's a simple text message or a plan that doesn't need parsing here.
+    if (typeof content === 'string') {
+        return [{ type: 'text', text: content }] as RenderablePart[];
+    }
     return [];
-  }, [content, isAppChat]);
+  }, [content]);
 
   useEffect(() => {
     if (isNew) {

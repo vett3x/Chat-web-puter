@@ -83,7 +83,8 @@ interface UseChatProps {
   chatMode: ChatMode;
 }
 
-const codeBlockRegex = /```(\w+)?(?::([\w./-]+))?\s*\n([\sS]*?)\s*```/g;
+// New, more robust regex to capture the entire info line after ```
+const codeBlockRegex = /```(.*)\n([\s\S]*?)\s*```/g;
 
 function parseAiResponseToRenderableParts(content: string, isAppChat: boolean): RenderablePart[] {
   const parts: RenderablePart[] = [];
@@ -92,16 +93,31 @@ function parseAiResponseToRenderableParts(content: string, isAppChat: boolean): 
   codeBlockRegex.lastIndex = 0;
 
   while ((match = codeBlockRegex.exec(content)) !== null) {
+    // Capture text before the code block
     if (match.index > lastIndex) {
       const textPart = content.substring(lastIndex, match.index).trim();
       if (textPart) parts.push({ type: 'text', text: textPart });
     }
     
+    const infoLine = (match[1] || '').trim();
+    const codeContent = (match[2] || '').trim();
+    let language = '';
+    let filename = '';
+
+    // Parse the infoLine to extract language and filename
+    const langFileMatch = infoLine.match(/(\w+)?(?::([\w./-]+))?/);
+    if (langFileMatch) {
+      language = langFileMatch[1] || '';
+      filename = langFileMatch[2] || '';
+    } else {
+      language = infoLine; // Fallback to the whole line as language if format is unexpected
+    }
+
     const part: RenderablePart = {
       type: 'code',
-      language: match[1] || '',
-      filename: match[2],
-      code: (match[3] || '').trim(),
+      language: language,
+      filename: filename,
+      code: codeContent,
     };
 
     // Only attempt to extract filename from code content if it's an app chat
@@ -120,6 +136,7 @@ function parseAiResponseToRenderableParts(content: string, isAppChat: boolean): 
     lastIndex = match.index + match[0].length;
   }
 
+  // Capture any remaining text after the last code block
   if (lastIndex < content.length) {
     const textPart = content.substring(lastIndex).trim();
     if (textPart) parts.push({ type: 'text', text: textPart });
