@@ -58,6 +58,7 @@ export interface Message {
   timestamp: Date;
   isNew?: boolean;
   isTyping?: boolean;
+  isCoding?: boolean; // New property to indicate coding in progress
   type?: 'text' | 'multimodal';
   isConstructionPlan?: boolean;
   planApproved?: boolean;
@@ -332,9 +333,18 @@ export function useChat({
   };
 
   const getAndStreamAIResponse = useCallback(async (convId: string, history: Message[]) => {
+    const isBuildModeCoding = chatMode === 'build' && history.some(m => m.content === '[USER_APPROVED_PLAN]');
+    
     setIsLoading(true);
     const assistantMessageId = `assistant-${Date.now()}`;
-    setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant', content: '', isTyping: true, timestamp: new Date() }]);
+    setMessages(prev => [...prev, { 
+      id: assistantMessageId, 
+      role: 'assistant', 
+      content: '', 
+      isTyping: true, 
+      isCoding: isBuildModeCoding,
+      timestamp: new Date() 
+    }]);
     
     const userMessageToSave = history.findLast(m => m.role === 'user');
     if (userMessageToSave) {
@@ -378,6 +388,7 @@ export function useChat({
 
       const selectedKey = userApiKeys.find(k => `user_key:${k.id}` === selectedModel);
       const isCustomEndpoint = selectedKey?.provider === 'custom_endpoint';
+      const isStreamingResponse = selectedModel.startsWith('user_key:') && !isCustomEndpoint;
 
       if (selectedModel.startsWith('puter:') || isCustomEndpoint) {
         let response;
@@ -388,7 +399,7 @@ export function useChat({
             body: JSON.stringify({
               messages: [systemMessage, ...messagesForApi],
               selectedKeyId: selectedModel.substring(9),
-              stream: false, // Request non-streaming for custom endpoint
+              stream: false,
             }),
           });
           response = await apiResponse.json();
@@ -399,29 +410,30 @@ export function useChat({
         }
         if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
         fullResponseText = response?.message?.content || 'Sin contenido.';
-      } else if (selectedModel.startsWith('user_key:')) {
+      } else if (isStreamingResponse) {
         const apiResponse = await fetch('/api/ai/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             messages: [systemMessage, ...messagesForApi],
             selectedKeyId: selectedModel.substring(9),
-            stream: true, // Request streaming for Gemini
+            stream: true,
           }),
         });
         if (!apiResponse.ok || !apiResponse.body) {
           const errorData = await apiResponse.json();
           throw new Error(errorData.message || 'Error en la API de IA.');
         }
-        const responseStream = apiResponse.body;
-        const reader = responseStream.getReader();
+        const reader = apiResponse.body.getReader();
         const decoder = new TextDecoder();
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
           const chunk = decoder.decode(value, { stream: true });
           fullResponseText += chunk;
-          setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: fullResponseText, isTyping: false, isNew: true } : m));
+          if (!isBuildModeCoding) {
+            setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: fullResponseText, isTyping: false, isNew: true } : m));
+          }
         }
       } else {
         throw new Error('Modelo de IA no válido seleccionado.');
@@ -445,17 +457,29 @@ export function useChat({
         model: modelUsedForResponse,
         type: 'multimodal' as const,
         isConstructionPlan,
+        isCoding: false,
+        isTyping: false,
       };
 
       const savedData = await saveMessageToDB(convId, finalAssistantMessageData);
-      setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, ...finalAssistantMessageData, id: savedData?.id || assistantMessageId, timestamp: savedData?.timestamp || new Date(), isNew: false, isTyping: false } : m));
+      setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, ...finalAssistantMessageData, id: savedData?.id || assistantMessageId, timestamp: savedData?.timestamp || new Date(), isNew: false } : m));
 
       if (filesToWrite.length > 0) {
         await onWriteFiles(filesToWrite);
       }
 
     } catch (error: any) {
-      // ... (existing error handling logic) ...
+      const errorMessage = `Error en la API de IA: ${error.message}`;
+      toast.error(errorMessage);
+      const errorContent = `Lo siento, ocurrió un error: ${error.message}`;
+      const errorAssistantMessage = {
+        content: errorContent,
+        role: 'assistant' as const,
+        model: selectedModel,
+        type: 'text' as const,
+      };
+      await saveMessageToDB(convId, errorAssistantMessage);
+      setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, ...errorAssistantMessage, isTyping: false, isNew: false } : m));
     } finally {
       setIsLoading(false);
     }
