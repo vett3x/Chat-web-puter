@@ -7,47 +7,18 @@ interface TextAnimatorProps {
   className?: string;
   isNew?: boolean; // Indicates if this part is currently being "animated" (i.e., just appeared)
   onAnimationComplete?: () => void;
-  animationSpeed: 'slow' | 'normal' | 'fast';
+  animationSpeed: 'slow' | 'normal' | 'fast'; // Not directly used for text animation, but kept for consistency
 }
 
-export function TextAnimator({ text, className, isNew, onAnimationComplete, animationSpeed }: TextAnimatorProps) {
-  const [displayedText, setDisplayedText] = useState('');
-  const indexRef = useRef(0);
-  const animationRef = useRef<NodeJS.Timeout | null>(null);
-
-  const speedMap = {
-    slow: 100,
-    normal: 50,
-    fast: 20,
-  };
-  const delay = speedMap[animationSpeed];
-
+export function TextAnimator({ text, className, isNew, onAnimationComplete }: TextAnimatorProps) {
   useEffect(() => {
-    if (isNew && text.length > 0) {
-      setDisplayedText('');
-      indexRef.current = 0;
-
-      const animate = () => {
-        if (indexRef.current < text.length) {
-          setDisplayedText(prev => prev + text.charAt(indexRef.current));
-          indexRef.current++;
-          animationRef.current = setTimeout(animate, delay);
-        } else {
-          onAnimationComplete?.();
-        }
-      };
-      animationRef.current = setTimeout(animate, delay);
-    } else if (!isNew) {
-      setDisplayedText(text); // If not new, just show full text
-      onAnimationComplete?.(); // Immediately complete if not new
+    if (isNew) {
+      // For text parts, we consider the "animation" complete as soon as they are rendered.
+      // The actual streaming effect is handled by the parent updating the 'text' prop.
+      // We just need to signal to the parent that this part is done, so the next can start.
+      onAnimationComplete?.();
     }
+  }, [isNew, onAnimationComplete]); // Depend on isNew to trigger when this part becomes active
 
-    return () => {
-      if (animationRef.current) {
-        clearTimeout(animationRef.current);
-      }
-    };
-  }, [text, isNew, delay, onAnimationComplete]);
-
-  return <span className={className}>{displayedText}</span>;
+  return <span className={className}>{text}</span>;
 }
