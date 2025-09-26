@@ -1,24 +1,36 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface TextAnimatorProps {
   text: string;
   className?: string;
-  isNew?: boolean; // Indicates if this part is currently being "animated" (i.e., just appeared)
+  isNew?: boolean;
   onAnimationComplete?: () => void;
-  animationSpeed: 'slow' | 'normal' | 'fast'; // Not directly used for text animation, but kept for consistency
+  animationSpeed: 'slow' | 'normal' | 'fast';
 }
 
 export function TextAnimator({ text, className, isNew, onAnimationComplete }: TextAnimatorProps) {
   useEffect(() => {
     if (isNew) {
-      // For text parts, we consider the "animation" complete as soon as they are rendered.
-      // The actual streaming effect is handled by the parent updating the 'text' prop.
-      // We just need to signal to the parent that this part is done, so the next can start.
       onAnimationComplete?.();
     }
-  }, [isNew, onAnimationComplete]); // Depend on isNew to trigger when this part becomes active
+  }, [isNew, onAnimationComplete]);
+
+  // Heurística para detectar si el texto contiene elementos de Markdown que necesitan estilo.
+  // Esto evita aplicar estilos de 'prose' a texto simple de una sola línea.
+  // Busca: Títulos (###), listas (* o -), negrita/cursiva (** o __), código en línea (`), enlaces, o múltiples saltos de línea.
+  const containsMarkdown = /(^#{1,6}\s)|(^\s*[\*\-]\s)|(\*\*|__)|(`[^`]+`)|(\[.*\]\(.*\))|(\n.*\n)/m.test(text);
+
+  if (containsMarkdown) {
+    return (
+      <div className="prose prose-sm dark:prose-invert max-w-none">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+      </div>
+    );
+  }
 
   return <span className={className}>{text}</span>;
 }
