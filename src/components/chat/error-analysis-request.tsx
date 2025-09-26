@@ -86,7 +86,7 @@ export function ErrorAnalysisRequest({ content, isNew, onAnimationComplete }: Er
             {section.icon}
             <h4>{section.title}</h4>
           </div>
-          <div className="prose prose-sm dark:prose-invert max-w-none pl-7 text-muted-foreground">
+          <div className="prose prose-sm dark:prose-invert max-w-none pl-7">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{section.content}</ReactMarkdown>
           </div>
         </div>
