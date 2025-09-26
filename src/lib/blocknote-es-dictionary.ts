@@ -10,8 +10,8 @@ export const esDictionary: Dictionary = {
     strike: { tooltip: "Tachado", secondary_tooltip: "Cmd+Shift+X" },
     code: { tooltip: "Código", secondary_tooltip: "Cmd+E" },
     colors: {
-      text_color: { tooltip: "Color de Texto" },
-      background_color: { tooltip: "Color de Fondo" },
+      text_color: "Color de Texto",
+      background_color: "Color de Fondo",
     },
     link: { tooltip: "Enlace", secondary_tooltip: "Cmd+K" },
     file_caption: { tooltip: "Añadir pie de foto", input_placeholder: "Escribe un pie de foto..." },
