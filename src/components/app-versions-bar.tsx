@@ -138,7 +138,7 @@ export function AppVersionsBar({ appId, onRevertToVersion, isReverting, autoFixS
           disabled={isAutoFixing}
           title="Corregir el último error de compilación"
         >
-          <Wrench className="mr-2 h-4 w-4" /> Corregir Build
+          <Wrench className="mr-2 h-4 w-4" /> Corregir Compilación
         </Button>
         <Button
           variant="outline"
@@ -147,7 +147,7 @@ export function AppVersionsBar({ appId, onRevertToVersion, isReverting, autoFixS
           disabled={isAutoFixing}
           title="Reportar un error en la vista previa web"
         >
-          <Bug className="mr-2 h-4 w-4" /> Reportar Web
+          <Bug className="mr-2 h-4 w-4" /> Reportar Error en App
         </Button>
         <Button variant="ghost" size="icon" onClick={fetchVersions} disabled={isLoadingVersions || isReverting || isAutoFixing} title="Refrescar versiones">
           {isLoadingVersions ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
