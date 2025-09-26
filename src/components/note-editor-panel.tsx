@@ -28,7 +28,6 @@ const customDarkTheme: Theme = {
     },
     // Ensure other UI elements also match
     sideMenu: "hsl(var(--background))",
-    sideMenuText: "hsl(var(--foreground))",
     tooltip: {
         background: "hsl(var(--muted))",
         text: "hsl(var(--muted-foreground))",
