@@ -29,48 +29,201 @@ export const esDictionary = {
     // Títulos de los bloques por defecto.
     heading: {
       title: "Título 1",
+      subtext: "Encabezado de sección grande",
+      aliases: ["h1", "encabezado grande", "encabezado de sección"],
+      group: "Encabezados",
     },
     heading_2: {
       title: "Título 2",
+      subtext: "Encabezado de subsección",
+      aliases: ["h2", "subencabezado"],
+      group: "Encabezados",
     },
     heading_3: {
       title: "Título 3",
+      subtext: "Encabezado pequeño",
+      aliases: ["h3", "encabezado pequeño"],
+      group: "Encabezados",
+    },
+    heading_4: {
+      title: "Título 4",
+      subtext: "Encabezado muy pequeño",
+      aliases: ["h4"],
+      group: "Encabezados",
+    },
+    heading_5: {
+      title: "Título 5",
+      subtext: "Encabezado diminuto",
+      aliases: ["h5"],
+      group: "Encabezados",
+    },
+    heading_6: {
+      title: "Título 6",
+      subtext: "Encabezado minúsculo",
+      aliases: ["h6"],
+      group: "Encabezados",
+    },
+    toggle_heading: {
+      title: "Título Plegable 1",
+      subtext: "Crear un título que se puede plegar",
+      aliases: ["toggle", "plegable"],
+      group: "Encabezados",
+    },
+    toggle_heading_2: {
+      title: "Título Plegable 2",
+      subtext: "Crear un título de nivel 2 que se puede plegar",
+      aliases: ["toggle h2", "plegable h2"],
+      group: "Encabezados",
+    },
+    toggle_heading_3: {
+      title: "Título Plegable 3",
+      subtext: "Crear un título de nivel 3 que se puede plegar",
+      aliases: ["toggle h3", "plegable h3"],
+      group: "Encabezados",
     },
     paragraph: {
       title: "Párrafo",
+      subtext: "Texto simple",
+      aliases: ["p", "texto"],
+      group: "Básico",
     },
-    bulleted_list: {
+    bullet_list: { // Renamed from bulleted_list
       title: "Lista de Viñetas",
+      subtext: "Crear una lista simple",
+      aliases: ["lista", "viñetas"],
+      group: "Listas",
     },
     numbered_list: {
       title: "Lista Numerada",
+      subtext: "Crear una lista con números",
+      aliases: ["lista", "números"],
+      group: "Listas",
     },
     check_list: {
       title: "Lista de Tareas",
+      subtext: "Crear una lista de tareas pendientes",
+      aliases: ["tareas", "check"],
+      group: "Listas",
+    },
+    toggle_list: {
+      title: "Lista Plegable",
+      subtext: "Crear una lista de elementos que se pueden plegar",
+      aliases: ["toggle list", "lista plegable"],
+      group: "Listas",
     },
     table: {
       title: "Tabla",
+      subtext: "Insertar una tabla",
+      aliases: ["tabla", "grid"],
+      group: "Media",
     },
     image: {
       title: "Imagen",
+      subtext: "Subir una imagen",
+      aliases: ["imagen", "foto"],
+      group: "Media",
     },
     file: {
       title: "Archivo",
+      subtext: "Subir un archivo",
+      aliases: ["archivo", "documento"],
+      group: "Media",
     },
     video: {
       title: "Video",
+      subtext: "Insertar un video",
+      aliases: ["video", "clip"],
+      group: "Media",
     },
     audio: {
       title: "Audio",
+      subtext: "Insertar un audio",
+      aliases: ["audio", "sonido"],
+      group: "Media",
     },
-    blockquote: {
+    quote: {
       title: "Cita",
+      subtext: "Citar texto",
+      aliases: ["cita", "quote", "blockquote"],
+      group: "Básico",
     },
     code_block: {
       title: "Bloque de Código",
+      subtext: "Insertar un bloque de código",
+      aliases: ["código", "code"],
+      group: "Básico",
     },
     alert: {
       title: "Alerta",
+      subtext: "Insertar un bloque de alerta",
+      aliases: ["alerta", "aviso"],
+      group: "Básico",
+    },
+    horizontal_rule: {
+      title: "Separador",
+      subtext: "Insertar una línea horizontal",
+      aliases: ["hr", "línea", "separador"],
+      group: "Básico",
+    },
+    columns: {
+      title: "Columnas",
+      subtext: "Crear un diseño de columnas",
+      aliases: ["columnas", "layout"],
+      group: "Layout",
+    },
+    group: {
+      title: "Grupo",
+      subtext: "Agrupar bloques",
+      aliases: ["grupo", "contenedor"],
+      group: "Layout",
+    },
+    callout: {
+      title: "Destacado",
+      subtext: "Insertar un bloque de texto destacado",
+      aliases: ["callout", "nota"],
+      group: "Básico",
+    },
+    equation: {
+      title: "Ecuación",
+      subtext: "Insertar una ecuación matemática",
+      aliases: ["ecuación", "math"],
+      group: "Media",
+    },
+    mermaid: {
+      title: "Diagrama Mermaid",
+      subtext: "Insertar un diagrama Mermaid",
+      aliases: ["mermaid", "diagrama"],
+      group: "Media",
+    },
+    diagram: {
+      title: "Diagrama",
+      subtext: "Insertar un diagrama",
+      aliases: ["diagrama", "flowchart"],
+      group: "Media",
+    },
+    embed: {
+      title: "Incrustar",
+      subtext: "Incrustar contenido externo",
+      aliases: ["embed", "iframe"],
+      group: "Media",
+    },
+    divider: {
+      title: "Divisor",
+      subtext: "Insertar un divisor",
+      aliases: ["divisor", "línea"],
+      group: "Básico",
+    },
+    emoji: {
+      title: "Emoji",
+      subtext: "Insertar un emoji",
+      aliases: ["emoji", "emoticono"],
+      group: "Básico",
+    },
+    page_break: { // Added
+      title: "Salto de Página",
+      subtext: "Insertar un salto de página",
+      aliases: ["salto", "página"],
+      group: "Básico",
     },
   },
   // El bloque de placeholder.
@@ -156,9 +309,7 @@ export const esDictionary = {
   toggle_blocks: {
     title: "Bloques de alternancia",
   },
-  // Missing keys from the error message
   file_blocks: {
-    // Assuming these are for specific file block types, similar to slash_menu
     file: {
       title: "Archivo",
       subtext: "Insertar un archivo",
@@ -193,28 +344,4 @@ export const esDictionary = {
     undo: "Deshacer",
     redo: "Rehacer",
   },
-  // Also adding other potentially missing top-level keys that are common in BlockNote
-  // These were not explicitly listed in the error but are part of the full dictionary.
-  // I'll add them to be thorough.
-  // Based on BlockNote's default dictionary structure:
-  // https://github.com/YousefED/BlockNote/blob/main/packages/core/src/BlockNoteEditor/dictionaries/en.ts
-  // I need to ensure all these are present.
-  // The error message is very specific about missing keys, so I should only add those.
-  // The previous fix removed `PartialBlockNoteDictionary` type, so I'm relying on inference.
-  // Let's re-add the `PartialBlockNoteDictionary` type and import it from `@blocknote/core`
-  // if it's actually exported. If not, I'll keep it inferred.
-  // The previous turn said it's NOT exported. So I'll keep it inferred.
-  // The error message is about missing properties from `PartialBlockNoteDictionary` type.
-  // This means the type *is* being used internally by `useCreateBlockNote`.
-  // I need to ensure the object matches the type.
-
-  // Let's re-check the `PartialBlockNoteDictionary` type.
-  // It's likely defined within the `@blocknote/core` package but not exported directly.
-  // If I can't import it, I'll have to manually ensure the structure is correct.
-  // The error message lists the missing properties. I need to add them.
-  // The previous `esDictionary` was missing these.
-
-  // I will add the missing keys with a minimal structure to satisfy the type.
-  // The error message lists: `file_blocks`, `suggestion_menu`, `file_panel`, `comments`, `generic`.
-  // I will add these.
 };
