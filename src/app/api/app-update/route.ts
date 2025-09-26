@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { SUPERUSER_EMAILS } from '@/lib/constants';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs/promises';
@@ -116,33 +116,23 @@ export async function POST(req: NextRequest) {
 
   if (action === 'force') {
     try {
-      let output = '';
-      
-      output += '--- Forzando la limpieza de cambios locales (git reset --hard HEAD) ---\n';
-      const { stdout: resetOut, stderr: resetErr } = await execAsync('git reset --hard HEAD');
-      output += resetOut + (resetErr ? `\nSTDERR: ${resetErr}` : '') + '\n';
+      const deployScriptPath = path.join(process.cwd(), 'deploy.sh');
+      await fs.chmod(deployScriptPath, '755');
 
-      output += '--- Ejecutando git pull origin main ---\n';
-      const { stdout: pullOut, stderr: pullErr } = await execAsync('git pull origin main');
-      output += pullOut.replace(/\[dyad\].*\n/g, '') + (pullErr ? `\nSTDERR: ${pullErr}` : '') + '\n'; // Filter Dyad commits
+      // Ejecutamos el script en segundo plano para que no mate este proceso de API.
+      const subprocess = spawn('bash', [deployScriptPath], {
+        detached: true,
+        stdio: 'ignore'
+      });
+      subprocess.unref();
 
-      output += '\n--- Ejecutando npm install ---\n';
-      const { stdout: installOut, stderr: installErr } = await execAsync('npm install');
-      output += installOut + (installErr ? `\nSTDERR: ${installErr}` : '') + '\n';
+      return NextResponse.json({ 
+        message: "Proceso de actualización iniciado. Esto borrará y reinstalará la aplicación. El proceso puede tardar varios minutos y la conexión se perderá. Por favor, espera y refresca la página manualmente en 2-3 minutos." 
+      });
 
-      output += '\n--- Ejecutando npm run build ---\n';
-      const { stdout: buildOut, stderr: buildErr } = await execAsync('npm run build');
-      output += buildOut + (buildErr ? `\nSTDERR: ${buildErr}` : '') + '\n';
-
-      output += '\n--- Actualización completada. El servidor debería reiniciarse automáticamente. ---';
-
-      // NOTE: We cannot restart the server from here as it would kill this API process.
-      // The process manager (like PM2, Docker, etc.) should be configured to watch for changes in the .next directory and restart automatically.
-
-      return NextResponse.json({ output });
     } catch (error: any) {
       console.error('[API app-update/force] Error:', error);
-      return NextResponse.json({ message: `Error durante la actualización: ${error.stderr || error.message}` }, { status: 500 });
+      return NextResponse.json({ message: `Error al iniciar el script de actualización: ${error.stderr || error.message}` }, { status: 500 });
     }
   }
 
