@@ -20,8 +20,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ConstructionPlan } from './construction-plan'; // NEW: Import ConstructionPlan
-import { Message } from '@/hooks/use-chat'; // NEW: Import Message type from hook
+import { ConstructionPlan } from './construction-plan';
+import { Message } from '@/hooks/use-chat';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 interface ChatMessagesProps {
@@ -35,7 +35,7 @@ interface ChatMessagesProps {
   onClearChat: () => void;
   onApprovePlan: (messageId: string) => void;
   isAppChat?: boolean;
-  onSuggestionClick: (prompt: string) => void; // New prop for suggestion clicks
+  onSuggestionClick: (prompt: string) => void;
 }
 
 const SuggestionCard = ({ icon, title, description, onClick }: { icon: React.ReactNode, title: string, description: string, onClick: () => void }) => (
@@ -112,13 +112,13 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
               </>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8 text-left w-full">
-              {suggestions.map((s, i) => (
+              {suggestions.map((s: { icon: React.ReactNode, title: string, description: string, prompt: string }, i: number) => (
                 <SuggestionCard key={i} {...s} onClick={() => onSuggestionClick(s.prompt)} />
               ))}
             </div>
           </div>
         ) : (
-          messages.map((message, index) => {
+          messages.map((message: Message, index: number) => {
             // Skip rendering the hidden approval message
             if (message.content === '[USER_APPROVED_PLAN]') {
               return null;
@@ -156,16 +156,26 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
                         <Loader2 className="h-4 w-4 animate-spin" />
                         <span className="text-sm">Pensando...</span>
                       </div>
-                    ) : message.isConstructionPlan ? (
-                      <ConstructionPlan
-                        content={message.content as string}
-                        onApprove={() => onApprovePlan(message.id)}
-                        onRequestChanges={handleRequestChanges}
-                        isApproved={!!message.planApproved}
-                        isNew={isLastMessage && !message.planApproved} // Only animate if it's the last message and not yet approved
-                      />
                     ) : (
-                      <MessageContent content={message.content as any} isNew={isLastMessage} aiResponseSpeed={aiResponseSpeed} isAppChat={isAppChat} />
+                      <MessageContent
+                        content={message.content}
+                        isNew={isLastMessage && !message.isAnimated} // Only pass isNew if it's the last message and not yet animated
+                        aiResponseSpeed={aiResponseSpeed}
+                        isAppChat={isAppChat}
+                        isConstructionPlan={message.isConstructionPlan} // Pass isConstructionPlan
+                        planApproved={message.planApproved} // Pass planApproved
+                        onApprovePlan={onApprovePlan} // Pass onApprovePlan
+                        onRequestChanges={handleRequestChanges} // Pass onRequestChanges
+                        messageId={message.id} // Pass messageId
+                        onAnimationComplete={() => {
+                          // Mark message as animated once its content animation is complete
+                          if (isLastMessage && !message.isAnimated) {
+                            // This will trigger a re-render, but isAnimated will prevent re-animation
+                            // For now, we only update the local state. Persistence to DB can be added later if needed.
+                            // setMessages(prev => prev.map(m => m.id === message.id ? { ...m, isAnimated: true } : m));
+                          }
+                        }}
+                      />
                     )}
                   </div>
                   {message.role === 'assistant' && !message.isTyping && !message.isConstructionPlan && (

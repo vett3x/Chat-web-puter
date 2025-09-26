@@ -5,15 +5,33 @@ import { CodeBlock } from './code-block';
 import { TextAnimator } from './text-animator';
 import Image from 'next/image';
 import { RenderablePart } from '@/lib/utils'; // Importar RenderablePart desde utils
+import { ConstructionPlan } from './chat/construction-plan'; // Importar ConstructionPlan
 
 interface MessageContentProps {
   content: string | RenderablePart[]; // MODIFICADO: Ahora acepta string o RenderablePart[]
   isNew?: boolean;
   aiResponseSpeed: 'slow' | 'normal' | 'fast';
   isAppChat?: boolean;
+  isConstructionPlan?: boolean; // NEW: Prop para indicar si el contenido es un plan de construcción
+  planApproved?: boolean; // NEW: Prop para indicar si el plan ha sido aprobado
+  onApprovePlan?: (messageId: string) => void; // NEW: Callback para aprobar el plan
+  onRequestChanges?: () => void; // NEW: Callback para solicitar cambios
+  messageId?: string; // NEW: ID del mensaje para pasar al ConstructionPlan
+  onAnimationComplete?: () => void; // NEW: Callback para cuando la animación de MessageContent termina
 }
 
-export function MessageContent({ content, isNew, aiResponseSpeed, isAppChat }: MessageContentProps) {
+export function MessageContent({ 
+  content, 
+  isNew, 
+  aiResponseSpeed, 
+  isAppChat, 
+  isConstructionPlan, 
+  planApproved, 
+  onApprovePlan, 
+  onRequestChanges, 
+  messageId,
+  onAnimationComplete,
+}: MessageContentProps) {
   const [animatedPartsCount, setAnimatedPartsCount] = useState(0);
 
   // Helper to render a single part
@@ -82,6 +100,21 @@ export function MessageContent({ content, isNew, aiResponseSpeed, isAppChat }: M
     setAnimatedPartsCount(prev => prev + 1);
   };
 
+  // NEW: Render ConstructionPlan directly if it's a plan
+  if (isConstructionPlan && typeof content === 'string' && messageId && onApprovePlan && onRequestChanges) {
+    return (
+      <ConstructionPlan
+        content={content}
+        onApprove={() => onApprovePlan(messageId)}
+        onRequestChanges={onRequestChanges}
+        isApproved={!!planApproved}
+        isNew={isNew} // Pass isNew to ConstructionPlan
+        onAnimationComplete={onAnimationComplete} // Pass onAnimationComplete
+      />
+    );
+  }
+
+  // If not new, render all parts immediately
   if (!isNew) {
     return (
       <>
@@ -92,6 +125,7 @@ export function MessageContent({ content, isNew, aiResponseSpeed, isAppChat }: M
     );
   }
 
+  // If new, animate parts sequentially
   return (
     <>
       {renderableParts.map((part, index) => {

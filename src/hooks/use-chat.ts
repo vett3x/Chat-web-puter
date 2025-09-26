@@ -55,13 +55,14 @@ export interface Message {
   role: 'user' | 'assistant';
   model?: string;
   timestamp: Date;
-  isNew?: boolean;
-  isTyping?: boolean;
+  isNew: boolean; // Changed from optional to required boolean
+  isTyping: boolean; // Changed from optional to required boolean
   type?: 'text' | 'multimodal';
-  isConstructionPlan?: boolean;
-  planApproved?: boolean;
-  isCorrectionPlan?: boolean;
-  correctionApproved?: boolean;
+  isConstructionPlan: boolean; // Changed from optional to required boolean
+  planApproved: boolean; // Changed from optional to required boolean
+  isCorrectionPlan: boolean; // Changed from optional to required boolean
+  correctionApproved: boolean; // Changed from optional to required boolean
+  isAnimated: boolean; // NEW: Flag to track if message has been animated
 }
 
 export type AutoFixStatus = 'idle' | 'analyzing' | 'plan_ready' | 'fixing' | 'failed';
@@ -213,6 +214,13 @@ export function useChat({
       model: msg.model || undefined,
       timestamp: new Date(msg.created_at),
       type: msg.type as 'text' | 'multimodal',
+      isConstructionPlan: typeof msg.content === 'string' && msg.content.includes('### 1. Análisis del Requerimiento'), // Detect plan from DB
+      planApproved: false, // Default to false when loading from DB
+      isCorrectionPlan: false, // Default to false when loading from DB
+      correctionApproved: false, // Default to false when loading from DB
+      isNew: false, // Messages from DB are not 'new'
+      isTyping: false, // Messages from DB are not 'typing'
+      isAnimated: true, // Messages from DB are considered animated
     }));
   }, [userId]);
 
@@ -273,7 +281,7 @@ export function useChat({
     const assistantMessageId = `assistant-${Date.now()}`;
     
     // Add a placeholder message immediately
-    setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant', content: '', isTyping: true, timestamp: new Date() }]);
+    setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant', content: '', isTyping: true, isNew: true, isConstructionPlan: false, planApproved: false, isCorrectionPlan: false, correctionApproved: false, isAnimated: false, timestamp: new Date() }]);
     
     const userMessageToSave = history.findLast(m => m.role === 'user');
     if (userMessageToSave) {
@@ -282,26 +290,26 @@ export function useChat({
 
     try {
       let systemPromptContent: string;
-      if (appPrompt) {
-        if (chatMode === 'build') {
-          systemPromptContent = `Eres un desarrollador experto en Next.js (App Router), TypeScript y Tailwind CSS. Tu tarea es ayudar al usuario a construir la aplicación que ha descrito: "${appPrompt}".
-          REGLAS DEL MODO BUILD:
-          1.  **PLANIFICAR PRIMERO:** Antes de escribir cualquier código, responde con un "Plan de Construcción" detallado usando este formato Markdown exacto:
-              ### 1. Análisis del Requerimiento
-              [Tu análisis aquí]
-              ### 2. Estructura de Archivos y Componentes
-              [Lista de archivos a crear/modificar aquí]
-              ### 3. Lógica de Componentes
-              [Breve descripción de la lógica de cada componente aquí]
-              ### 4. Dependencias Necesarias
-              [Lista de dependencias npm aquí, si las hay]
-              ### 5. Resumen y Confirmación
-              [Resumen y pregunta de confirmación aquí]
-          2.  **ESPERAR APROBACIÓN:** Después de enviar el plan, detente y espera. NO generes código. El usuario te responderá con un mensaje especial: "[USER_APPROVED_PLAN]".
-          3.  **GENERAR CÓDIGO:** SOLO cuando recibas el mensaje "[USER_APPROVED_PLAN]", responde ÚNICAMENTE con los bloques de código para los archivos completos. Usa el formato \`\`\`language:ruta/del/archivo.tsx\`\`\` para cada bloque. NO incluyas texto conversacional en esta respuesta final de código.`;
-        } else {
-          systemPromptContent = `Eres un asistente de código experto y depurador para un proyecto Next.js. Estás en 'Modo Chat'. Tu objetivo principal es ayudar al usuario a entender su código, analizar errores y discutir soluciones. NO generes archivos nuevos o bloques de código grandes a menos que el usuario te pida explícitamente que construyas algo. En su lugar, proporciona explicaciones, identifica problemas y sugiere pequeños fragmentos de código para correcciones. Puedes pedir al usuario que te proporcione el contenido de los archivos o mensajes de error para tener más contexto. El proyecto es: "${appPrompt}".`;
-        }
+      const isAppChatModeBuild = !!appPrompt && chatMode === 'build'; // FIX: Ensure strict boolean
+
+      if (isAppChatModeBuild) {
+        systemPromptContent = `Eres un desarrollador experto en Next.js (App Router), TypeScript y Tailwind CSS. Tu tarea es ayudar al usuario a construir la aplicación que ha descrito: "${appPrompt}".
+        REGLAS DEL MODO BUILD:
+        1.  **PLANIFICAR PRIMERO:** Antes de escribir cualquier código, responde con un "Plan de Construcción" detallado usando este formato Markdown exacto:
+            ### 1. Análisis del Requerimiento
+            [Tu análisis aquí]
+            ### 2. Estructura de Archivos y Componentes
+            [Lista de archivos a crear/modificar aquí]
+            ### 3. Lógica de Componentes
+            [Breve descripción de la lógica de cada componente aquí]
+            ### 4. Dependencias Necesarias
+            [Lista de dependencias npm aquí, si las hay]
+            ### 5. Resumen y Confirmación
+            [Resumen y pregunta de confirmación aquí]
+        2.  **ESPERAR APROBACIÓN:** Después de enviar el plan, detente y espera. NO generes código. El usuario te responderá con un mensaje especial: "[USER_APPROVED_PLAN]".
+        3.  **GENERAR CÓDIGO:** SOLO cuando recibas el mensaje "[USER_APPROVED_PLAN]", responde ÚNICAMENTE con los bloques de código para los archivos completos. Usa el formato \`\`\`language:ruta/del/archivo.tsx\`\`\` para cada bloque. NO incluyas texto conversacional en esta respuesta final de código.`;
+      } else if (appPrompt) {
+        systemPromptContent = `Eres un asistente de código experto y depurador para un proyecto Next.js. Estás en 'Modo Chat'. Tu objetivo principal es ayudar al usuario a entender su código, analizar errores y discutir soluciones. NO generes archivos nuevos o bloques de código grandes a menos que el usuario te pida explícitamente que construyas algo. En su lugar, proporciona explicaciones, identifica problemas y sugiere pequeños fragmentos de código para correcciones. Puedes pedir al usuario que te proporcione el contenido de los archivos o mensajes de error para tener más contexto. El proyecto es: "${appPrompt}".`;
       } else {
         systemPromptContent = "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante.";
       }
@@ -314,7 +322,6 @@ export function useChat({
 
       let fullResponseText = '';
       let modelUsedForResponse = selectedModel;
-      let isConstructionPlanDetected = false; // Flag to detect if the final response is a plan
 
       const selectedKey = userApiKeys.find(k => `user_key:${k.id}` === selectedModel);
       const isCustomEndpoint = selectedKey?.provider === 'custom_endpoint';
@@ -339,8 +346,6 @@ export function useChat({
         }
         if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
         fullResponseText = response?.message?.content || 'Sin contenido.';
-        isConstructionPlanDetected = chatMode === 'build' && fullResponseText.includes('### 1. Análisis del Requerimiento');
-
       } else if (selectedModel.startsWith('user_key:')) {
         const apiResponse = await fetch('/api/ai/chat', {
           method: 'POST',
@@ -364,46 +369,53 @@ export function useChat({
           const chunk = decoder.decode(value, { stream: true });
           fullResponseText += chunk;
 
-          // Only update messages during streaming if NOT in build mode, or if it's not a plan
-          // If in build mode, we buffer the fullResponseText until the end to avoid showing raw plan output
-          if (chatMode !== 'build' || !fullResponseText.includes('### 1. Análisis del Requerimiento')) {
-            setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: parseAiResponseToRenderableParts(fullResponseText, chatMode === 'build'), isTyping: false, isNew: true } : m));
+          // Only update messages during streaming if NOT a construction plan
+          if (!isAppChatModeBuild || !fullResponseText.includes('### 1. Análisis del Requerimiento')) {
+            setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: parseAiResponseToRenderableParts(fullResponseText, isAppChatModeBuild), isTyping: false, isNew: true } : m));
           }
         }
-        // After stream is done, check if it's a construction plan
-        isConstructionPlanDetected = chatMode === 'build' && fullResponseText.includes('### 1. Análisis del Requerimiento');
       } else {
         throw new Error('Modelo de IA no válido seleccionado.');
       }
 
-      const finalParts = parseAiResponseToRenderableParts(fullResponseText, chatMode === 'build');
+      const isConstructionPlan = isAppChatModeBuild && fullResponseText.includes('### 1. Análisis del Requerimiento');
+      const finalContentForMessage = isConstructionPlan ? fullResponseText : parseAiResponseToRenderableParts(fullResponseText, isAppChatModeBuild);
       const filesToWrite: { path: string; content: string }[] = [];
 
-      if (chatMode === 'build' && !isConstructionPlanDetected) { // Only extract files if NOT a construction plan
-        finalParts.forEach(part => {
+      if (isAppChatModeBuild && !isConstructionPlan) { // Only extract files if NOT a construction plan
+        (finalContentForMessage as RenderablePart[]).forEach(part => {
           if (part.type === 'code' && appId && part.filename && part.code) {
             filesToWrite.push({ path: part.filename, content: part.code });
           }
         });
       }
 
-      const finalAssistantMessageData = {
-        content: isConstructionPlanDetected ? fullResponseText : finalParts, // Store raw string for plan, parsed parts otherwise
+      const finalAssistantMessageData: Omit<Message, 'timestamp' | 'id'> = {
+        content: finalContentForMessage,
         role: 'assistant' as const,
         model: modelUsedForResponse,
         type: 'multimodal' as const,
-        isConstructionPlan: isConstructionPlanDetected,
+        isConstructionPlan: isConstructionPlan, // FIX: isConstructionPlan is now a strict boolean
+        planApproved: false,
+        isCorrectionPlan: false,
+        correctionApproved: false,
+        isNew: true, // Mark as new for animation
+        isTyping: false,
+        isAnimated: false, // Mark as not animated yet for new messages
       };
 
       const savedData = await saveMessageToDB(convId, finalAssistantMessageData);
-      setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, ...finalAssistantMessageData, id: savedData?.id || assistantMessageId, timestamp: savedData?.timestamp || new Date(), isNew: false, isTyping: false } : m));
+      setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, ...finalAssistantMessageData, id: savedData?.id || assistantMessageId, timestamp: savedData?.timestamp || new Date() } : m));
 
       if (filesToWrite.length > 0) {
         await onWriteFiles(filesToWrite);
       }
 
     } catch (error: any) {
-      // ... (existing error handling logic) ...
+      console.error('[API /ai/chat] Error:', error);
+      let userFriendlyMessage = `Error en la API de IA: ${error.message}`;
+      setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: userFriendlyMessage, isTyping: false, isNew: true, isConstructionPlan: false, planApproved: false, isCorrectionPlan: false, correctionApproved: false, isAnimated: false } : m));
+      toast.error(userFriendlyMessage);
     } finally {
       setIsLoading(false);
     }
@@ -432,6 +444,13 @@ export function useChat({
       role: 'user',
       timestamp: new Date(),
       type: content.some(part => part.type === 'image_url') ? 'multimodal' : 'text',
+      isNew: true,
+      isTyping: false,
+      isConstructionPlan: false,
+      planApproved: false,
+      isCorrectionPlan: false,
+      correctionApproved: false,
+      isAnimated: true, // User messages are always 'animated'
     };
 
     setMessages(prev => [...prev, newUserMessage]);
@@ -454,6 +473,13 @@ export function useChat({
       role: 'user',
       timestamp: new Date(),
       type: 'text',
+      isNew: true,
+      isTyping: false,
+      isConstructionPlan: false,
+      planApproved: false,
+      isCorrectionPlan: false,
+      correctionApproved: false,
+      isAnimated: true,
     };
 
     const historyWithApproval = [...messages, approvalMessage];

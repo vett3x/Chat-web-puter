@@ -126,7 +126,7 @@ export function ChatInterface({
           onClearChat={clearChat}
           onApprovePlan={approvePlan}
           isAppChat={isAppChat}
-          onSuggestionClick={(prompt) => sendMessage([{ type: 'text', text: prompt }], prompt)}
+          onSuggestionClick={(prompt: string) => sendMessage([{ type: 'text', text: prompt }], prompt)}
         />
         <AutoFixStatus status={autoFixStatus} /> {/* NEW: Add AutoFixStatus component */}
         <ChatInput
