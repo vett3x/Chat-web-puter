@@ -424,9 +424,9 @@ export function useChat({
         throw new Error('Modelo de IA no válido seleccionado.');
       }
 
-      const isConstructionPlan = isAppChatModeBuild && fullResponseText.includes('### 1. Análisis del Requerimiento');
-      const isErrorAnalysisRequest = fullResponseText.includes('### 💡 Entendido!'); // NEW: Detect error analysis request
-      const isCorrectionPlan = fullResponseText.includes('### 💡 Error Detectado'); // NEW: Detect correction plan
+      const isConstructionPlan = isAppChatModeBuild && !!fullResponseText.match(/###\s*1\.\s*Análisis del Requerimiento/);
+      const isErrorAnalysisRequest = !!fullResponseText.match(/###\s*💡?\s*Entendido!/);
+      const isCorrectionPlan = !!fullResponseText.match(/###\s*💡?\s*Error Detectado/);
       const finalContentForMessage = (isConstructionPlan || isErrorAnalysisRequest || isCorrectionPlan) ? fullResponseText : parseAiResponseToRenderableParts(fullResponseText, isAppChatModeBuild);
       const filesToWrite: { path: string; content: string }[] = [];
 
