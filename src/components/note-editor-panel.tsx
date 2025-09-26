@@ -11,7 +11,7 @@ import { NoteAiChat, ChatMessage } from './note-ai-chat';
 import { ApiKey } from '@/hooks/use-user-api-keys';
 
 // BlockNote imports
-import { BlockNoteViewRaw, useBlockNote } from "@blocknote/react"; // Changed BlockNoteView to BlockNoteViewRaw
+import { BlockNoteViewRaw, useBlockNote } from "@blocknote/react";
 import { BlockNoteEditor, Block } from "@blocknote/core"; // Corrected import for types
 import "@blocknote/core/style.css";
 import { useTheme } from 'next-themes';
