@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/components/session-context-provider';
 import { toast } from 'sonner';
@@ -11,9 +11,10 @@ import { NoteAiChat, ChatMessage } from './note-ai-chat';
 import { ApiKey } from '@/hooks/use-user-api-keys';
 
 // BlockNote imports
-import { BlockNoteView, useBlockNote } from "@blocknote/react";
-import { type Block, type BlockNoteEditor } from "@blocknote/core";
-import "@blocknote/react/style.css"; // Corrected style import path
+import { useCreateBlockNote } from "@blocknote/react";
+import { BlockNoteView } from "@blocknote/mantine";
+import { type Block, type BlockNoteEditor, markdownToBlocks, blocksToMarkdown } from "@blocknote/core";
+import "@blocknote/mantine/style.css";
 import { useTheme } from 'next-themes';
 
 interface Note {
@@ -41,13 +42,25 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
   const [isSaving, setIsSaving] = useState(false);
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [showAiHint, setShowAiHint] = useState(false);
+  const [noteContentForChat, setNoteContentForChat] = useState('');
 
-  const editor = useBlockNote({
-    onEditorContentChange: (editor: BlockNoteEditor) => {
-      // For auto-saving, you could trigger a save here.
-      // For now, we'll rely on the manual save button and title change.
-    },
-  });
+  const editor = useCreateBlockNote();
+
+  // Effect to update the markdown representation for the AI chat
+  // whenever the editor content changes.
+  useEffect(() => {
+    if (!editor) {
+      return;
+    }
+    const updateMarkdownContent = async () => {
+      const markdown = await blocksToMarkdown(editor.topLevelBlocks);
+      setNoteContentForChat(markdown);
+    };
+    
+    const debouncedUpdate = setTimeout(updateMarkdownContent, 500); // Debounce to avoid running on every keystroke
+    return () => clearTimeout(debouncedUpdate);
+
+  }, [editor, editor?.topLevelBlocks]);
 
   const fetchNote = useCallback(async () => {
     if (!session?.user?.id || !noteId || !editor) return;
@@ -62,7 +75,7 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
       // Handle content migration from Markdown string to BlockNote JSON
       if (typeof data.content === 'string') {
         // If it's an old note (Markdown string), convert it to blocks
-        const blocks = await editor.markdownToBlocks(data.content);
+        const blocks = await markdownToBlocks(data.content);
         setInitialContent(blocks);
       } else {
         // If it's a new note (already JSONB), use it directly
@@ -123,12 +136,6 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
     const handler = setTimeout(() => { handleSave(); }, 2000);
     return () => { clearTimeout(handler); };
   }, [title, note, isSaving, isLoading, handleSave]);
-
-  const noteContentForChat = useMemo(() => {
-    if (!editor) return '';
-    // Convert blocks to a plain text representation for the AI context
-    return editor.topLevelBlocks.map((block: Block) => editor.blockToMarkdown(block)).join('\n');
-  }, [editor, editor?.topLevelBlocks]);
 
   if (isLoading || isLoadingApiKeys) {
     return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /><p className="ml-2 text-muted-foreground">Cargando nota y claves...</p></div>;
