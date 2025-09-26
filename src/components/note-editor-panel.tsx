@@ -47,7 +47,7 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
   const editor = useCreateBlockNote();
 
   // Effect to update the markdown representation for the AI chat
-  // whenever the editor content changes, including on initial load.
+  // whenever the editor content changes.
   useEffect(() => {
     if (!editor) {
       return;
@@ -97,10 +97,15 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
 
   useEffect(() => { fetchNote(); }, [fetchNote]);
 
-  // Load initial content into the editor once it's fetched
+  // Load initial content into the editor once it's fetched and generate markdown for AI
   useEffect(() => {
     if (initialContent && editor) {
-      editor.replaceBlocks(editor.topLevelBlocks, initialContent);
+      const loadContentAndSetMarkdown = async () => {
+        editor.replaceBlocks(editor.topLevelBlocks, initialContent);
+        const markdown = await editor.blocksToMarkdownLossy();
+        setNoteContentForChat(markdown);
+      };
+      loadContentAndSetMarkdown();
     }
   }, [initialContent, editor]);
 
