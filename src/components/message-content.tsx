@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { RenderablePart } from '@/lib/utils'; // Importar RenderablePart desde utils
 import { ConstructionPlan } from './chat/construction-plan'; // Importar ConstructionPlan
 import { ErrorAnalysisRequest } from './chat/error-analysis-request'; // NEW: Import ErrorAnalysisRequest
+import { CorrectionPlan } from './chat/correction-plan'; // NEW: Import CorrectionPlan
 
 interface MessageContentProps {
   content: string | RenderablePart[]; // MODIFICADO: Ahora acepta string o RenderablePart[]
@@ -20,6 +21,8 @@ interface MessageContentProps {
   messageId?: string; // NEW: ID del mensaje para pasar al ConstructionPlan
   onAnimationComplete?: () => void; // NEW: Callback para cuando la animación de MessageContent termina
   isErrorAnalysisRequest?: boolean; // NEW: Prop para indicar si el contenido es una solicitud de análisis de error
+  isCorrectionPlan?: boolean; // NEW: Prop para indicar si el contenido es un plan de corrección
+  correctionApproved?: boolean; // NEW: Prop para indicar si el plan de corrección ha sido aprobado
 }
 
 export function MessageContent({ 
@@ -33,7 +36,9 @@ export function MessageContent({
   onRequestChanges, 
   messageId,
   onAnimationComplete,
-  isErrorAnalysisRequest, // NEW: Destructure new prop
+  isErrorAnalysisRequest,
+  isCorrectionPlan, // NEW: Destructure new prop
+  correctionApproved, // NEW: Destructure new prop
 }: MessageContentProps) {
   const [animatedPartsCount, setAnimatedPartsCount] = useState(0);
 
@@ -103,7 +108,7 @@ export function MessageContent({
     setAnimatedPartsCount(prev => prev + 1);
   };
 
-  // NEW: Render ErrorAnalysisRequest directly if it's an error analysis request
+  // Render ErrorAnalysisRequest directly if it's an error analysis request
   if (isErrorAnalysisRequest && typeof content === 'string') {
     return (
       <ErrorAnalysisRequest
@@ -114,7 +119,21 @@ export function MessageContent({
     );
   }
 
-  // NEW: Render ConstructionPlan directly if it's a plan
+  // Render CorrectionPlan directly if it's a correction plan
+  if (isCorrectionPlan && typeof content === 'string' && messageId && onApprovePlan && onRequestChanges) {
+    return (
+      <CorrectionPlan
+        content={content}
+        onApprove={() => onApprovePlan(messageId)}
+        onRequestManualFix={onRequestChanges} // Assuming onRequestChanges can be used for manual fix
+        isApproved={!!correctionApproved}
+        isNew={isNew}
+        onAnimationComplete={onAnimationComplete}
+      />
+    );
+  }
+
+  // Render ConstructionPlan directly if it's a construction plan
   if (isConstructionPlan && typeof content === 'string' && messageId && onApprovePlan && onRequestChanges) {
     return (
       <ConstructionPlan
