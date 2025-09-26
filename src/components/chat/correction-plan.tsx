@@ -89,7 +89,7 @@ export function CorrectionPlan({ content, onApprove, onRequestManualFix, isAppro
             {section.icon}
             <h4>{section.title}</h4>
           </div>
-          <div className="prose prose-sm dark:prose-invert max-w-none pl-7">
+          <div className="prose prose-sm dark:prose-invert max-w-none pl-7 text-muted-foreground">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{section.content}</ReactMarkdown>
           </div>
         </div>
