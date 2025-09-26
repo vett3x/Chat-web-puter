@@ -99,14 +99,20 @@ export function useChat({
         const details = await chatDbService.fetchConversationDetails(conversationId, userId);
         if (details?.model) setSelectedModel(details.model);
         const fetchedMsgs = await chatDbService.fetchMessages(conversationId, userId);
-        if (!isSendingFirstMessage || fetchedMsgs.length > 0) setMessages(fetchedMsgs);
+        
+        // Only set messages if we are NOT in the middle of creating a new conversation.
+        // This prevents a race condition where the empty history overwrites the user's first message.
+        if (!isSendingFirstMessage) {
+          setMessages(fetchedMsgs);
+        }
+        
         setIsLoading(false);
       } else {
         setMessages([]);
       }
     };
     loadConversationData();
-  }, [conversationId, userId, isSendingFirstMessage]);
+  }, [conversationId, userId]); // Dependency array simplified to only core identifiers
 
   const handleModelChange = (modelValue: string) => {
     setSelectedModel(modelValue);
