@@ -3,7 +3,7 @@
 import React from 'react';
 
 const APP_VERSION = "v0.4b Stable";
-const BUILD_NUMBER = "675"; // Updated build number
+const BUILD_NUMBER = "802"; // Updated build number
 
 export function VersionDisplay() {
   return (
