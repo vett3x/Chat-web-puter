@@ -200,7 +200,7 @@ export function useChat({
   }, [userId]);
 
   const getMessagesFromDB = useCallback(async (convId: string) => {
-    const { data, error } = await supabase.from('messages').select('id, content, role, model, created_at, conversation_id, type, is_construction_plan, plan_approved, is_correction_plan, correction_approved').eq('conversation_id', convId).eq('user_id', userId).order('created_at', { ascending: true });
+    const { data, error } = await supabase.from('messages').select('id, content, role, model, created_at, conversation_id, type').eq('conversation_id', convId).eq('user_id', userId).order('created_at', { ascending: true });
     if (error) {
       console.error('Error fetching messages:', error);
       toast.error('Error al cargar los mensajes.');
@@ -214,13 +214,13 @@ export function useChat({
       model: msg.model || undefined,
       timestamp: new Date(msg.created_at),
       type: msg.type as 'text' | 'multimodal',
-      isConstructionPlan: msg.is_construction_plan || false,
-      planApproved: msg.plan_approved || false,
-      isCorrectionPlan: msg.is_correction_plan || false,
-      correctionApproved: msg.correction_approved || false,
-      isNew: false,
-      isTyping: false,
-      isAnimated: true,
+      isConstructionPlan: typeof msg.content === 'string' && msg.content.includes('### 1. Análisis del Requerimiento'), // Detect plan from DB
+      planApproved: false, // Default to false when loading from DB
+      isCorrectionPlan: false, // Default to false when loading from DB
+      correctionApproved: false, // Default to false when loading from DB
+      isNew: false, // Messages from DB are not 'new'
+      isTyping: false, // Messages from DB are not 'typing'
+      isAnimated: true, // Messages from DB are considered animated
     }));
   }, [userId]);
 
@@ -268,18 +268,7 @@ export function useChat({
 
   const saveMessageToDB = async (convId: string, msg: Omit<Message, 'timestamp' | 'id'>) => {
     if (!userId) return null;
-    const { data, error } = await supabase.from('messages').insert({
-      conversation_id: convId,
-      user_id: userId,
-      role: msg.role,
-      content: msg.content as any,
-      model: msg.model,
-      type: msg.type,
-      is_construction_plan: msg.isConstructionPlan,
-      plan_approved: msg.planApproved,
-      is_correction_plan: msg.isCorrectionPlan,
-      correction_approved: msg.correctionApproved,
-    }).select('id, created_at').single();
+    const { data, error } = await supabase.from('messages').insert({ conversation_id: convId, user_id: userId, role: msg.role, content: msg.content as any, model: msg.model, type: msg.type }).select('id, created_at').single();
     if (error) {
       toast.error('Error al guardar el mensaje.');
       return null;
@@ -406,7 +395,7 @@ export function useChat({
         role: 'assistant' as const,
         model: modelUsedForResponse,
         type: 'multimodal' as const,
-        isConstructionPlan: isConstructionPlan,
+        isConstructionPlan: isConstructionPlan, // FIX: isConstructionPlan is now a strict boolean
         planApproved: false,
         isCorrectionPlan: false,
         correctionApproved: false,
@@ -475,21 +464,7 @@ export function useChat({
     const planMessage = messages.find(m => m.id === messageId);
     if (!planMessage || !conversationId) return;
 
-    // Update local state immediately for responsiveness
     setMessages(prev => prev.map(m => m.id === messageId ? { ...m, planApproved: true } : m));
-
-    // Update the database
-    const { error } = await supabase
-      .from('messages')
-      .update({ plan_approved: true })
-      .eq('id', messageId);
-
-    if (error) {
-      toast.error('Error al guardar el estado de aprobación del plan.');
-      // Optionally revert local state change
-      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, planApproved: false } : m));
-      return;
-    }
 
     const approvalMessage: Message = {
       id: `user-approval-${Date.now()}`,
