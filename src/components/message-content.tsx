@@ -77,9 +77,9 @@ export function MessageContent({ content, isNew, aiResponseSpeed, isAppChat }: M
   }, [isNew, content]);
 
   const handlePartAnimationComplete = () => {
-    setTimeout(() => {
-      setAnimatedPartsCount(prev => prev + 1);
-    }, 100);
+    // No hay setTimeout aquí, la siguiente parte se anima inmediatamente
+    // después de que la actual notifica su finalización.
+    setAnimatedPartsCount(prev => prev + 1);
   };
 
   if (!isNew) {

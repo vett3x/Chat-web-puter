@@ -80,7 +80,7 @@ interface CodePart { type: 'code'; language?: string; filename?: string; code?: 
 export type RenderablePart = TextPart | ImagePart | CodePart;
 
 // New, more robust regex to capture the entire info line after ```
-const codeBlockRegex = /```(\w+)?(?::([\w./-]+))?\n([\s\S]*?)\n```/g;
+const codeBlockRegex = /```(.*)\n([\s\S]*?)\s*```/g;
 
 export function parseAiResponseToRenderableParts(content: string, isAppChat: boolean): RenderablePart[] {
   const parts: RenderablePart[] = [];
@@ -95,11 +95,19 @@ export function parseAiResponseToRenderableParts(content: string, isAppChat: boo
       if (textPart) parts.push({ type: 'text', text: textPart });
     }
     
-    const infoLine = (match[1] || '').trim(); // Language part
-    const filenameFromRegex = (match[2] || '').trim(); // Filename part from regex
-    const codeContent = (match[3] || '').trim();
-    let language = infoLine;
-    let filename = filenameFromRegex;
+    const infoLine = (match[1] || '').trim();
+    const codeContent = (match[2] || '').trim();
+    let language = '';
+    let filename = '';
+
+    // Parse the infoLine to extract language and filename
+    const langFileMatch = infoLine.match(/(\w+)?(?::([\w./-]+))?/);
+    if (langFileMatch) {
+      language = langFileMatch[1] || '';
+      filename = langFileMatch[2] || '';
+    } else {
+      language = infoLine; // Fallback to the whole line as language if format is unexpected
+    }
 
     const part: RenderablePart = {
       type: 'code',

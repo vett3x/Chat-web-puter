@@ -15,30 +15,26 @@ interface CodeBlockProps {
   filename?: string;
   isNew?: boolean;
   onAnimationComplete?: () => void;
-  animationSpeed: 'slow' | 'normal' | 'fast';
+  animationSpeed: 'slow' | 'normal' | 'fast'; // Not directly used for text animation, but kept for consistency
 }
 
 export function CodeBlock({ language, code, filename, isNew, onAnimationComplete }: CodeBlockProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const [isTyping, setIsTyping] = useState(!!isNew);
+  const [isTyping, setIsTyping] = useState(false); // Control local de la animación de 'typing'
 
-  // The streaming from useChat now handles the animation.
-  // This component just needs to render the code as it receives it.
-  // The onAnimationComplete is called by the stream handler in useChat when the stream ends.
   useEffect(() => {
-    if (!isNew) {
-      setIsTyping(false);
-      onAnimationComplete?.();
-    } else {
-      // A simple heuristic: if the code length stops changing for a moment, assume typing is done.
+    if (isNew) {
+      setIsTyping(true);
       const timer = setTimeout(() => {
         setIsTyping(false);
-        onAnimationComplete?.();
-      }, 1000); // If no new code for 1 second, stop the typing indicator.
+        onAnimationComplete?.(); // Notificar al padre que la animación ha terminado
+      }, 1000); // Duración de la animación de 'typing' (1 segundo)
       return () => clearTimeout(timer);
+    } else {
+      setIsTyping(false); // Si no es nuevo, no está 'typing'
     }
-  }, [code, isNew, onAnimationComplete]);
+  }, [isNew, onAnimationComplete]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(code).then(() => {

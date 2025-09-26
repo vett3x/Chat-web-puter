@@ -51,7 +51,7 @@ declare global {
 export interface Message {
   id: string;
   conversation_id?: string;
-  content: string | MessageContentPart[];
+  content: string | RenderablePart[]; // MODIFICADO: Ahora content puede ser string o RenderablePart[]
   role: 'user' | 'assistant';
   model?: string;
   timestamp: Date;
