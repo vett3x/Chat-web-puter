@@ -91,8 +91,8 @@ export function ConstructionPlan({ content, onApprove, onRequestChanges, isAppro
             {section.icon}
             <h4>{section.title}</h4>
           </div>
-          <div className="pl-7 text-muted-foreground">
-            <div className="prose prose-sm dark:prose-invert max-w-none">
+          <div className="pl-7 text-muted-foreground"> {/* Mantener pl-7 para el icono */}
+            <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap"> {/* Añadir whitespace-pre-wrap aquí */}
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{section.content}</ReactMarkdown>
             </div>
           </div>
