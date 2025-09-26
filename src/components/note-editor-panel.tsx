@@ -10,11 +10,10 @@ import { Save, Loader2, Wand2, X } from 'lucide-react';
 import { NoteAiChat, ChatMessage } from './note-ai-chat';
 import { ApiKey } from '@/hooks/use-user-api-keys';
 
-// BlockNote imports - Workaround for persistent compile errors
-import { BlockNoteViewRaw } from "@blocknote/react";
-import * as BlockNoteReact from "@blocknote/react";
-import { BlockNoteEditor, Block } from "@blocknote/core";
-import "@blocknote/core/style.css";
+// BlockNote imports
+import { BlockNoteView, useBlockNote } from "@blocknote/react";
+import { type Block, type BlockNoteEditor } from "@blocknote/core";
+import "@blocknote/react/style.css"; // Corrected style import path
 import { useTheme } from 'next-themes';
 
 interface Note {
@@ -43,7 +42,7 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [showAiHint, setShowAiHint] = useState(false);
 
-  const editor = (BlockNoteReact as any).useBlockNote({ // Using namespace and 'any' to bypass TS check
+  const editor = useBlockNote({
     onEditorContentChange: (editor: BlockNoteEditor) => {
       // For auto-saving, you could trigger a save here.
       // For now, we'll rely on the manual save button and title change.
@@ -51,7 +50,7 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
   });
 
   const fetchNote = useCallback(async () => {
-    if (!session?.user?.id || !noteId) return;
+    if (!session?.user?.id || !noteId || !editor) return;
     setIsLoading(true);
     const { data, error } = await supabase.from('notes').select('id, title, content, updated_at, chat_history').eq('id', noteId).eq('user_id', session.user.id).single();
     if (error) {
@@ -147,7 +146,7 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
         </div>
       </div>
       <div className="flex-1 overflow-y-auto">
-        <BlockNoteViewRaw editor={editor} theme={theme === 'dark' ? 'dark' : 'light'} />
+        <BlockNoteView editor={editor} theme={theme === 'dark' ? 'dark' : 'light'} />
       </div>
       {showAiHint && (<div className="absolute bottom-20 right-4 bg-info text-info-foreground p-2 rounded-md shadow-lg text-sm animate-in fade-in slide-in-from-bottom-2 flex items-center gap-2 z-10"><span>¡Usa la IA para chatear con tu nota!</span><Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setShowAiHint(false)}><X className="h-3 w-3" /></Button></div>)}
       <Button variant="destructive" size="icon" onClick={() => setIsAiChatOpen(prev => !prev)} className="absolute bottom-4 right-4 rounded-full h-12 w-12 animate-pulse-red z-10" title="Asistente de Nota"><Wand2 className="h-6 w-6" /></Button>
