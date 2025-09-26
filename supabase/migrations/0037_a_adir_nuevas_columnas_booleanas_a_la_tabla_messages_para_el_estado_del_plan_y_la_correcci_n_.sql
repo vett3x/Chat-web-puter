@@ -1,5 +1,0 @@
-ALTER TABLE public.messages
-ADD COLUMN is_construction_plan BOOLEAN DEFAULT FALSE,
-ADD COLUMN plan_approved BOOLEAN DEFAULT FALSE,
-ADD COLUMN is_correction_plan BOOLEAN DEFAULT FALSE,
-ADD COLUMN correction_approved BOOLEAN DEFAULT FALSE;
