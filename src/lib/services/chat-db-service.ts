@@ -1,25 +1,41 @@
 "use server";
 
-import { supabase } from '@/integrations/supabase/client';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { toast } from 'sonner';
 import { Message } from '@/types/chat';
 
+// Helper para obtener un cliente de Supabase para Server Actions
+async function getSupabaseServerClient() {
+  // Pasamos directamente la instancia de cookies() de next/headers.
+  // createServerClient sabe cómo usar los métodos get, set, remove de esta instancia.
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: cookies()
+    }
+  );
+}
+
 export const fetchConversationDetails = async (convId: string, userId: string) => {
+  const supabase = await getSupabaseServerClient();
   const { data, error } = await supabase.from('conversations').select('id, title, model').eq('id', convId).eq('user_id', userId).single();
   if (error) {
     console.error('Error fetching conversation details:', error);
-    toast.error('Error al cargar los detalles de la conversación.');
-    return null;
+    // No usar toast directamente en Server Actions, ya que no se ejecutan en el cliente.
+    // El error se propagará al cliente que llamó a esta acción.
+    throw new Error('Error al cargar los detalles de la conversación.');
   }
   return data;
 };
 
 export const fetchMessages = async (convId: string, userId: string): Promise<Message[]> => {
+  const supabase = await getSupabaseServerClient();
   const { data, error } = await supabase.from('messages').select('*').eq('conversation_id', convId).eq('user_id', userId).order('created_at', { ascending: true });
   if (error) {
     console.error('Error fetching messages:', error);
-    toast.error('Error al cargar los mensajes.');
-    return [];
+    throw new Error('Error al cargar los mensajes.');
   }
   return data.map((msg: any) => ({
     ...msg,
@@ -35,20 +51,26 @@ export const fetchMessages = async (convId: string, userId: string): Promise<Mes
 };
 
 export const createConversation = async (userId: string, selectedModel: string) => {
+  const supabase = await getSupabaseServerClient();
   const { data, error } = await supabase.from('conversations').insert({ user_id: userId, title: 'Nueva conversación', model: selectedModel }).select('id, title').single();
   if (error) {
-    toast.error('Error al crear una nueva conversación.');
-    return null;
+    console.error('Error creating new conversation:', error);
+    throw new Error('Error al crear una nueva conversación.');
   }
   return data;
 };
 
 export const updateConversationModel = async (convId: string, userId: string, model: string) => {
+  const supabase = await getSupabaseServerClient();
   const { error } = await supabase.from('conversations').update({ model }).eq('id', convId).eq('user_id', userId);
-  if (error) toast.error('Error al actualizar el modelo de la conversación.');
+  if (error) {
+    console.error('Error updating conversation model:', error);
+    throw new Error('Error al actualizar el modelo de la conversación.');
+  }
 };
 
 export const saveMessage = async (convId: string, userId: string, msg: Omit<Message, 'timestamp' | 'id'>) => {
+  const supabase = await getSupabaseServerClient();
   const { data, error } = await supabase.from('messages').insert({
     conversation_id: convId,
     user_id: userId,
@@ -63,17 +85,21 @@ export const saveMessage = async (convId: string, userId: string, msg: Omit<Mess
   }).select('id, created_at').single();
 
   if (error) {
-    toast.error('Error al guardar el mensaje.');
-    return null;
+    console.error('Error saving message:', error);
+    throw new Error('Error al guardar el mensaje.');
   }
   return { id: data.id, timestamp: new Date(data.created_at) };
 };
 
 export const clearMessages = async (convId: string, userId: string) => {
+    const supabase = await getSupabaseServerClient();
     const { error } = await supabase
         .from('messages')
         .delete()
         .eq('conversation_id', convId)
         .eq('user_id', userId);
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.error('Error clearing messages:', error);
+      throw new Error(error.message);
+    }
 };
