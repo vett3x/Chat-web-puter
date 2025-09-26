@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileText, Puzzle, Package, Check, Wand2, ThumbsUp, ThumbsDown, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { cn } from '@/lib/utils'; // Import cn for conditional styling
+import { cn } from '@/lib/utils';
 
 interface ConstructionPlanProps {
   content: string;
@@ -91,7 +91,7 @@ export function ConstructionPlan({ content, onApprove, onRequestChanges, isAppro
             {section.icon}
             <h4>{section.title}</h4>
           </div>
-          <div className="prose prose-sm dark:prose-invert max-w-none pl-7 text-muted-foreground">
+          <div className="prose prose-sm dark:prose-invert max-w-none pl-7">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{section.content}</ReactMarkdown>
           </div>
         </div>
