@@ -233,6 +233,10 @@ export const esDictionary = {
   // El manejador para arrastrar.
   drag_handle: {
     tooltip: "Arrastra para reordenar",
+    delete_menuitem: "Eliminar",
+    colors_menuitem: "Colores",
+    header_row_menuitem: "Fila de Encabezado",
+    header_column_menuitem: "Columna de Encabezado",
   },
   // El menú del bloque.
   block_toolbar: {
@@ -257,6 +261,15 @@ export const esDictionary = {
     colors_menuitem: "Colores de Tabla",
     header_row_menuitem: "Fila de Encabezado",
     header_column_menuitem: "Columna de Encabezado",
+    delete_column_menuitem: "Eliminar Columna",
+    delete_row_menuitem: "Eliminar Fila",
+    add_left_menuitem: "Añadir a la Izquierda",
+    add_right_menuitem: "Añadir a la Derecha",
+    add_above_menuitem: "Añadir Arriba",
+    add_below_menuitem: "Añadir Abajo",
+    split_cell_menuitem: "Dividir Celda",
+    merge_cells_menuitem: "Unir Celdas",
+    background_color_menuitem: "Color de Fondo",
   },
   link_toolbar: {
     edit_link: "Editar enlace",
@@ -330,6 +343,7 @@ export const esDictionary = {
     no_results: {
       title: "Sin sugerencias",
     },
+    no_items_title: "No hay elementos",
   },
   file_panel: {
     title: "Panel de Archivos",
