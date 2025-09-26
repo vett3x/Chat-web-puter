@@ -271,6 +271,8 @@ export function useChat({
   const getAndStreamAIResponse = useCallback(async (convId: string, history: Message[]) => {
     setIsLoading(true);
     const assistantMessageId = `assistant-${Date.now()}`;
+    
+    // Add a placeholder message immediately
     setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant', content: '', isTyping: true, timestamp: new Date() }]);
     
     const userMessageToSave = history.findLast(m => m.role === 'user');
@@ -312,6 +314,7 @@ export function useChat({
 
       let fullResponseText = '';
       let modelUsedForResponse = selectedModel;
+      let isConstructionPlanDetected = false; // Flag to detect if the final response is a plan
 
       const selectedKey = userApiKeys.find(k => `user_key:${k.id}` === selectedModel);
       const isCustomEndpoint = selectedKey?.provider === 'custom_endpoint';
@@ -336,6 +339,8 @@ export function useChat({
         }
         if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
         fullResponseText = response?.message?.content || 'Sin contenido.';
+        isConstructionPlanDetected = chatMode === 'build' && fullResponseText.includes('### 1. Análisis del Requerimiento');
+
       } else if (selectedModel.startsWith('user_key:')) {
         const apiResponse = await fetch('/api/ai/chat', {
           method: 'POST',
@@ -358,18 +363,23 @@ export function useChat({
           if (done) break;
           const chunk = decoder.decode(value, { stream: true });
           fullResponseText += chunk;
-          // Update content with parsed parts during streaming
-          setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: parseAiResponseToRenderableParts(fullResponseText, chatMode === 'build'), isTyping: false, isNew: true } : m));
+
+          // Only update messages during streaming if NOT in build mode, or if it's not a plan
+          // If in build mode, we buffer the fullResponseText until the end to avoid showing raw plan output
+          if (chatMode !== 'build' || !fullResponseText.includes('### 1. Análisis del Requerimiento')) {
+            setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: parseAiResponseToRenderableParts(fullResponseText, chatMode === 'build'), isTyping: false, isNew: true } : m));
+          }
         }
+        // After stream is done, check if it's a construction plan
+        isConstructionPlanDetected = chatMode === 'build' && fullResponseText.includes('### 1. Análisis del Requerimiento');
       } else {
         throw new Error('Modelo de IA no válido seleccionado.');
       }
 
-      const isConstructionPlan = chatMode === 'build' && fullResponseText.includes('### 1. Análisis del Requerimiento');
       const finalParts = parseAiResponseToRenderableParts(fullResponseText, chatMode === 'build');
       const filesToWrite: { path: string; content: string }[] = [];
 
-      if (chatMode === 'build' && !isConstructionPlan) {
+      if (chatMode === 'build' && !isConstructionPlanDetected) { // Only extract files if NOT a construction plan
         finalParts.forEach(part => {
           if (part.type === 'code' && appId && part.filename && part.code) {
             filesToWrite.push({ path: part.filename, content: part.code });
@@ -378,11 +388,11 @@ export function useChat({
       }
 
       const finalAssistantMessageData = {
-        content: isConstructionPlan ? fullResponseText : finalParts,
+        content: isConstructionPlanDetected ? fullResponseText : finalParts, // Store raw string for plan, parsed parts otherwise
         role: 'assistant' as const,
         model: modelUsedForResponse,
         type: 'multimodal' as const,
-        isConstructionPlan,
+        isConstructionPlan: isConstructionPlanDetected,
       };
 
       const savedData = await saveMessageToDB(convId, finalAssistantMessageData);
