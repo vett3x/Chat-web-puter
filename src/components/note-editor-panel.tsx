@@ -16,6 +16,7 @@ import { BlockNoteView, darkDefaultTheme, type Theme } from "@blocknote/mantine"
 import { type Block, type BlockNoteEditor } from "@blocknote/core";
 import "@blocknote/mantine/style.css";
 import { useTheme } from 'next-themes';
+import { getDictionary } from '@/lib/blocknote-dictionaries'; // NEW: Import getDictionary
 
 // Create a custom dark theme that uses the app's CSS variables
 const customDarkTheme: Theme = {
@@ -66,7 +67,13 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
   const [noteContentForChat, setNoteContentForChat] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('saved');
 
-  const editor = useCreateBlockNote();
+  // Determine the language for the dictionary
+  const currentLang = 'es'; // For now, hardcode to Spanish. This could be dynamic based on user settings.
+  const dictionary = getDictionary(currentLang);
+
+  const editor = useCreateBlockNote({
+    dictionary: dictionary, // Use the dynamically loaded dictionary
+  });
 
   const handleSave = useCallback(async () => {
     if (!note || saveStatus === 'saving' || !editor) return;
