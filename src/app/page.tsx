@@ -15,6 +15,7 @@ import { DeepAiCoderDialog } from "@/components/deep-ai-coder-dialog";
 import { RetryUploadDialog } from "@/components/retry-upload-dialog";
 import { UpdateManagerDialog } from "@/components/update-manager-dialog";
 import { ApiManagementDialog } from "@/components/api-management-dialog";
+import { AppVersionsBar } from "@/components/app-versions-bar"; // NEW: Import AppVersionsBar
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -25,6 +26,8 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { useSidebarData } from "@/hooks/use-sidebar-data";
 import { useUserApiKeys } from "@/hooks/use-user-api-keys";
+import { format } from 'date-fns'; // Import format
+import { es } from 'date-fns/locale'; // Import es locale
 
 interface UserApp {
   id: string;
@@ -96,6 +99,7 @@ export default function Home() {
   const [activeFile, setActiveFile] = useState<ActiveFile | null>(null);
   const [isFileLoading, setIsFileLoading] = useState(false);
   const [isDeletingAppId, setIsDeletingAppId] = useState<string | null>(null);
+  const [isRevertingApp, setIsRevertingApp] = useState(false); // NEW: State for reverting app
   const [retryState, setRetryState] = useState<RetryState>({ isOpen: false, files: null });
   const appBrowserRef = useRef<{ refresh: () => void }>(null);
   const [fileTreeRefreshKey, setFileTreeRefreshKey] = useState(0);
@@ -239,6 +243,39 @@ export default function Home() {
     setRetryState({ isOpen: false, files: null });
   };
 
+  const handleRevertToVersion = async (timestamp: string) => {
+    if (!selectedAppDetails?.id) return;
+
+    setIsRevertingApp(true);
+    const toastId = toast.loading(`Restaurando a la versión del ${format(new Date(timestamp), 'dd/MM/yyyy HH:mm', { locale: es })}...`);
+
+    try {
+      const response = await fetch(`/api/apps/${selectedAppDetails.id}/versions?timestamp=${encodeURIComponent(timestamp)}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+      const filesToRevert: { file_path: string; file_content: string }[] = await response.json();
+
+      if (filesToRevert.length === 0) {
+        throw new Error('No se encontraron archivos para esta versión.');
+      }
+
+      const formattedFiles = filesToRevert.map(f => ({ path: f.file_path, content: f.file_content }));
+      await writeFilesToApp(formattedFiles); // Use existing writeFilesToApp logic
+
+      toast.success('Aplicación restaurada a la versión seleccionada.', { id: toastId });
+      setFileTreeRefreshKey(prev => prev + 1); // Refresh file tree
+      appBrowserRef.current?.refresh(); // Refresh app preview
+
+    } catch (error: any) {
+      console.error('Error reverting to version:', error);
+      toast.error(`Error al restaurar la versión: ${error.message}`, { id: toastId });
+    } finally {
+      setIsRevertingApp(false);
+    }
+  };
+
   const handleOpenProfileSettings = () => setIsProfileSettingsOpen(true);
   const handleOpenAppSettings = () => setIsAppSettingsOpen(true);
   const handleOpenServerManagement = () => setIsServerManagementOpen(true);
@@ -304,17 +341,24 @@ export default function Home() {
           removeLocalItem={removeLocalItem}
         />
       </div>
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 flex flex-col"> {/* Added flex-col here */}
+        {selectedItem?.type === 'app' && selectedAppDetails && (
+          <AppVersionsBar
+            appId={selectedAppDetails.id}
+            onRevertToVersion={handleRevertToVersion}
+            isReverting={isRevertingApp}
+          />
+        )}
         {selectedItem?.type === 'note' ? (
           <NoteEditorPanel
             noteId={selectedItem.id}
             onNoteUpdated={(id, data) => updateLocalItem(id, 'note', data)}
             userApiKeys={userApiKeys}
             isLoadingApiKeys={isLoadingApiKeys}
-            userLanguage={userLanguage || 'es'} // Pass user language
+            userLanguage={userLanguage || 'es'}
           />
         ) : (
-          <ResizablePanelGroup direction="horizontal">
+          <ResizablePanelGroup direction="horizontal" className="flex-1"> {/* flex-1 to take remaining height */}
             <ResizablePanel defaultSize={50} minSize={30}>
               <ChatInterface
                 key={selectedItem?.conversationId || 'no-conversation'}
