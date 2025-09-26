@@ -6,6 +6,7 @@ import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+const MAX_VERSIONS_TO_SHOW = 20;
 
 async function getUserId() {
   const cookieStore = cookies() as any;
@@ -65,7 +66,11 @@ export async function GET(req: NextRequest, context: any) {
         file_count: file_count,
       }));
 
-      return NextResponse.json(versions);
+      // Sort again just in case the map doesn't preserve order perfectly, and limit
+      const sortedVersions = versions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      const limitedVersions = sortedVersions.slice(0, MAX_VERSIONS_TO_SHOW);
+
+      return NextResponse.json(limitedVersions);
     }
   } catch (error: any) {
     console.error(`[API /apps/${appId}/versions] Error:`, error);

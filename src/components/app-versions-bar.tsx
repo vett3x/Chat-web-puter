@@ -24,15 +24,16 @@ interface AppVersion {
 
 interface AppVersionsBarProps {
   appId: string;
-  onRevertToVersion: (timestamp: string) => void;
+  onRevertToVersion: (timestamp: string) => Promise<void>; // Changed to Promise
   isReverting: boolean;
-  autoFixStatus: AutoFixStatus; // NEW: Prop for auto-fix status
-  onTriggerFixBuildError: () => void; // NEW: Callback to trigger build error fix
-  onTriggerReportWebError: () => void; // NEW: Callback to trigger web error report
+  autoFixStatus: AutoFixStatus;
+  onTriggerFixBuildError: () => void;
+  onTriggerReportWebError: () => void;
 }
 
 export function AppVersionsBar({ appId, onRevertToVersion, isReverting, autoFixStatus, onTriggerFixBuildError, onTriggerReportWebError }: AppVersionsBarProps) {
   const [versions, setVersions] = useState<AppVersion[]>([]);
+  const [activeVersion, setActiveVersion] = useState<string | null>(null);
   const [isLoadingVersions, setIsLoadingVersions] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,6 +48,11 @@ export function AppVersionsBar({ appId, onRevertToVersion, isReverting, autoFixS
       }
       const data: AppVersion[] = await response.json();
       setVersions(data);
+      if (data.length > 0) {
+        setActiveVersion(data[0].created_at); // The first one is the most recent
+      } else {
+        setActiveVersion(null);
+      }
     } catch (err: any) {
       console.error('Error fetching app versions:', err);
       setError(err.message || 'Error al cargar las versiones de la aplicación.');
@@ -61,6 +67,13 @@ export function AppVersionsBar({ appId, onRevertToVersion, isReverting, autoFixS
       fetchVersions();
     }
   }, [appId, fetchVersions]);
+
+  const handleRevert = async (timestamp: string) => {
+    await onRevertToVersion(timestamp);
+    // After reverting, the new "latest" version will be the one we just created by saving the old files.
+    // Refetching will update the list and set the active version correctly.
+    await fetchVersions();
+  };
 
   const isAutoFixing = autoFixStatus !== 'idle';
 
@@ -78,31 +91,37 @@ export function AppVersionsBar({ appId, onRevertToVersion, isReverting, autoFixS
     <div className="flex items-center justify-between p-2 border-b bg-background">
       <div className="flex items-center gap-2">
         <History className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-medium text-muted-foreground">Versiones:</span>
+        <span className="text-sm font-medium text-muted-foreground">
+          Versión Actual:
+        </span>
         {isLoadingVersions ? (
           <Loader2 className="h-4 w-4 animate-spin text-primary" />
-        ) : error ? (
-          <span className="text-destructive text-xs flex items-center gap-1">
-            <AlertCircle className="h-4 w-4" /> Error
+        ) : activeVersion ? (
+          <span className="text-sm font-mono bg-muted px-2 py-1 rounded-md">
+            {format(new Date(activeVersion), 'dd/MM/yy HH:mm:ss', { locale: es })}
           </span>
-        ) : versions.length === 0 ? (
-          <span className="text-muted-foreground text-xs">No hay versiones guardadas.</span>
         ) : (
+          <span className="text-muted-foreground text-xs">No hay versiones guardadas.</span>
+        )}
+        {versions.length > 0 && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" disabled={isReverting || isAutoFixing}>
                 <GitPullRequest className="mr-2 h-4 w-4" />
-                Seleccionar Versión
+                Historial
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-64 bg-popover text-popover-foreground border-border">
               <DropdownMenuLabel>Historial de Versiones</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {versions.map((version) => (
-                <DropdownMenuItem key={version.created_at} onClick={() => onRevertToVersion(version.created_at)} disabled={isReverting || isAutoFixing}>
-                  <div className="flex flex-col">
-                    <span className="font-medium">{format(new Date(version.created_at), 'dd/MM/yyyy HH:mm', { locale: es })}</span>
-                    <span className="text-xs text-muted-foreground">{version.file_count} archivo(s)</span>
+                <DropdownMenuItem key={version.created_at} onClick={() => handleRevert(version.created_at)} disabled={isReverting || isAutoFixing || version.created_at === activeVersion}>
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex flex-col">
+                      <span className="font-medium">{format(new Date(version.created_at), 'dd/MM/yyyy HH:mm', { locale: es })}</span>
+                      <span className="text-xs text-muted-foreground">{version.file_count} archivo(s)</span>
+                    </div>
+                    {version.created_at === activeVersion && <CheckCircle2 className="h-4 w-4 text-green-500" />}
                   </div>
                 </DropdownMenuItem>
               ))}

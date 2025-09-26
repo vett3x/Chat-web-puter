@@ -13,6 +13,7 @@ import crypto from 'crypto';
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants';
 
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+const MAX_VERSIONS_TO_KEEP = 20;
 
 async function getUserId() {
   const cookieStore = cookies() as any;
@@ -90,6 +91,41 @@ function buildFileTree(paths: string[]): FileNode[] {
     }
   }
   return root.children || [];
+}
+
+async function pruneOldVersions(appId: string, userId: string) {
+  try {
+    const { data: allBackups, error: fetchError } = await supabaseAdmin
+      .from('app_file_backups')
+      .select('created_at')
+      .eq('app_id', appId)
+      .eq('user_id', userId);
+
+    if (fetchError) throw fetchError;
+
+    const uniqueTimestamps = [...new Set(allBackups.map(b => b.created_at))];
+    uniqueTimestamps.sort((a, b) => new Date(b).getTime() - new Date(a).getTime()); // Sort descending (newest first)
+
+    if (uniqueTimestamps.length > MAX_VERSIONS_TO_KEEP) {
+      const timestampsToDelete = uniqueTimestamps.slice(MAX_VERSIONS_TO_KEEP);
+      console.log(`[Pruning] App ${appId}: Found ${uniqueTimestamps.length} versions. Deleting ${timestampsToDelete.length} oldest versions.`);
+      
+      const { error: deleteError } = await supabaseAdmin
+        .from('app_file_backups')
+        .delete()
+        .in('created_at', timestampsToDelete)
+        .eq('app_id', appId)
+        .eq('user_id', userId);
+
+      if (deleteError) {
+        console.error(`[Pruning] Error deleting old versions for app ${appId}:`, deleteError);
+      } else {
+        console.log(`[Pruning] Successfully deleted old versions for app ${appId}.`);
+      }
+    }
+  } catch (error) {
+    console.error(`[Pruning] A critical error occurred while pruning versions for app ${appId}:`, error);
+  }
 }
 
 export async function GET(req: NextRequest, context: any) {
@@ -207,6 +243,9 @@ export async function POST(req: NextRequest, context: any) {
       supabaseAdmin.from('app_file_backups').upsert(backups, { onConflict: 'app_id, file_path' }),
       supabaseAdmin.from('server_events_log').insert(logEntries)
     ]);
+
+    // Prune old versions after successful save
+    await pruneOldVersions(appId, userId);
 
     return NextResponse.json({ message: 'Archivos guardados y respaldados correctamente.' });
 
