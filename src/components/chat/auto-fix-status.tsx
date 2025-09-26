@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Loader2, Wand2, AlertTriangle } from 'lucide-react';
-import { AutoFixStatus as AutoFixStatusType } from '@/hooks/use-chat';
+import { AutoFixStatus as AutoFixStatusType } from '@/types/chat';
 
 interface AutoFixStatusProps {
   status: AutoFixStatusType;
@@ -13,7 +13,7 @@ export function AutoFixStatus({ status }: AutoFixStatusProps) {
     return null;
   }
 
-  const statusConfig = {
+  const statusConfig: Record<Exclude<AutoFixStatusType, 'idle'>, { icon: React.ReactNode; text: string; bgColor: string; }> = {
     analyzing: {
       icon: <Loader2 className="h-4 w-4 animate-spin text-yellow-400" />,
       text: 'Compilación fallida. Analizando error...',

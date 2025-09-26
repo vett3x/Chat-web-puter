@@ -21,8 +21,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ConstructionPlan } from './construction-plan';
-import { Message } from '@/hooks/use-chat';
+import { Message } from '@/types/chat';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { RenderablePart } from '@/lib/utils';
 
 interface ChatMessagesProps {
   messages: Message[];
@@ -125,7 +126,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
             }
 
             const isLastMessage = index === messages.length - 1;
-            const hasFiles = Array.isArray(message.content) && message.content.some(part => (part as any).type === 'code' && (part as any).filename);
+            const hasFiles = Array.isArray(message.content) && message.content.some(part => part.type === 'code' && !!(part as any).filename);
 
             return (
               <div
