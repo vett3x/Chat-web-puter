@@ -87,7 +87,7 @@ export const esDictionary = {
       aliases: ["p", "texto"],
       group: "Básico",
     },
-    bullet_list: { // Renamed from bulleted_list
+    bullet_list: {
       title: "Lista de Viñetas",
       subtext: "Crear una lista simple",
       aliases: ["lista", "viñetas"],
@@ -219,7 +219,7 @@ export const esDictionary = {
       aliases: ["emoji", "emoticono"],
       group: "Básico",
     },
-    page_break: { // Added
+    page_break: {
       title: "Salto de Página",
       subtext: "Insertar un salto de página",
       aliases: ["salto", "página"],
@@ -248,7 +248,8 @@ export const esDictionary = {
   },
   // Propiedades adicionales para completar el diccionario
   side_menu: {
-    tooltip: "Abrir menú lateral",
+    add_block_label: "Añadir bloque",
+    drag_handle_label: "Arrastrar bloque",
   },
   table_handle: {
     tooltip: "Arrastra para mover la tabla",
@@ -308,13 +309,14 @@ export const esDictionary = {
   },
   toggle_blocks: {
     title: "Bloques de alternancia",
+    add_block_button: "Añadir bloque",
   },
   file_blocks: {
-    file: {
-      title: "Archivo",
-      subtext: "Insertar un archivo",
-      aliases: ["archivo", "documento"],
-      group: "Media",
+    add_button_text: {
+      file: "Añadir Archivo",
+      image: "Añadir Imagen",
+      video: "Añadir Video",
+      audio: "Añadir Audio",
     },
   },
   suggestion_menu: {
