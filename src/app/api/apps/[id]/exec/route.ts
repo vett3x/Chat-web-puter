@@ -6,6 +6,7 @@ import { executeSshCommand } from '@/lib/ssh-utils';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
+import { createClient } from '@supabase/supabase-js';
 
 const execSchema = z.object({
   command: z.string().min(1, { message: 'El comando es requerido.' }),
@@ -25,6 +26,7 @@ async function getUserId() {
 
 export async function POST(req: NextRequest, context: any) {
   const appId = context.params.id;
+  const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
   try {
     const userId = await getUserId();
@@ -41,9 +43,26 @@ export async function POST(req: NextRequest, context: any) {
     const mainCommand = command.trim().split(' ')[0];
     if (!ALLOWED_COMMANDS.includes(mainCommand)) {
       console.warn(`[SECURITY] Blocked command execution for app ${appId}: "${command}"`);
+      // Log the suspicious command attempt
+      await supabaseAdmin.from('server_events_log').insert({
+        user_id: userId,
+        server_id: app.server_id,
+        event_type: 'command_blocked',
+        description: `Intento de ejecución de comando bloqueado en el contenedor ${app.container_id.substring(0, 12)}.`,
+        command_details: command,
+      });
       return NextResponse.json({ message: `Comando no permitido por razones de seguridad: "${mainCommand}"` }, { status: 403 });
     }
     // --- FIN DE LA VALIDACIÓN DE SEGURIDAD ---
+
+    // Log the command before execution
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: userId,
+      server_id: app.server_id,
+      event_type: 'command_executed',
+      description: `Comando ejecutado en el contenedor ${app.container_id.substring(0, 12)}.`,
+      command_details: command,
+    });
 
     const fullCommand = `docker exec ${app.container_id} bash -c "cd /app && ${command.replace(/"/g, '\\"')}"`;
     const { stdout, stderr, code } = await executeSshCommand(server, fullCommand);

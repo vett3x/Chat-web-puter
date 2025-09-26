@@ -32,9 +32,6 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { DockerContainer } from '@/types/docker';
 import { CreateTunnelDialog } from './CreateTunnelDialog';
-import { ContainerHistoryDialog } from '@/components/container-history-dialog';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -43,7 +40,21 @@ interface ServerEvent {
   event_type: string;
   description: string;
   created_at: string;
+  command_details: string | null;
 }
+
+const DANGEROUS_KEYWORDS = ['rm -rf', 'mv /', 'dd ', 'mkfs', 'shutdown', 'reboot', ':(){:|:&};:', '> /dev/sda', 'chmod -R 777'];
+
+const isCommandSuspicious = (command: string | null | undefined): boolean => {
+  if (!command) return false;
+  const normalizedCommand = command.toLowerCase().trim();
+  // Check for exact commands or commands with dangerous flags
+  return DANGEROUS_KEYWORDS.some(keyword => {
+    const lowerKeyword = keyword.toLowerCase();
+    // Check if the command starts with the keyword (e.g., "rm -rf /") or is the exact keyword
+    return normalizedCommand.startsWith(lowerKeyword + ' ') || normalizedCommand === lowerKeyword;
+  });
+};
 
 interface DockerContainerListProps {
   containers: DockerContainer[];
@@ -59,10 +70,8 @@ interface DockerContainerListProps {
 export function DockerContainerList({ containers, server, isLoading, actionLoading, onAction, onRefresh, canManageDockerContainers, canManageCloudflareTunnels }: DockerContainerListProps) {
   const [isTunnelDialogOpen, setIsTunnelDialogOpen] = useState(false);
   const [selectedContainerForTunnel, setSelectedContainerForTunnel] = useState<DockerContainer | null>(null);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [selectedContainerForHistory, setSelectedContainerForHistory] = useState<DockerContainer | null>(null);
   const [expandedHistoryContainerId, setExpandedHistoryContainerId] = useState<string | null>(null);
-  const [containerHistoryLog, setContainerHistoryLog] = useState<string>('');
+  const [containerHistory, setContainerHistory] = useState<ServerEvent[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState<boolean>(false);
 
   const openCreateTunnelDialogFor = (container: DockerContainer) => {
@@ -70,19 +79,14 @@ export function DockerContainerList({ containers, server, isLoading, actionLoadi
     setIsTunnelDialogOpen(true);
   };
 
-  const openHistoryFor = (container: DockerContainer) => {
-    setSelectedContainerForHistory(container);
-    setIsHistoryOpen(true);
-  };
-
   const fetchAndDisplayHistory = async (containerId: string) => {
     if (expandedHistoryContainerId === containerId) {
-      setExpandedHistoryContainerId(null); // Collapse if already open
+      setExpandedHistoryContainerId(null);
       return;
     }
     setExpandedHistoryContainerId(containerId);
     setIsHistoryLoading(true);
-    setContainerHistoryLog('Cargando historial...');
+    setContainerHistory([]);
     try {
       const response = await fetch(`/api/servers/${server.id}/docker/containers/${containerId}/history`);
       if (!response.ok) {
@@ -90,19 +94,10 @@ export function DockerContainerList({ containers, server, isLoading, actionLoadi
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
       const events: ServerEvent[] = await response.json();
-      if (events.length === 0) {
-        setContainerHistoryLog('No hay eventos registrados para este contenedor.');
-      } else {
-        const formattedLog = events
-          .map(event => 
-            `[${format(new Date(event.created_at), 'dd/MM/yyyy HH:mm:ss', { locale: es })}] [${event.event_type}]\n${event.description}\n--------------------------------------------------`
-          )
-          .join('\n\n');
-        setContainerHistoryLog(formattedLog);
-      }
+      setContainerHistory(events);
     } catch (err: any) {
       toast.error(`Error al cargar el historial: ${err.message}`);
-      setContainerHistoryLog(`Error al cargar el historial: ${err.message}`);
+      setContainerHistory([]);
     } finally {
       setIsHistoryLoading(false);
     }
@@ -168,7 +163,7 @@ export function DockerContainerList({ containers, server, isLoading, actionLoadi
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
                         <Button variant="outline" size="icon" onClick={() => fetchAndDisplayHistory(container.ID)} title="Ver historial" disabled={!canManageDockerContainers}>
-                          <Terminal className="h-4 w-4" />
+                          <History className="h-4 w-4" />
                         </Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild><Button variant="outline" size="sm" disabled={isActionInProgress || !canManageDockerContainers}>{isActionInProgress ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Acciones</Button></DropdownMenuTrigger>
@@ -183,9 +178,6 @@ export function DockerContainerList({ containers, server, isLoading, actionLoadi
                               <RefreshCw className="mr-2 h-4 w-4" /> Reiniciar
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => openHistoryFor(container)} disabled={isActionInProgress}>
-                              <ScrollText className="mr-2 h-4 w-4" /> Ver Historial (Legacy)
-                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openCreateTunnelDialogFor(container)} disabled={isActionInProgress || !canManageCloudflareTunnels}>
                               <Globe className="mr-2 h-4 w-4" /> Crear Túnel Cloudflare
                             </DropdownMenuItem>
@@ -205,21 +197,32 @@ export function DockerContainerList({ containers, server, isLoading, actionLoadi
                   {isHistoryExpanded && (
                     <TableRow>
                       <TableCell colSpan={6} className="p-0">
-                        <div className="p-2 bg-[#1E1E1E] rounded-b-md">
+                        <div className="p-2 bg-[#1E1E1E] rounded-b-md max-h-[400px] overflow-y-auto">
                           {isHistoryLoading ? (
                             <div className="flex items-center gap-2 p-4 text-white">
                               <Loader2 className="h-4 w-4 animate-spin" />
                               Cargando historial...
                             </div>
+                          ) : containerHistory.length === 0 ? (
+                            <div className="p-4 text-center text-sm text-gray-400">
+                              No hay eventos registrados para este contenedor.
+                            </div>
                           ) : (
-                            <SyntaxHighlighter
-                              language="bash"
-                              style={vscDarkPlus}
-                              customStyle={{ margin: 0, padding: '1rem', fontSize: '0.875rem', lineHeight: '1.25rem', maxHeight: '400px', overflowY: 'auto' }}
-                              codeTagProps={{ style: { fontFamily: 'var(--font-geist-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' } }}
-                            >
-                              {containerHistoryLog}
-                            </SyntaxHighlighter>
+                            containerHistory.map(event => {
+                              const isSuspicious = isCommandSuspicious(event.command_details);
+                              return (
+                                <div key={event.id} className={cn("mb-2 p-2 rounded text-white", isSuspicious ? "bg-red-900/50 border border-red-700" : "bg-gray-700/20")}>
+                                  <pre className="whitespace-pre-wrap font-mono text-xs">
+                                    {`[${format(new Date(event.created_at), 'dd/MM/yyyy HH:mm:ss', { locale: es })}] [${event.event_type}]\n${event.description}`}
+                                    {event.command_details && (
+                                      <span className={cn(isSuspicious && "text-red-300 font-bold")}>
+                                        {`\n\n[COMANDO EJECUTADO${isSuspicious ? ' - SOSPECHOSO' : ''}]\n${event.command_details}`}
+                                      </span>
+                                    )}
+                                  </pre>
+                                </div>
+                              )
+                            })
                           )}
                         </div>
                       </TableCell>
@@ -231,14 +234,6 @@ export function DockerContainerList({ containers, server, isLoading, actionLoadi
           </TableBody>
         </Table>
       </TooltipProvider>
-      {selectedContainerForHistory && (
-        <ContainerHistoryDialog
-          open={isHistoryOpen}
-          onOpenChange={setIsHistoryOpen}
-          server={server}
-          container={selectedContainerForHistory}
-        />
-      )}
       <CreateTunnelDialog
         open={isTunnelDialogOpen}
         onOpenChange={setIsTunnelDialogOpen}

@@ -106,7 +106,7 @@ export async function GET(
     const shortContainerId = containerId.substring(0, 12);
     const { data: events, error: fetchError } = await supabaseAdmin
       .from('server_events_log')
-      .select('id, event_type, description, created_at')
+      .select('id, event_type, description, created_at, command_details')
       .eq('server_id', serverId)
       .like('description', `%${shortContainerId}%`)
       .order('created_at', { ascending: false });
