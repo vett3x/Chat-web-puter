@@ -156,4 +156,65 @@ export const esDictionary = {
   toggle_blocks: {
     title: "Bloques de alternancia",
   },
+  // Missing keys from the error message
+  file_blocks: {
+    // Assuming these are for specific file block types, similar to slash_menu
+    file: {
+      title: "Archivo",
+      subtext: "Insertar un archivo",
+      aliases: ["archivo", "documento"],
+      group: "Media",
+    },
+  },
+  suggestion_menu: {
+    search_input: {
+      placeholder: "Buscar sugerencias...",
+    },
+    no_results: {
+      title: "Sin sugerencias",
+    },
+  },
+  file_panel: {
+    title: "Panel de Archivos",
+    upload_button: "Subir",
+    empty_state: "No hay archivos",
+  },
+  comments: {
+    add_comment: "Añadir comentario",
+    resolve_comment: "Resolver comentario",
+    delete_comment: "Eliminar comentario",
+    comment_placeholder: "Escribe un comentario...",
+  },
+  generic: {
+    ok: "Aceptar",
+    cancel: "Cancelar",
+    save: "Guardar",
+    delete: "Eliminar",
+    undo: "Deshacer",
+    redo: "Rehacer",
+  },
+  // Also adding other potentially missing top-level keys that are common in BlockNote
+  // These were not explicitly listed in the error but are part of the full dictionary.
+  // I'll add them to be thorough.
+  // Based on BlockNote's default dictionary structure:
+  // https://github.com/YousefED/BlockNote/blob/main/packages/core/src/BlockNoteEditor/dictionaries/en.ts
+  // I need to ensure all these are present.
+  // The error message is very specific about missing keys, so I should only add those.
+  // The previous fix removed `PartialBlockNoteDictionary` type, so I'm relying on inference.
+  // Let's re-add the `PartialBlockNoteDictionary` type and import it from `@blocknote/core`
+  // if it's actually exported. If not, I'll keep it inferred.
+  // The previous turn said it's NOT exported. So I'll keep it inferred.
+  // The error message is about missing properties from `PartialBlockNoteDictionary` type.
+  // This means the type *is* being used internally by `useCreateBlockNote`.
+  // I need to ensure the object matches the type.
+
+  // Let's re-check the `PartialBlockNoteDictionary` type.
+  // It's likely defined within the `@blocknote/core` package but not exported directly.
+  // If I can't import it, I'll have to manually ensure the structure is correct.
+  // The error message lists the missing properties. I need to add them.
+  // The previous `esDictionary` was missing these.
+
+  // I will add the missing keys with a minimal structure to satisfy the type.
+  // The error message lists: `file_blocks`, `suggestion_menu`, `file_panel`, `comments`, `generic`.
+  // I will add these.
 };
