@@ -69,8 +69,8 @@ export default {
   				border: 'hsl(var(--sidebar-border))',
   				ring: 'hsl(var(--sidebar-ring))'
   			},
-        'user-avatar-shadow': 'hsl(var(--user-avatar-shadow))',
-        'ai-avatar-shadow': 'hsl(var(--ai-avatar-shadow))'
+        'user-avatar-shadow': '0 0 8px 2px hsl(var(--user-avatar-shadow))',
+        'ai-avatar-shadow': '0 0 8px 2px hsl(var(--ai-avatar-shadow) / 0.5)',
   		},
   		borderRadius: {
   			lg: 'var(--radius)',
@@ -146,5 +146,5 @@ export default {
       },
   	}
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography")],
 } satisfies Config;

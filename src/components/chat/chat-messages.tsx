@@ -119,8 +119,11 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
           </div>
         ) : (
           messages.map((message: Message, index: number) => {
-            // Skip rendering the hidden approval message
-            if (message.content === '[USER_APPROVED_PLAN]' || message.content === '[USER_REQUESTED_BUILD_FIX]' || message.content === '[USER_REPORTED_WEB_ERROR]') {
+            // Skip rendering the hidden internal user messages
+            if (typeof message.content === 'string' && 
+                (message.content.endsWith('[USER_APPROVED_PLAN]') || 
+                 message.content.endsWith('[USER_REQUESTED_BUILD_FIX]') || 
+                 message.content.endsWith('[USER_REPORTED_WEB_ERROR]'))) {
               return null;
             }
 
@@ -175,6 +178,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
                             // setMessages(prev => prev.map(m => m.id === message.id ? { ...m, isAnimated: true } : m));
                           }
                         }}
+                        isErrorAnalysisRequest={message.isErrorAnalysisRequest} // Pass isErrorAnalysisRequest
                       />
                     )}
                   </div>
