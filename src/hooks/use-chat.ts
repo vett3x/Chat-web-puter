@@ -201,7 +201,7 @@ export function useChat({
   }, [userId]);
 
   const getMessagesFromDB = useCallback(async (convId: string) => {
-    const { data, error } = await supabase.from('messages').select('id, content, role, model, created_at, conversation_id, type, plan_approved, is_correction_plan, correction_approved').eq('conversation_id', convId).eq('user_id', userId).order('created_at', { ascending: true });
+    const { data, error } = await supabase.from('messages').select('id, content, role, model, created_at, conversation_id, type, plan_approved').eq('conversation_id', convId).eq('user_id', userId).order('created_at', { ascending: true });
     if (error) {
       console.error('Error fetching messages:', error);
       toast.error('Error al cargar los mensajes.');
@@ -217,8 +217,8 @@ export function useChat({
       type: msg.type as 'text' | 'multimodal',
       isConstructionPlan: typeof msg.content === 'string' && msg.content.includes('### 1. Análisis del Requerimiento'), // Detect plan from DB
       planApproved: msg.plan_approved || false, // NEW: Fetch plan_approved from DB
-      isCorrectionPlan: msg.is_correction_plan || false, // NEW: Fetch is_correction_plan from DB
-      correctionApproved: msg.correction_approved || false, // NEW: Fetch correction_approved from DB
+      isCorrectionPlan: false, // Default to false when loading from DB
+      correctionApproved: false, // Default to false when loading from DB
       isErrorAnalysisRequest: typeof msg.content === 'string' && msg.content.includes('### 💡 Entendido!'), // NEW: Detect error analysis request from DB
       isNew: false, // Messages from DB are not 'new'
       isTyping: false, // Messages from DB are not 'typing'
@@ -278,8 +278,6 @@ export function useChat({
       model: msg.model, 
       type: msg.type,
       plan_approved: msg.planApproved, // NEW: Save planApproved status
-      is_correction_plan: msg.isCorrectionPlan, // NEW: Save isCorrectionPlan status
-      correction_approved: msg.correctionApproved, // NEW: Save correctionApproved status
     }).select('id, created_at').single();
     if (error) {
       toast.error('Error al guardar el mensaje.');
@@ -424,13 +422,12 @@ export function useChat({
         throw new Error('Modelo de IA no válido seleccionado.');
       }
 
-      const isConstructionPlan = isAppChatModeBuild && !!fullResponseText.match(/###\s*1\.\s*Análisis del Requerimiento/);
-      const isErrorAnalysisRequest = !!fullResponseText.match(/###\s*💡?\s*Entendido!/);
-      const isCorrectionPlan = !!fullResponseText.match(/###\s*💡?\s*Error Detectado/);
-      const finalContentForMessage = (isConstructionPlan || isErrorAnalysisRequest || isCorrectionPlan) ? fullResponseText : parseAiResponseToRenderableParts(fullResponseText, isAppChatModeBuild);
+      const isConstructionPlan = isAppChatModeBuild && fullResponseText.includes('### 1. Análisis del Requerimiento');
+      const isErrorAnalysisRequest = fullResponseText.includes('### 💡 Entendido!'); // NEW: Detect error analysis request
+      const finalContentForMessage = (isConstructionPlan || isErrorAnalysisRequest) ? fullResponseText : parseAiResponseToRenderableParts(fullResponseText, isAppChatModeBuild);
       const filesToWrite: { path: string; content: string }[] = [];
 
-      if (isAppChatModeBuild && !isConstructionPlan && !isErrorAnalysisRequest && !isCorrectionPlan) { // Only extract files if NOT a plan or error request
+      if (isAppChatModeBuild && !isConstructionPlan && !isErrorAnalysisRequest) { // Only extract files if NOT a plan or error request
         (finalContentForMessage as RenderablePart[]).forEach(part => {
           if (part.type === 'code' && appId && part.filename && part.code) {
             filesToWrite.push({ path: part.filename, content: part.code });
@@ -445,8 +442,8 @@ export function useChat({
         type: 'multimodal' as const,
         isConstructionPlan: isConstructionPlan,
         planApproved: false, // Default to false for new messages
-        isCorrectionPlan: isCorrectionPlan, // NEW: Set flag
-        correctionApproved: false, // Default to false for new messages
+        isCorrectionPlan: false,
+        correctionApproved: false,
         isErrorAnalysisRequest: isErrorAnalysisRequest, // NEW: Set flag
         isNew: true, // Mark as new for animation
         isTyping: false,
@@ -461,7 +458,7 @@ export function useChat({
       }
 
       // Update autoFixStatus based on AI's response
-      if (isErrorAnalysisRequest || isConstructionPlan || isCorrectionPlan) {
+      if (isErrorAnalysisRequest || isConstructionPlan) {
         setAutoFixStatus('plan_ready');
       } else {
         setAutoFixStatus('idle'); // Reset if AI didn't respond with a plan/request
@@ -522,37 +519,22 @@ export function useChat({
     const planMessage = messages.find(m => m.id === messageId);
     if (!planMessage || !conversationId) return;
 
-    // Determine if it's a construction plan or a correction plan
-    const isConstruction = planMessage.isConstructionPlan;
-    const isCorrection = planMessage.isCorrectionPlan;
-
     // Update local state
-    setMessages(prev => prev.map(m => m.id === messageId ? { 
-      ...m, 
-      planApproved: isConstruction ? true : m.planApproved,
-      correctionApproved: isCorrection ? true : m.correctionApproved,
-    } : m));
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, planApproved: true } : m));
 
     // Update in DB
     const { error } = await supabase
       .from('messages')
-      .update({ 
-        plan_approved: isConstruction ? true : undefined, // Only update if it's a construction plan
-        correction_approved: isCorrection ? true : undefined, // Only update if it's a correction plan
-      })
+      .update({ plan_approved: true })
       .eq('id', messageId)
       .eq('conversation_id', conversationId)
       .eq('user_id', userId);
 
     if (error) {
-      console.error('Error updating plan_approved/correction_approved status in DB:', error);
+      console.error('Error updating plan_approved status in DB:', error);
       toast.error('Error al guardar la aprobación del plan.');
       // Optionally revert local state if DB update fails
-      setMessages(prev => prev.map(m => m.id === messageId ? { 
-        ...m, 
-        planApproved: isConstruction ? false : m.planApproved,
-        correctionApproved: isCorrection ? false : m.correctionApproved,
-      } : m));
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, planApproved: false } : m));
       return;
     }
     toast.success('Plan aprobado y guardado.');
@@ -560,7 +542,7 @@ export function useChat({
     const approvalMessage: Message = {
       id: `user-approval-${Date.now()}`,
       conversation_id: conversationId,
-      content: isConstruction ? '[USER_APPROVED_PLAN]' : '[USER_APPROVED_CORRECTION]', // Different marker for correction
+      content: '[USER_APPROVED_PLAN]',
       role: 'user',
       timestamp: new Date(),
       type: 'text',
@@ -579,30 +561,6 @@ export function useChat({
     await getAndStreamAIResponse(conversationId, historyWithApproval);
 
   }, [messages, conversationId, getAndStreamAIResponse, userId]);
-
-  const onRequestManualFix = useCallback(async () => {
-    if (!conversationId || !userId) return;
-    toast.info("Has solicitado una corrección manual. Por favor, describe los cambios que deseas en el chat.");
-
-    const manualFixMessage: Message = {
-      id: `user-manual-fix-${Date.now()}`,
-      conversation_id: conversationId,
-      content: '[USER_REQUESTED_MANUAL_FIX]', // Internal marker
-      role: 'user',
-      timestamp: new Date(),
-      type: 'text',
-      isNew: true,
-      isTyping: false,
-      isConstructionPlan: false,
-      planApproved: false,
-      isCorrectionPlan: false,
-      correctionApproved: false,
-      isErrorAnalysisRequest: false,
-      isAnimated: true,
-    };
-    setMessages(prev => [...prev, manualFixMessage]);
-    setAutoFixStatus('idle'); // Reset auto-fix status
-  }, [conversationId, userId]);
 
 
   const regenerateLastResponse = useCallback(async () => {
@@ -694,7 +652,7 @@ export function useChat({
       }
       const { nextjsLogs } = await logsResponse.json();
 
-      const userMessageContent = `El último intento de compilación de la aplicación falló. Aquí están los logs de compilación de Next.js:\n\n\`\`\`bash\n${nextjsLogs || 'No se encontraron logs de Next.js.'}\n\`\`\`\n[USER_REQUESTED_BUILD_FIX]`; // Internal prompt for AI
+      const userMessageContent = `El último intento de compilación de la aplicación falló. Aquí están los logs de compilación de Next.js:\n\n\`\`\`bash\n${nextjsLogs || 'No se encontraron logs de Next.js.'}\n\`\`\`\n\n[USER_REQUESTED_BUILD_FIX]`; // Internal prompt for AI
 
       const userMessage: Message = {
         id: `user-fix-build-${Date.now()}`,
@@ -766,7 +724,7 @@ export function useChat({
         `[${new Date(event.created_at).toLocaleString()}] [${event.event_type}] ${event.description}`
       ).join('\n');
 
-      const userMessageContent = `He reportado un error en la vista previa web de la aplicación. Aquí están los logs de actividad recientes del servidor:\n\n\`\`\`text\n${formattedActivityLogs || 'No se encontraron logs de actividad recientes.'}\n\`\`\`\n[USER_REPORTED_WEB_ERROR]`; // Internal prompt for AI
+      const userMessageContent = `He reportado un error en la vista previa web de la aplicación. Aquí están los logs de actividad recientes del servidor:\n\n\`\`\`text\n${formattedActivityLogs || 'No se encontraron logs de actividad recientes.'}\n\`\`\`\n\n[USER_REPORTED_WEB_ERROR]`; // Internal prompt for AI
 
       const userMessage: Message = {
         id: `user-report-web-error-${Date.now()}`,
@@ -824,7 +782,6 @@ export function useChat({
     reapplyFilesFromMessage,
     clearChat,
     approvePlan,
-    onRequestManualFix, // NEW: Expose onRequestManualFix
     autoFixStatus,
     triggerFixBuildError, // NEW: Expose triggerFixBuildError
     triggerReportWebError, // NEW: Expose triggerReportWebError
