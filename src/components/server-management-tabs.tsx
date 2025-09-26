@@ -2,19 +2,24 @@
 
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Server, Dock, History, Cloud } from 'lucide-react';
+import { Server, Dock, History, Cloud, Shield } from 'lucide-react';
 import { ServerListTab } from './server-tabs/server-list-tab';
 import { UsageHistoryTab } from './server-tabs/usage-history-tab';
 import { CloudflareTunnelTab } from './server-tabs/cloudflare-tunnel-tab';
 import { ScrollArea } from './ui/scroll-area';
-import { AllDockerContainersTab } from './server-tabs/all-docker-containers-tab'; // Import the new component
+import { AllDockerContainersTab } from './server-tabs/all-docker-containers-tab';
+import { SecurityTab } from './server-tabs/security-tab';
+import { useSession } from '@/components/session-context-provider';
+import { cn } from '@/lib/utils';
 
 export function ServerManagementTabs() {
   const [activeTab, setActiveTab] = useState('servers');
+  const { userRole } = useSession();
+  const isSuperAdmin = userRole === 'super_admin';
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col">
-      <TabsList className="grid w-full grid-cols-4">
+      <TabsList className={cn("grid w-full", isSuperAdmin ? "grid-cols-5" : "grid-cols-4")}>
         <TabsTrigger value="servers" className="flex items-center gap-2">
           <Server className="h-4 w-4" /> Servidores
         </TabsTrigger>
@@ -27,6 +32,11 @@ export function ServerManagementTabs() {
         <TabsTrigger value="cloudflare" className="flex items-center gap-2">
           <Cloud className="h-4 w-4" /> Cloudflare
         </TabsTrigger>
+        {isSuperAdmin && (
+          <TabsTrigger value="security" className="flex items-center gap-2">
+            <Shield className="h-4 w-4" /> Seguridad
+          </TabsTrigger>
+        )}
       </TabsList>
       <div className="flex-1 overflow-hidden mt-4">
         <ScrollArea className="h-full w-full">
@@ -34,7 +44,7 @@ export function ServerManagementTabs() {
             <ServerListTab />
           </TabsContent>
           <TabsContent value="docker" className="h-full">
-            <AllDockerContainersTab /> {/* Using the new component here */}
+            <AllDockerContainersTab />
           </TabsContent>
           <TabsContent value="history" className="h-full">
             <UsageHistoryTab />
@@ -42,6 +52,11 @@ export function ServerManagementTabs() {
           <TabsContent value="cloudflare" className="h-full">
             <CloudflareTunnelTab />
           </TabsContent>
+          {isSuperAdmin && (
+            <TabsContent value="security" className="h-full">
+              <SecurityTab />
+            </TabsContent>
+          )}
         </ScrollArea>
       </div>
     </Tabs>

@@ -12,9 +12,7 @@ const execSchema = z.object({
   command: z.string().min(1, { message: 'El comando es requerido.' }),
 });
 
-// --- CAPA DE SEGURIDAD: LISTA BLANCA DE COMANDOS ---
-// Solo se permitirán los comandos que comiencen con estas cadenas.
-const ALLOWED_COMMANDS = ['npm', 'npx', 'yarn', 'pnpm'];
+const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
 async function getUserId() {
   const cookieStore = cookies() as any;
@@ -26,7 +24,6 @@ async function getUserId() {
 
 export async function POST(req: NextRequest, context: any) {
   const appId = context.params.id;
-  const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
   try {
     const userId = await getUserId();
@@ -40,7 +37,18 @@ export async function POST(req: NextRequest, context: any) {
     const { command } = execSchema.parse(body);
 
     // --- VALIDACIÓN DE SEGURIDAD ---
+    const { data: allowedCommandsData, error: fetchCommandsError } = await supabaseAdmin
+      .from('allowed_commands')
+      .select('command');
+
+    if (fetchCommandsError) {
+      console.error('[SECURITY] Could not fetch allowed commands from DB:', fetchCommandsError);
+      throw new Error('Error interno de seguridad al verificar el comando.');
+    }
+
+    const ALLOWED_COMMANDS = allowedCommandsData.map(c => c.command);
     const mainCommand = command.trim().split(' ')[0];
+
     if (!ALLOWED_COMMANDS.includes(mainCommand)) {
       console.warn(`[SECURITY] Blocked command execution for app ${appId}: "${command}"`);
       // Log the suspicious command attempt
