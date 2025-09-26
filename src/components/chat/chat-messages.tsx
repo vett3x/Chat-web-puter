@@ -179,6 +179,9 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
                           }
                         }}
                         isErrorAnalysisRequest={message.isErrorAnalysisRequest} // Pass isErrorAnalysisRequest
+                        isCorrectionPlan={message.isCorrectionPlan}
+                        correctionApproved={message.correctionApproved}
+                        isLoading={isLoading} // Pass isLoading
                       />
                     )}
                   </div>

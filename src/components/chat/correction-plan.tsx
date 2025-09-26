@@ -14,6 +14,7 @@ interface CorrectionPlanProps {
   isApproved: boolean;
   isNew?: boolean; // Prop para indicar si el plan es nuevo y debe animarse
   onAnimationComplete?: () => void; // Callback cuando la animación del plan termina
+  isLoading: boolean; // NEW: Prop to disable buttons while AI is thinking
 }
 
 interface PlanSection {
@@ -22,7 +23,7 @@ interface PlanSection {
   icon: React.ReactNode;
 }
 
-export function CorrectionPlan({ content, onApprove, onRequestManualFix, isApproved, isNew, onAnimationComplete }: CorrectionPlanProps) {
+export function CorrectionPlan({ content, onApprove, onRequestManualFix, isApproved, isNew, onAnimationComplete, isLoading }: CorrectionPlanProps) {
   const [sections, setSections] = useState<PlanSection[]>([]);
   const [animatedSectionsCount, setAnimatedSectionsCount] = useState(0);
 
@@ -101,11 +102,11 @@ export function CorrectionPlan({ content, onApprove, onRequestManualFix, isAppro
           </p>
         ) : (
           <>
-            <Button variant="outline" size="sm" onClick={onRequestManualFix} disabled={isNew && animatedSectionsCount < sections.length}>
+            <Button variant="outline" size="sm" onClick={onRequestManualFix} disabled={isLoading || (isNew && animatedSectionsCount < sections.length)}>
               <ThumbsDown className="h-4 w-4 mr-2" />
               Lo Arreglaré Manualmente
             </Button>
-            <Button size="sm" onClick={onApprove} className="bg-blue-600 hover:bg-blue-700 text-white" disabled={isNew && animatedSectionsCount < sections.length}>
+            <Button size="sm" onClick={onApprove} className="bg-blue-600 hover:bg-blue-700 text-white" disabled={isLoading || (isNew && animatedSectionsCount < sections.length)}>
               <ThumbsUp className="h-4 w-4 mr-2" />
               Intentar Arreglo Automático
             </Button>

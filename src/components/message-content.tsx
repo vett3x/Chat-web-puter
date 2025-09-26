@@ -23,6 +23,7 @@ interface MessageContentProps {
   isErrorAnalysisRequest?: boolean; // NEW: Prop para indicar si el contenido es una solicitud de análisis de error
   isCorrectionPlan?: boolean; // NEW: Prop para indicar si el contenido es un plan de corrección
   correctionApproved?: boolean; // NEW: Prop para indicar si el plan de corrección ha sido aprobado
+  isLoading: boolean; // NEW: Prop to pass loading state down
 }
 
 export function MessageContent({ 
@@ -39,6 +40,7 @@ export function MessageContent({
   isErrorAnalysisRequest,
   isCorrectionPlan, // NEW: Destructure new prop
   correctionApproved, // NEW: Destructure new prop
+  isLoading, // NEW: Destructure new prop
 }: MessageContentProps) {
   const [animatedPartsCount, setAnimatedPartsCount] = useState(0);
 
@@ -134,6 +136,7 @@ export function MessageContent({
         isApproved={!!correctionApproved}
         isNew={isNew}
         onAnimationComplete={onAnimationComplete}
+        isLoading={isLoading} // Pass isLoading
       />
     );
   }
@@ -148,6 +151,7 @@ export function MessageContent({
         isApproved={!!planApproved}
         isNew={isNew} // Pass isNew to ConstructionPlan
         onAnimationComplete={onAnimationComplete} // Pass onAnimationComplete
+        isLoading={isLoading} // Pass isLoading
       />
     );
   }
