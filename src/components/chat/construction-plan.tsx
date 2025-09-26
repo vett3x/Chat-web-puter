@@ -8,7 +8,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils'; // Import cn for conditional styling
 
-interface ConstructionPlanProps {
+interface ConstructionPlanProps { // Renamed from CorrectionPlanProps to ConstructionPlanProps
   content: string;
   onApprove: () => void;
   onRequestChanges: () => void;
@@ -39,10 +39,10 @@ export function ConstructionPlan({ content, onApprove, onRequestChanges, isAppro
     const rawSections = content.split(/###\s*\d+\.\s*/).slice(1);
     const parsedSections: PlanSection[] = [];
 
-    rawSections.forEach((rawSection) => {
+    rawSections.forEach((rawSection: string) => { // Added explicit type 'string' for rawSection
       const lines = rawSection.split('\n');
       const title = lines[0].trim();
-      const sectionContent = lines.slice(1).join('\n').trim();
+      const sectionContent = lines.slice(1).join('\n'); // REMOVED .trim() here
       const mapping = sectionMappings.find(m => title.toLowerCase().includes(m.title.toLowerCase()));
       
       if (mapping) {
