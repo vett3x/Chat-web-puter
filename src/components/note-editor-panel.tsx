@@ -11,7 +11,7 @@ import { NoteAiChat, ChatMessage } from './note-ai-chat';
 import { ApiKey } from '@/hooks/use-user-api-keys';
 
 // BlockNote imports
-import { useCreateBlockNote } from "@blocknote/react";
+import { useCreateBlockNote, FormattingToolbar } from "@blocknote/react";
 import { BlockNoteView, darkDefaultTheme, type Theme } from "@blocknote/mantine";
 import { type Block, type BlockNoteEditor } from "@blocknote/core";
 import "@blocknote/mantine/style.css";
@@ -27,10 +27,8 @@ const customDarkTheme: Theme = {
       text: "hsl(var(--foreground))",       // Match app foreground
     },
     // Ensure other UI elements also match
-    sideMenu: {
-        background: "hsl(var(--background))",
-        text: "hsl(var(--foreground))",
-    },
+    sideMenu: "hsl(var(--background))",
+    sideMenuText: "hsl(var(--foreground))",
     tooltip: {
         background: "hsl(var(--muted))",
         text: "hsl(var(--muted-foreground))",
@@ -39,8 +37,6 @@ const customDarkTheme: Theme = {
         background: "hsl(var(--card))",
         text: "hsl(var(--card-foreground))",
     },
-    // The properties below were incorrect and have been removed.
-    // Their styling is inherited or handled by other properties.
   },
 };
 
@@ -195,8 +191,10 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
           </div>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto">
-        <BlockNoteView editor={editor} theme={theme === 'dark' ? customDarkTheme : 'light'} />
+      <div className="flex-1 overflow-y-auto flex flex-col">
+        <BlockNoteView editor={editor} theme={theme === 'dark' ? customDarkTheme : 'light'} className="flex-1">
+          <FormattingToolbar />
+        </BlockNoteView>
       </div>
       {showAiHint && (<div className="absolute bottom-20 right-4 bg-info text-info-foreground p-2 rounded-md shadow-lg text-sm animate-in fade-in slide-in-from-bottom-2 flex items-center gap-2 z-10"><span>¡Usa la IA para chatear con tu nota!</span><Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setShowAiHint(false)}><X className="h-3 w-3" /></Button></div>)}
       <Button variant="destructive" size="icon" onClick={() => setIsAiChatOpen(prev => !prev)} className="absolute bottom-4 right-4 rounded-full h-12 w-12 animate-pulse-red z-10" title="Asistente de Nota"><Wand2 className="h-6 w-6" /></Button>
