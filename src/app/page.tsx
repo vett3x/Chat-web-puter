@@ -15,7 +15,8 @@ import { DeepAiCoderDialog } from "@/components/deep-ai-coder-dialog";
 import { RetryUploadDialog } from "@/components/retry-upload-dialog";
 import { UpdateManagerDialog } from "@/components/update-manager-dialog";
 import { ApiManagementDialog } from "@/components/api-management-dialog";
-import { AppVersionsBar } from "@/components/app-versions-bar"; // NEW: Import AppVersionsBar
+import { AlertsDialog } from "@/components/alerts-dialog"; // Import the new dialog
+import { AppVersionsBar } from "@/components/app-versions-bar";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -26,8 +27,8 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { useSidebarData } from "@/hooks/use-sidebar-data";
 import { useUserApiKeys } from "@/hooks/use-user-api-keys";
-import { format } from 'date-fns'; // Import format
-import { es } from 'date-fns/locale'; // Import es locale
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface UserApp {
   id: string;
@@ -87,6 +88,7 @@ export default function Home() {
   const [isDeepAiCoderOpen, setIsDeepAiCoderOpen] = useState(false);
   const [isUpdateManagerOpen, setIsUpdateManagerOpen] = useState(false);
   const [isApiManagementOpen, setIsApiManagementOpen] = useState(false);
+  const [isAlertsOpen, setIsAlertsOpen] = useState(false); // New state for alerts dialog
   
   const [aiResponseSpeed, setAiResponseSpeed] = useState<'slow' | 'normal' | 'fast'>(() => {
     if (typeof window !== 'undefined') {
@@ -99,13 +101,12 @@ export default function Home() {
   const [activeFile, setActiveFile] = useState<ActiveFile | null>(null);
   const [isFileLoading, setIsFileLoading] = useState(false);
   const [isDeletingAppId, setIsDeletingAppId] = useState<string | null>(null);
-  const [isRevertingApp, setIsRevertingApp] = useState(false); // NEW: State for reverting app
+  const [isRevertingApp, setIsRevertingApp] = useState(false);
   const [retryState, setRetryState] = useState<RetryState>({ isOpen: false, files: null });
   const appBrowserRef = useRef<{ refresh: () => void }>(null);
   const [fileTreeRefreshKey, setFileTreeRefreshKey] = useState(0);
 
-  // NEW: State and functions for ChatInterface to expose
-  const chatInterfaceRef = useRef<any>(null); // Ref to ChatInterface to access its internal functions
+  const chatInterfaceRef = useRef<any>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -265,11 +266,11 @@ export default function Home() {
       }
 
       const formattedFiles = filesToRevert.map(f => ({ path: f.file_path, content: f.file_content }));
-      await writeFilesToApp(formattedFiles); // Use existing writeFilesToApp logic
+      await writeFilesToApp(formattedFiles);
 
       toast.success('Aplicación restaurada a la versión seleccionada.', { id: toastId });
-      setFileTreeRefreshKey(prev => prev + 1); // Refresh file tree
-      appBrowserRef.current?.refresh(); // Refresh app preview
+      setFileTreeRefreshKey(prev => prev + 1);
+      appBrowserRef.current?.refresh();
 
     } catch (error: any) {
       console.error('Error reverting to version:', error);
@@ -279,7 +280,6 @@ export default function Home() {
     }
   };
 
-  // NEW: Handlers for error fixing buttons
   const handleTriggerFixBuildError = () => {
     if (chatInterfaceRef.current && chatInterfaceRef.current.triggerFixBuildError) {
       chatInterfaceRef.current.triggerFixBuildError();
@@ -303,6 +303,7 @@ export default function Home() {
   const handleOpenDeepAiCoder = () => setIsDeepAiCoderOpen(true);
   const handleOpenUpdateManager = () => setIsUpdateManagerOpen(true);
   const handleOpenApiManagement = () => setIsApiManagementOpen(true);
+  const handleOpenAlerts = () => setIsAlertsOpen(true); // New handler
 
   const handleAiResponseSpeedChange = (speed: 'slow' | 'normal' | 'fast') => {
     setAiResponseSpeed(speed);
@@ -349,6 +350,7 @@ export default function Home() {
           onOpenDeepAiCoder={handleOpenDeepAiCoder}
           onOpenUpdateManager={handleOpenUpdateManager}
           onOpenApiManagement={handleOpenApiManagement}
+          onOpenAlerts={handleOpenAlerts} // Pass new handler
           refreshData={refreshSidebarData}
           createConversation={createConversation as any}
           createFolder={createFolder}
@@ -361,15 +363,15 @@ export default function Home() {
           removeLocalItem={removeLocalItem}
         />
       </div>
-      <div className="flex-1 min-w-0 flex flex-col"> {/* Added flex-col here */}
+      <div className="flex-1 min-w-0 flex flex-col">
         {selectedItem?.type === 'app' && selectedAppDetails && (
           <AppVersionsBar
             appId={selectedAppDetails.id}
             onRevertToVersion={handleRevertToVersion}
             isReverting={isRevertingApp}
-            autoFixStatus={chatInterfaceRef.current?.autoFixStatus || 'idle'} // Pass autoFixStatus
-            onTriggerFixBuildError={handleTriggerFixBuildError} // Pass trigger function
-            onTriggerReportWebError={handleTriggerReportWebError} // Pass trigger function
+            autoFixStatus={chatInterfaceRef.current?.autoFixStatus || 'idle'}
+            onTriggerFixBuildError={handleTriggerFixBuildError}
+            onTriggerReportWebError={handleTriggerReportWebError}
           />
         )}
         {selectedItem?.type === 'note' ? (
@@ -381,10 +383,10 @@ export default function Home() {
             userLanguage={userLanguage || 'es'}
           />
         ) : (
-          <ResizablePanelGroup direction="horizontal" className="flex-1"> {/* flex-1 to take remaining height */}
+          <ResizablePanelGroup direction="horizontal" className="flex-1">
             <ResizablePanel defaultSize={50} minSize={30}>
               <ChatInterface
-                ref={chatInterfaceRef} /* Attach ref here */
+                ref={chatInterfaceRef}
                 key={selectedItem?.conversationId || 'no-conversation'}
                 userId={userId}
                 conversationId={selectedItem?.conversationId || null}
@@ -424,6 +426,7 @@ export default function Home() {
       {isAdmin && <ServerManagementDialog open={isServerManagementOpen} onOpenChange={setIsServerManagementOpen} />}
       {isAdmin && <UserManagementDialog open={isUserManagementOpen} onOpenChange={setIsUserManagementOpen} />}
       {isAdmin && <ApiManagementDialog open={isApiManagementOpen} onOpenChange={setIsApiManagementOpen} />}
+      {isAdmin && <AlertsDialog open={isAlertsOpen} onOpenChange={setIsAlertsOpen} />} {/* Render new dialog */}
       <DeepAiCoderDialog open={isDeepAiCoderOpen} onOpenChange={setIsDeepAiCoderOpen} onAppCreated={handleAppCreated} />
       <RetryUploadDialog
         open={retryState.isOpen}

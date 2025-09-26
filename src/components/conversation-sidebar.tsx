@@ -60,7 +60,8 @@ interface ConversationSidebarProps {
   onOpenUserManagement: () => void;
   onOpenDeepAiCoder: () => void;
   onOpenUpdateManager: () => void;
-  onOpenApiManagement: () => void; // New prop
+  onOpenApiManagement: () => void;
+  onOpenAlerts: () => void; // Added missing prop
   refreshData: () => void;
   createConversation: (onSuccess: (newItem: Conversation) => void) => void;
   createFolder: (parentId?: string | null) => void;
@@ -88,7 +89,8 @@ export function ConversationSidebar({
   onOpenUserManagement,
   onOpenDeepAiCoder,
   onOpenUpdateManager,
-  onOpenApiManagement, // New prop
+  onOpenApiManagement,
+  onOpenAlerts, // Added missing prop
   refreshData,
   createConversation,
   createFolder,
@@ -179,7 +181,22 @@ export function ConversationSidebar({
 
   return (
     <div className="flex flex-col h-full p-4 border-r bg-sidebar text-sidebar-foreground">
-      <SidebarHeader onNewConversation={handleCreateConversation} onNewFolder={handleCreateFolder} onNewNote={handleCreateNote} isCreatingConversation={isCreatingConversation} isCreatingFolder={isCreatingFolder} isCreatingNote={isCreatingNote} onOpenProfileSettings={onOpenProfileSettings} onOpenAppSettings={onOpenAppSettings} onOpenServerManagement={onOpenServerManagement} onOpenUserManagement={onOpenUserManagement} onOpenDeepAiCoder={onOpenDeepAiCoder} onOpenUpdateManager={onOpenUpdateManager} onOpenApiManagement={onOpenApiManagement} />
+      <SidebarHeader
+        onNewConversation={handleCreateConversation}
+        onNewFolder={handleCreateFolder}
+        onNewNote={handleCreateNote}
+        isCreatingConversation={isCreatingConversation}
+        isCreatingFolder={isCreatingFolder}
+        isCreatingNote={isCreatingNote}
+        onOpenProfileSettings={onOpenProfileSettings}
+        onOpenAppSettings={onOpenAppSettings}
+        onOpenServerManagement={onOpenServerManagement}
+        onOpenUserManagement={onOpenUserManagement}
+        onOpenDeepAiCoder={onOpenDeepAiCoder}
+        onOpenUpdateManager={onOpenUpdateManager}
+        onOpenApiManagement={onOpenApiManagement}
+        onOpenAlerts={onOpenAlerts} // Pass prop down
+      />
       <ScrollArea className="flex-1" onDrop={(e) => handleDrop(e, null)} onDragOver={(e) => e.preventDefault()} onDragEnter={(e) => handleDragEnter(e, null)} onDragLeave={(e) => handleDragLeave(e, null)}>
         <div className="space-y-2">
           {isLoading ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />) : (

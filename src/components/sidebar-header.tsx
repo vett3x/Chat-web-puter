@@ -21,7 +21,8 @@ interface SidebarHeaderProps {
   onOpenUserManagement: () => void;
   onOpenDeepAiCoder: () => void;
   onOpenUpdateManager: () => void;
-  onOpenApiManagement: () => void; // New prop
+  onOpenApiManagement: () => void;
+  onOpenAlerts: () => void;
 }
 
 export function SidebarHeader({
@@ -37,16 +38,18 @@ export function SidebarHeader({
   onOpenUserManagement,
   onOpenDeepAiCoder,
   onOpenUpdateManager,
-  onOpenApiManagement, // New prop
+  onOpenApiManagement,
+  onOpenAlerts,
 }: SidebarHeaderProps) {
   const { userRole } = useSession();
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
   const [hasNewErrorTickets, setHasNewErrorTickets] = useState(false);
+  const [hasNewCriticalAlerts, setHasNewCriticalAlerts] = useState(false);
 
   useEffect(() => {
     if (!isAdmin) return;
 
-    const channel = supabase
+    const errorTicketsChannel = supabase
       .channel('error-tickets-channel')
       .on(
         'postgres_changes',
@@ -61,14 +64,48 @@ export function SidebarHeader({
       )
       .subscribe();
 
+    const CRITICAL_EVENT_TYPES = [
+      'command_blocked', 'server_add_failed', 'server_delete_failed',
+      'container_create_failed', 'container_delete_failed', 'tunnel_create_failed',
+      'tunnel_delete_failed', 'npm_install_failed', 'app_recovery_failed',
+      'user_create_failed', 'user_delete_failed', 'user_role_update_failed',
+      'user_permissions_update_failed',
+    ];
+
+    const criticalAlertsChannel = supabase
+      .channel('critical-alerts-channel')
+      .on(
+        'postgres_changes',
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'server_events_log',
+          filter: `event_type=in.(${CRITICAL_EVENT_TYPES.map(e => `'${e}'`).join(',')})`
+        },
+        (payload) => {
+          console.log('New critical alert received:', payload.new);
+          setHasNewCriticalAlerts(true);
+          toast.error('¡Alerta Crítica del Sistema!', {
+            description: `Evento: ${payload.new.event_type}. Revisa el panel de alertas para más detalles.`,
+          });
+        }
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(errorTicketsChannel);
+      supabase.removeChannel(criticalAlertsChannel);
     };
   }, [isAdmin]);
 
   const handleOpenUserManagementAndClearNotification = () => {
     setHasNewErrorTickets(false);
     onOpenUserManagement();
+  };
+
+  const handleOpenAlertsAndClearNotification = () => {
+    setHasNewCriticalAlerts(false);
+    onOpenAlerts();
   };
 
   return (
@@ -172,6 +209,23 @@ export function SidebarHeader({
               title="Gestión de API Keys"
             >
               <KeyRound className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleOpenAlertsAndClearNotification}
+              className="relative text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7"
+              title="Alertas Críticas"
+            >
+              {hasNewCriticalAlerts && (
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                </span>
+              )}
+              <ShieldAlert className="h-3.5 w-3.5" />
             </Button>
           )}
         </div>
