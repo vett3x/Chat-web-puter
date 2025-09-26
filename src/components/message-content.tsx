@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { RenderablePart } from '@/lib/utils'; // Importar RenderablePart desde utils
 
 interface MessageContentProps {
-  content: RenderablePart[]; // Updated to always expect an array of parts
+  content: string | RenderablePart[]; // MODIFICADO: Ahora acepta string o RenderablePart[]
   isNew?: boolean;
   aiResponseSpeed: 'slow' | 'normal' | 'fast';
   isAppChat?: boolean;
@@ -58,8 +58,17 @@ export function MessageContent({ content, isNew, aiResponseSpeed, isAppChat }: M
     return null;
   };
 
-  // The component now expects pre-parsed parts.
-  const renderableParts = content; // Content is already RenderablePart[]
+  // El componente ahora espera partes pre-procesadas o una cadena.
+  const renderableParts = React.useMemo(() => {
+    if (Array.isArray(content)) {
+      return content;
+    }
+    // Si es una cadena, la convertimos en una parte de texto simple.
+    if (typeof content === 'string') {
+        return [{ type: 'text', text: content }] as RenderablePart[];
+    }
+    return [];
+  }, [content]);
 
   useEffect(() => {
     if (isNew) {
