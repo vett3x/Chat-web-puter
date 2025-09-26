@@ -8,7 +8,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils'; // Import cn for conditional styling
 
-interface ConstructionPlanProps { // Renamed from CorrectionPlanProps to ConstructionPlanProps
+interface ConstructionPlanProps {
   content: string;
   onApprove: () => void;
   onRequestChanges: () => void;
@@ -39,10 +39,20 @@ export function ConstructionPlan({ content, onApprove, onRequestChanges, isAppro
     const rawSections = content.split(/###\s*\d+\.\s*/).slice(1);
     const parsedSections: PlanSection[] = [];
 
-    rawSections.forEach((rawSection: string) => { // Added explicit type 'string' for rawSection
+    rawSections.forEach((rawSection: string) => {
       const lines = rawSection.split('\n');
       const title = lines[0].trim();
-      const sectionContent = lines.slice(1).join('\n'); // REMOVED .trim() here
+      let sectionContent = lines.slice(1).join('\n');
+
+      // FIX: Ensure there's a blank line before lists for proper Markdown rendering
+      // Check if sectionContent starts with a list item marker (-, *, +, or digit. )
+      if (sectionContent.match(/^\s*[-*+]\s/) || sectionContent.match(/^\s*\d+\.\s/)) {
+        // Prepend a newline if it doesn't already start with one (or multiple)
+        if (!sectionContent.startsWith('\n')) {
+          sectionContent = '\n' + sectionContent;
+        }
+      }
+      
       const mapping = sectionMappings.find(m => title.toLowerCase().includes(m.title.toLowerCase()));
       
       if (mapping) {
