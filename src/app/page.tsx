@@ -1,433 +1,372 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useSession } from '@/components/session-context-provider';
-import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Plus, 
-  Search, 
-  FileText, 
-  Folder, 
-  FolderOpen, 
-  MoreHorizontal, 
-  Trash2, 
-  Edit2,
-  ChevronRight,
-  ChevronDown,
-  Settings
-} from 'lucide-react';
-import { NoteEditorPanel } from '@/components/note-editor-panel';
-import { useUserApiKeys } from '@/hooks/use-user-api-keys';
-import { UserSettingsDialog } from '@/components/user-settings-dialog';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useSession } from "@/components/session-context-provider";
+import { ConversationSidebar } from "@/components/conversation-sidebar";
+import { ChatInterface } from "@/components/chat-interface";
+import { AppBrowserPanel } from "@/components/app-browser-panel";
+import { CodeEditorPanel } from "@/components/code-editor-panel";
+import { NoteEditorPanel } from "@/components/note-editor-panel";
+import { ProfileSettingsDialog } from "@/components/profile-settings-dialog";
+import { AppSettingsDialog } from "@/components/app-settings-dialog";
+import { ServerManagementDialog } from "@/components/server-management-dialog";
+import { UserManagementDialog } from "@/components/user-management-dialog";
+import { DeepAiCoderDialog } from "@/components/deep-ai-coder-dialog";
+import { RetryUploadDialog } from "@/components/retry-upload-dialog";
+import { UpdateManagerDialog } from "@/components/update-manager-dialog";
+import { ApiManagementDialog } from "@/components/api-management-dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
+import { useSidebarData } from "@/hooks/use-sidebar-data";
+import { useUserApiKeys } from "@/hooks/use-user-api-keys"; // NEW: Import useUserApiKeys
 
-interface Note {
-  id: string;
-  title: string;
-  content: any;
-  created_at: string;
-  updated_at: string;
-  folder_id: string | null;
-}
-
-interface Folder {
+interface UserApp {
   id: string;
   name: string;
-  parent_id: string | null;
-  created_at: string;
+  status: string;
+  url: string | null;
+  conversation_id: string | null;
+  prompt: string | null;
+}
+
+interface SelectedItem {
+  id: string;
+  type: 'app' | 'conversation' | 'note' | 'folder';
+  conversationId?: string | null;
+}
+
+interface ActiveFile {
+  path: string;
+  content: string;
+}
+
+type RightPanelView = 'editor' | 'preview';
+
+interface RetryState {
+  isOpen: boolean;
+  files: { path: string; content: string }[] | null;
 }
 
 export default function Home() {
-  const { session } = useSession();
-  const { userApiKeys, isLoadingApiKeys } = useUserApiKeys(); // Corregido: usar isLoadingApiKeys directamente
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [folders, setFolders] = useState<Folder[]>([]);
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
-  const [newFolderName, setNewFolderName] = useState('');
-  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const { session, isLoading: isSessionLoading, userRole } = useSession();
+  const userId = session?.user?.id;
+  
+  const {
+    apps,
+    conversations,
+    folders,
+    notes,
+    isLoading: isLoadingData,
+    fetchData: refreshSidebarData,
+    createConversation,
+    createFolder,
+    createNote,
+    moveItem,
+    updateLocalItem,
+    removeLocalItem,
+  } = useSidebarData();
 
-  const fetchNotesAndFolders = useCallback(async () => {
-    if (!session?.user?.id) return;
-    
-    setIsLoading(true);
-    try {
-      const [notesResponse, foldersResponse] = await Promise.all([
-        supabase.from('notes').select('*').eq('user_id', session.user.id).order('updated_at', { ascending: false }),
-        supabase.from('folders').select('*').eq('user_id', session.user.id).order('name')
-      ]);
+  const { userApiKeys, isLoadingApiKeys } = useUserApiKeys(); // NEW: Get user API keys
 
-      if (notesResponse.error) throw notesResponse.error;
-      if (foldersResponse.error) throw foldersResponse.error;
-
-      setNotes(notesResponse.data || []);
-      setFolders(foldersResponse.data || []);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      toast.error('Error al cargar las notas y carpetas.');
-    } finally {
-      setIsLoading(false);
+  const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
+  const [selectedAppDetails, setSelectedAppDetails] = useState<UserApp | null>(null);
+  
+  const [isProfileSettingsOpen, setIsProfileSettingsOpen] = useState(false);
+  const [isAppSettingsOpen, setIsAppSettingsOpen] = useState(false);
+  const [isServerManagementOpen, setIsServerManagementOpen] = useState(false);
+  const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
+  const [isDeepAiCoderOpen, setIsDeepAiCoderOpen] = useState(false);
+  const [isUpdateManagerOpen, setIsUpdateManagerOpen] = useState(false);
+  const [isApiManagementOpen, setIsApiManagementOpen] = useState(false);
+  
+  const [aiResponseSpeed, setAiResponseSpeed] = useState<'slow' | 'normal' | 'fast'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('aiResponseSpeed') as 'slow' | 'normal' | 'fast') || 'normal';
     }
-  }, [session?.user?.id]);
+    return 'normal';
+  });
+
+  const [rightPanelView, setRightPanelView] = useState<RightPanelView>('preview');
+  const [activeFile, setActiveFile] = useState<ActiveFile | null>(null);
+  const [isFileLoading, setIsFileLoading] = useState(false);
+  const [isDeletingAppId, setIsDeletingAppId] = useState<string | null>(null);
+  const [retryState, setRetryState] = useState<RetryState>({ isOpen: false, files: null });
+  const appBrowserRef = useRef<{ refresh: () => void }>(null);
+  const [fileTreeRefreshKey, setFileTreeRefreshKey] = useState(0);
 
   useEffect(() => {
-    fetchNotesAndFolders();
-  }, [fetchNotesAndFolders]);
-
-  const createNote = async (folderId?: string) => {
-    if (!session?.user?.id) return;
-
-    try {
-      const { data, error } = await supabase.from('notes').insert({
-        title: 'Nueva nota',
-        content: [{ type: 'paragraph', content: '' }],
-        user_id: session.user.id,
-        folder_id: folderId || null
-      }).select().single();
-
-      if (error) throw error;
-
-      setNotes(prev => [data, ...prev]);
-      setSelectedNoteId(data.id);
-      toast.success('Nueva nota creada.');
-    } catch (error) {
-      console.error('Error creating note:', error);
-      toast.error('Error al crear la nota.');
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('aiResponseSpeed', aiResponseSpeed);
     }
-  };
+  }, [aiResponseSpeed]);
 
-  const createFolder = async () => {
-    if (!session?.user?.id || !newFolderName.trim()) return;
-
-    try {
-      const { data, error } = await supabase.from('folders').insert({
-        name: newFolderName.trim(),
-        user_id: session.user.id
-      }).select().single();
-
-      if (error) throw error;
-
-      setFolders(prev => [...prev, data]);
-      setNewFolderName('');
-      setIsCreatingFolder(false);
-      toast.success('Carpeta creada.');
-    } catch (error) {
-      console.error('Error creating folder:', error);
-      toast.error('Error al crear la carpeta.');
-    }
-  };
-
-  const deleteNote = async (noteId: string) => {
-    try {
-      const { error } = await supabase.from('notes').delete().eq('id', noteId);
-      if (error) throw error;
-
-      setNotes(prev => prev.filter(note => note.id !== noteId));
-      if (selectedNoteId === noteId) {
-        setSelectedNoteId(null);
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+    const checkAppStatus = async () => {
+      if (!selectedAppDetails?.id) return;
+      const { data: updatedApp } = await supabase.from('user_apps').select('*').eq('id', selectedAppDetails.id).single();
+      if (updatedApp && updatedApp.status !== 'provisioning') {
+        setSelectedAppDetails(updatedApp);
+        if (updatedApp.status === 'ready') {
+          toast.success(`La aplicación "${updatedApp.name}" está lista.`);
+          refreshSidebarData();
+        } else {
+          toast.error(`Falló el aprovisionamiento de "${updatedApp.name}".`);
+        }
+        if (intervalId) clearInterval(intervalId);
       }
-      toast.success('Nota eliminada.');
-    } catch (error) {
-      console.error('Error deleting note:', error);
-      toast.error('Error al eliminar la nota.');
+    };
+    if (selectedAppDetails?.status === 'provisioning') {
+      intervalId = setInterval(checkAppStatus, 5000);
     }
-  };
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [selectedAppDetails, refreshSidebarData]);
 
-  const deleteFolder = async (folderId: string) => {
-    try {
-      const { error } = await supabase.from('folders').delete().eq('id', folderId);
-      if (error) throw error;
-
-      setFolders(prev => prev.filter(folder => folder.id !== folderId));
-      toast.success('Carpeta eliminada.');
-    } catch (error) {
-      console.error('Error deleting folder:', error);
-      toast.error('Error al eliminar la carpeta.');
+  const handleSelectItem = useCallback(async (id: string | null, type: SelectedItem['type'] | null) => {
+    setActiveFile(null);
+    setRightPanelView('preview');
+    if (!id || !type) {
+      setSelectedItem(null);
+      setSelectedAppDetails(null);
+      return;
     }
-  };
-
-  const toggleFolder = (folderId: string) => {
-    setExpandedFolders(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(folderId)) {
-        newSet.delete(folderId);
-      } else {
-        newSet.add(folderId);
+    if (type === 'app') {
+      const { data, error } = await supabase.from('user_apps').select('*').eq('id', id).eq('user_id', userId).single();
+      if (error) {
+        toast.error('Error al cargar los detalles de la aplicación.');
+        return;
       }
-      return newSet;
-    });
+      setSelectedAppDetails(data);
+      setSelectedItem({ id, type, conversationId: data.conversation_id });
+    } else {
+      setSelectedAppDetails(null);
+      setSelectedItem({ id, type, conversationId: type === 'conversation' ? id : null });
+    }
+  }, [userId]);
+
+  const handleFileSelect = async (path: string) => {
+    if (!selectedItem || selectedItem.type !== 'app') return;
+    setIsFileLoading(true);
+    try {
+      const response = await fetch(`/api/apps/${selectedItem.id}/files?path=${encodeURIComponent(path)}`);
+      if (!response.ok) throw new Error('No se pudo cargar el contenido del archivo.');
+      const data = await response.json();
+      setActiveFile({ path, content: data.content });
+      setRightPanelView('editor');
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setIsFileLoading(false);
+    }
   };
 
-  const handleNoteUpdated = (noteId: string, updatedData: Partial<Note>) => {
-    setNotes(prev => prev.map(note => 
-      note.id === noteId ? { ...note, ...updatedData } : note
-    ));
+  const handleNewConversationCreated = (conversationId: string) => {
+    // This function is called when a new conversation is created within the ChatInterface.
+    // It should update the selected item in the sidebar.
+    handleSelectItem(conversationId, 'conversation');
   };
 
-  const filteredNotes = notes.filter(note =>
-    note.title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleAppCreated = async (newApp: UserApp) => {
+    await refreshSidebarData();
+    handleSelectItem(newApp.id, 'app');
+  };
 
-  const notesWithoutFolder = filteredNotes.filter(note => !note.folder_id);
-  const notesInFolders = filteredNotes.filter(note => note.folder_id);
+  const handleDeleteApp = async (appId: string) => {
+    setIsDeletingAppId(appId);
+    try {
+      const response = await fetch(`/api/apps/${appId}`, { method: 'DELETE' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message);
+      toast.success(result.message);
+      if (selectedItem?.id === appId) {
+        handleSelectItem(null, null);
+      }
+      await refreshSidebarData();
+    } catch (error: any) {
+      toast.error(`Error al eliminar el proyecto: ${error.message}`);
+    } finally {
+      setIsDeletingAppId(null);
+    }
+  };
 
-  const renderFolderTree = (parentId: string | null = null) => {
-    return folders
-      .filter(folder => folder.parent_id === parentId)
-      .map(folder => {
-        const folderNotes = notesInFolders.filter(note => note.folder_id === folder.id);
-        const isExpanded = expandedFolders.has(folder.id);
+  const writeFilesToApp = async (files: { path: string; content: string }[]) => {
+    if (!selectedAppDetails?.id || files.length === 0) return;
 
-        return (
-          <div key={folder.id} className="space-y-1">
-            <div className="flex items-center gap-1 p-2 hover:bg-muted rounded-md group">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-4 w-4 p-0"
-                onClick={() => toggleFolder(folder.id)}
-              >
-                {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-              </Button>
-              {isExpanded ? <FolderOpen className="h-4 w-4 text-blue-500" /> : <Folder className="h-4 w-4 text-blue-500" />}
-              <span className="flex-1 text-sm font-medium">{folder.name}</span>
-              <Badge variant="secondary" className="text-xs">
-                {folderNotes.length}
-              </Badge>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100">
-                    <MoreHorizontal className="h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => createNote(folder.id)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nueva nota
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => deleteFolder(folder.id)} className="text-destructive">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Eliminar carpeta
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            
-            {isExpanded && (
-              <div className="ml-6 space-y-1">
-                {folderNotes.map(note => (
-                  <div
-                    key={note.id}
-                    className={`flex items-center gap-2 p-2 rounded-md cursor-pointer group ${
-                      selectedNoteId === note.id ? 'bg-primary/10 border-l-2 border-primary' : 'hover:bg-muted'
-                    }`}
-                    onClick={() => setSelectedNoteId(note.id)}
-                  >
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{note.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(note.updated_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100">
-                          <MoreHorizontal className="h-3 w-3" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => deleteNote(note.id)} className="text-destructive">
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Eliminar
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
+    console.log("[Home] writeFilesToApp called with files:", files); // NEW: Log files being sent
+
+    const toastId = toast.loading(`Aplicando ${files.length} archivo(s)...`);
+    try {
+      const response = await fetch(`/api/apps/${selectedAppDetails.id}/files`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ files }),
       });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || 'Error del servidor al guardar los archivos.');
+      }
+      toast.success(`Archivos aplicados. Reiniciando servidor...`, { id: toastId });
+
+      // Now, restart the server
+      const restartResponse = await fetch(`/api/apps/${selectedAppDetails.id}/restart`, { method: 'POST' });
+      const restartResult = await restartResponse.json();
+      if (!restartResponse.ok) {
+        throw new Error(restartResult.message || 'Error al reiniciar el servidor.');
+      }
+      
+      toast.success(`¡Listo! Actualizando vista previa...`, { id: toastId });
+      
+      // Force refresh of file tree and browser preview
+      setFileTreeRefreshKey(prev => prev + 1);
+      setTimeout(() => appBrowserRef.current?.refresh(), 2000); // Delay to allow server to restart
+
+    } catch (error: any) {
+      console.error("[Home] Error writing files or restarting:", error);
+      toast.error(`Error: ${error.message}`, { id: toastId });
+      setRetryState({ isOpen: true, files: files });
+    }
   };
 
-  if (!session) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <p>Por favor, inicia sesión para acceder a tus notas.</p>
-      </div>
-    );
-  }
+  const handleRetryUpload = () => {
+    if (retryState.files) {
+      writeFilesToApp(retryState.files);
+    }
+    setRetryState({ isOpen: false, files: null });
+  };
+
+  const handleOpenProfileSettings = () => setIsProfileSettingsOpen(true);
+  const handleOpenAppSettings = () => setIsAppSettingsOpen(true);
+  const handleOpenServerManagement = () => setIsServerManagementOpen(true);
+  const handleOpenUserManagement = () => setIsUserManagementOpen(true);
+  const handleOpenDeepAiCoder = () => setIsDeepAiCoderOpen(true);
+  const handleOpenUpdateManager = () => setIsUpdateManagerOpen(true);
+  const handleOpenApiManagement = () => setIsApiManagementOpen(true);
+
+  const handleAiResponseSpeedChange = (speed: 'slow' | 'normal' | 'fast') => {
+    setAiResponseSpeed(speed);
+  };
+
+  const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+  const isAppDeleting = selectedItem?.type === 'app' && selectedItem.id === isDeletingAppId;
+
+  const renderRightPanelContent = () => {
+    if (isAppDeleting) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-4">
+          <Loader2 className="h-12 w-12 animate-spin text-destructive mb-4" />
+          <h3 className="text-lg font-semibold">Eliminando Proyecto</h3>
+          <p>Por favor, espera mientras se eliminan todos los recursos asociados...</p>
+        </div>
+      );
+    }
+    if (isFileLoading) {
+      return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+    }
+    if (rightPanelView === 'editor' && activeFile && selectedItem?.type === 'app') {
+      return <CodeEditorPanel appId={selectedItem.id} file={activeFile} onClose={() => { setActiveFile(null); setRightPanelView('preview'); }} onSwitchToPreview={() => setRightPanelView('preview')} />;
+    }
+    return <AppBrowserPanel ref={appBrowserRef} appId={selectedAppDetails?.id || null} appUrl={selectedAppDetails?.url || null} appStatus={selectedAppDetails?.status || null} />;
+  };
 
   return (
-    <div className="flex h-screen bg-background">
-      {/* Sidebar */}
-      <div className="w-80 border-r bg-muted/30 flex flex-col">
-        {/* Header */}
-        <div className="p-4 border-b">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-xl font-semibold">Mis Notas</h1>
-            <div className="flex items-center gap-2">
-              <UserSettingsDialog>
-                <Button variant="ghost" size="icon">
-                  <Settings className="h-4 w-4" />
-                </Button>
-              </UserSettingsDialog>
-              <Button onClick={() => createNote()} size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Nueva nota
-              </Button>
-            </div>
-          </div>
-          
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar notas..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </div>
-
-        {/* Content */}
-        <ScrollArea className="flex-1">
-          <div className="p-4 space-y-4">
-            {/* Create Folder */}
-            <div className="space-y-2">
-              {isCreatingFolder ? (
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Nombre de la carpeta"
-                    value={newFolderName}
-                    onChange={(e) => setNewFolderName(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && createFolder()}
-                    autoFocus
-                  />
-                  <Button onClick={createFolder} size="sm">
-                    Crear
-                  </Button>
-                  <Button onClick={() => setIsCreatingFolder(false)} variant="outline" size="sm">
-                    Cancelar
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  onClick={() => setIsCreatingFolder(true)}
-                  variant="outline"
-                  size="sm"
-                  className="w-full justify-start"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nueva carpeta
-                </Button>
-              )}
-            </div>
-
-            <Separator />
-
-            {/* Folders */}
-            {folders.length > 0 && (
-              <div className="space-y-1">
-                {renderFolderTree()}
-              </div>
-            )}
-
-            {/* Notes without folder */}
-            {notesWithoutFolder.length > 0 && (
-              <>
-                {folders.length > 0 && <Separator />}
-                <div className="space-y-1">
-                  {notesWithoutFolder.map(note => (
-                    <div
-                      key={note.id}
-                      className={`flex items-center gap-2 p-2 rounded-md cursor-pointer group ${
-                        selectedNoteId === note.id ? 'bg-primary/10 border-l-2 border-primary' : 'hover:bg-muted'
-                      }`}
-                      onClick={() => setSelectedNoteId(note.id)}
-                    >
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{note.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(note.updated_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100">
-                            <MoreHorizontal className="h-3 w-3" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem onClick={() => deleteNote(note.id)} className="text-destructive">
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Eliminar
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {/* Empty state */}
-            {notes.length === 0 && !isLoading && (
-              <div className="text-center py-8">
-                <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground mb-4">No tienes notas aún</p>
-                <Button onClick={() => createNote()}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Crear tu primera nota
-                </Button>
-              </div>
-            )}
-          </div>
-        </ScrollArea>
+    <div className="h-screen bg-background flex">
+      <div className="w-[320px] flex-shrink-0">
+        <ConversationSidebar
+          apps={apps}
+          conversations={conversations}
+          folders={folders}
+          notes={notes}
+          isLoading={isLoadingData}
+          selectedItem={selectedItem}
+          onSelectItem={handleSelectItem}
+          onFileSelect={handleFileSelect}
+          onOpenProfileSettings={handleOpenProfileSettings}
+          onOpenAppSettings={handleOpenAppSettings}
+          onOpenServerManagement={handleOpenServerManagement}
+          onOpenUserManagement={handleOpenUserManagement}
+          onOpenDeepAiCoder={handleOpenDeepAiCoder}
+          onOpenUpdateManager={handleOpenUpdateManager}
+          onOpenApiManagement={handleOpenApiManagement}
+          refreshData={refreshSidebarData}
+          createConversation={createConversation as any}
+          createFolder={createFolder}
+          createNote={createNote as any}
+          moveItem={moveItem}
+          onDeleteApp={handleDeleteApp}
+          isDeletingAppId={isDeletingAppId}
+          fileTreeRefreshKey={fileTreeRefreshKey}
+          updateLocalItem={updateLocalItem}
+          removeLocalItem={removeLocalItem}
+        />
       </div>
-
-      {/* Main Content */}
-      <div className="flex-1">
-        {selectedNoteId ? (
+      <div className="flex-1 min-w-0">
+        {selectedItem?.type === 'note' ? (
           <NoteEditorPanel
-            noteId={selectedNoteId}
-            onNoteUpdated={handleNoteUpdated}
-            userApiKeys={userApiKeys}
-            isLoadingApiKeys={isLoadingApiKeys}
+            noteId={selectedItem.id}
+            onNoteUpdated={(id, data) => updateLocalItem(id, 'note', data)}
+            userApiKeys={userApiKeys} // NEW: Pass userApiKeys
+            isLoadingApiKeys={isLoadingApiKeys} // NEW: Pass isLoadingApiKeys
           />
         ) : (
-          <div className="flex items-center justify-center h-full text-muted-foreground">
-            <div className="text-center">
-              <FileText className="h-16 w-16 mx-auto mb-4 opacity-50" />
-              <p className="text-lg">Selecciona una nota para empezar a escribir</p>
-            </div>
-          </div>
+          <ResizablePanelGroup direction="horizontal">
+            <ResizablePanel defaultSize={50} minSize={30}>
+              <ChatInterface
+                key={selectedItem?.conversationId || 'no-conversation'}
+                userId={userId}
+                conversationId={selectedItem?.conversationId || null}
+                onNewConversationCreated={handleNewConversationCreated}
+                onConversationTitleUpdate={(id, newTitle) => {}}
+                aiResponseSpeed={aiResponseSpeed}
+                isAppProvisioning={selectedAppDetails?.status === 'provisioning'}
+                isAppDeleting={isAppDeleting}
+                appPrompt={selectedAppDetails?.prompt}
+                appId={selectedAppDetails?.id}
+                onWriteFiles={writeFilesToApp}
+                isAppChat={selectedItem?.type === 'app'}
+                onSidebarDataRefresh={refreshSidebarData}
+                userApiKeys={userApiKeys} // NEW: Pass userApiKeys
+                isLoadingApiKeys={isLoadingApiKeys} // NEW: Pass isLoadingApiKeys
+              />
+            </ResizablePanel>
+            {selectedItem?.type === 'app' && (
+              <>
+                <ResizableHandle withHandle />
+                <ResizablePanel defaultSize={50} minSize={30}>
+                  {renderRightPanelContent()}
+                </ResizablePanel>
+              </>
+            )}
+          </ResizablePanelGroup>
         )}
       </div>
+
+      <ProfileSettingsDialog open={isProfileSettingsOpen} onOpenChange={setIsProfileSettingsOpen} />
+      <AppSettingsDialog
+        open={isAppSettingsOpen}
+        onOpenChange={setIsAppSettingsOpen}
+        aiResponseSpeed={aiResponseSpeed}
+        onAiResponseSpeedChange={handleAiResponseSpeedChange}
+      />
+      {isAdmin && <ServerManagementDialog open={isServerManagementOpen} onOpenChange={setIsServerManagementOpen} />}
+      {isAdmin && <UserManagementDialog open={isUserManagementOpen} onOpenChange={setIsUserManagementOpen} />}
+      {isAdmin && <ApiManagementDialog open={isApiManagementOpen} onOpenChange={setIsApiManagementOpen} />}
+      <DeepAiCoderDialog open={isDeepAiCoderOpen} onOpenChange={setIsDeepAiCoderOpen} onAppCreated={handleAppCreated} />
+      <RetryUploadDialog
+        open={retryState.isOpen}
+        onOpenChange={(open) => setRetryState({ ...retryState, isOpen: open })}
+        onRetry={handleRetryUpload}
+        fileCount={retryState.files?.length || 0}
+      />
+      {userRole === 'super_admin' && <UpdateManagerDialog open={isUpdateManagerOpen} onOpenChange={setIsUpdateManagerOpen} />}
     </div>
   );
 }
