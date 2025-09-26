@@ -94,25 +94,25 @@ export function useChat({
 
   useEffect(() => {
     const loadConversationData = async () => {
+      // If we are in the process of creating a new conversation, just bail.
+      // The sendMessage function will handle the initial state.
+      if (isSendingFirstMessage) {
+        return;
+      }
+
       if (conversationId && userId) {
         setIsLoading(true);
         const details = await chatDbService.fetchConversationDetails(conversationId, userId);
         if (details?.model) setSelectedModel(details.model);
         const fetchedMsgs = await chatDbService.fetchMessages(conversationId, userId);
-        
-        // Only set messages if we are NOT in the middle of creating a new conversation.
-        // This prevents a race condition where the empty history overwrites the user's first message.
-        if (!isSendingFirstMessage) {
-          setMessages(fetchedMsgs);
-        }
-        
+        setMessages(fetchedMsgs); // Set messages directly.
         setIsLoading(false);
       } else {
         setMessages([]);
       }
     };
     loadConversationData();
-  }, [conversationId, userId]); // Dependency array simplified to only core identifiers
+  }, [conversationId, userId, isSendingFirstMessage]); // Add isSendingFirstMessage back
 
   const handleModelChange = (modelValue: string) => {
     setSelectedModel(modelValue);
