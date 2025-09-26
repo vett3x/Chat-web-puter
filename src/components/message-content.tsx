@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { RenderablePart } from '@/lib/utils'; // Importar RenderablePart desde utils
 import { ConstructionPlan } from './chat/construction-plan'; // Importar ConstructionPlan
 import { ErrorAnalysisRequest } from './chat/error-analysis-request'; // NEW: Import ErrorAnalysisRequest
+import { CorrectionPlan } from './chat/correction-plan'; // NEW: Import CorrectionPlan
 
 interface MessageContentProps {
   content: string | RenderablePart[]; // MODIFICADO: Ahora acepta string o RenderablePart[]
@@ -20,6 +21,8 @@ interface MessageContentProps {
   messageId?: string; // NEW: ID del mensaje para pasar al ConstructionPlan
   onAnimationComplete?: () => void; // NEW: Callback para cuando la animación de MessageContent termina
   isErrorAnalysisRequest?: boolean; // NEW: Prop para indicar si el contenido es una solicitud de análisis de error
+  isCorrectionPlan?: boolean; // NEW: Prop para indicar si el contenido es un plan de corrección
+  correctionApproved?: boolean; // NEW: Prop para indicar si el plan de corrección ha sido aprobado
 }
 
 export function MessageContent({ 
@@ -33,7 +36,9 @@ export function MessageContent({
   onRequestChanges, 
   messageId,
   onAnimationComplete,
-  isErrorAnalysisRequest, // NEW: Destructure new prop
+  isErrorAnalysisRequest,
+  isCorrectionPlan, // NEW: Destructure new prop
+  correctionApproved, // NEW: Destructure new prop
 }: MessageContentProps) {
   const [animatedPartsCount, setAnimatedPartsCount] = useState(0);
 
@@ -108,6 +113,20 @@ export function MessageContent({
     return (
       <ErrorAnalysisRequest
         content={content}
+        isNew={isNew}
+        onAnimationComplete={onAnimationComplete}
+      />
+    );
+  }
+
+  // NEW: Render CorrectionPlan directly if it's a correction plan
+  if (isCorrectionPlan && typeof content === 'string' && messageId && onApprovePlan && onRequestChanges) {
+    return (
+      <CorrectionPlan
+        content={content}
+        onApprove={() => onApprovePlan(messageId)} // Reusing onApprovePlan for now
+        onRequestManualFix={onRequestChanges} // Reusing onRequestChanges for now
+        isApproved={!!correctionApproved}
         isNew={isNew}
         onAnimationComplete={onAnimationComplete}
       />

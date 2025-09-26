@@ -201,7 +201,7 @@ export function useChat({
   }, [userId]);
 
   const getMessagesFromDB = useCallback(async (convId: string) => {
-    const { data, error } = await supabase.from('messages').select('id, content, role, model, created_at, conversation_id, type, plan_approved').eq('conversation_id', convId).eq('user_id', userId).order('created_at', { ascending: true });
+    const { data, error } = await supabase.from('messages').select('id, content, role, model, created_at, conversation_id, type, plan_approved, is_correction_plan, correction_approved').eq('conversation_id', convId).eq('user_id', userId).order('created_at', { ascending: true });
     if (error) {
       console.error('Error fetching messages:', error);
       toast.error('Error al cargar los mensajes.');
@@ -217,8 +217,8 @@ export function useChat({
       type: msg.type as 'text' | 'multimodal',
       isConstructionPlan: typeof msg.content === 'string' && msg.content.includes('### 1. Análisis del Requerimiento'), // Detect plan from DB
       planApproved: msg.plan_approved || false, // NEW: Fetch plan_approved from DB
-      isCorrectionPlan: false, // Default to false when loading from DB
-      correctionApproved: false, // Default to false when loading from DB
+      isCorrectionPlan: msg.is_correction_plan || false, // NEW: Fetch is_correction_plan from DB
+      correctionApproved: msg.correction_approved || false, // NEW: Fetch correction_approved from DB
       isErrorAnalysisRequest: typeof msg.content === 'string' && msg.content.includes('### 💡 Entendido!'), // NEW: Detect error analysis request from DB
       isNew: false, // Messages from DB are not 'new'
       isTyping: false, // Messages from DB are not 'typing'
@@ -278,6 +278,8 @@ export function useChat({
       model: msg.model, 
       type: msg.type,
       plan_approved: msg.planApproved, // NEW: Save planApproved status
+      is_correction_plan: msg.isCorrectionPlan, // NEW: Save isCorrectionPlan status
+      correction_approved: msg.correctionApproved, // NEW: Save correctionApproved status
     }).select('id, created_at').single();
     if (error) {
       toast.error('Error al guardar el mensaje.');
@@ -412,9 +414,9 @@ export function useChat({
           const chunk = decoder.decode(value, { stream: true });
           fullResponseText += chunk;
 
-          // Only update messages during streaming if NOT a construction plan or error analysis request
-          const isCurrentResponsePlanOrRequest = fullResponseText.includes('### 1. Análisis del Requerimiento') || fullResponseText.includes('### 💡 Entendido!');
-          if (!isAppChatModeBuild || !isCurrentResponsePlanOrRequest) {
+          // Only update messages during streaming if NOT a construction plan or error analysis request or correction plan
+          const isCurrentResponseStructured = fullResponseText.includes('### 1. Análisis del Requerimiento') || fullResponseText.includes('### 💡 Entendido!') || fullResponseText.includes('### 💡 Error Detectado');
+          if (!isAppChatModeBuild || !isCurrentResponseStructured) {
             setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: parseAiResponseToRenderableParts(fullResponseText, isAppChatModeBuild), isTyping: false, isNew: true } : m));
           }
         }
@@ -424,10 +426,12 @@ export function useChat({
 
       const isConstructionPlan = isAppChatModeBuild && fullResponseText.includes('### 1. Análisis del Requerimiento');
       const isErrorAnalysisRequest = fullResponseText.includes('### 💡 Entendido!'); // NEW: Detect error analysis request
-      const finalContentForMessage = (isConstructionPlan || isErrorAnalysisRequest) ? fullResponseText : parseAiResponseToRenderableParts(fullResponseText, isAppChatModeBuild);
+      const isCorrectionPlan = fullResponseText.includes('### 💡 Error Detectado'); // NEW: Detect correction plan
+      
+      const finalContentForMessage = (isConstructionPlan || isErrorAnalysisRequest || isCorrectionPlan) ? fullResponseText : parseAiResponseToRenderableParts(fullResponseText, isAppChatModeBuild);
       const filesToWrite: { path: string; content: string }[] = [];
 
-      if (isAppChatModeBuild && !isConstructionPlan && !isErrorAnalysisRequest) { // Only extract files if NOT a plan or error request
+      if (isAppChatModeBuild && !isConstructionPlan && !isErrorAnalysisRequest && !isCorrectionPlan) { // Only extract files if NOT a plan or error request or correction plan
         (finalContentForMessage as RenderablePart[]).forEach(part => {
           if (part.type === 'code' && appId && part.filename && part.code) {
             filesToWrite.push({ path: part.filename, content: part.code });
@@ -442,8 +446,8 @@ export function useChat({
         type: 'multimodal' as const,
         isConstructionPlan: isConstructionPlan,
         planApproved: false, // Default to false for new messages
-        isCorrectionPlan: false,
-        correctionApproved: false,
+        isCorrectionPlan: isCorrectionPlan, // NEW: Set flag
+        correctionApproved: false, // Default to false for new messages
         isErrorAnalysisRequest: isErrorAnalysisRequest, // NEW: Set flag
         isNew: true, // Mark as new for animation
         isTyping: false,
@@ -458,7 +462,7 @@ export function useChat({
       }
 
       // Update autoFixStatus based on AI's response
-      if (isErrorAnalysisRequest || isConstructionPlan) {
+      if (isErrorAnalysisRequest || isConstructionPlan || isCorrectionPlan) {
         setAutoFixStatus('plan_ready');
       } else {
         setAutoFixStatus('idle'); // Reset if AI didn't respond with a plan/request
