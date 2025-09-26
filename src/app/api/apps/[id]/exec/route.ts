@@ -11,6 +11,10 @@ const execSchema = z.object({
   command: z.string().min(1, { message: 'El comando es requerido.' }),
 });
 
+// --- CAPA DE SEGURIDAD: LISTA BLANCA DE COMANDOS ---
+// Solo se permitirán los comandos que comiencen con estas cadenas.
+const ALLOWED_COMMANDS = ['npm', 'npx', 'yarn', 'pnpm'];
+
 async function getUserId() {
   const cookieStore = cookies() as any;
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { cookies: { get: (name: string) => cookieStore.get(name)?.value } });
@@ -32,6 +36,14 @@ export async function POST(req: NextRequest, context: any) {
 
     const body = await req.json();
     const { command } = execSchema.parse(body);
+
+    // --- VALIDACIÓN DE SEGURIDAD ---
+    const mainCommand = command.trim().split(' ')[0];
+    if (!ALLOWED_COMMANDS.includes(mainCommand)) {
+      console.warn(`[SECURITY] Blocked command execution for app ${appId}: "${command}"`);
+      return NextResponse.json({ message: `Comando no permitido por razones de seguridad: "${mainCommand}"` }, { status: 403 });
+    }
+    // --- FIN DE LA VALIDACIÓN DE SEGURIDAD ---
 
     const fullCommand = `docker exec ${app.container_id} bash -c "cd /app && ${command.replace(/"/g, '\\"')}"`;
     const { stdout, stderr, code } = await executeSshCommand(server, fullCommand);
