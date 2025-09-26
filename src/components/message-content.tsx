@@ -46,68 +46,14 @@ export function MessageContent({ content, isNew, aiResponseSpeed, isAppChat }: M
   // Helper to render a single part
   const renderPart = (part: RenderablePart, index: number, isAnimating: boolean, onComplete?: () => void) => {
     if (part.type === 'text') {
-      const textValue = part.text;
-      
-      // Check for code blocks within text parts
-      const textParts = [];
-      let lastIndex = 0;
-      let match;
-      codeBlockRegex.lastIndex = 0; // Reset regex for each text part
-
-      while ((match = codeBlockRegex.exec(textValue)) !== null) {
-        if (match.index > lastIndex) {
-          textParts.push({ type: 'text_segment', value: textValue.substring(lastIndex, match.index) });
-        }
-        textParts.push({
-          type: 'code_block',
-          language: match[1],
-          filename: match[2],
-          code: (match[3] || '').trim(),
-        });
-        lastIndex = match.index + match[0].length;
-      }
-
-      if (lastIndex < textValue.length) {
-        textParts.push({ type: 'text_segment', value: textValue.substring(lastIndex) });
-      }
-
-      if (textParts.length > 0) {
-        return textParts.map((segment, segIndex) => {
-          if (segment.type === 'code_block') {
-            return (
-              <CodeBlock
-                key={`${index}-${segIndex}`}
-                language={segment.language || ''}
-                filename={segment.filename}
-                code={segment.code || ''}
-                isNew={isAnimating}
-                onAnimationComplete={onComplete}
-                animationSpeed={aiResponseSpeed} // Pass speed
-              />
-            );
-          }
-          return (
-            <TextAnimator
-              key={`${index}-${segIndex}`}
-              text={segment.value || ''}
-              className="whitespace-pre-wrap"
-              isNew={isAnimating}
-              onAnimationComplete={onComplete}
-              animationSpeed={aiResponseSpeed} // Pass speed
-            />
-          );
-        });
-      }
-      
-      // If no code blocks, treat as a single text segment
       return (
         <TextAnimator
           key={index}
-          text={textValue || ''}
+          text={part.text || ''}
           className="whitespace-pre-wrap"
           isNew={isAnimating}
           onAnimationComplete={onComplete}
-          animationSpeed={aiResponseSpeed} // Pass speed
+          animationSpeed={aiResponseSpeed}
         />
       );
     } else if (part.type === 'image_url') {
@@ -132,7 +78,7 @@ export function MessageContent({ content, isNew, aiResponseSpeed, isAppChat }: M
           code={part.code || ''}
           isNew={isAnimating}
           onAnimationComplete={onComplete}
-          animationSpeed={aiResponseSpeed} // Pass speed
+          animationSpeed={aiResponseSpeed}
         />
       );
     }
