@@ -154,7 +154,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
                     {message.isTyping ? (
                       <div className="flex items-center gap-2">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="text-sm">Generando respuesta...</span>
+                        <span className="text-sm">Pensando...</span>
                       </div>
                     ) : message.isConstructionPlan ? (
                       <ConstructionPlan

@@ -25,8 +25,7 @@ interface PlanSection {
 
 export function ConstructionPlan({ content, onApprove, onRequestChanges, isApproved, isNew, onAnimationComplete }: ConstructionPlanProps) {
   const [sections, setSections] = useState<PlanSection[]>([]);
-  const [displayedContent, setDisplayedContent] = useState<string[]>([]);
-  const [animationFinished, setAnimationFinished] = useState(false); // New state to track overall animation
+  const [animatedSectionsCount, setAnimatedSectionsCount] = useState(0);
 
   const sectionMappings = [
     { title: "Análisis del Requerimiento", icon: <Wand2 className="h-5 w-5 text-purple-400" /> },
@@ -39,79 +38,61 @@ export function ConstructionPlan({ content, onApprove, onRequestChanges, isAppro
   useEffect(() => {
     const rawSections = content.split(/###\s*\d+\.\s*/).slice(1);
     const parsedSections: PlanSection[] = [];
+
     rawSections.forEach((rawSection) => {
       const lines = rawSection.split('\n');
       const title = lines[0].trim();
       const sectionContent = lines.slice(1).join('\n').trim();
       const mapping = sectionMappings.find(m => title.toLowerCase().includes(m.title.toLowerCase()));
+      
       if (mapping) {
-        parsedSections.push({ title: mapping.title, content: sectionContent, icon: mapping.icon });
+        parsedSections.push({
+          title: mapping.title,
+          content: sectionContent,
+          icon: mapping.icon,
+        });
       }
     });
     setSections(parsedSections);
-    setAnimationFinished(false); // Reset animation status
     if (isNew) {
-      setDisplayedContent(parsedSections.map(() => '')); // Start with empty content for animation
+      setAnimatedSectionsCount(0); // Reset animation count when new plan arrives
     } else {
-      setDisplayedContent(parsedSections.map(s => s.content)); // Show full content if not new
-      setAnimationFinished(true); // Mark as finished if not new
+      setAnimatedSectionsCount(parsedSections.length); // Show all if not new
     }
   }, [content, isNew]);
 
   useEffect(() => {
-    if (!isNew || animationFinished) {
-      if (animationFinished) {
-        onAnimationComplete?.(); // Notify parent when overall animation is finished
+    if (!isNew || animatedSectionsCount >= sections.length) {
+      if (isNew && animatedSectionsCount >= sections.length) {
+        onAnimationComplete?.(); // Notify parent when all sections are animated
       }
       return;
     }
 
-    let currentSection = 0;
-    let currentChar = 0;
-    let timeoutId: NodeJS.Timeout;
+    const timer = setTimeout(() => {
+      setAnimatedSectionsCount(prev => prev + 1);
+    }, 500); // Delay between sections
 
-    const typeChar = () => {
-      if (currentSection < sections.length) {
-        const targetContent = sections[currentSection].content;
-        if (currentChar < targetContent.length) {
-          setDisplayedContent(prev => {
-            const newDisplayed = [...prev];
-            newDisplayed[currentSection] = targetContent.substring(0, currentChar + 1);
-            return newDisplayed;
-          });
-          currentChar++;
-          timeoutId = setTimeout(typeChar, 10); // Typing speed
-        } else {
-          // Section finished, move to next section after a short delay
-          currentSection++;
-          currentChar = 0;
-          if (currentSection < sections.length) {
-            timeoutId = setTimeout(typeChar, 300); // Delay between sections
-          } else {
-            setAnimationFinished(true); // All sections animated
-          }
-        }
-      }
-    };
-
-    typeChar(); // Start typing
-
-    return () => clearTimeout(timeoutId);
-  }, [isNew, sections, animationFinished, onAnimationComplete]);
+    return () => clearTimeout(timer);
+  }, [animatedSectionsCount, sections.length, isNew, onAnimationComplete]);
 
   return (
     <div className="space-y-4 max-w-full">
       <h3 className="text-lg font-semibold text-foreground">Plan de Construcción</h3>
       {sections.map((section, index) => (
-        <div key={index} className="space-y-2">
+        <div 
+          key={index} 
+          className={cn(
+            "space-y-2 transition-opacity duration-500",
+            isNew && index >= animatedSectionsCount ? "opacity-0" : "opacity-100"
+          )}
+        >
           <div className="flex items-center gap-2 font-medium text-foreground">
             {section.icon}
             <h4>{section.title}</h4>
           </div>
           <div className="prose prose-sm dark:prose-invert max-w-none pl-7 text-muted-foreground">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {displayedContent[index]}
-            </ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{section.content}</ReactMarkdown>
           </div>
         </div>
       ))}
@@ -122,11 +103,11 @@ export function ConstructionPlan({ content, onApprove, onRequestChanges, isAppro
           </p>
         ) : (
           <>
-            <Button variant="outline" size="sm" onClick={onRequestChanges} disabled={isNew && !animationFinished}>
+            <Button variant="outline" size="sm" onClick={onRequestChanges} disabled={isNew && animatedSectionsCount < sections.length}>
               <ThumbsDown className="h-4 w-4 mr-2" />
               Solicitar Cambios
             </Button>
-            <Button size="sm" onClick={onApprove} className="bg-green-600 hover:bg-green-700 text-white" disabled={isNew && !animationFinished}>
+            <Button size="sm" onClick={onApprove} className="bg-green-600 hover:bg-green-700 text-white" disabled={isNew && animatedSectionsCount < sections.length}>
               <ThumbsUp className="h-4 w-4 mr-2" />
               Aprobar y Construir
             </Button>
