@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/components/session-context-provider';
 import { toast } from 'sonner';
@@ -45,32 +45,47 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
   const [noteContentForChat, setNoteContentForChat] = useState('');
 
   const editor = useCreateBlockNote();
+  const isSavingRef = useRef(isSaving);
+  isSavingRef.current = isSaving;
 
-  // Effect to update the markdown representation for the AI chat
-  // whenever the editor content changes.
-  useEffect(() => {
-    if (!editor) {
-      return;
+  const handleSave = useCallback(async () => {
+    if (!note || isSavingRef.current || !editor) return;
+
+    setIsSaving(true);
+    const currentContent = editor.topLevelBlocks;
+    const { error } = await supabase.from('notes').update({ title, content: currentContent }).eq('id', note.id);
+
+    if (error) {
+      toast.error('Error en el autoguardado.');
+    } else {
+      toast.success('Nota guardada.', { duration: 2000 });
+      onNoteUpdated();
+      setNote(prev => prev ? { ...prev, title, content: currentContent, updated_at: new Date().toISOString() } : null);
     }
+    setIsSaving(false);
+  }, [note, title, onNoteUpdated, editor]);
+
+  // Effect to handle auto-saving and updating markdown for AI chat
+  useEffect(() => {
+    if (!editor) return;
 
     let debounceTimeout: NodeJS.Timeout;
 
-    const handleContentChange = async () => {
+    const handleContentChange = () => {
       clearTimeout(debounceTimeout);
       debounceTimeout = setTimeout(async () => {
         const markdown = await editor.blocksToMarkdownLossy();
         setNoteContentForChat(markdown);
-      }, 500); // 500ms debounce
+        handleSave(); // Trigger auto-save
+      }, 2000); // 2-second debounce for auto-saving
     };
 
     editor.onEditorContentChange(handleContentChange);
 
     return () => {
-      // The user's previous errors indicate there's no standard way to unsubscribe.
-      // We will just clear our own timeout.
       clearTimeout(debounceTimeout);
     };
-  }, [editor]);
+  }, [editor, handleSave]);
 
   const fetchNote = useCallback(async () => {
     if (!session?.user?.id || !noteId || !editor) return;
@@ -82,13 +97,10 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
     } else {
       setNote(data);
       setTitle(data.title);
-      // Handle content migration from Markdown string to BlockNote JSON
       if (typeof data.content === 'string') {
-        // If it's an old note (Markdown string), convert it to blocks
         const blocks = await editor.tryParseMarkdownToBlocks(data.content);
         setInitialContent(blocks);
       } else {
-        // If it's a new note (already JSONB), use it directly
         setInitialContent(data.content);
       }
     }
@@ -97,15 +109,15 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
 
   useEffect(() => { fetchNote(); }, [fetchNote]);
 
-  // Load initial content into the editor once it's fetched and generate markdown for AI
+  // Load initial content and set initial markdown for AI
   useEffect(() => {
     if (initialContent && editor) {
-      const loadContentAndSetMarkdown = async () => {
+      const loadContent = async () => {
         editor.replaceBlocks(editor.topLevelBlocks, initialContent);
         const markdown = await editor.blocksToMarkdownLossy();
         setNoteContentForChat(markdown);
       };
-      loadContentAndSetMarkdown();
+      loadContent();
     }
   }, [initialContent, editor]);
 
@@ -119,21 +131,6 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
     }
   }, [noteId]);
 
-  const handleSave = useCallback(async () => {
-    if (!note || isSaving || !editor) return;
-    setIsSaving(true);
-    const currentContent = editor.topLevelBlocks;
-    const { error } = await supabase.from('notes').update({ title, content: currentContent }).eq('id', note.id);
-    if (error) {
-      toast.error('Error al guardar la nota.');
-    } else {
-      toast.success('Nota guardada.');
-      onNoteUpdated();
-      setNote(prev => prev ? { ...prev, title, content: currentContent, updated_at: new Date().toISOString() } : null);
-    }
-    setIsSaving(false);
-  }, [note, title, isSaving, onNoteUpdated, editor]);
-
   const handleSaveChatHistory = useCallback(async (newHistory: ChatMessage[]) => {
     if (!note) return;
     const { error } = await supabase.from('notes').update({ chat_history: newHistory }).eq('id', note.id);
@@ -143,14 +140,6 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
       setNote(prev => prev ? { ...prev, chat_history: newHistory } : null);
     }
   }, [note]);
-
-  // Auto-save on title change
-  useEffect(() => {
-    if (isSaving || isLoading || !note) return;
-    if (title === note.title) return;
-    const handler = setTimeout(() => { handleSave(); }, 2000);
-    return () => { clearTimeout(handler); };
-  }, [title, note, isSaving, isLoading, handleSave]);
 
   if (isLoading || isLoadingApiKeys) {
     return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /><p className="ml-2 text-muted-foreground">Cargando nota y claves...</p></div>;
