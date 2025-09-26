@@ -118,7 +118,9 @@ export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialCha
   const handleSendMessage = async () => {
     if (!userInput.trim() || isLoading) return;
 
-    const newMessages: ChatMessage[] = [...messages, { role: 'user', content: userInput }];
+    // The message displayed in the UI is just the user's input
+    const userMessageForUI: ChatMessage = { role: 'user', content: userInput };
+    const newMessages: ChatMessage[] = [...messages, userMessageForUI];
     setMessages(newMessages);
     setUserInput('');
     setIsLoading(true);
@@ -127,23 +129,26 @@ export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialCha
     setMessages(prev => [...prev, { role: 'assistant', content: '', isTyping: true, id: assistantMessageId }]);
 
     try {
-      const systemPrompt = `Eres un asistente de IA experto que ayuda a un usuario con su nota. La nota del usuario se proporciona a continuación, delimitada por '---'. Tu tarea es responder a las preguntas del usuario basándote únicamente en el contexto de esta nota y la conversación actual. Sé conciso y directo.
+      // The actual content sent to the AI includes the note's context
+      const fullUserInput = `Basado en el siguiente contexto de mi nota, responde a mi pregunta. Sé conciso y directo.
 ---
 Título: ${noteTitle}
 Contenido:
 ${noteContent}
----`;
+---
 
-      const puterMessages: PuterMessage[] = [
-        { role: 'system', content: systemPrompt },
-        ...newMessages.map(msg => ({ role: msg.role, content: msg.content }))
+Mi pregunta es: ${userInput}`;
+
+      const messagesForApi: PuterMessage[] = [
+        ...messages.map(msg => ({ role: msg.role, content: msg.content })),
+        { role: 'user', content: fullUserInput }
       ];
 
       let fullResponseText = '';
 
       if (selectedModel.startsWith('puter:')) {
         const actualModelForPuter = selectedModel.substring(6);
-        const response = await window.puter.ai.chat(puterMessages, { model: actualModelForPuter });
+        const response = await window.puter.ai.chat(messagesForApi, { model: actualModelForPuter });
         if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
         fullResponseText = response?.message?.content || 'Sin contenido.';
       } else if (selectedModel.startsWith('user_key:')) {
@@ -151,7 +156,7 @@ ${noteContent}
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            messages: puterMessages,
+            messages: messagesForApi,
             selectedKeyId: selectedModel.substring(9),
           }),
         });
