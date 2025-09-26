@@ -13,7 +13,7 @@ import { ApiKey } from '@/hooks/use-user-api-keys';
 // BlockNote imports
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
-import { type Block, type BlockNoteEditor, markdownToBlocks, blocksToMarkdown } from "@blocknote/core";
+import { type Block, type BlockNoteEditor } from "@blocknote/core";
 import "@blocknote/mantine/style.css";
 import { useTheme } from 'next-themes';
 
@@ -53,7 +53,7 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
       return;
     }
     const updateMarkdownContent = async () => {
-      const markdown = await blocksToMarkdown(editor.topLevelBlocks, editor.schema); // Pass editor.schema
+      const markdown = await editor.blocksToMarkdownLossy();
       setNoteContentForChat(markdown);
     };
     
@@ -75,7 +75,7 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
       // Handle content migration from Markdown string to BlockNote JSON
       if (typeof data.content === 'string') {
         // If it's an old note (Markdown string), convert it to blocks
-        const blocks = await markdownToBlocks(data.content, editor.schema); // Pass editor.schema
+        const blocks = await editor.tryParseMarkdownToBlocks(data.content);
         setInitialContent(blocks);
       } else {
         // If it's a new note (already JSONB), use it directly

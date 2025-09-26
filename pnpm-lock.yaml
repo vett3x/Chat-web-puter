@@ -9,13 +9,13 @@ importers:
   .:
     dependencies:
       '@blocknote/core':
-        specifier: ^0.39.1
+        specifier: latest
         version: 0.39.1(@tiptap/extensions@3.5.0(@tiptap/core@3.5.0(@tiptap/pm@3.5.0))(@tiptap/pm@3.5.0))(@types/hast@3.0.4)
       '@blocknote/mantine':
-        specifier: ^0.39.1
+        specifier: latest
         version: 0.39.1(@floating-ui/dom@1.7.4)(@tiptap/extensions@3.5.0(@tiptap/core@3.5.0(@tiptap/pm@3.5.0))(@tiptap/pm@3.5.0))(@types/hast@3.0.4)(@types/react-dom@19.1.5(@types/react@19.1.5))(@types/react@19.1.5)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       '@blocknote/react':
-        specifier: ^0.39.1
+        specifier: latest
         version: 0.39.1(@floating-ui/dom@1.7.4)(@tiptap/extensions@3.5.0(@tiptap/core@3.5.0(@tiptap/pm@3.5.0))(@tiptap/pm@3.5.0))(@types/hast@3.0.4)(@types/react-dom@19.1.5(@types/react@19.1.5))(@types/react@19.1.5)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       '@google-cloud/local-auth':
         specifier: ^3.0.1
