@@ -57,7 +57,7 @@ interface Folder {
 
 export default function Home() {
   const { session } = useSession();
-  const { userApiKeys, isLoading: isLoadingApiKeys } = useUserApiKeys();
+  const { userApiKeys, isLoadingApiKeys } = useUserApiKeys(); // Corregido: usar isLoadingApiKeys directamente
   const [notes, setNotes] = useState<Note[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
