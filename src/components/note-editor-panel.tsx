@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Save, Loader2, Wand2, X, Check } from 'lucide-react';
 import { NoteAiChat, ChatMessage } from './note-ai-chat';
 import { ApiKey } from '@/hooks/use-user-api-keys';
+import { useUserLanguage } from '@/hooks/use-user-language';
 
 // BlockNote imports
 import { useCreateBlockNote } from "@blocknote/react";
@@ -16,6 +17,9 @@ import { BlockNoteView, darkDefaultTheme, type Theme } from "@blocknote/mantine"
 import { type Block, type BlockNoteEditor } from "@blocknote/core";
 import "@blocknote/mantine/style.css";
 import { useTheme } from 'next-themes';
+
+// Import all available locales from BlockNote
+import * as locales from "@blocknote/core/locales";
 
 // Create a custom dark theme that uses the app's CSS variables
 const customDarkTheme: Theme = {
@@ -57,6 +61,7 @@ interface NoteEditorPanelProps {
 export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingApiKeys }: NoteEditorPanelProps) {
   const { session } = useSession();
   const { theme } = useTheme();
+  const { language, isLoading: isLoadingLanguage } = useUserLanguage();
   const [note, setNote] = useState<Note | null>(null);
   const [title, setTitle] = useState('');
   const [initialContent, setInitialContent] = useState<any>(null);
@@ -66,8 +71,16 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
   const [noteContentForChat, setNoteContentForChat] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('saved');
 
-  // Crear el editor sin diccionario personalizado para evitar errores
-  const editor = useCreateBlockNote();
+  // Get the appropriate dictionary based on user's language
+  const getDictionary = () => {
+    const localeKey = language as keyof typeof locales;
+    return locales[localeKey] || locales.es; // Fallback to Spanish if language not found
+  };
+
+  // Create editor with dynamic dictionary
+  const editor = useCreateBlockNote({
+    dictionary: getDictionary(),
+  });
 
   const handleSave = useCallback(async () => {
     if (!note || saveStatus === 'saving' || !editor) return;
@@ -173,8 +186,8 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
     return () => { clearTimeout(handler); };
   }, [title, note, isLoading, handleSave]);
 
-  if (isLoading || isLoadingApiKeys) {
-    return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /><p className="ml-2 text-muted-foreground">Cargando nota y claves...</p></div>;
+  if (isLoading || isLoadingApiKeys || isLoadingLanguage) {
+    return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /><p className="ml-2 text-muted-foreground">Cargando nota y configuración...</p></div>;
   }
   if (!note) {
     return <div className="flex items-center justify-center h-full"><p>Nota no encontrada.</p></div>;
