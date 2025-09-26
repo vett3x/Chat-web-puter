@@ -51,6 +51,6 @@ export async function POST(req: NextRequest, context: any) {
       return NextResponse.json({ message: 'Error de validación', errors: error.errors }, { status: 400 });
     }
     console.error(`[API EXEC /apps/${appId}] Error:`, error);
-    return NextResponse.json({ message: error.message }, { status: 500 });
+    return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
   }
 }

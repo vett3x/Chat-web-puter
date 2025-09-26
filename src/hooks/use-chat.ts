@@ -288,6 +288,33 @@ export function useChat({
     return { id: data.id, timestamp: new Date(data.created_at) };
   };
 
+  const executeCommandsInContainer = async (commands: string[]) => {
+    if (!appId || commands.length === 0) return;
+    const toastId = toast.loading(`Ejecutando ${commands.length} comando(s)...`);
+    try {
+      const response = await fetch(`/api/apps/${appId}/exec`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: commands.join(' && ') }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || result.message || 'Error al ejecutar los comandos.');
+      }
+      toast.success('Comandos ejecutados. Reiniciando servidor...', { id: toastId });
+
+      const restartResponse = await fetch(`/api/apps/${appId}/restart`, { method: 'POST' });
+      const restartResult = await restartResponse.json();
+      if (!restartResponse.ok) {
+        throw new Error(restartResult.message || 'Error al reiniciar el servidor.');
+      }
+      toast.success('¡Listo! Actualizando vista previa...', { id: toastId });
+      // The parent component will handle the preview refresh.
+    } catch (error: any) {
+      toast.error(`Error: ${error.message}`, { id: toastId });
+    }
+  };
+
   const getAndStreamAIResponse = useCallback(async (convId: string, history: Message[]) => {
     setIsLoading(true);
     const assistantMessageId = `assistant-${Date.now()}`;
@@ -328,11 +355,11 @@ export function useChat({
             ### 🧠 Análisis de la IA
             [Tu análisis de la causa raíz del error]
             ### 🛠️ Plan de Corrección
-            [Pasos detallados para corregir el error, incluyendo modificaciones de código si es necesario. Si hay código, usa bloques \`\`\`language:ruta/del/archivo.tsx\`\`\`]
+            [Pasos detallados para corregir el error, incluyendo modificaciones de código si es necesario. Si hay código, usa bloques \`\`\`language:ruta/del/archivo.tsx\`\`\`. Si la corrección implica ejecutar comandos de terminal (como \`npm install\` o \`rm -rf node_modules\`), genera un bloque de código con el formato \`\`\`bash:exec\`\`\` que contenga los comandos a ejecutar. NO generes archivos de código en este caso.]
             ### ✅ Confirmación
             [Pregunta de confirmación al usuario para aplicar el arreglo]
         2.  **ESPERAR APROBACIÓN DE CORRECCIÓN:** Después de enviar un plan de corrección, detente y espera. El usuario te responderá con "[USER_APPROVED_CORRECTION_PLAN]".
-        3.  **GENERAR CÓDIGO DE CORRECCIÓN:** SOLO cuando recibas el mensaje "[USER_APPROVED_CORRECTION_PLAN]", responde ÚNICAMENTE con los bloques de código necesarios para arreglar el error. Usa el formato \`\`\`language:ruta/del/archivo.tsx\`\`\` para cada bloque. NO incluyas texto conversacional.`;
+        3.  **GENERAR CÓDIGO O COMANDOS DE CORRECCIÓN:** SOLO cuando recibas el mensaje "[USER_APPROVED_CORRECTION_PLAN]", responde ÚNICAMENTE con los bloques de código o de comandos necesarios para arreglar el error. Usa el formato \`\`\`language:ruta/del/archivo.tsx\`\`\` para archivos o \`\`\`bash:exec\`\`\` para comandos. NO incluyas texto conversacional.`;
       } else if (appPrompt) {
         systemPromptContent = `Eres un asistente de código experto y depurador para un proyecto Next.js. Estás en 'Modo Chat'. Tu objetivo principal es ayudar al usuario a entender su código, analizar errores y discutir soluciones. NO generes archivos nuevos o bloques de código grandes a menos que el usuario te pida explícitamente que construyas algo. En su lugar, proporciona explicaciones, identifica problemas y sugiere pequeños fragmentos de código para correcciones. Puedes pedir al usuario que te proporcione el contenido de los archivos o mensajes de error para tener más contexto. El proyecto es: "${appPrompt}".`;
       } else {
@@ -354,7 +381,7 @@ export function useChat({
             ### 🧠 Análisis de la IA
             [Tu análisis de la causa raíz del error]
             ### 🛠️ Plan de Corrección
-            [Pasos detallados para corregir el error, incluyendo modificaciones de código si es necesario. Si hay código, usa bloques \`\`\`language:ruta/del/archivo.tsx\`\`\`]
+            [Pasos detallados para corregir el error, incluyendo modificaciones de código si es necesario. Si hay código, usa bloques \`\`\`language:ruta/del/archivo.tsx\`\`\`. Si la corrección implica ejecutar comandos de terminal (como \`npm install\` o \`rm -rf node_modules\`), genera un bloque de código con el formato \`\`\`bash:exec\`\`\` que contenga los comandos a ejecutar. NO generes archivos de código en este caso.]
             ### ✅ Confirmación
             [Pregunta de confirmación al usuario para aplicar el arreglo]`;
         } else if (lastUserMessageContent.includes('[USER_REPORTED_WEB_ERROR]')) {
@@ -443,11 +470,16 @@ export function useChat({
       
       const finalContentForMessage = (isConstructionPlan || isErrorAnalysisRequest || isCorrectionPlan) ? fullResponseText : parseAiResponseToRenderableParts(fullResponseText, isAppChatModeBuild);
       const filesToWrite: { path: string; content: string }[] = [];
+      const commandsToExecute: string[] = [];
 
-      if (isAppChatModeBuild && !isConstructionPlan && !isErrorAnalysisRequest && !isCorrectionPlan) { // Only extract files if NOT a plan or error request or correction plan
+      if (isAppChatModeBuild && !isConstructionPlan && !isErrorAnalysisRequest) {
         (finalContentForMessage as RenderablePart[]).forEach(part => {
-          if (part.type === 'code' && appId && part.filename && part.code) {
-            filesToWrite.push({ path: part.filename, content: part.code });
+          if (part.type === 'code' && appId) {
+            if (part.language === 'bash' && part.filename === 'exec' && part.code) {
+              commandsToExecute.push(part.code);
+            } else if (part.filename && part.code) {
+              filesToWrite.push({ path: part.filename, content: part.code });
+            }
           }
         });
       }
@@ -472,6 +504,9 @@ export function useChat({
 
       if (filesToWrite.length > 0) {
         await onWriteFiles(filesToWrite);
+      }
+      if (commandsToExecute.length > 0) {
+        await executeCommandsInContainer(commandsToExecute);
       }
 
       // Update autoFixStatus based on AI's response
