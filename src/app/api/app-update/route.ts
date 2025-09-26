@@ -118,6 +118,10 @@ export async function POST(req: NextRequest) {
     try {
       let output = '';
       
+      output += '--- Forzando la limpieza de cambios locales (git reset --hard HEAD) ---\n';
+      const { stdout: resetOut, stderr: resetErr } = await execAsync('git reset --hard HEAD');
+      output += resetOut + (resetErr ? `\nSTDERR: ${resetErr}` : '') + '\n';
+
       output += '--- Ejecutando git pull origin main ---\n';
       const { stdout: pullOut, stderr: pullErr } = await execAsync('git pull origin main');
       output += pullOut.replace(/\[dyad\].*\n/g, '') + (pullErr ? `\nSTDERR: ${pullErr}` : '') + '\n'; // Filter Dyad commits
