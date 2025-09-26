@@ -33,6 +33,7 @@ export async function provisionApp(data: AppProvisioningData) {
   const { appId, userId, appName, conversationId, prompt } = data;
   let containerId: string | undefined;
   let server: any;
+  let containerName: string | undefined;
 
   try {
     // FASE 1: Configuración del Entorno
@@ -42,10 +43,17 @@ export async function provisionApp(data: AppProvisioningData) {
 
     const containerPort = 3000;
     const hostPort = generateRandomPort();
-    const containerName = `app-${appName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${appId.substring(0, 8)}`;
+    containerName = `app-${appName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${appId.substring(0, 8)}`;
     
-    // Se crea un contenedor base que se mantendrá en ejecución para poder instalar dependencias dentro.
-    const runCommand = `docker run -d --name ${containerName} -p ${hostPort}:${containerPort} --entrypoint tail node:lts-bookworm -f /dev/null`;
+    // --- CAPA 3: FORTALECIMIENTO DEL CONTENEDOR ---
+    const securityFlags = [
+      '--read-only', // Make container root filesystem read-only
+      '--tmpfs /tmp', // Provide a writable temporary directory
+      '--cap-drop=ALL', // Drop all Linux capabilities
+      '--security-opt no-new-privileges', // Prevent privilege escalation
+    ].join(' ');
+
+    const runCommand = `docker run -d --name ${containerName} -p ${hostPort}:${containerPort} ${securityFlags} -v ${containerName}-app-data:/app --entrypoint tail node:lts-bookworm -f /dev/null`;
     
     const { stdout: newContainerId, stderr: runStderr, code: runCode } = await executeSshCommand(server, runCommand);
     if (runCode !== 0) throw new Error(`Error al crear el contenedor: ${runStderr}`);
@@ -70,9 +78,11 @@ export async function provisionApp(data: AppProvisioningData) {
   } catch (error: any) {
     console.error(`[Provisioning] Failed for app ${appId}:`, error);
     await updateAppStatus(appId, 'failed');
-    if (containerId && server) {
+    if (containerId && server && containerName) {
       try {
+        // Also remove the named volume associated with the container
         await executeSshCommand(server, `docker rm -f ${containerId}`);
+        await executeSshCommand(server, `docker volume rm ${containerName}-app-data`);
       } catch (cleanupError) {
         console.error(`[Provisioning] Failed to cleanup container ${containerId} for failed app ${appId}:`, cleanupError);
       }
