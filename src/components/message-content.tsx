@@ -108,8 +108,13 @@ export function MessageContent({
     setAnimatedPartsCount(prev => prev + 1);
   };
 
-  // NEW: Render ErrorAnalysisRequest directly if it's an error analysis request
-  if (isErrorAnalysisRequest && typeof content === 'string') {
+  // NEW: More robust detection logic for special message types
+  const looksLikeConstructionPlan = isConstructionPlan || (isAppChat && typeof content === 'string' && content.includes('### 1. Análisis del Requerimiento'));
+  const looksLikeErrorAnalysisRequest = isErrorAnalysisRequest || (typeof content === 'string' && content.includes('### 💡 Entendido!'));
+  const looksLikeCorrectionPlan = isCorrectionPlan || (typeof content === 'string' && content.includes('### 💡 Error Detectado'));
+
+  // Render ErrorAnalysisRequest directly if it's an error analysis request
+  if (looksLikeErrorAnalysisRequest && typeof content === 'string') {
     return (
       <ErrorAnalysisRequest
         content={content}
@@ -119,8 +124,8 @@ export function MessageContent({
     );
   }
 
-  // NEW: Render CorrectionPlan directly if it's a correction plan
-  if (isCorrectionPlan && typeof content === 'string' && messageId && onApprovePlan && onRequestChanges) {
+  // Render CorrectionPlan directly if it's a correction plan
+  if (looksLikeCorrectionPlan && typeof content === 'string' && messageId && onApprovePlan && onRequestChanges) {
     return (
       <CorrectionPlan
         content={content}
@@ -133,8 +138,8 @@ export function MessageContent({
     );
   }
 
-  // NEW: Render ConstructionPlan directly if it's a plan
-  if (isConstructionPlan && typeof content === 'string' && messageId && onApprovePlan && onRequestChanges) {
+  // Render ConstructionPlan directly if it's a plan
+  if (looksLikeConstructionPlan && typeof content === 'string' && messageId && onApprovePlan && onRequestChanges) {
     return (
       <ConstructionPlan
         content={content}
