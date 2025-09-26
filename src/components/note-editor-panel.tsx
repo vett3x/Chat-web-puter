@@ -190,8 +190,8 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
           </div>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto flex flex-col">
-        <BlockNoteView editor={editor} theme={theme === 'dark' ? customDarkTheme : 'light'} className="flex-1">
+      <div className="flex-1 overflow-y-auto">
+        <BlockNoteView editor={editor} theme={theme === 'dark' ? customDarkTheme : 'light'}>
           <FormattingToolbar />
         </BlockNoteView>
       </div>
