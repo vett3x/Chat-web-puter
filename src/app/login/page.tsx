@@ -12,7 +12,7 @@ import { useTheme } from 'next-themes';
 
 export default function LoginPage() {
   const [currentLang, setCurrentLang] = useState('es'); // Estado para el idioma actual
-  const { setTheme, resolvedTheme } = useTheme(); // Usamos resolvedTheme para la lógica
+  const { theme, setTheme } = useTheme();
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -109,10 +109,10 @@ export default function LoginPage() {
           variant="outline"
           size="icon"
           className="absolute top-4 right-4 h-12 w-12 rounded-full text-foreground"
-          onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')} // Corregido aquí
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           aria-label="Toggle theme"
         >
-          {resolvedTheme === 'dark' ? ( // Corregido aquí
+          {theme === 'dark' ? (
             <Sun className="h-6 w-6" />
           ) : (
             <Moon className="h-6 w-6" />
