@@ -94,25 +94,26 @@ export function useChat({
 
   useEffect(() => {
     const loadConversationData = async () => {
-      // If we are in the process of creating a new conversation, just bail.
-      // The sendMessage function will handle the initial state.
-      if (isSendingFirstMessage) {
-        return;
-      }
-
       if (conversationId && userId) {
         setIsLoading(true);
-        const details = await chatDbService.fetchConversationDetails(conversationId, userId);
-        if (details?.model) setSelectedModel(details.model);
-        const fetchedMsgs = await chatDbService.fetchMessages(conversationId, userId);
-        setMessages(fetchedMsgs); // Set messages directly.
-        setIsLoading(false);
+        try {
+          const details = await chatDbService.fetchConversationDetails(conversationId, userId);
+          if (details?.model) setSelectedModel(details.model);
+          const fetchedMsgs = await chatDbService.fetchMessages(conversationId, userId);
+          setMessages(fetchedMsgs);
+        } catch (error) {
+          console.error("Error loading conversation data:", error);
+          toast.error("Error al cargar los datos de la conversación.");
+          setMessages([]); // Clear messages on error
+        } finally {
+          setIsLoading(false);
+        }
       } else {
         setMessages([]);
       }
     };
     loadConversationData();
-  }, [conversationId, userId, isSendingFirstMessage]); // Add isSendingFirstMessage back
+  }, [conversationId, userId]); // Dependencies simplified
 
   const handleModelChange = (modelValue: string) => {
     setSelectedModel(modelValue);
@@ -201,40 +202,53 @@ export function useChat({
 
   const sendMessage = useCallback(async (content: PuterContentPart[], messageText: string) => {
     if (!userId) return toast.error('No hay usuario autenticado.');
-    let currentConversationId = conversationId;
-    if (!currentConversationId) {
-      setIsSendingFirstMessage(true);
-      const newConv = await chatDbService.createConversation(userId, selectedModel);
-      if (!newConv) {
-        setIsSendingFirstMessage(false);
-        return;
+    
+    setIsLoading(true); // Start loading immediately
+    setIsSendingFirstMessage(true); // Indicate that we are sending the first message for a potentially new conv
+
+    let currentConversationId: string; // Declare as string
+    try {
+      if (!conversationId) { // If no existing conversationId is provided
+        const newConv = await chatDbService.createConversation(userId, selectedModel);
+        if (!newConv) {
+          setIsSendingFirstMessage(false);
+          toast.error('Fallo al crear una nueva conversación.'); // Notify user
+          return; // Exit if conversation creation failed
+        }
+        currentConversationId = newConv.id; // newConv.id is guaranteed to be string here
+        onNewConversationCreated(currentConversationId);
+        onConversationTitleUpdate(currentConversationId, newConv.title);
+        onSidebarDataRefresh();
+      } else {
+        currentConversationId = conversationId; // Use the existing conversationId
       }
-      currentConversationId = newConv.id;
-      onNewConversationCreated(newConv.id);
-      onConversationTitleUpdate(newConv.id, newConv.title);
-      onSidebarDataRefresh();
+
+      const newUserMessage: Message = {
+        id: `user-${Date.now()}`,
+        conversation_id: currentConversationId,
+        content,
+        role: 'user',
+        timestamp: new Date(),
+        type: content.some(part => part.type === 'image_url') ? 'multimodal' : 'text',
+        isNew: true,
+        isTyping: false,
+        isConstructionPlan: false,
+        planApproved: false,
+        isCorrectionPlan: false,
+        correctionApproved: false,
+        isAnimated: true,
+      };
+
+      setMessages(prev => [...prev, newUserMessage]); // Optimistic update
+
+      await getAndStreamAIResponse(currentConversationId, [...messages, newUserMessage]); // Pass updated history
+    } catch (error: any) {
+      toast.error(`Error al enviar mensaje: ${error.message}`);
+      setMessages(prev => prev.filter(msg => msg.id !== `user-${Date.now()}`)); // Rollback optimistic user message
+    } finally {
+      setIsLoading(false); // Ensure loading is false
+      setIsSendingFirstMessage(false); // Reset this flag
     }
-    const newUserMessage: Message = {
-      id: `user-${Date.now()}`,
-      conversation_id: currentConversationId,
-      content,
-      role: 'user',
-      timestamp: new Date(),
-      type: content.some(part => part.type === 'image_url') ? 'multimodal' : 'text',
-      isNew: true,
-      isTyping: false,
-      isConstructionPlan: false,
-      planApproved: false,
-      isCorrectionPlan: false,
-      correctionApproved: false,
-      isAnimated: true,
-    };
-    const newMessages = [...messages, newUserMessage];
-    setMessages(newMessages);
-    if (currentConversationId) {
-      await getAndStreamAIResponse(currentConversationId, newMessages);
-    }
-    setIsSendingFirstMessage(false);
   }, [userId, conversationId, messages, selectedModel, getAndStreamAIResponse, onNewConversationCreated, onConversationTitleUpdate, onSidebarDataRefresh]);
 
   const approvePlan = useCallback(async (messageId: string) => {
