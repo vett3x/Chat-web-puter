@@ -582,6 +582,68 @@ export function useChat({
     }
   }, [conversationId, userId]);
 
+  // NEW: Function to trigger auto-fix for build errors
+  const triggerFixBuildError = useCallback(async () => {
+    if (!appId || !conversationId || isLoading) {
+      toast.error("No se puede corregir el error de compilación. Asegúrate de que haya un proyecto y chat activos.");
+      return;
+    }
+    if (autoFixStatus !== 'idle' && autoFixStatus !== 'failed') {
+      toast.info("Ya hay un proceso de auto-corrección en curso.");
+      return;
+    }
+
+    setAutoFixStatus('analyzing');
+    const userMessage: Message = {
+      id: `user-fix-build-${Date.now()}`,
+      conversation_id: conversationId,
+      content: '[USER_REQUESTED_BUILD_FIX]', // Internal prompt for AI
+      role: 'user',
+      timestamp: new Date(),
+      type: 'text',
+      isNew: true,
+      isTyping: false,
+      isConstructionPlan: false,
+      planApproved: false,
+      isCorrectionPlan: false,
+      correctionApproved: false,
+      isAnimated: true,
+    };
+    setMessages(prev => [...prev, userMessage]);
+    await getAndStreamAIResponse(conversationId, [...messages, userMessage]);
+  }, [appId, conversationId, isLoading, autoFixStatus, messages, getAndStreamAIResponse]);
+
+  // NEW: Function to trigger reporting a web error
+  const triggerReportWebError = useCallback(async () => {
+    if (!appId || !conversationId || isLoading) {
+      toast.error("No se puede reportar el error web. Asegúrate de que haya un proyecto y chat activos.");
+      return;
+    }
+    if (autoFixStatus !== 'idle') {
+      toast.info("Ya hay un proceso de auto-corrección en curso. Por favor, espera a que termine.");
+      return;
+    }
+
+    const userMessage: Message = {
+      id: `user-report-web-error-${Date.now()}`,
+      conversation_id: conversationId,
+      content: '[USER_REPORTED_WEB_ERROR]', // Internal prompt for AI
+      role: 'user',
+      timestamp: new Date(),
+      type: 'text',
+      isNew: true,
+      isTyping: false,
+      isConstructionPlan: false,
+      planApproved: false,
+      isCorrectionPlan: false,
+      correctionApproved: false,
+      isAnimated: true,
+    };
+    setMessages(prev => [...prev, userMessage]);
+    await getAndStreamAIResponse(conversationId, [...messages, userMessage]);
+  }, [appId, conversationId, isLoading, autoFixStatus, messages, getAndStreamAIResponse]);
+
+
   return {
     messages,
     isLoading,
@@ -594,5 +656,7 @@ export function useChat({
     clearChat,
     approvePlan,
     autoFixStatus,
+    triggerFixBuildError, // NEW: Expose triggerFixBuildError
+    triggerReportWebError, // NEW: Expose triggerReportWebError
   };
 }

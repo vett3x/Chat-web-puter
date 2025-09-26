@@ -104,6 +104,9 @@ export default function Home() {
   const appBrowserRef = useRef<{ refresh: () => void }>(null);
   const [fileTreeRefreshKey, setFileTreeRefreshKey] = useState(0);
 
+  // NEW: State and functions for ChatInterface to expose
+  const chatInterfaceRef = useRef<any>(null); // Ref to ChatInterface to access its internal functions
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('aiResponseSpeed', aiResponseSpeed);
@@ -276,6 +279,23 @@ export default function Home() {
     }
   };
 
+  // NEW: Handlers for error fixing buttons
+  const handleTriggerFixBuildError = () => {
+    if (chatInterfaceRef.current && chatInterfaceRef.current.triggerFixBuildError) {
+      chatInterfaceRef.current.triggerFixBuildError();
+    } else {
+      toast.error("El chat no está listo para corregir errores de compilación.");
+    }
+  };
+
+  const handleTriggerReportWebError = () => {
+    if (chatInterfaceRef.current && chatInterfaceRef.current.triggerReportWebError) {
+      chatInterfaceRef.current.triggerReportWebError();
+    } else {
+      toast.error("El chat no está listo para reportar errores web.");
+    }
+  };
+
   const handleOpenProfileSettings = () => setIsProfileSettingsOpen(true);
   const handleOpenAppSettings = () => setIsAppSettingsOpen(true);
   const handleOpenServerManagement = () => setIsServerManagementOpen(true);
@@ -347,6 +367,9 @@ export default function Home() {
             appId={selectedAppDetails.id}
             onRevertToVersion={handleRevertToVersion}
             isReverting={isRevertingApp}
+            autoFixStatus={chatInterfaceRef.current?.autoFixStatus || 'idle'} // Pass autoFixStatus
+            onTriggerFixBuildError={handleTriggerFixBuildError} // Pass trigger function
+            onTriggerReportWebError={handleTriggerReportWebError} // Pass trigger function
           />
         )}
         {selectedItem?.type === 'note' ? (
@@ -361,6 +384,7 @@ export default function Home() {
           <ResizablePanelGroup direction="horizontal" className="flex-1"> {/* flex-1 to take remaining height */}
             <ResizablePanel defaultSize={50} minSize={30}>
               <ChatInterface
+                ref={chatInterfaceRef} /* Attach ref here */
                 key={selectedItem?.conversationId || 'no-conversation'}
                 userId={userId}
                 conversationId={selectedItem?.conversationId || null}

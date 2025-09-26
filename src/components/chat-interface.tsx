@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useImperativeHandle, forwardRef } from 'react';
 import { Loader2 } from 'lucide-react';
-import { useChat } from '@/hooks/use-chat';
+import { useChat, AutoFixStatus } from '@/hooks/use-chat'; // Import AutoFixStatus type
 import { ChatMessages } from '@/components/chat/chat-messages';
 import { ChatInput, ChatMode } from '@/components/chat/chat-input';
 import { ApiKey } from '@/hooks/use-user-api-keys';
 import { useSession } from './session-context-provider';
-import { AutoFixStatus } from './chat/auto-fix-status'; // NEW: Import AutoFixStatus
+import { AutoFixStatus as AutoFixStatusComponent } from './chat/auto-fix-status'; // NEW: Import AutoFixStatus
 
 interface ChatInterfaceProps {
   userId: string | undefined;
@@ -26,7 +26,13 @@ interface ChatInterfaceProps {
   isLoadingApiKeys: boolean;
 }
 
-export function ChatInterface({
+export interface ChatInterfaceRef {
+  autoFixStatus: AutoFixStatus;
+  triggerFixBuildError: () => void;
+  triggerReportWebError: () => void;
+}
+
+export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
   userId,
   conversationId,
   onNewConversationCreated,
@@ -41,7 +47,7 @@ export function ChatInterface({
   onSidebarDataRefresh,
   userApiKeys,
   isLoadingApiKeys,
-}: ChatInterfaceProps) {
+}, ref) => {
   const { userAvatarUrl } = useSession();
   const [chatMode, setChatMode] = useState<ChatMode>('build');
 
@@ -56,7 +62,9 @@ export function ChatInterface({
     reapplyFilesFromMessage,
     clearChat,
     approvePlan,
-    autoFixStatus, // NEW: Get autoFixStatus from hook
+    autoFixStatus,
+    triggerFixBuildError, // NEW: Get triggerFixBuildError from hook
+    triggerReportWebError, // NEW: Get triggerReportWebError from hook
   } = useChat({
     userId,
     conversationId,
@@ -70,6 +78,13 @@ export function ChatInterface({
     isLoadingApiKeys,
     chatMode,
   });
+
+  // Expose autoFixStatus and trigger functions via ref
+  useImperativeHandle(ref, () => ({
+    autoFixStatus,
+    triggerFixBuildError,
+    triggerReportWebError,
+  }));
 
   if (isAppProvisioning) {
     return (
@@ -128,7 +143,7 @@ export function ChatInterface({
           isAppChat={isAppChat}
           onSuggestionClick={(prompt: string) => sendMessage([{ type: 'text', text: prompt }], prompt)}
         />
-        <AutoFixStatus status={autoFixStatus} /> {/* NEW: Add AutoFixStatus component */}
+        <AutoFixStatusComponent status={autoFixStatus} /> {/* NEW: Add AutoFixStatus component */}
         <ChatInput
           isLoading={isLoading}
           selectedModel={selectedModel}
@@ -142,4 +157,6 @@ export function ChatInterface({
       </div>
     </div>
   );
-}
+});
+
+ChatInterface.displayName = 'ChatInterface';
