@@ -594,23 +594,58 @@ export function useChat({
     }
 
     setAutoFixStatus('analyzing');
-    const userMessage: Message = {
-      id: `user-fix-build-${Date.now()}`,
-      conversation_id: conversationId,
-      content: '[USER_REQUESTED_BUILD_FIX]', // Internal prompt for AI
-      role: 'user',
-      timestamp: new Date(),
-      type: 'text',
-      isNew: true,
-      isTyping: false,
-      isConstructionPlan: false,
-      planApproved: false,
-      isCorrectionPlan: false,
-      correctionApproved: false,
-      isAnimated: true,
-    };
-    setMessages(prev => [...prev, userMessage]);
-    await getAndStreamAIResponse(conversationId, [...messages, userMessage]);
+    
+    try {
+      // Fetch Next.js logs
+      const logsResponse = await fetch(`/api/apps/${appId}/logs`);
+      if (!logsResponse.ok) {
+        const errorData = await logsResponse.json();
+        throw new Error(errorData.message || `HTTP error! status: ${logsResponse.status}`);
+      }
+      const { nextjsLogs } = await logsResponse.json();
+
+      const userMessageContent = `El último intento de compilación de la aplicación falló. Aquí están los logs de compilación de Next.js:\n\n\`\`\`bash\n${nextjsLogs || 'No se encontraron logs de Next.js.'}\n\`\`\`\n\nPor favor, analiza estos logs y propón un plan de corrección.`;
+
+      const userMessage: Message = {
+        id: `user-fix-build-${Date.now()}`,
+        conversation_id: conversationId,
+        content: userMessageContent,
+        role: 'user',
+        timestamp: new Date(),
+        type: 'text',
+        isNew: true,
+        isTyping: false,
+        isConstructionPlan: false,
+        planApproved: false,
+        isCorrectionPlan: false,
+        correctionApproved: false,
+        isAnimated: true,
+      };
+      setMessages(prev => [...prev, userMessage]);
+      await getAndStreamAIResponse(conversationId, [...messages, userMessage]);
+      setAutoFixStatus('plan_ready'); // Assuming AI will respond with a plan
+    } catch (error: any) {
+      console.error("Error fetching build logs for auto-fix:", error);
+      toast.error(`Error al obtener los logs de compilación: ${error.message}`);
+      setAutoFixStatus('failed');
+      // Add a message to the chat indicating the failure
+      const errorMessage: Message = {
+        id: `error-fix-build-${Date.now()}`,
+        conversation_id: conversationId,
+        content: `Fallo al obtener los logs de compilación para la auto-corrección: ${error.message}. Por favor, inténtalo de nuevo o revisa los logs manualmente.`,
+        role: 'assistant',
+        timestamp: new Date(),
+        type: 'text',
+        isNew: true,
+        isTyping: false,
+        isConstructionPlan: false,
+        planApproved: false,
+        isCorrectionPlan: false,
+        correctionApproved: false,
+        isAnimated: true,
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    }
   }, [appId, conversationId, isLoading, autoFixStatus, messages, getAndStreamAIResponse]);
 
   // NEW: Function to trigger reporting a web error
@@ -624,23 +659,63 @@ export function useChat({
       return;
     }
 
-    const userMessage: Message = {
-      id: `user-report-web-error-${Date.now()}`,
-      conversation_id: conversationId,
-      content: '[USER_REPORTED_WEB_ERROR]', // Internal prompt for AI
-      role: 'user',
-      timestamp: new Date(),
-      type: 'text',
-      isNew: true,
-      isTyping: false,
-      isConstructionPlan: false,
-      planApproved: false,
-      isCorrectionPlan: false,
-      correctionApproved: false,
-      isAnimated: true,
-    };
-    setMessages(prev => [...prev, userMessage]);
-    await getAndStreamAIResponse(conversationId, [...messages, userMessage]);
+    setAutoFixStatus('analyzing');
+
+    try {
+      // Fetch recent activity logs
+      const activityResponse = await fetch(`/api/apps/${appId}/activity`);
+      if (!activityResponse.ok) {
+        const errorData = await activityResponse.json();
+        throw new Error(errorData.message || `HTTP error! status: ${activityResponse.status}`);
+      }
+      const activityLogs = await activityResponse.json();
+      
+      const formattedActivityLogs = activityLogs.map((event: any) => 
+        `[${new Date(event.created_at).toLocaleString()}] [${event.event_type}] ${event.description}`
+      ).join('\n');
+
+      const userMessageContent = `He reportado un error en la vista previa web de la aplicación. Aquí están los logs de actividad recientes del servidor:\n\n\`\`\`text\n${formattedActivityLogs || 'No se encontraron logs de actividad recientes.'}\n\`\`\`\n\nPor favor, describe el error que estás viendo en la vista previa web (comportamiento inesperado, errores visuales, errores en la consola del navegador, etc.) para que la IA pueda ayudarte a diagnosticarlo.`;
+
+      const userMessage: Message = {
+        id: `user-report-web-error-${Date.now()}`,
+        conversation_id: conversationId,
+        content: userMessageContent,
+        role: 'user',
+        timestamp: new Date(),
+        type: 'text',
+        isNew: true,
+        isTyping: false,
+        isConstructionPlan: false,
+        planApproved: false,
+        isCorrectionPlan: false,
+        correctionApproved: false,
+        isAnimated: true,
+      };
+      setMessages(prev => [...prev, userMessage]);
+      await getAndStreamAIResponse(conversationId, [...messages, userMessage]);
+      setAutoFixStatus('plan_ready'); // Assuming AI will respond with a request for more info or a plan
+    } catch (error: any) {
+      console.error("Error fetching activity logs for web error report:", error);
+      toast.error(`Error al obtener los logs de actividad para el reporte web: ${error.message}`);
+      setAutoFixStatus('failed');
+      // Add a message to the chat indicating the failure
+      const errorMessage: Message = {
+        id: `error-report-web-${Date.now()}`,
+        conversation_id: conversationId,
+        content: `Fallo al obtener los logs de actividad para el reporte web: ${error.message}. Por favor, inténtalo de nuevo o revisa los logs manualmente.`,
+        role: 'assistant',
+        timestamp: new Date(),
+        type: 'text',
+        isNew: true,
+        isTyping: false,
+        isConstructionPlan: false,
+        planApproved: false,
+        isCorrectionPlan: false,
+        correctionApproved: false,
+        isAnimated: true,
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    }
   }, [appId, conversationId, isLoading, autoFixStatus, messages, getAndStreamAIResponse]);
 
 
