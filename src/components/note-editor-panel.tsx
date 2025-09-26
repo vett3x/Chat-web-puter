@@ -11,7 +11,7 @@ import { NoteAiChat, ChatMessage } from './note-ai-chat';
 import { ApiKey } from '@/hooks/use-user-api-keys';
 
 // BlockNote imports
-import { BlockNoteView, useBlockNote } from "@blocknote/react";
+import { BlockNoteViewRaw, useBlockNote } from "@blocknote/react"; // Changed BlockNoteView to BlockNoteViewRaw
 import { BlockNoteEditor, Block } from "@blocknote/core"; // Corrected import for types
 import "@blocknote/core/style.css";
 import { useTheme } from 'next-themes';
@@ -146,7 +146,7 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
         </div>
       </div>
       <div className="flex-1 overflow-y-auto">
-        <BlockNoteView editor={editor} theme={theme === 'dark' ? 'dark' : 'light'} />
+        <BlockNoteViewRaw editor={editor} theme={theme === 'dark' ? 'dark' : 'light'} />
       </div>
       {showAiHint && (<div className="absolute bottom-20 right-4 bg-info text-info-foreground p-2 rounded-md shadow-lg text-sm animate-in fade-in slide-in-from-bottom-2 flex items-center gap-2 z-10"><span>¡Usa la IA para chatear con tu nota!</span><Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setShowAiHint(false)}><X className="h-3 w-3" /></Button></div>)}
       <Button variant="destructive" size="icon" onClick={() => setIsAiChatOpen(prev => !prev)} className="absolute bottom-4 right-4 rounded-full h-12 w-12 animate-pulse-red z-10" title="Asistente de Nota"><Wand2 className="h-6 w-6" /></Button>
