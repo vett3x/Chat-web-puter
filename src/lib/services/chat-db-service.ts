@@ -1,6 +1,6 @@
 "use server";
 
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createServerClient, type CookieOptions, type CookieMethodsServerDeprecated } from '@supabase/ssr'; // Importar CookieMethodsServerDeprecated
 import { cookies } from 'next/headers';
 import { Message } from '@/types/chat';
 
@@ -8,31 +8,35 @@ import { Message } from '@/types/chat';
 function getSupabaseServerClient() {
   const cookieStore = cookies();
 
+  // Implementar explícitamente CookieMethodsServerDeprecated
+  const cookieMethods: CookieMethodsServerDeprecated = {
+    get(name: string): string | undefined {
+      return cookieStore.get(name)?.value;
+    },
+    set(name: string, value: string, options: CookieOptions): void {
+      try {
+        cookieStore.set({ name, value, ...options });
+      } catch (error) {
+        // Este error es esperado si 'set' se llama en un Server Component después de que las cabeceras han sido enviadas.
+        // Normalmente es manejado por el middleware de Next.js que refresca las sesiones.
+        console.warn("Failed to set cookie in Server Action:", error);
+      }
+    },
+    remove(name: string, options: CookieOptions): void {
+      try {
+        // Usar cookieStore.delete para eliminar cookies en next/headers
+        cookieStore.delete(name); 
+      } catch (error) {
+        console.warn("Failed to remove cookie in Server Action:", error);
+      }
+    },
+  };
+
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          try {
-            cookieStore.set({ name, value, ...options });
-          } catch (error) {
-            // The `set` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing sessions.
-          }
-        },
-        remove(name: string, options: CookieOptions) {
-          try {
-            cookieStore.set({ name, value: '', ...options });
-          } catch (error) {
-            // The `delete` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing sessions.
-          }
-        },
-      },
+      cookies: cookieMethods // Pasar el objeto de métodos de cookies explícitamente tipado
     }
   );
 }
