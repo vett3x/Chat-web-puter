@@ -253,6 +253,10 @@ export const esDictionary = {
   },
   table_handle: {
     tooltip: "Arrastra para mover la tabla",
+    delete_menuitem: "Eliminar Tabla",
+    colors_menuitem: "Colores de Tabla",
+    header_row_menuitem: "Fila de Encabezado",
+    header_column_menuitem: "Columna de Encabezado",
   },
   link_toolbar: {
     edit_link: "Editar enlace",
