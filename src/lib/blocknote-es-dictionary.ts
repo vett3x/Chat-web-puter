@@ -10,8 +10,8 @@ export const esDictionary: Dictionary = {
     strike: { tooltip: "Tachado", secondary_tooltip: "Cmd+Shift+X" },
     code: { tooltip: "Código", secondary_tooltip: "Cmd+E" },
     colors: {
-      text_color: { tooltip: "Color de Texto" },
-      background_color: { tooltip: "Color de Fondo" },
+      text_color: "Color de Texto", // Corregido
+      background_color: "Color de Fondo", // Corregido
     },
     link: { tooltip: "Enlace", secondary_tooltip: "Cmd+K" },
     file_caption: { tooltip: "Añadir pie de foto", input_placeholder: "Escribe un pie de foto..." },
@@ -30,16 +30,16 @@ export const esDictionary: Dictionary = {
       justify: { tooltip: "Justificar" },
     },
     nest: {
-      indent: { tooltip: "Aumentar sangría" },
-      outdent: { tooltip: "Disminuir sangría" },
+      indent: "Aumentar sangría", // Corregido
+      outdent: "Disminuir sangría", // Corregido
     },
     block_type: { tooltip: "Tipo de bloque" },
     more: { tooltip: "Más opciones" },
     comment: { tooltip: "Comentario" },
   },
   slash_menu: {
-    search_input: { placeholder: "Buscar bloques..." },
-    no_results: { title: "Sin resultados" },
+    search_input: "Buscar bloques...", // Corregido
+    no_results: "Sin resultados", // Corregido
     blocks: {
       heading: { title: "Título 1", subtext: "Encabezado de sección grande", aliases: ["h1"], group: "Encabezados" },
       heading_2: { title: "Título 2", subtext: "Encabezado de subsección", aliases: ["h2"], group: "Encabezados" },
@@ -78,7 +78,7 @@ export const esDictionary: Dictionary = {
   },
   placeholders: { default: "Escribe '/' para ver comandos" },
   drag_handle: {
-    tooltip: "Arrastra para reordenar",
+    tooltip: "Arrastra para reordenar", // Corregido
     delete_menuitem: "Eliminar",
     colors_menuitem: "Colores",
     header_row_menuitem: "Fila de Encabezado",
@@ -140,8 +140,8 @@ export const esDictionary: Dictionary = {
   toggle_blocks: { add_block_button: "Añadir bloque" },
   file_blocks: { add_button_text: { file: "Añadir Archivo", image: "Añadir Imagen", video: "Añadir Video", audio: "Añadir Audio" } },
   suggestion_menu: {
-    search_input: { placeholder: "Buscar sugerencias..." },
-    no_results: { title: "Sin sugerencias" },
+    search_input: "Buscar sugerencias...", // Corregido
+    no_results: "Sin sugerencias", // Corregido
     no_items_title: "No hay elementos",
   },
   file_panel: {
@@ -154,16 +154,16 @@ export const esDictionary: Dictionary = {
     cancel_button_text: "Cancelar",
     actions: { add_reaction: "Añadir reacción", resolve: "Resolver", edit_comment: "Editar comentario", delete_comment: "Eliminar comentario", more_actions: "Más acciones" },
     reactions: {
-      "👍": { tooltip: "Pulgar arriba" },
-      "👎": { tooltip: "Pulgar abajo" },
-      "❤️": { tooltip: "Corazón" },
-      "😂": { tooltip: "Risa" },
-      "😮": { tooltip: "Sorpresa" },
-      "😢": { tooltip: "Tristeza" },
+      "👍": "Pulgar arriba", // Corregido
+      "👎": "Pulgar abajo",
+      "❤️": "Corazón",
+      "😂": "Risa",
+      "😮": "Sorpresa",
+      "😢": "Tristeza",
     },
     sidebar: {
-      title: "Comentarios",
-      empty_state: "No hay comentarios",
+      title: "Comentarios", // Corregido
+      empty_state: "No hay comentarios", // Corregido
       marked_as_resolved: "Marcado como resuelto",
       more_replies: (count: number) => `${count} respuestas más`,
     },
