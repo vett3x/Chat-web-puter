@@ -200,7 +200,7 @@ export function useChat({
   }, [userId]);
 
   const getMessagesFromDB = useCallback(async (convId: string) => {
-    const { data, error } = await supabase.from('messages').select('id, content, role, model, created_at, conversation_id, type').eq('conversation_id', convId).eq('user_id', userId).order('created_at', { ascending: true });
+    const { data, error } = await supabase.from('messages').select('id, content, role, model, created_at, conversation_id, type, plan_approved').eq('conversation_id', convId).eq('user_id', userId).order('created_at', { ascending: true });
     if (error) {
       console.error('Error fetching messages:', error);
       toast.error('Error al cargar los mensajes.');
@@ -215,7 +215,7 @@ export function useChat({
       timestamp: new Date(msg.created_at),
       type: msg.type as 'text' | 'multimodal',
       isConstructionPlan: typeof msg.content === 'string' && msg.content.includes('### 1. Análisis del Requerimiento'), // Detect plan from DB
-      planApproved: false, // Default to false when loading from DB
+      planApproved: msg.plan_approved || false, // NEW: Fetch plan_approved from DB
       isCorrectionPlan: false, // Default to false when loading from DB
       correctionApproved: false, // Default to false when loading from DB
       isNew: false, // Messages from DB are not 'new'
@@ -268,7 +268,15 @@ export function useChat({
 
   const saveMessageToDB = async (convId: string, msg: Omit<Message, 'timestamp' | 'id'>) => {
     if (!userId) return null;
-    const { data, error } = await supabase.from('messages').insert({ conversation_id: convId, user_id: userId, role: msg.role, content: msg.content as any, model: msg.model, type: msg.type }).select('id, created_at').single();
+    const { data, error } = await supabase.from('messages').insert({ 
+      conversation_id: convId, 
+      user_id: userId, 
+      role: msg.role, 
+      content: msg.content as any, 
+      model: msg.model, 
+      type: msg.type,
+      plan_approved: msg.planApproved, // NEW: Save planApproved status
+    }).select('id, created_at').single();
     if (error) {
       toast.error('Error al guardar el mensaje.');
       return null;
@@ -290,7 +298,7 @@ export function useChat({
 
     try {
       let systemPromptContent: string;
-      const isAppChatModeBuild = !!appPrompt && chatMode === 'build'; // FIX: Ensure strict boolean
+      const isAppChatModeBuild = !!appPrompt && chatMode === 'build';
 
       if (isAppChatModeBuild) {
         systemPromptContent = `Eres un desarrollador experto en Next.js (App Router), TypeScript y Tailwind CSS. Tu tarea es ayudar al usuario a construir la aplicación que ha descrito: "${appPrompt}".
@@ -395,8 +403,8 @@ export function useChat({
         role: 'assistant' as const,
         model: modelUsedForResponse,
         type: 'multimodal' as const,
-        isConstructionPlan: isConstructionPlan, // FIX: isConstructionPlan is now a strict boolean
-        planApproved: false,
+        isConstructionPlan: isConstructionPlan,
+        planApproved: false, // Default to false for new messages
         isCorrectionPlan: false,
         correctionApproved: false,
         isNew: true, // Mark as new for animation
@@ -464,7 +472,25 @@ export function useChat({
     const planMessage = messages.find(m => m.id === messageId);
     if (!planMessage || !conversationId) return;
 
+    // Update local state
     setMessages(prev => prev.map(m => m.id === messageId ? { ...m, planApproved: true } : m));
+
+    // Update in DB
+    const { error } = await supabase
+      .from('messages')
+      .update({ plan_approved: true })
+      .eq('id', messageId)
+      .eq('conversation_id', conversationId)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error updating plan_approved status in DB:', error);
+      toast.error('Error al guardar la aprobación del plan.');
+      // Optionally revert local state if DB update fails
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, planApproved: false } : m));
+      return;
+    }
+    toast.success('Plan aprobado y guardado.');
 
     const approvalMessage: Message = {
       id: `user-approval-${Date.now()}`,
@@ -486,7 +512,7 @@ export function useChat({
     
     await getAndStreamAIResponse(conversationId, historyWithApproval);
 
-  }, [messages, conversationId, getAndStreamAIResponse]);
+  }, [messages, conversationId, getAndStreamAIResponse, userId]);
 
 
   const regenerateLastResponse = useCallback(async () => {
