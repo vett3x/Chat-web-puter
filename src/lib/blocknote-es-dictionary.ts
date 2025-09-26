@@ -1,11 +1,9 @@
 "use client";
 
-import { type PartialBlockNoteDictionary } from "@blocknote/core";
-
 // Un diccionario parcial con traducciones al español para los elementos más comunes de la interfaz de usuario.
-export const esDictionary: PartialBlockNoteDictionary = {
+export const esDictionary = {
   // La barra de herramientas de formato principal.
-  formatting_toolbar: {
+  formattingToolbar: {
     bold: "Negrita",
     italic: "Cursiva",
     underline: "Subrayado",
@@ -19,7 +17,7 @@ export const esDictionary: PartialBlockNoteDictionary = {
     removeLink: "Quitar Enlace",
   },
   // El menú de comandos (slash menu).
-  slash_menu: {
+  slashMenu: {
     // El texto del placeholder en el campo de búsqueda.
     searchInput: {
       placeholder: "Buscar bloques...",
@@ -76,15 +74,15 @@ export const esDictionary: PartialBlockNoteDictionary = {
     },
   },
   // El bloque de placeholder.
-  placeholders: {
+  placeholder: {
     title: "Escribe '/' para ver comandos",
   },
   // El manejador para arrastrar.
-  drag_handle: {
+  dragHandle: {
     tooltip: "Arrastra para reordenar",
   },
   // El menú del bloque.
-  block_toolbar: {
+  blockToolbar: {
     "Turn into": "Convertir en",
     "Delete": "Eliminar",
   },
