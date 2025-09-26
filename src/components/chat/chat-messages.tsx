@@ -23,6 +23,7 @@ import {
 import { ConstructionPlan } from './construction-plan';
 import { Message } from '@/hooks/use-chat';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 interface ChatMessagesProps {
   messages: Message[];
@@ -153,7 +154,12 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
                       </div>
                     )}
                   </div>
-                  <div className={`rounded-lg p-3 ${message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                  <div className={cn(
+                    'rounded-lg p-3',
+                    message.role === 'user'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted prose prose-sm dark:prose-invert max-w-none'
+                  )}>
                     {message.isTyping ? (
                       <div className="flex items-center gap-2">
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -179,6 +185,8 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
                           }
                         }}
                         isErrorAnalysisRequest={message.isErrorAnalysisRequest} // Pass isErrorAnalysisRequest
+                        isCorrectionPlan={message.isCorrectionPlan}
+                        correctionApproved={message.correctionApproved}
                       />
                     )}
                   </div>
