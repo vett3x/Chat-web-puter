@@ -23,14 +23,11 @@ const customDarkTheme: Theme = {
   colors: {
     ...darkDefaultTheme.colors,
     editor: {
-      background: "hsl(var(--background))", // Match app background
-      text: "hsl(var(--foreground))",       // Match app foreground
+      background: "hsl(var(--background))",
+      text: "hsl(var(--foreground))",
     },
-    // Ensure other UI elements also match
-    sideMenu: {
-        background: "hsl(var(--background))",
-        text: "hsl(var(--foreground))",
-    },
+    // Correctly providing a string for the text color, as expected by the type.
+    sideMenu: "hsl(var(--foreground))",
     tooltip: {
         background: "hsl(var(--muted))",
         text: "hsl(var(--muted-foreground))",
@@ -39,8 +36,6 @@ const customDarkTheme: Theme = {
         background: "hsl(var(--card))",
         text: "hsl(var(--card-foreground))",
     },
-    // The properties below were incorrect and have been removed.
-    // Their styling is inherited or handled by other properties.
   },
 };
 
