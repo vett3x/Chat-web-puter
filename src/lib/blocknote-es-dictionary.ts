@@ -1,52 +1,98 @@
 "use client";
 
-export const esDictionary = {
-  // General
-  "Drag handle to reorder": "Arrastra para reordenar",
-  "Block": "Bloque",
-  "Edit": "Editar",
-  "Turn into": "Convertir en",
-  "Press Enter for a new line": "Presiona Enter para una nueva línea",
+import { type PartialBlockNoteDictionary } from "@blocknote/core";
 
-  // Formatting
-  "Bold": "Negrita",
-  "Italic": "Cursiva",
-  "Underline": "Subrayado",
-  "Strikethrough": "Tachado",
-  "Code": "Código",
-  "Text Color": "Color de Texto",
-  "Background Color": "Color de Fondo",
-
-  // Block Types
-  "Heading 1": "Título 1",
-  "Heading 2": "Título 2",
-  "Heading 3": "Título 3",
-  "Paragraph": "Párrafo",
-  "Numbered List": "Lista Numerada",
-  "Bulleted List": "Lista de Viñetas",
-  "Table": "Tabla",
-  "Image": "Imagen",
-  "File": "Archivo",
-  "Video": "Video",
-  "Audio": "Audio",
-  "Check List": "Lista de Tareas",
-  "Blockquote": "Cita",
-  "Code Block": "Bloque de Código",
-  "Alert": "Alerta",
-
-  // Slash Menu
-  "Search for a block": "Buscar un bloque",
-  "No results": "Sin resultados",
-  "Type '/' for commands": "Escribe '/' para ver comandos",
-
-  // Placeholders
-  "Type something": "Escribe algo",
-  "Heading": "Título",
-  "List": "Lista",
-
-  // Alerts
-  "Info": "Información",
-  "Warning": "Advertencia",
-  "Error": "Error",
-  "Success": "Éxito",
+// Un diccionario parcial con traducciones al español para los elementos más comunes de la interfaz de usuario.
+export const esDictionary: PartialBlockNoteDictionary = {
+  // La barra de herramientas de formato principal.
+  formatting_toolbar: {
+    bold: "Negrita",
+    italic: "Cursiva",
+    underline: "Subrayado",
+    strikethrough: "Tachado",
+    code: "Código",
+    textColor: "Color de Texto",
+    backgroundColor: "Color de Fondo",
+    link: "Enlace",
+    createLink: "Crear Enlace",
+    editLink: "Editar Enlace",
+    removeLink: "Quitar Enlace",
+  },
+  // El menú de comandos (slash menu).
+  slash_menu: {
+    // El texto del placeholder en el campo de búsqueda.
+    searchInput: {
+      placeholder: "Buscar bloques...",
+    },
+    // El título del bloque "sin resultados".
+    noResults: {
+      title: "Sin resultados",
+    },
+    // Títulos de los bloques por defecto.
+    heading: {
+      title: "Título 1",
+    },
+    heading2: {
+      title: "Título 2",
+    },
+    heading3: {
+      title: "Título 3",
+    },
+    paragraph: {
+      title: "Párrafo",
+    },
+    bulletedList: {
+      title: "Lista de Viñetas",
+    },
+    numberedList: {
+      title: "Lista Numerada",
+    },
+    checkList: {
+      title: "Lista de Tareas",
+    },
+    table: {
+      title: "Tabla",
+    },
+    image: {
+      title: "Imagen",
+    },
+    file: {
+      title: "Archivo",
+    },
+    video: {
+      title: "Video",
+    },
+    audio: {
+      title: "Audio",
+    },
+    blockquote: {
+      title: "Cita",
+    },
+    codeBlock: {
+      title: "Bloque de Código",
+    },
+    alert: {
+      title: "Alerta",
+    },
+  },
+  // El bloque de placeholder.
+  placeholders: {
+    title: "Escribe '/' para ver comandos",
+  },
+  // El manejador para arrastrar.
+  drag_handle: {
+    tooltip: "Arrastra para reordenar",
+  },
+  // El menú del bloque.
+  block_toolbar: {
+    "Turn into": "Convertir en",
+    "Delete": "Eliminar",
+  },
+  // El bloque de alerta.
+  alert: {
+    info: "Información",
+    warning: "Advertencia",
+    error: "Error",
+    success: "Éxito",
+  },
 };
