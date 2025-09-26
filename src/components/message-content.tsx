@@ -6,6 +6,7 @@ import { TextAnimator } from './text-animator';
 import Image from 'next/image';
 import { RenderablePart } from '@/lib/utils'; // Importar RenderablePart desde utils
 import { ConstructionPlan } from './chat/construction-plan'; // Importar ConstructionPlan
+import { ErrorAnalysisRequest } from './chat/error-analysis-request'; // NEW: Import ErrorAnalysisRequest
 
 interface MessageContentProps {
   content: string | RenderablePart[]; // MODIFICADO: Ahora acepta string o RenderablePart[]
@@ -18,6 +19,7 @@ interface MessageContentProps {
   onRequestChanges?: () => void; // NEW: Callback para solicitar cambios
   messageId?: string; // NEW: ID del mensaje para pasar al ConstructionPlan
   onAnimationComplete?: () => void; // NEW: Callback para cuando la animación de MessageContent termina
+  isErrorAnalysisRequest?: boolean; // NEW: Prop para indicar si el contenido es una solicitud de análisis de error
 }
 
 export function MessageContent({ 
@@ -31,6 +33,7 @@ export function MessageContent({
   onRequestChanges, 
   messageId,
   onAnimationComplete,
+  isErrorAnalysisRequest, // NEW: Destructure new prop
 }: MessageContentProps) {
   const [animatedPartsCount, setAnimatedPartsCount] = useState(0);
 
@@ -99,6 +102,17 @@ export function MessageContent({
     // después de que la actual notifica su finalización.
     setAnimatedPartsCount(prev => prev + 1);
   };
+
+  // NEW: Render ErrorAnalysisRequest directly if it's an error analysis request
+  if (isErrorAnalysisRequest && typeof content === 'string') {
+    return (
+      <ErrorAnalysisRequest
+        content={content}
+        isNew={isNew}
+        onAnimationComplete={onAnimationComplete}
+      />
+    );
+  }
 
   // NEW: Render ConstructionPlan directly if it's a plan
   if (isConstructionPlan && typeof content === 'string' && messageId && onApprovePlan && onRequestChanges) {

@@ -63,6 +63,7 @@ export interface Message {
   isCorrectionPlan: boolean; // Changed from optional to required boolean
   correctionApproved: boolean; // Changed from optional to required boolean
   isAnimated: boolean; // NEW: Flag to track if message has been animated
+  isErrorAnalysisRequest: boolean; // NEW: Flag to detect error analysis request
 }
 
 export type AutoFixStatus = 'idle' | 'analyzing' | 'plan_ready' | 'fixing' | 'failed';
@@ -218,6 +219,7 @@ export function useChat({
       planApproved: msg.plan_approved || false, // NEW: Fetch plan_approved from DB
       isCorrectionPlan: false, // Default to false when loading from DB
       correctionApproved: false, // Default to false when loading from DB
+      isErrorAnalysisRequest: typeof msg.content === 'string' && msg.content.includes('### 💡 Entendido!'), // NEW: Detect error analysis request from DB
       isNew: false, // Messages from DB are not 'new'
       isTyping: false, // Messages from DB are not 'typing'
       isAnimated: true, // Messages from DB are considered animated
@@ -289,7 +291,7 @@ export function useChat({
     const assistantMessageId = `assistant-${Date.now()}`;
     
     // Add a placeholder message immediately
-    setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant', content: '', isTyping: true, isNew: true, isConstructionPlan: false, planApproved: false, isCorrectionPlan: false, correctionApproved: false, isAnimated: false, timestamp: new Date() }]);
+    setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant', content: '', isTyping: true, isNew: true, isConstructionPlan: false, planApproved: false, isCorrectionPlan: false, correctionApproved: false, isErrorAnalysisRequest: false, isAnimated: false, timestamp: new Date() }]);
     
     const userMessageToSave = history.findLast(m => m.role === 'user');
     if (userMessageToSave) {
@@ -322,11 +324,44 @@ export function useChat({
         systemPromptContent = "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante.";
       }
 
-      const systemMessage: PuterMessage = { role: 'system', content: systemPromptContent };
       const messagesForApi = history.map(msg => ({
         role: msg.role,
         content: messageContentToApiFormat(msg.content),
       }));
+
+      // NEW: Add specific system prompts for auto-fix actions
+      const lastUserMessageContent = messagesForApi[messagesForApi.length - 1]?.content;
+      if (typeof lastUserMessageContent === 'string') {
+        if (lastUserMessageContent.includes('[USER_REQUESTED_BUILD_FIX]')) {
+          systemPromptContent += `\n\nEl usuario ha solicitado corregir un error de compilación. Analiza los logs de compilación proporcionados en el último mensaje del usuario y propón un "Plan de Corrección" detallado. Utiliza el siguiente formato Markdown exacto:
+            ### 💡 Error Detectado
+            [Descripción concisa del error de compilación]
+            ### 🧠 Análisis de la IA
+            [Tu análisis de la causa raíz del error]
+            ### 🛠️ Plan de Corrección
+            [Pasos detallados para corregir el error, incluyendo modificaciones de código si es necesario. Si hay código, usa bloques \`\`\`language:ruta/del/archivo.tsx\`\`\`]
+            ### ✅ Confirmación
+            [Pregunta de confirmación al usuario para aplicar el arreglo]`;
+        } else if (lastUserMessageContent.includes('[USER_REPORTED_WEB_ERROR]')) {
+          systemPromptContent += `\n\nEl usuario ha reportado un error en la vista previa web. Analiza los logs de actividad del servidor proporcionados en el último mensaje del usuario. Luego, solicita al usuario que describa el error visual o de comportamiento que está viendo en la vista previa web. Utiliza el siguiente formato Markdown exacto:
+            ### 💡 Entendido! Has reportado un error en la web.
+            ### 📄 Contexto del Error
+            [Tu análisis inicial de los logs de actividad del servidor. Si no hay información relevante, indícalo.]
+            ### ❓ Información Requerida
+            Para poder ayudarte a diagnosticar y solucionar el problema, necesito que me proporciones la mayor cantidad de detalles posible. Por favor, describe:
+            1.  **¿Cuál es el mensaje de error exacto?** (Si aparece en la consola del navegador, en la terminal donde ejecutas \`npm run dev\`, o en la interfaz de usuario). Copia y pega el texto si es posible.
+            2.  **¿En qué parte de la aplicación ocurre el error?** (Por ejemplo, al cargar la página de inicio, al hacer clic en un producto, al añadir al carrito, al visitar el carrito, etc.)
+            3.  **¿Qué acciones realizaste justo antes de que apareciera el error?** (Los pasos para reproducirlo).
+            4.  **¿Hay algún mensaje de error en la consola de tu navegador (Developer Tools - Console)?**
+            5.  **¿Hay algún mensaje de error en la terminal donde estás ejecutando Next.js (\`npm run dev\`)?**
+            ### ➡️ Siguientes Pasos
+            Una vez que tenga esta información, podré analizarla y proponerte una solución. Por favor, comparte todos los detalles que puedas.`;
+        }
+      }
+
+      // Define systemMessage after systemPromptContent is finalized
+      const systemMessage: PuterMessage = { role: 'system', content: systemPromptContent };
+      const finalMessagesForApi = [systemMessage, ...messagesForApi];
 
       let fullResponseText = '';
       let modelUsedForResponse = selectedModel;
@@ -341,7 +376,7 @@ export function useChat({
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              messages: [systemMessage, ...messagesForApi],
+              messages: finalMessagesForApi,
               selectedKeyId: selectedModel.substring(9),
               stream: false, // Request non-streaming for custom endpoint
             }),
@@ -350,7 +385,7 @@ export function useChat({
           if (!apiResponse.ok) throw new Error(response.message || 'Error en la API de IA.');
         } else {
           const actualModelForPuter = selectedModel.substring(6);
-          response = await window.puter.ai.chat([systemMessage, ...messagesForApi], { model: actualModelForPuter });
+          response = await window.puter.ai.chat(finalMessagesForApi, { model: actualModelForPuter });
         }
         if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
         fullResponseText = response?.message?.content || 'Sin contenido.';
@@ -359,7 +394,7 @@ export function useChat({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            messages: [systemMessage, ...messagesForApi],
+            messages: finalMessagesForApi,
             selectedKeyId: selectedModel.substring(9),
             stream: true, // Request streaming for Gemini
           }),
@@ -377,8 +412,9 @@ export function useChat({
           const chunk = decoder.decode(value, { stream: true });
           fullResponseText += chunk;
 
-          // Only update messages during streaming if NOT a construction plan
-          if (!isAppChatModeBuild || !fullResponseText.includes('### 1. Análisis del Requerimiento')) {
+          // Only update messages during streaming if NOT a construction plan or error analysis request
+          const isCurrentResponsePlanOrRequest = fullResponseText.includes('### 1. Análisis del Requerimiento') || fullResponseText.includes('### 💡 Entendido!');
+          if (!isAppChatModeBuild || !isCurrentResponsePlanOrRequest) {
             setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: parseAiResponseToRenderableParts(fullResponseText, isAppChatModeBuild), isTyping: false, isNew: true } : m));
           }
         }
@@ -387,10 +423,11 @@ export function useChat({
       }
 
       const isConstructionPlan = isAppChatModeBuild && fullResponseText.includes('### 1. Análisis del Requerimiento');
-      const finalContentForMessage = isConstructionPlan ? fullResponseText : parseAiResponseToRenderableParts(fullResponseText, isAppChatModeBuild);
+      const isErrorAnalysisRequest = fullResponseText.includes('### 💡 Entendido!'); // NEW: Detect error analysis request
+      const finalContentForMessage = (isConstructionPlan || isErrorAnalysisRequest) ? fullResponseText : parseAiResponseToRenderableParts(fullResponseText, isAppChatModeBuild);
       const filesToWrite: { path: string; content: string }[] = [];
 
-      if (isAppChatModeBuild && !isConstructionPlan) { // Only extract files if NOT a construction plan
+      if (isAppChatModeBuild && !isConstructionPlan && !isErrorAnalysisRequest) { // Only extract files if NOT a plan or error request
         (finalContentForMessage as RenderablePart[]).forEach(part => {
           if (part.type === 'code' && appId && part.filename && part.code) {
             filesToWrite.push({ path: part.filename, content: part.code });
@@ -407,6 +444,7 @@ export function useChat({
         planApproved: false, // Default to false for new messages
         isCorrectionPlan: false,
         correctionApproved: false,
+        isErrorAnalysisRequest: isErrorAnalysisRequest, // NEW: Set flag
         isNew: true, // Mark as new for animation
         isTyping: false,
         isAnimated: false, // Mark as not animated yet for new messages
@@ -419,11 +457,19 @@ export function useChat({
         await onWriteFiles(filesToWrite);
       }
 
+      // Update autoFixStatus based on AI's response
+      if (isErrorAnalysisRequest || isConstructionPlan) {
+        setAutoFixStatus('plan_ready');
+      } else {
+        setAutoFixStatus('idle'); // Reset if AI didn't respond with a plan/request
+      }
+
     } catch (error: any) {
       console.error('[API /ai/chat] Error:', error);
       let userFriendlyMessage = `Error en la API de IA: ${error.message}`;
-      setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: userFriendlyMessage, isTyping: false, isNew: true, isConstructionPlan: false, planApproved: false, isCorrectionPlan: false, correctionApproved: false, isAnimated: false } : m));
+      setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: userFriendlyMessage, isTyping: false, isNew: true, isConstructionPlan: false, planApproved: false, isCorrectionPlan: false, correctionApproved: false, isErrorAnalysisRequest: false, isAnimated: false } : m));
       toast.error(userFriendlyMessage);
+      setAutoFixStatus('failed'); // Set status to failed on error
     } finally {
       setIsLoading(false);
     }
@@ -458,6 +504,7 @@ export function useChat({
       planApproved: false,
       isCorrectionPlan: false,
       correctionApproved: false,
+      isErrorAnalysisRequest: false, // Default to false
       isAnimated: true, // User messages are always 'animated'
     };
 
@@ -505,6 +552,7 @@ export function useChat({
       planApproved: false,
       isCorrectionPlan: false,
       correctionApproved: false,
+      isErrorAnalysisRequest: false,
       isAnimated: true,
     };
 
@@ -604,7 +652,7 @@ export function useChat({
       }
       const { nextjsLogs } = await logsResponse.json();
 
-      const userMessageContent = `El último intento de compilación de la aplicación falló. Aquí están los logs de compilación de Next.js:\n\n\`\`\`bash\n${nextjsLogs || 'No se encontraron logs de Next.js.'}\n\`\`\`\n\nPor favor, analiza estos logs y propón un plan de corrección.`;
+      const userMessageContent = `El último intento de compilación de la aplicación falló. Aquí están los logs de compilación de Next.js:\n\n\`\`\`bash\n${nextjsLogs || 'No se encontraron logs de Next.js.'}\n\`\`\`\n\n[USER_REQUESTED_BUILD_FIX]`; // Internal prompt for AI
 
       const userMessage: Message = {
         id: `user-fix-build-${Date.now()}`,
@@ -619,11 +667,12 @@ export function useChat({
         planApproved: false,
         isCorrectionPlan: false,
         correctionApproved: false,
+        isErrorAnalysisRequest: false,
         isAnimated: true,
       };
       setMessages(prev => [...prev, userMessage]);
       await getAndStreamAIResponse(conversationId, [...messages, userMessage]);
-      setAutoFixStatus('plan_ready'); // Assuming AI will respond with a plan
+      // autoFixStatus will be set to 'plan_ready' by getAndStreamAIResponse if AI responds with a plan
     } catch (error: any) {
       console.error("Error fetching build logs for auto-fix:", error);
       toast.error(`Error al obtener los logs de compilación: ${error.message}`);
@@ -642,6 +691,7 @@ export function useChat({
         planApproved: false,
         isCorrectionPlan: false,
         correctionApproved: false,
+        isErrorAnalysisRequest: false,
         isAnimated: true,
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -674,7 +724,7 @@ export function useChat({
         `[${new Date(event.created_at).toLocaleString()}] [${event.event_type}] ${event.description}`
       ).join('\n');
 
-      const userMessageContent = `He reportado un error en la vista previa web de la aplicación. Aquí están los logs de actividad recientes del servidor:\n\n\`\`\`text\n${formattedActivityLogs || 'No se encontraron logs de actividad recientes.'}\n\`\`\`\n\nPor favor, describe el error que estás viendo en la vista previa web (comportamiento inesperado, errores visuales, errores en la consola del navegador, etc.) para que la IA pueda ayudarte a diagnosticarlo.`;
+      const userMessageContent = `He reportado un error en la vista previa web de la aplicación. Aquí están los logs de actividad recientes del servidor:\n\n\`\`\`text\n${formattedActivityLogs || 'No se encontraron logs de actividad recientes.'}\n\`\`\`\n\n[USER_REPORTED_WEB_ERROR]`; // Internal prompt for AI
 
       const userMessage: Message = {
         id: `user-report-web-error-${Date.now()}`,
@@ -689,11 +739,12 @@ export function useChat({
         planApproved: false,
         isCorrectionPlan: false,
         correctionApproved: false,
+        isErrorAnalysisRequest: false,
         isAnimated: true,
       };
       setMessages(prev => [...prev, userMessage]);
       await getAndStreamAIResponse(conversationId, [...messages, userMessage]);
-      setAutoFixStatus('plan_ready'); // Assuming AI will respond with a request for more info or a plan
+      // autoFixStatus will be set to 'plan_ready' by getAndStreamAIResponse if AI responds with a plan
     } catch (error: any) {
       console.error("Error fetching activity logs for web error report:", error);
       toast.error(`Error al obtener los logs de actividad para el reporte web: ${error.message}`);
@@ -712,6 +763,7 @@ export function useChat({
         planApproved: false,
         isCorrectionPlan: false,
         correctionApproved: false,
+        isErrorAnalysisRequest: false,
         isAnimated: true,
       };
       setMessages(prev => [...prev, errorMessage]);
