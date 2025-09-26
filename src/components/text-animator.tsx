@@ -5,23 +5,20 @@ import { useState, useEffect, useRef } from 'react';
 interface TextAnimatorProps {
   text: string;
   className?: string;
-  isNew?: boolean;
+  isNew?: boolean; // Indicates if this part is currently being "animated" (i.e., just appeared)
   onAnimationComplete?: () => void;
-  animationSpeed: 'slow' | 'normal' | 'fast';
+  animationSpeed: 'slow' | 'normal' | 'fast'; // Not directly used for text animation, but kept for consistency
 }
 
 export function TextAnimator({ text, className, isNew, onAnimationComplete }: TextAnimatorProps) {
-  // The streaming from useChat now handles the animation.
-  // This component just needs to render the text as it receives it.
-  // The onAnimationComplete is called by the stream handler in useChat when the stream ends.
-  
   useEffect(() => {
-    // If this component is part of a message that is NOT new (i.e., loaded from history),
-    // and it's the last part of that message, we can consider its "animation" complete immediately.
-    if (!isNew) {
+    if (isNew) {
+      // For text parts, we consider the "animation" complete as soon as they are rendered.
+      // The actual streaming effect is handled by the parent updating the 'text' prop.
+      // We just need to signal to the parent that this part is done, so the next can start.
       onAnimationComplete?.();
     }
-  }, [isNew, onAnimationComplete]);
+  }, [isNew, onAnimationComplete]); // Depend on isNew to trigger when this part becomes active
 
   return <span className={className}>{text}</span>;
 }

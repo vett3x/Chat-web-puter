@@ -4,33 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { CodeBlock } from './code-block';
 import { TextAnimator } from './text-animator';
 import Image from 'next/image';
-
-// New types for multimodal content
-interface PuterTextContentPart {
-  type: 'text';
-  text: string;
-}
-
-interface PuterImageContentPart {
-  type: 'image_url';
-  image_url: {
-    url: string; // Can be data URL (base64) or public URL
-  };
-}
-
-// Define a specific type for code block parts
-interface CodeBlockPart {
-  type: 'code';
-  language?: string;
-  filename?: string;
-  code: string;
-}
-
-// Union type for all possible renderable parts
-type RenderablePart = PuterTextContentPart | PuterImageContentPart | CodeBlockPart;
+import { RenderablePart } from '@/lib/utils'; // Importar RenderablePart desde utils
 
 interface MessageContentProps {
-  content: string | RenderablePart[]; // Updated to allow array of parts
+  content: RenderablePart[]; // Updated to always expect an array of parts
   isNew?: boolean;
   aiResponseSpeed: 'slow' | 'normal' | 'fast';
   isAppChat?: boolean;
@@ -81,17 +58,8 @@ export function MessageContent({ content, isNew, aiResponseSpeed, isAppChat }: M
     return null;
   };
 
-  // The component now expects pre-parsed parts. The string parsing is done in the useChat hook.
-  const renderableParts = React.useMemo(() => {
-    if (Array.isArray(content)) {
-      return content;
-    }
-    // If it's a string, it's a simple text message or a plan that doesn't need parsing here.
-    if (typeof content === 'string') {
-        return [{ type: 'text', text: content }] as RenderablePart[];
-    }
-    return [];
-  }, [content]);
+  // The component now expects pre-parsed parts.
+  const renderableParts = content; // Content is already RenderablePart[]
 
   useEffect(() => {
     if (isNew) {

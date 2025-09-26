@@ -72,3 +72,65 @@ export function generateRandomPort(): number {
   const maxPort = 65535;
   return Math.floor(Math.random() * (maxPort - minPort + 1)) + minPort;
 }
+
+// Define unified part types for internal API handling
+interface TextPart { type: 'text'; text: string; }
+interface ImagePart { type: 'image_url'; image_url: { url: string }; }
+interface CodePart { type: 'code'; language?: string; filename?: string; code?: string; }
+export type RenderablePart = TextPart | ImagePart | CodePart;
+
+// New, more robust regex to capture the entire info line after ```
+const codeBlockRegex = /```(\w+)?(?::([\w./-]+))?\n([\s\S]*?)\n```/g;
+
+export function parseAiResponseToRenderableParts(content: string, isAppChat: boolean): RenderablePart[] {
+  const parts: RenderablePart[] = [];
+  let lastIndex = 0;
+  let match;
+  codeBlockRegex.lastIndex = 0; // Reset regex lastIndex for repeated calls
+
+  while ((match = codeBlockRegex.exec(content)) !== null) {
+    // Capture text before the code block
+    if (match.index > lastIndex) {
+      const textPart = content.substring(lastIndex, match.index).trim();
+      if (textPart) parts.push({ type: 'text', text: textPart });
+    }
+    
+    const infoLine = (match[1] || '').trim(); // Language part
+    const filenameFromRegex = (match[2] || '').trim(); // Filename part from regex
+    const codeContent = (match[3] || '').trim();
+    let language = infoLine;
+    let filename = filenameFromRegex;
+
+    const part: RenderablePart = {
+      type: 'code',
+      language: language,
+      filename: filename,
+      code: codeContent,
+    };
+
+    // Only attempt to extract filename from code content if it's an app chat
+    // and filename wasn't already explicitly provided in the ```info:filename``` format
+    if (isAppChat && !part.filename && part.code) {
+      const lines = part.code.split('\n');
+      const firstLine = lines[0].trim();
+      // Regex to find common file path comments like //path/to/file.js or #path/to/file.py
+      const pathRegex = /^(?:\/\/|#|\/\*|\*)\s*([\w./-]+\.[a-zA-Z]+)\s*\*?\/?$/;
+      const pathMatch = firstLine.match(pathRegex);
+      if (pathMatch && pathMatch[1]) {
+        part.filename = pathMatch[1];
+        part.code = lines.slice(1).join('\n').trim(); // Remove the first line from code content
+      }
+    }
+
+    parts.push(part);
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Capture any remaining text after the last code block
+  if (lastIndex < content.length) {
+    const textPart = content.substring(lastIndex).trim();
+    if (textPart) parts.push({ type: 'text', text: textPart });
+  }
+
+  return parts.length > 0 ? parts : [{ type: 'text', text: content }];
+}

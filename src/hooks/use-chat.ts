@@ -9,6 +9,7 @@ import { ApiKey } from '@/hooks/use-user-api-keys';
 import { GoogleGenerativeAI, Part } from '@google/generative-ai';
 import { GoogleAuth } from 'google-auth-library';
 import { ChatMode } from '@/components/chat/chat-input';
+import { parseAiResponseToRenderableParts, RenderablePart } from '@/lib/utils'; // Importar desde utils
 
 // Define unified part types
 interface TextPart {
@@ -47,8 +48,6 @@ declare global {
   }
 }
 
-type RenderablePart = TextPart | CodePart;
-
 export interface Message {
   id: string;
   conversation_id?: string;
@@ -81,68 +80,6 @@ interface UseChatProps {
   userApiKeys: ApiKey[];
   isLoadingApiKeys: boolean;
   chatMode: ChatMode;
-}
-
-// New, more robust regex to capture the entire info line after ```
-const codeBlockRegex = /```(.*)\n([\s\S]*?)\s*```/g;
-
-function parseAiResponseToRenderableParts(content: string, isAppChat: boolean): RenderablePart[] {
-  const parts: RenderablePart[] = [];
-  let lastIndex = 0;
-  let match;
-  codeBlockRegex.lastIndex = 0;
-
-  while ((match = codeBlockRegex.exec(content)) !== null) {
-    // Capture text before the code block
-    if (match.index > lastIndex) {
-      const textPart = content.substring(lastIndex, match.index).trim();
-      if (textPart) parts.push({ type: 'text', text: textPart });
-    }
-    
-    const infoLine = (match[1] || '').trim();
-    const codeContent = (match[2] || '').trim();
-    let language = '';
-    let filename = '';
-
-    // Parse the infoLine to extract language and filename
-    const langFileMatch = infoLine.match(/(\w+)?(?::([\w./-]+))?/);
-    if (langFileMatch) {
-      language = langFileMatch[1] || '';
-      filename = langFileMatch[2] || '';
-    } else {
-      language = infoLine; // Fallback to the whole line as language if format is unexpected
-    }
-
-    const part: RenderablePart = {
-      type: 'code',
-      language: language,
-      filename: filename,
-      code: codeContent,
-    };
-
-    // Only attempt to extract filename from code content if it's an app chat
-    if (isAppChat && !part.filename && part.code) {
-      const lines = part.code.split('\n');
-      const firstLine = lines[0].trim();
-      const pathRegex = /^(?:\/\/|#|\/\*|\*)\s*([\w./-]+\.[a-zA-Z]+)\s*\*?\/?$/;
-      const pathMatch = firstLine.match(pathRegex);
-      if (pathMatch && pathMatch[1]) {
-        part.filename = pathMatch[1];
-        part.code = lines.slice(1).join('\n').trim();
-      }
-    }
-
-    parts.push(part);
-    lastIndex = match.index + match[0].length;
-  }
-
-  // Capture any remaining text after the last code block
-  if (lastIndex < content.length) {
-    const textPart = content.substring(lastIndex).trim();
-    if (textPart) parts.push({ type: 'text', text: textPart });
-  }
-
-  return parts.length > 0 ? parts : [{ type: 'text', text: content }];
 }
 
 function messageContentToApiFormat(content: Message['content']): string | PuterContentPart[] {
@@ -421,7 +358,8 @@ export function useChat({
           if (done) break;
           const chunk = decoder.decode(value, { stream: true });
           fullResponseText += chunk;
-          setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: fullResponseText, isTyping: false, isNew: true } : m));
+          // Update content with parsed parts during streaming
+          setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: parseAiResponseToRenderableParts(fullResponseText, chatMode === 'build'), isTyping: false, isNew: true } : m));
         }
       } else {
         throw new Error('Modelo de IA no válido seleccionado.');
