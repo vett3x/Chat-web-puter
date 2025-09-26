@@ -120,7 +120,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
         ) : (
           messages.map((message: Message, index: number) => {
             // Skip rendering the hidden approval message
-            if (message.content === '[USER_APPROVED_PLAN]') {
+            if (message.content === '[USER_APPROVED_PLAN]' || message.content === '[USER_REQUESTED_BUILD_FIX]' || message.content === '[USER_REPORTED_WEB_ERROR]') {
               return null;
             }
 
