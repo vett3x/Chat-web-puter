@@ -21,18 +21,18 @@ interface CodeBlockProps {
 export function CodeBlock({ language, code, filename, isNew, onAnimationComplete }: CodeBlockProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const [isTyping, setIsTyping] = useState(false); // Control local de la animación de 'typing'
+  const [isAnimatingAppearance, setIsAnimatingAppearance] = useState(false); // Renamed from isTyping for clarity
 
   useEffect(() => {
     if (isNew) {
-      setIsTyping(true);
+      setIsAnimatingAppearance(true);
       const timer = setTimeout(() => {
-        setIsTyping(false);
-        onAnimationComplete?.(); // Notificar al padre que la animación ha terminado
-      }, 1000); // Duración de la animación de 'typing' (1 segundo)
+        setIsAnimatingAppearance(false);
+        onAnimationComplete?.(); // Notify parent that the appearance animation has finished
+      }, 2000); // Increased duration to 2 seconds for more noticeable effect
       return () => clearTimeout(timer);
     } else {
-      setIsTyping(false); // Si no es nuevo, no está 'typing'
+      setIsAnimatingAppearance(false); // If not new, no appearance animation
     }
   }, [isNew, onAnimationComplete]);
 
@@ -74,12 +74,12 @@ export function CodeBlock({ language, code, filename, isNew, onAnimationComplete
       onOpenChange={setIsOpen}
       className={cn(
         "rounded-lg border bg-muted/50 my-2 transition-all duration-300",
-        isTyping && "border-warning shadow-[0_0_10px_1px_hsl(var(--warning))]"
+        isAnimatingAppearance && "border-warning shadow-[0_0_10px_1px_hsl(var(--warning))]" // Keep the visual indicator
       )}
     >
       <div className="flex items-center justify-between p-2 pl-4 bg-muted/80 rounded-t-lg">
         <div className="flex items-center gap-2 overflow-hidden">
-          {isTyping ? (
+          {isAnimatingAppearance ? (
             <Loader2 className="h-4 w-4 animate-spin text-warning flex-shrink-0" />
           ) : (
             <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
