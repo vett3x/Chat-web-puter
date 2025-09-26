@@ -319,7 +319,20 @@ export function useChat({
             ### 5. Resumen y Confirmación
             [Resumen y pregunta de confirmación aquí]
         2.  **ESPERAR APROBACIÓN:** Después de enviar el plan, detente y espera. NO generes código. El usuario te responderá con un mensaje especial: "[USER_APPROVED_PLAN]".
-        3.  **GENERAR CÓDIGO:** SOLO cuando recibas el mensaje "[USER_APPROVED_PLAN]", responde ÚNICAMENTE con los bloques de código para los archivos completos. Usa el formato \`\`\`language:ruta/del/archivo.tsx\`\`\` para cada bloque. NO incluyas texto conversacional en esta respuesta final de código.`;
+        3.  **GENERAR CÓDIGO:** SOLO cuando recibas el mensaje "[USER_APPROVED_PLAN]", responde ÚNICAMENTE con los bloques de código para los archivos completos. Usa el formato \`\`\`language:ruta/del/archivo.tsx\`\`\` para cada bloque. NO incluyas texto conversacional en esta respuesta final de código.
+        
+        REGLAS DE CORRECCIÓN DE ERRORES:
+        1.  **ANALIZAR ERROR:** Si el usuario envía un mensaje con "[USER_REQUESTED_BUILD_FIX]" y logs de error, analiza el error y responde con un "Plan de Corrección" detallado usando este formato Markdown exacto:
+            ### 💡 Error Detectado
+            [Descripción concisa del error de compilación]
+            ### 🧠 Análisis de la IA
+            [Tu análisis de la causa raíz del error]
+            ### 🛠️ Plan de Corrección
+            [Pasos detallados para corregir el error, incluyendo modificaciones de código si es necesario. Si hay código, usa bloques \`\`\`language:ruta/del/archivo.tsx\`\`\`]
+            ### ✅ Confirmación
+            [Pregunta de confirmación al usuario para aplicar el arreglo]
+        2.  **ESPERAR APROBACIÓN DE CORRECCIÓN:** Después de enviar un plan de corrección, detente y espera. El usuario te responderá con "[USER_APPROVED_CORRECTION_PLAN]".
+        3.  **GENERAR CÓDIGO DE CORRECCIÓN:** SOLO cuando recibas el mensaje "[USER_APPROVED_CORRECTION_PLAN]", responde ÚNICAMENTE con los bloques de código necesarios para arreglar el error. Usa el formato \`\`\`language:ruta/del/archivo.tsx\`\`\` para cada bloque. NO incluyas texto conversacional.`;
       } else if (appPrompt) {
         systemPromptContent = `Eres un asistente de código experto y depurador para un proyecto Next.js. Estás en 'Modo Chat'. Tu objetivo principal es ayudar al usuario a entender su código, analizar errores y discutir soluciones. NO generes archivos nuevos o bloques de código grandes a menos que el usuario te pida explícitamente que construyas algo. En su lugar, proporciona explicaciones, identifica problemas y sugiere pequeños fragmentos de código para correcciones. Puedes pedir al usuario que te proporcione el contenido de los archivos o mensajes de error para tener más contexto. El proyecto es: "${appPrompt}".`;
       } else {
@@ -522,31 +535,36 @@ export function useChat({
   const approvePlan = useCallback(async (messageId: string) => {
     const planMessage = messages.find(m => m.id === messageId);
     if (!planMessage || !conversationId) return;
-
-    // Update local state
-    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, planApproved: true } : m));
-
-    // Update in DB
+  
+    const isCorrection = planMessage.isCorrectionPlan;
+    
+    const dbUpdatePayload = isCorrection ? { correction_approved: true } : { plan_approved: true };
+    const approvalMessageContent = isCorrection ? '[USER_APPROVED_CORRECTION_PLAN]' : '[USER_APPROVED_PLAN]';
+    const successToastMessage = isCorrection ? 'Plan de corrección aprobado.' : 'Plan de construcción aprobado.';
+  
+    const updatedPlanMessage = isCorrection 
+      ? { ...planMessage, correctionApproved: true }
+      : { ...planMessage, planApproved: true };
+  
+    setMessages(prev => prev.map(m => m.id === messageId ? updatedPlanMessage : m));
+  
     const { error } = await supabase
       .from('messages')
-      .update({ plan_approved: true })
-      .eq('id', messageId)
-      .eq('conversation_id', conversationId)
-      .eq('user_id', userId);
-
+      .update(dbUpdatePayload)
+      .eq('id', messageId);
+  
     if (error) {
-      console.error('Error updating plan_approved status in DB:', error);
+      console.error('Error updating plan approval status in DB:', error);
       toast.error('Error al guardar la aprobación del plan.');
-      // Optionally revert local state if DB update fails
-      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, planApproved: false } : m));
+      setMessages(prev => prev.map(m => m.id === messageId ? planMessage : m));
       return;
     }
-    toast.success('Plan aprobado y guardado.');
-
+    toast.success(successToastMessage);
+  
     const approvalMessage: Message = {
       id: `user-approval-${Date.now()}`,
       conversation_id: conversationId,
-      content: '[USER_APPROVED_PLAN]',
+      content: approvalMessageContent,
       role: 'user',
       timestamp: new Date(),
       type: 'text',
@@ -559,11 +577,16 @@ export function useChat({
       isErrorAnalysisRequest: false,
       isAnimated: true,
     };
-
-    const historyWithApproval = [...messages, approvalMessage];
+  
+    const historyWithUpdatedPlan = messages.map(m => m.id === messageId ? updatedPlanMessage : m);
+    const historyWithApproval = [...historyWithUpdatedPlan, approvalMessage];
     
+    if (isCorrection) {
+      setAutoFixStatus('fixing');
+    }
+  
     await getAndStreamAIResponse(conversationId, historyWithApproval);
-
+  
   }, [messages, conversationId, getAndStreamAIResponse, userId]);
 
 
