@@ -20,10 +20,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ConstructionPlan } from './construction-plan';
-import { Message } from '@/hooks/use-chat';
+import { ConstructionPlan } from './construction-plan'; // NEW: Import ConstructionPlan
+import { Message } from '@/hooks/use-chat'; // NEW: Import Message type from hook
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { CodingIndicator } from './coding-indicator'; // New import
 
 interface ChatMessagesProps {
   messages: Message[];
@@ -36,7 +35,7 @@ interface ChatMessagesProps {
   onClearChat: () => void;
   onApprovePlan: (messageId: string) => void;
   isAppChat?: boolean;
-  onSuggestionClick: (prompt: string) => void;
+  onSuggestionClick: (prompt: string) => void; // New prop for suggestion clicks
 }
 
 const SuggestionCard = ({ icon, title, description, onClick }: { icon: React.ReactNode, title: string, description: string, onClick: () => void }) => (
@@ -120,6 +119,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
           </div>
         ) : (
           messages.map((message, index) => {
+            // Skip rendering the hidden approval message
             if (message.content === '[USER_APPROVED_PLAN]') {
               return null;
             }
@@ -151,9 +151,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
                     )}
                   </div>
                   <div className={`rounded-lg p-3 ${message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                    {message.isCoding ? (
-                      <CodingIndicator />
-                    ) : message.isTyping ? (
+                    {message.isTyping ? (
                       <div className="flex items-center gap-2">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         <span className="text-sm">Pensando...</span>
