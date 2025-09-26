@@ -312,7 +312,7 @@ export default function Home() {
         {selectedItem?.type === 'note' ? (
           <NoteEditorPanel
             noteId={selectedItem.id}
-            onNoteUpdated={refreshSidebarData}
+            onNoteUpdated={(id, data) => updateLocalItem(id, 'note', data)}
             userApiKeys={userApiKeys} // NEW: Pass userApiKeys
             isLoadingApiKeys={isLoadingApiKeys} // NEW: Pass isLoadingApiKeys
           />

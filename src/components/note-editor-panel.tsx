@@ -6,7 +6,7 @@ import { useSession } from '@/components/session-context-provider';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Save, Loader2, Wand2, X } from 'lucide-react';
+import { Save, Loader2, Wand2, X, Check } from 'lucide-react';
 import { NoteAiChat, ChatMessage } from './note-ai-chat';
 import { ApiKey } from '@/hooks/use-user-api-keys';
 
@@ -27,7 +27,7 @@ interface Note {
 
 interface NoteEditorPanelProps {
   noteId: string;
-  onNoteUpdated: () => void;
+  onNoteUpdated: (id: string, updatedData: Partial<Note>) => void;
   userApiKeys: ApiKey[];
   isLoadingApiKeys: boolean;
 }
@@ -39,31 +39,30 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
   const [title, setTitle] = useState('');
   const [initialContent, setInitialContent] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [showAiHint, setShowAiHint] = useState(false);
   const [noteContentForChat, setNoteContentForChat] = useState('');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('saved');
 
   const editor = useCreateBlockNote();
-  const isSavingRef = useRef(isSaving);
-  isSavingRef.current = isSaving;
 
   const handleSave = useCallback(async () => {
-    if (!note || isSavingRef.current || !editor) return;
+    if (!note || saveStatus === 'saving' || !editor) return;
 
-    setIsSaving(true);
+    setSaveStatus('saving');
     const currentContent = editor.topLevelBlocks;
     const { error } = await supabase.from('notes').update({ title, content: currentContent }).eq('id', note.id);
 
     if (error) {
       toast.error('Error en el autoguardado.');
+      setSaveStatus('idle');
     } else {
-      toast.success('Nota guardada.', { duration: 2000 });
-      onNoteUpdated();
-      setNote(prev => prev ? { ...prev, title, content: currentContent, updated_at: new Date().toISOString() } : null);
+      const updatedData = { title, content: currentContent, updated_at: new Date().toISOString() };
+      onNoteUpdated(note.id, updatedData);
+      setNote(prev => prev ? { ...prev, ...updatedData } : null);
+      setSaveStatus('saved');
     }
-    setIsSaving(false);
-  }, [note, title, onNoteUpdated, editor]);
+  }, [note, title, onNoteUpdated, editor, saveStatus]);
 
   // Effect to handle auto-saving and updating markdown for AI chat
   useEffect(() => {
@@ -72,6 +71,7 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
     let debounceTimeout: NodeJS.Timeout;
 
     const handleContentChange = () => {
+      setSaveStatus('idle');
       clearTimeout(debounceTimeout);
       debounceTimeout = setTimeout(async () => {
         const markdown = await editor.blocksToMarkdownLossy();
@@ -141,6 +141,15 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
     }
   }, [note]);
 
+  // Auto-save on title change
+  useEffect(() => {
+    if (isLoading || !note) return;
+    if (title === note.title) return;
+    setSaveStatus('idle');
+    const handler = setTimeout(() => { handleSave(); }, 2000);
+    return () => { clearTimeout(handler); };
+  }, [title, note, isLoading, handleSave]);
+
   if (isLoading || isLoadingApiKeys) {
     return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /><p className="ml-2 text-muted-foreground">Cargando nota y claves...</p></div>;
   }
@@ -151,9 +160,12 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
   return (
     <div className="h-full w-full flex flex-col bg-background relative">
       <div className="flex items-center justify-between p-2 border-b bg-muted">
-        <Input value={title} onChange={(e) => setTitle(e.target.value)} className="text-lg font-semibold border-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent" disabled={isSaving} />
+        <Input value={title} onChange={(e) => setTitle(e.target.value)} className="text-lg font-semibold border-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent" disabled={saveStatus === 'saving'} />
         <div className="flex items-center gap-2">
-          <Button size="sm" onClick={handleSave} disabled={isSaving}>{isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />} Guardar</Button>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground w-24 justify-end">
+            {saveStatus === 'saving' && <><Loader2 className="h-3 w-3 animate-spin" /><span>Guardando...</span></>}
+            {saveStatus === 'saved' && <><Check className="h-3 w-3 text-green-500" /><span>Guardado</span></>}
+          </div>
         </div>
       </div>
       <div className="flex-1 overflow-y-auto">
