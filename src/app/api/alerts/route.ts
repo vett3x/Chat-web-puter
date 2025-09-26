@@ -48,6 +48,13 @@ async function getIsAdmin(): Promise<boolean> {
 
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
+// Function to sanitize command details
+function sanitizeCommandDetails(command: string | null): string | null {
+  if (!command) return null;
+  // Replace sshpass -p 'password' with a generic placeholder
+  return command.replace(/sshpass -p '[^']+' ssh/, 'sshpass -p \'[PASSWORD_HIDDEN]\' ssh');
+}
+
 export async function GET(req: NextRequest) {
   const isAdmin = await getIsAdmin();
   if (!isAdmin) {
@@ -80,6 +87,7 @@ export async function GET(req: NextRequest) {
   const formattedAlerts = data.map(alert => ({
     ...alert,
     server_name: (alert.user_servers as any)?.name || (alert.user_servers as any)?.ip_address || 'N/A',
+    command_details: sanitizeCommandDetails(alert.command_details), // Apply sanitization here
   }));
 
   return NextResponse.json(formattedAlerts);
