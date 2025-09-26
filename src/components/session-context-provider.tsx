@@ -5,18 +5,19 @@ import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/integrations/supabase/client';
 import { Session } from '@supabase/supabase-js';
 import { Loader2 } from 'lucide-react';
-import { SUPERUSER_EMAILS, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
-import { toast } from 'sonner'; // Import toast
+import { SUPERUSER_EMAILS, PERMISSION_KEYS } from '@/lib/constants';
+import { toast } from 'sonner';
 
 type UserRole = 'user' | 'admin' | 'super_admin';
-type UserPermissions = Record<string, boolean>; // Define type for permissions
+type UserPermissions = Record<string, boolean>;
 
 interface SessionContextType {
   session: Session | null;
   isLoading: boolean;
   userRole: UserRole | null;
-  userPermissions: UserPermissions; // Add userPermissions to context
-  userAvatarUrl: string | null; // NEW: Add userAvatarUrl to context
+  userPermissions: UserPermissions;
+  userAvatarUrl: string | null;
+  userLanguage: string | null; // NEW: Add userLanguage to context
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -25,8 +26,9 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
-  const [userPermissions, setUserPermissions] = useState<UserPermissions>({}); // State for userPermissions
-  const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null); // NEW: State for userAvatarUrl
+  const [userPermissions, setUserPermissions] = useState<UserPermissions>({});
+  const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
+  const [userLanguage, setUserLanguage] = useState<string | null>('es'); // NEW: State for userLanguage, default to 'es'
   const router = useRouter();
   const pathname = usePathname();
 
@@ -35,36 +37,35 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     if (currentSession?.user?.id) {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('role, permissions, avatar_url') // NEW: Select avatar_url
+        .select('role, permissions, avatar_url, language') // NEW: Select language
         .eq('id', currentSession.user.id)
         .single();
 
       let determinedRole: UserRole | null = null;
       let determinedPermissions: UserPermissions = {};
-      let determinedAvatarUrl: string | null = null; // NEW: Variable for avatar URL
+      let determinedAvatarUrl: string | null = null;
+      let determinedLanguage: string | null = 'es'; // NEW: Variable for language, default to 'es'
 
       if (error) {
-        console.error('[SessionContext] Error fetching user profile role, permissions, and avatar:', error);
-        // Fallback to email check if profile fetch fails
+        console.error('[SessionContext] Error fetching user profile:', error);
         determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
       } else if (profile) {
         console.log("[SessionContext] Profile fetched:", profile);
         determinedRole = profile.role as UserRole;
         determinedPermissions = profile.permissions || {};
-        determinedAvatarUrl = profile.avatar_url; // NEW: Set avatar URL
+        determinedAvatarUrl = profile.avatar_url;
+        determinedLanguage = profile.language || 'es'; // NEW: Set language, fallback to 'es'
       } else {
-        // Fallback if profile not found (shouldn't happen with trigger)
         console.log("[SessionContext] Profile not found, falling back to email check.");
         determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
       }
 
-      // Explicitly set all permissions to true if the determined role is super_admin
       if (determinedRole === 'super_admin') {
-        determinedPermissions = {}; // Reset to ensure all are set
+        determinedPermissions = {};
         for (const key of Object.values(PERMISSION_KEYS)) {
           determinedPermissions[key] = true;
         }
-      } else if (!profile) { // If no profile and not super_admin by email, set default user permissions
+      } else if (!profile) {
         determinedPermissions = {
           can_create_server: false,
           can_manage_docker_containers: false,
@@ -75,13 +76,15 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       
       setUserRole(determinedRole);
       setUserPermissions(determinedPermissions);
-      setUserAvatarUrl(determinedAvatarUrl); // NEW: Set user avatar URL state
+      setUserAvatarUrl(determinedAvatarUrl);
+      setUserLanguage(determinedLanguage); // NEW: Set user language state
 
     } else {
       console.log("[SessionContext] No current session for profile fetch.");
       setUserRole(null);
       setUserPermissions({});
-      setUserAvatarUrl(null); // NEW: Clear avatar URL
+      setUserAvatarUrl(null);
+      setUserLanguage('es'); // NEW: Clear language
     }
   };
 
@@ -90,7 +93,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       console.log(`[SessionContext] onAuthStateChange event: ${event}, session: ${currentSession?.user?.id}`);
       setSession(currentSession);
-      setIsLoading(false); // This is important: set to false after auth state change
+      setIsLoading(false);
       await fetchUserProfileAndRole(currentSession);
 
       if (event === 'SIGNED_OUT' || !currentSession) {
@@ -109,7 +112,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
       console.log(`[SessionContext] getSession().then() resolved. Initial session: ${initialSession?.user?.id}`);
       setSession(initialSession);
-      setIsLoading(false); // This is also important: set to false after initial session load
+      setIsLoading(false);
       await fetchUserProfileAndRole(initialSession);
 
       if (!initialSession && pathname !== '/login') {
@@ -121,7 +124,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       }
     }).catch(error => {
       console.error("[SessionContext] Error in getSession():", error);
-      setIsLoading(false); // Ensure loading is false even on error
+      setIsLoading(false);
       toast.error("Error al cargar la sesión: " + error.message);
     });
 
@@ -129,7 +132,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       console.log("[SessionContext] useEffect cleanup.");
       subscription.unsubscribe();
     };
-  }, [router, pathname]); // Dependencies look correct
+  }, [router, pathname]);
 
   if (isLoading) {
     console.log("[SessionContext] Rendering loading state.");
@@ -142,7 +145,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   }
   console.log("[SessionContext] Rendering children.");
   return (
-    <SessionContext.Provider value={{ session, isLoading, userRole, userPermissions, userAvatarUrl }}>
+    <SessionContext.Provider value={{ session, isLoading, userRole, userPermissions, userAvatarUrl, userLanguage }}>
       {children}
     </SessionContext.Provider>
   );

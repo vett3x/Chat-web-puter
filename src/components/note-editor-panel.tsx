@@ -14,6 +14,7 @@ import { ApiKey } from '@/hooks/use-user-api-keys';
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView, darkDefaultTheme, type Theme } from "@blocknote/mantine";
 import { type Block, type BlockNoteEditor } from "@blocknote/core";
+import * as locales from "@blocknote/core/locales"; // Import all locales
 import "@blocknote/mantine/style.css";
 import { useTheme } from 'next-themes';
 
@@ -26,7 +27,6 @@ const customDarkTheme: Theme = {
       background: "hsl(var(--background))",
       text: "hsl(var(--foreground))",
     },
-    // Correctly providing a string for the text color, as expected by the type.
     sideMenu: "hsl(var(--foreground))",
     tooltip: {
         background: "hsl(var(--muted))",
@@ -42,7 +42,7 @@ const customDarkTheme: Theme = {
 interface Note {
   id: string;
   title: string;
-  content: any; // Now can be string (old) or JSONB (new)
+  content: any;
   updated_at: string;
   chat_history: ChatMessage[] | null;
 }
@@ -52,9 +52,10 @@ interface NoteEditorPanelProps {
   onNoteUpdated: (id: string, updatedData: Partial<Note>) => void;
   userApiKeys: ApiKey[];
   isLoadingApiKeys: boolean;
+  userLanguage: string; // New prop for user language
 }
 
-export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingApiKeys }: NoteEditorPanelProps) {
+export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingApiKeys, userLanguage }: NoteEditorPanelProps) {
   const { session } = useSession();
   const { theme } = useTheme();
   const [note, setNote] = useState<Note | null>(null);
@@ -66,8 +67,9 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
   const [noteContentForChat, setNoteContentForChat] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('saved');
 
-  // Crear el editor sin diccionario personalizado para evitar errores
-  const editor = useCreateBlockNote();
+  const editor = useCreateBlockNote({
+    dictionary: locales[userLanguage as keyof typeof locales] || locales.es, // Dynamic dictionary
+  });
 
   const handleSave = useCallback(async () => {
     if (!note || saveStatus === 'saving' || !editor) return;
@@ -87,24 +89,19 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
     }
   }, [note, title, onNoteUpdated, editor, saveStatus]);
 
-  // Effect to handle auto-saving and updating markdown for AI chat
   useEffect(() => {
     if (!editor) return;
-
     let debounceTimeout: NodeJS.Timeout;
-
     const handleContentChange = () => {
       setSaveStatus('idle');
       clearTimeout(debounceTimeout);
       debounceTimeout = setTimeout(async () => {
         const markdown = await editor.blocksToMarkdownLossy();
         setNoteContentForChat(markdown);
-        handleSave(); // Trigger auto-save
-      }, 2000); // 2-second debounce for auto-saving
+        handleSave();
+      }, 2000);
     };
-
     editor.onEditorContentChange(handleContentChange);
-
     return () => {
       clearTimeout(debounceTimeout);
     };
@@ -132,7 +129,6 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
 
   useEffect(() => { fetchNote(); }, [fetchNote]);
 
-  // Load initial content and set initial markdown for AI
   useEffect(() => {
     if (initialContent && editor) {
       const loadContent = async () => {
@@ -164,7 +160,6 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
     }
   }, [note]);
 
-  // Auto-save on title change
   useEffect(() => {
     if (isLoading || !note) return;
     if (title === note.title) return;

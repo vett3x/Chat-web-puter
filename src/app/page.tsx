@@ -24,7 +24,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { useSidebarData } from "@/hooks/use-sidebar-data";
-import { useUserApiKeys } from "@/hooks/use-user-api-keys"; // NEW: Import useUserApiKeys
+import { useUserApiKeys } from "@/hooks/use-user-api-keys";
 
 interface UserApp {
   id: string;
@@ -54,7 +54,7 @@ interface RetryState {
 }
 
 export default function Home() {
-  const { session, isLoading: isSessionLoading, userRole } = useSession();
+  const { session, isLoading: isSessionLoading, userRole, userLanguage } = useSession();
   const userId = session?.user?.id;
   
   const {
@@ -72,7 +72,7 @@ export default function Home() {
     removeLocalItem,
   } = useSidebarData();
 
-  const { userApiKeys, isLoadingApiKeys } = useUserApiKeys(); // NEW: Get user API keys
+  const { userApiKeys, isLoadingApiKeys } = useUserApiKeys();
 
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   const [selectedAppDetails, setSelectedAppDetails] = useState<UserApp | null>(null);
@@ -169,8 +169,6 @@ export default function Home() {
   };
 
   const handleNewConversationCreated = (conversationId: string) => {
-    // This function is called when a new conversation is created within the ChatInterface.
-    // It should update the selected item in the sidebar.
     handleSelectItem(conversationId, 'conversation');
   };
 
@@ -200,7 +198,7 @@ export default function Home() {
   const writeFilesToApp = async (files: { path: string; content: string }[]) => {
     if (!selectedAppDetails?.id || files.length === 0) return;
 
-    console.log("[Home] writeFilesToApp called with files:", files); // NEW: Log files being sent
+    console.log("[Home] writeFilesToApp called with files:", files);
 
     const toastId = toast.loading(`Aplicando ${files.length} archivo(s)...`);
     try {
@@ -216,7 +214,6 @@ export default function Home() {
       }
       toast.success(`Archivos aplicados. Reiniciando servidor...`, { id: toastId });
 
-      // Now, restart the server
       const restartResponse = await fetch(`/api/apps/${selectedAppDetails.id}/restart`, { method: 'POST' });
       const restartResult = await restartResponse.json();
       if (!restartResponse.ok) {
@@ -225,9 +222,8 @@ export default function Home() {
       
       toast.success(`¡Listo! Actualizando vista previa...`, { id: toastId });
       
-      // Force refresh of file tree and browser preview
       setFileTreeRefreshKey(prev => prev + 1);
-      setTimeout(() => appBrowserRef.current?.refresh(), 2000); // Delay to allow server to restart
+      setTimeout(() => appBrowserRef.current?.refresh(), 2000);
 
     } catch (error: any) {
       console.error("[Home] Error writing files or restarting:", error);
@@ -313,8 +309,9 @@ export default function Home() {
           <NoteEditorPanel
             noteId={selectedItem.id}
             onNoteUpdated={(id, data) => updateLocalItem(id, 'note', data)}
-            userApiKeys={userApiKeys} // NEW: Pass userApiKeys
-            isLoadingApiKeys={isLoadingApiKeys} // NEW: Pass isLoadingApiKeys
+            userApiKeys={userApiKeys}
+            isLoadingApiKeys={isLoadingApiKeys}
+            userLanguage={userLanguage || 'es'} // Pass user language
           />
         ) : (
           <ResizablePanelGroup direction="horizontal">
@@ -333,8 +330,8 @@ export default function Home() {
                 onWriteFiles={writeFilesToApp}
                 isAppChat={selectedItem?.type === 'app'}
                 onSidebarDataRefresh={refreshSidebarData}
-                userApiKeys={userApiKeys} // NEW: Pass userApiKeys
-                isLoadingApiKeys={isLoadingApiKeys} // NEW: Pass isLoadingApiKeys
+                userApiKeys={userApiKeys}
+                isLoadingApiKeys={isLoadingApiKeys}
               />
             </ResizablePanel>
             {selectedItem?.type === 'app' && (
