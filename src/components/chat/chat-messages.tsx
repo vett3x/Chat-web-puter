@@ -146,7 +146,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
                       </Avatar>
                     ) : (
                       <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center shadow-avatar-ai">
-                        <Bot className="h-4 w-4 text-secondary-foreground" />
+                        <Bot className="h-4 w-4" />
                       </div>
                     )}
                   </div>
@@ -162,9 +162,10 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
                         onApprove={() => onApprovePlan(message.id)}
                         onRequestChanges={handleRequestChanges}
                         isApproved={!!message.planApproved}
+                        isNew={isLastMessage && !message.planApproved} // Only animate if it's the last message and not yet approved
                       />
                     ) : (
-                      <MessageContent content={message.content as any} isNew={!!message.isNew} aiResponseSpeed={aiResponseSpeed} isAppChat={isAppChat} />
+                      <MessageContent content={message.content as any} isNew={isLastMessage} aiResponseSpeed={aiResponseSpeed} isAppChat={isAppChat} />
                     )}
                   </div>
                   {message.role === 'assistant' && !message.isTyping && !message.isConstructionPlan && (
