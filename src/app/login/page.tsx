@@ -15,29 +15,11 @@ export default function LoginPage() {
   const [currentLang, setCurrentLang] = useState('es');
   const { theme, setTheme } = useTheme();
   const [isMounted, setIsMounted] = useState(false);
-  const [maintenanceMode, setMaintenanceMode] = useState(false);
-  const [usersDisabled, setUsersDisabled] = useState(false);
-  const [adminsDisabled, setAdminsDisabled] = useState(false);
-  const [isLoadingStatus, setIsLoadingStatus] = useState(true);
   const searchParams = useSearchParams();
   const accountDisabledError = searchParams.get('error') === 'account_type_disabled';
 
   useEffect(() => {
     setIsMounted(true);
-    const checkStatus = async () => {
-      try {
-        const response = await fetch('/api/settings/public-status');
-        const data = await response.json();
-        setMaintenanceMode(data.maintenanceModeEnabled);
-        setUsersDisabled(data.usersDisabled);
-        setAdminsDisabled(data.adminsDisabled);
-      } catch (error) {
-        console.error("Failed to fetch public status, defaulting to off:", error);
-      } finally {
-        setIsLoadingStatus(false);
-      }
-    };
-    checkStatus();
   }, []);
 
   // ... (spanishVariables and englishVariables remain the same)
@@ -60,32 +42,6 @@ export default function LoginPage() {
     lang: currentLang,
     variables: currentLang === 'es' ? spanishVariables : englishVariables,
   };
-
-  if (isLoadingStatus) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
-  if (maintenanceMode) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
-        <Card className="w-full max-w-md text-center">
-          <CardHeader>
-            <ShieldAlert className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-            <CardTitle className="text-2xl">Servicio en Mantenimiento</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">
-              El inicio de sesión está temporalmente desactivado. Por favor, inténtalo de nuevo más tarde.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4 relative">
