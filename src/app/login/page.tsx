@@ -7,16 +7,31 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Moon, Sun } from 'lucide-react';
+import { Moon, Sun, ShieldAlert, Loader2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
 export default function LoginPage() {
-  const [currentLang, setCurrentLang] = useState('es'); // Estado para el idioma actual
+  const [currentLang, setCurrentLang] = useState('es');
   const { theme, setTheme } = useTheme();
   const [isMounted, setIsMounted] = useState(false);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [isLoadingStatus, setIsLoadingStatus] = useState(true);
 
   useEffect(() => {
     setIsMounted(true);
+    const checkMaintenanceStatus = async () => {
+      try {
+        const response = await fetch('/api/settings/maintenance-status');
+        const data = await response.json();
+        setMaintenanceMode(data.maintenanceModeEnabled);
+      } catch (error) {
+        console.error("Failed to fetch maintenance status, defaulting to off:", error);
+        setMaintenanceMode(false);
+      } finally {
+        setIsLoadingStatus(false);
+      }
+    };
+    checkMaintenanceStatus();
   }, []);
 
   const spanishVariables = {
@@ -101,6 +116,33 @@ export default function LoginPage() {
     lang: currentLang,
     variables: currentLang === 'es' ? spanishVariables : englishVariables,
   };
+
+  if (isLoadingStatus) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (maintenanceMode) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader>
+            <ShieldAlert className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+            <CardTitle className="text-2xl">Servicio en Mantenimiento</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              El inicio de sesión está temporalmente desactivado mientras realizamos tareas de mantenimiento.
+              Por favor, inténtalo de nuevo más tarde.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4 relative">
