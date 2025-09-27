@@ -127,14 +127,12 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       if (!session) return;
 
       // 1. Primary Check: Force a token refresh to see if the session was invalidated on the server.
-      const { error: refreshError } = await supabase.auth.refreshSession();
+      const { data, error: refreshError } = await supabase.auth.refreshSession();
       
-      // If refreshSession fails, the onAuthStateChange listener will automatically
-      // receive a SIGNED_OUT event and handle the redirection.
-      if (refreshError) {
-        console.warn("[SessionContext] Session refresh failed, likely due to admin action (kick/ban). Signing out.", refreshError.message);
-        // The onAuthStateChange listener should handle the rest, but we can force it.
+      if (refreshError || !data.session) {
+        console.warn("[SessionContext] Session refresh failed or returned null session. Signing out.", refreshError?.message);
         await supabase.auth.signOut();
+        toast.error("Tu sesión ha sido invalidada por un administrador o ha expirado.");
         return;
       }
 
@@ -146,8 +144,8 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
             console.warn('Could not fetch public status for real-time check.');
             return;
           }
-          const data = await response.json();
-          const { usersDisabled, adminsDisabled } = data;
+          const statusData = await response.json();
+          const { usersDisabled, adminsDisabled } = statusData;
 
           if (usersDisabled && userRole === 'user') {
             await supabase.auth.signOut();
