@@ -126,12 +126,16 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     const checkSessionAndGlobalStatus = async () => {
       if (!session) return;
 
-      // 1. Primary Check: Is the current session token still valid on the server?
-      const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !currentSession) {
+      // 1. Primary Check: Force a token refresh to see if the session was invalidated on the server.
+      const { error: refreshError } = await supabase.auth.refreshSession();
+      
+      // If refreshSession fails, the onAuthStateChange listener will automatically
+      // receive a SIGNED_OUT event and handle the redirection.
+      if (refreshError) {
+        console.warn("[SessionContext] Session refresh failed, likely due to admin action (kick/ban). Signing out.", refreshError.message);
+        // The onAuthStateChange listener should handle the rest, but we can force it.
         await supabase.auth.signOut();
-        toast.error("Tu sesión ha sido invalidada por un administrador o ha expirado.");
-        return; // Stop further checks
+        return;
       }
 
       // 2. Secondary Check: Is the user's role globally disabled? (Only for non-super-admins)
