@@ -57,7 +57,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'user' | 'admin' | 'super_admin'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'banned'>('all');
-  const [reasonDialogState, setReasonDialogState] = useState<{ isOpen: boolean; user: User | null; action: 'expulsar' | 'banear' | null }>({ isOpen: false, user: null, action: null });
+  const [reasonDialogState, setReasonDialogState] = useState<{ isOpen: boolean; user: User | null; action: 'expulsar' | 'banear' | 'unban' | null }>({ isOpen: false, user: null, action: null });
 
   const fetchUsers = useCallback(async () => {
     setIsLoadingUsers(true);
@@ -143,7 +143,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
     setIsDetailDialogOpen(true);
   };
 
-  const openReasonDialog = (user: User, action: 'expulsar' | 'banear') => {
+  const openReasonDialog = (user: User, action: 'expulsar' | 'banear' | 'unban') => {
     setReasonDialogState({ isOpen: true, user, action });
   };
 
@@ -203,7 +203,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => openReasonDialog(user, 'expulsar')}><LogOut className="mr-2 h-4 w-4" /> Expulsar</DropdownMenuItem>
                               {user.status === 'banned' ? (
-                                <DropdownMenuItem onClick={() => openReasonDialog(user, 'unban' as any)}><CheckCircle className="mr-2 h-4 w-4" /> Desbanear</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => openReasonDialog(user, 'unban')}><CheckCircle className="mr-2 h-4 w-4" /> Desbanear</DropdownMenuItem>
                               ) : (
                                 <DropdownMenuItem onClick={() => openReasonDialog(user, 'banear')} className="text-destructive focus:text-destructive"><Ban className="mr-2 h-4 w-4" /> Banear</DropdownMenuItem>
                               )}
@@ -276,7 +276,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
           action={reasonDialogState.action!}
           onSubmit={(reason) => {
             if (reasonDialogState.user && reasonDialogState.action) {
-              handleUserStatusChange(reasonDialogState.user.id, reasonDialogState.action as 'kick' | 'ban', reason);
+              handleUserStatusChange(reasonDialogState.user.id, reasonDialogState.action as 'kick' | 'ban' | 'unban', reason);
             }
           }}
         />

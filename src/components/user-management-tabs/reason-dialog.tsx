@@ -19,7 +19,7 @@ interface ReasonDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   userName: string;
-  action: 'expulsar' | 'banear';
+  action: 'expulsar' | 'banear' | 'unban';
   onSubmit: (reason: string) => void;
 }
 
@@ -34,11 +34,18 @@ export function ReasonDialog({ open, onOpenChange, userName, action, onSubmit }:
     }
   };
 
+  const actionTextMap = {
+    expulsar: 'expulsar',
+    banear: 'banear',
+    unban: 'desbanear'
+  };
+  const actionText = actionTextMap[action];
+
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>¿Estás seguro de que quieres {action} a {userName}?</AlertDialogTitle>
+          <AlertDialogTitle>¿Estás seguro de que quieres {actionText} a {userName}?</AlertDialogTitle>
           <AlertDialogDescription>
             Por favor, proporciona una razón para esta acción. Quedará registrada en el historial del sistema.
           </AlertDialogDescription>
@@ -49,14 +56,14 @@ export function ReasonDialog({ open, onOpenChange, userName, action, onSubmit }:
             id="reason"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder={`Motivo para ${action} al usuario...`}
+            placeholder={`Motivo para ${actionText} al usuario...`}
             className="mt-2"
           />
         </div>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={() => setReason('')}>Cancelar</AlertDialogCancel>
           <AlertDialogAction onClick={handleSubmit} disabled={!reason.trim()}>
-            Confirmar y {action}
+            Confirmar y {actionText}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
