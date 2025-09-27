@@ -159,30 +159,55 @@ export async function POST(req: NextRequest, context: any) {
     const body = await req.json();
     const { command } = execSchema.parse(body);
 
-    // --- CAPA 1 y 2: VALIDACIÓN DE SEGURIDAD ---
-    const { data: allowedCommandsData, error: fetchCommandsError } = await supabaseAdmin
-      .from('allowed_commands')
-      .select('command');
+    // --- Consultar el estado de seguridad global ---
+    const { data: globalSettings, error: settingsError } = await supabaseAdmin
+      .from('global_settings')
+      .select('security_enabled')
+      .single();
 
-    if (fetchCommandsError) {
-      console.error('[SECURITY] Could not fetch allowed commands from DB:', fetchCommandsError);
-      throw new Error('Error interno de seguridad al verificar el comando.');
+    if (settingsError) {
+      console.error('[SECURITY] Could not fetch global security setting:', settingsError);
+      throw new Error('Error interno de seguridad al verificar la configuración global.');
     }
 
-    const ALLOWED_COMMANDS = allowedCommandsData.map(c => c.command);
-    
-    if (!isCommandSafe(command, ALLOWED_COMMANDS)) {
-      console.warn(`[SECURITY] Blocked command execution for app ${appId}: "${command}"`);
+    const securityEnabled = globalSettings?.security_enabled ?? true; // Default to true if not found
+
+    if (!securityEnabled) {
+      console.warn(`[SECURITY BYPASS] Command execution for app ${appId} bypassed security checks (global setting disabled): "${command}"`);
       await supabaseAdmin.from('server_events_log').insert({
         user_id: userId,
         server_id: app.server_id,
-        event_type: 'command_blocked',
-        description: `Intento de ejecución de comando bloqueado en el contenedor ${app.container_id.substring(0, 12)}.`,
+        event_type: 'command_security_bypassed',
+        description: `Ejecución de comando bypassó la seguridad (desactivada globalmente) en el contenedor ${app.container_id.substring(0, 12)}.`,
         command_details: command,
       });
-      return NextResponse.json({ message: `Comando no permitido por razones de seguridad: "${command}"` }, { status: 403 });
+      // If security is disabled, skip the isCommandSafe check
+    } else {
+      // --- CAPA 1 y 2: VALIDACIÓN DE SEGURIDAD ---
+      const { data: allowedCommandsData, error: fetchCommandsError } = await supabaseAdmin
+        .from('allowed_commands')
+        .select('command');
+
+      if (fetchCommandsError) {
+        console.error('[SECURITY] Could not fetch allowed commands from DB:', fetchCommandsError);
+        throw new Error('Error interno de seguridad al verificar el comando.');
+      }
+
+      const ALLOWED_COMMANDS = allowedCommandsData.map(c => c.command);
+      
+      if (!isCommandSafe(command, ALLOWED_COMMANDS)) {
+        console.warn(`[SECURITY] Blocked command execution for app ${appId}: "${command}"`);
+        await supabaseAdmin.from('server_events_log').insert({
+          user_id: userId,
+          server_id: app.server_id,
+          event_type: 'command_blocked',
+          description: `Intento de ejecución de comando bloqueado en el contenedor ${app.container_id.substring(0, 12)}.`,
+          command_details: command,
+        });
+        return NextResponse.json({ message: `Comando no permitido por razones de seguridad: "${command}"` }, { status: 403 });
+      }
+      // --- FIN DE LA VALIDACIÓN DE SEGURIDAD ---
     }
-    // --- FIN DE LA VALIDACIÓN DE SEGURIDAD ---
 
     await supabaseAdmin.from('server_events_log').insert({
       user_id: userId,

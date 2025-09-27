@@ -10,7 +10,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
-import { Loader2, Shield, PlusCircle, Trash2, RefreshCw } from 'lucide-react';
+import { Loader2, Shield, PlusCircle, Trash2, RefreshCw, ToggleLeft, ToggleRight } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -24,6 +24,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { useSession } from '@/components/session-context-provider';
 
 interface AllowedCommand {
   command: string;
@@ -39,9 +42,16 @@ const commandSchema = z.object({
 type CommandFormValues = z.infer<typeof commandSchema>;
 
 export function SecurityTab() {
+  const { userRole } = useSession();
+  const isSuperAdmin = userRole === 'super_admin';
+
   const [commands, setCommands] = useState<AllowedCommand[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingCommands, setIsLoadingCommands] = useState(true);
+  const [isSubmittingCommand, setIsSubmittingCommand] = useState(false);
+
+  const [securityEnabled, setSecurityEnabled] = useState(true);
+  const [isLoadingSecuritySetting, setIsLoadingSecuritySetting] = useState(true);
+  const [isTogglingSecurity, setIsTogglingSecurity] = useState(false);
 
   const form = useForm<CommandFormValues>({
     resolver: zodResolver(commandSchema),
@@ -49,7 +59,7 @@ export function SecurityTab() {
   });
 
   const fetchCommands = useCallback(async () => {
-    setIsLoading(true);
+    setIsLoadingCommands(true);
     try {
       const response = await fetch('/api/security/allowed-commands');
       if (!response.ok) {
@@ -61,16 +71,40 @@ export function SecurityTab() {
     } catch (err: any) {
       toast.error(err.message);
     } finally {
-      setIsLoading(false);
+      setIsLoadingCommands(false);
     }
   }, []);
 
+  const fetchSecuritySetting = useCallback(async () => {
+    setIsLoadingSecuritySetting(true);
+    try {
+      const response = await fetch('/api/settings/security');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al cargar la configuración de seguridad.');
+      }
+      const data = await response.json();
+      setSecurityEnabled(data.security_enabled);
+    } catch (err: any) {
+      // Only show error if user is Super Admin, otherwise it's expected to be denied
+      if (isSuperAdmin) {
+        toast.error(err.message);
+      }
+      setSecurityEnabled(true); // Default to enabled on error or no access
+    } finally {
+      setIsLoadingSecuritySetting(false);
+    }
+  }, [isSuperAdmin]);
+
   useEffect(() => {
+    if (isSuperAdmin) {
+      fetchSecuritySetting();
+    }
     fetchCommands();
-  }, [fetchCommands]);
+  }, [fetchCommands, fetchSecuritySetting, isSuperAdmin]);
 
   const onSubmit = async (values: CommandFormValues) => {
-    setIsSubmitting(true);
+    setIsSubmittingCommand(true);
     try {
       const response = await fetch('/api/security/allowed-commands', {
         method: 'POST',
@@ -85,7 +119,7 @@ export function SecurityTab() {
     } catch (err: any) {
       toast.error(err.message);
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingCommand(false);
     }
   };
 
@@ -101,8 +135,61 @@ export function SecurityTab() {
     }
   };
 
+  const handleToggleSecurity = async (checked: boolean) => {
+    setIsTogglingSecurity(true);
+    try {
+      const response = await fetch('/api/settings/security', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ security_enabled: checked }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message);
+      setSecurityEnabled(result.security_enabled);
+      toast.success(result.message);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsTogglingSecurity(false);
+    }
+  };
+
   return (
     <div className="space-y-8 h-full overflow-y-auto p-1">
+      {isSuperAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-6 w-6" /> Control del Sistema de Seguridad
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoadingSecuritySetting ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Cargando configuración...
+              </div>
+            ) : (
+              <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                <div className="space-y-0.5">
+                  <Label htmlFor="security-toggle" className="text-base">
+                    Activar Sistema de Seguridad de Comandos
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Cuando está desactivado, la IA puede ejecutar cualquier comando en los contenedores. Úsalo con precaución y solo para diagnóstico.
+                  </p>
+                </div>
+                <Switch
+                  id="security-toggle"
+                  checked={securityEnabled}
+                  onCheckedChange={handleToggleSecurity}
+                  disabled={isTogglingSecurity}
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -110,28 +197,32 @@ export function SecurityTab() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField control={form.control} name="command" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Comando</FormLabel>
-                  <FormControl><Input placeholder="ej: npm" {...field} disabled={isSubmitting} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="description" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Descripción (Opcional)</FormLabel>
-                  <FormControl><Input placeholder="ej: Node Package Manager" {...field} disabled={isSubmitting} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
-                Añadir Comando
-              </Button>
-            </form>
-          </Form>
+          {!isSuperAdmin ? (
+            <p className="text-muted-foreground">Solo los Super Admins pueden añadir comandos a la lista blanca.</p>
+          ) : (
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField control={form.control} name="command" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Comando</FormLabel>
+                    <FormControl><Input placeholder="ej: npm" {...field} disabled={isSubmittingCommand} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="description" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Descripción (Opcional)</FormLabel>
+                    <FormControl><Input placeholder="ej: Node Package Manager" {...field} disabled={isSubmittingCommand} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <Button type="submit" disabled={isSubmittingCommand}>
+                  {isSubmittingCommand ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                  Añadir Comando
+                </Button>
+              </form>
+            </Form>
+          )}
         </CardContent>
       </Card>
 
@@ -142,12 +233,12 @@ export function SecurityTab() {
           <CardTitle className="flex items-center gap-2">
             <Shield className="h-6 w-6" /> Comandos Permitidos
           </CardTitle>
-          <Button variant="ghost" size="icon" onClick={fetchCommands} disabled={isLoading}>
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          <Button variant="ghost" size="icon" onClick={fetchCommands} disabled={isLoadingCommands}>
+            {isLoadingCommands ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           </Button>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {isLoadingCommands ? (
             <div className="flex items-center justify-center py-4"><Loader2 className="h-6 w-6 animate-spin" /></div>
           ) : (
             <Table>
@@ -166,7 +257,7 @@ export function SecurityTab() {
                     <TableCell className="text-right">
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="destructive" size="icon" className="h-8 w-8">
+                          <Button variant="destructive" size="icon" className="h-8 w-8" disabled={!isSuperAdmin}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </AlertDialogTrigger>
