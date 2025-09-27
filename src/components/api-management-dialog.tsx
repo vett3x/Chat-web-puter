@@ -340,9 +340,6 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         payload.api_endpoint = undefined;
       }
 
-      // --- NEW: Log payload before sending ---
-      console.log("[ApiManagementDialog] Sending payload:", payload);
-
       const response = await fetch('/api/ai-keys', {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -354,19 +351,16 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       try {
         result = JSON.parse(responseText);
       } catch (jsonError) {
-        console.error("[ApiManagementDialog] Failed to parse JSON response:", jsonError, "Raw response:", responseText);
         throw new Error(`Respuesta inesperada del servidor: ${responseText.substring(0, 100)}...`);
       }
 
       if (!response.ok) {
-        console.error("[ApiManagementDialog] API call failed:", result);
         throw new Error(result.message || `Error HTTP: ${response.status}`);
       }
       toast.success(`API Key ${editingKeyId ? 'actualizada' : 'guardada'}.`);
       handleCancelEdit(); // Clear form and editing state
       fetchKeys();
     } catch (error: any) {
-      console.error("[ApiManagementDialog] Error in onSubmit:", error);
       toast.error(`Error: ${error.message || 'Ocurrió un error desconocido al guardar la clave.'}`);
     } finally {
       setIsSubmitting(false);
@@ -658,7 +652,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                   <div className="flex gap-2">
                     <Button type="submit" disabled={isSubmitting || !selectedProvider}>
                       {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingKeyId ? <Edit className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />)}
-                      {editingKeyId ? 'Actualizar Clave' : 'Añadir Clave'}
+                      {editingKeyId ? 'Actualizar' : 'Añadir Clave'}
                     </Button>
                     {editingKeyId && (
                       <Button type="button" variant="outline" onClick={handleCancelEdit} disabled={isSubmitting}>
