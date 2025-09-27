@@ -2,10 +2,12 @@ export const runtime = 'nodejs';
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { GoogleGenerativeAI, Part } from '@google/generative-ai';
 import { GoogleAuth } from 'google-auth-library';
 import { z } from 'zod';
+import { SUPERUSER_EMAILS, PERMISSION_KEYS, UserPermissions } from '@/lib/constants';
 
 // Define unified part types for internal API handling
 interface TextPart { type: 'text'; text: string; }
@@ -32,19 +34,34 @@ const chatRequestSchema = z.object({
   stream: z.boolean().optional().default(true), // New field to control streaming
 });
 
-async function getSupabaseClient() {
+async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null }> {
   const cookieStore = cookies() as any;
-  return createServerClient(
+  const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: (name: string) => cookieStore.get(name)?.value,
-        set: (name: string, value: string, options: CookieOptions) => {},
-        remove: (name: string, options: CookieOptions) => {},
+        get(name: string) { return cookieStore.get(name)?.value; },
+        set(name: string, value: string, options: CookieOptions) {},
+        remove(name: string, options: CookieOptions) {},
       },
     }
   );
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { session: null, userRole: null };
+
+  if (session.user.email && SUPERUSER_EMAILS.includes(session.user.email)) {
+    return { session, userRole: 'super_admin' };
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
+
+  const userRole = profile?.role as 'user' | 'admin' | 'super_admin' | null;
+  return { session, userRole };
 }
 
 // Helper to convert internal content parts to a string for token counting and custom endpoints
@@ -140,8 +157,7 @@ function truncateMessagesByTokenLimit(messages: any[], limit: number, systemProm
 
 
 export async function POST(req: NextRequest) {
-  const supabase = await getSupabaseClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { session, userRole } = await getSessionAndRole();
   if (!session) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 401 });
   }
@@ -151,6 +167,11 @@ export async function POST(req: NextRequest) {
     const { messages: rawMessages, selectedKeyId, stream } = chatRequestSchema.parse(body);
 
     console.log("[API /ai/chat] Received rawMessages:", JSON.stringify(rawMessages, null, 2));
+
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
     // Fetch key details by ID first
     const { data: keyDetails, error: keyError } = await supabase
@@ -166,8 +187,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Authorization check for the fetched key
-    if (!keyDetails.is_global && keyDetails.user_id !== session.user.id) {
-      console.warn(`[API /ai/chat] Access denied for key ${selectedKeyId}: not global and user_id mismatch.`);
+    const isOwner = keyDetails.user_id === session.user.id;
+    if (!keyDetails.is_global && !isOwner && userRole !== 'super_admin') {
+      console.warn(`[API /ai/chat] Access denied for key ${selectedKeyId}: not global, not owner, and user is not super_admin.`);
       throw new Error('Acceso denegado. No tienes permiso para usar esta clave.');
     }
 
