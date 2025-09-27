@@ -15,11 +15,25 @@ export default function LoginPage() {
   const [currentLang, setCurrentLang] = useState('es');
   const { theme, setTheme } = useTheme();
   const [isMounted, setIsMounted] = useState(false);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [isLoadingStatus, setIsLoadingStatus] = useState(true);
   const searchParams = useSearchParams();
   const accountDisabledError = searchParams.get('error') === 'account_type_disabled';
 
   useEffect(() => {
     setIsMounted(true);
+    const checkStatus = async () => {
+      try {
+        const response = await fetch('/api/settings/public-status');
+        const data = await response.json();
+        setMaintenanceMode(data.maintenanceModeEnabled);
+      } catch (error) {
+        console.error("Failed to fetch public status, defaulting to off:", error);
+      } finally {
+        setIsLoadingStatus(false);
+      }
+    };
+    checkStatus();
   }, []);
 
   // ... (spanishVariables and englishVariables remain the same)
@@ -43,6 +57,14 @@ export default function LoginPage() {
     variables: currentLang === 'es' ? spanishVariables : englishVariables,
   };
 
+  if (isLoadingStatus) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4 relative">
       {isMounted && (
@@ -52,14 +74,29 @@ export default function LoginPage() {
       )}
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">{currentLang === 'es' ? 'Bienvenido' : 'Welcome'}</CardTitle>
-          <CardDescription>{currentLang === 'es' ? 'Inicia sesión o regístrate para continuar' : 'Sign in or sign up to continue'}</CardDescription>
+          {maintenanceMode ? (
+            <>
+              <ShieldAlert className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+              <CardTitle className="text-2xl">Modo Mantenimiento</CardTitle>
+              <CardDescription>Solo el personal autorizado puede iniciar sesión.</CardDescription>
+            </>
+          ) : (
+            <>
+              <CardTitle className="text-2xl">{currentLang === 'es' ? 'Bienvenido' : 'Welcome'}</CardTitle>
+              <CardDescription>{currentLang === 'es' ? 'Inicia sesión o regístrate para continuar' : 'Sign in or sign up to continue'}</CardDescription>
+            </>
+          )}
         </CardHeader>
         <CardContent>
           {accountDisabledError && (
             <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-center text-sm text-destructive-foreground flex items-center gap-2">
               <Ban className="h-5 w-5" />
               <span>El inicio de sesión para tu tipo de cuenta está temporalmente desactivado.</span>
+            </div>
+          )}
+          {maintenanceMode && (
+            <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-center text-sm text-yellow-200">
+              El sistema está en mantenimiento. El acceso está restringido.
             </div>
           )}
           <div className="mb-4 flex justify-end">
