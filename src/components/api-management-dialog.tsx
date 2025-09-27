@@ -82,17 +82,20 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
     },
   });
 
-  // Efecto para rellenar el formulario cuando editingKeyId se establece (modo edición)
-  // O para resetearlo al estado de "añadir nueva clave" cuando editingKeyId es null
+  // Este ref actuará como un semáforo para controlar el reseteo del formulario a su estado por defecto.
+  const hasResetToDefaultRef = useRef(false);
+
+  // Efecto para manejar la población/reseteo del formulario basado en editingKeyId
   useEffect(() => {
     if (editingKeyId) {
+      hasResetToDefaultRef.current = false; // Resetear el semáforo cuando entramos en modo edición
       const keyToEdit = keys.find(k => k.id === editingKeyId);
       if (keyToEdit) {
         form.reset({
           id: keyToEdit.id,
           provider: keyToEdit.provider,
           nickname: keyToEdit.nickname || '',
-          api_key: '', // API key is masked, so don't pre-fill
+          api_key: '', // La API key está enmascarada, no la pre-rellenamos
           project_id: keyToEdit.project_id || '',
           location_id: keyToEdit.location_id || '',
           use_vertex_ai: keyToEdit.use_vertex_ai || false,
@@ -102,32 +105,32 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
           api_endpoint: keyToEdit.api_endpoint || '',
           is_global: keyToEdit.is_global,
         });
-        // Limpiar el archivo JSON seleccionado al iniciar la edición de una clave
-        // a menos que sea una clave Vertex AI existente con contenido
+        // Limpiar la selección de archivo JSON si no es una clave Vertex AI existente con contenido
         if (!(keyToEdit.use_vertex_ai && keyToEdit.json_key_content)) {
             handleRemoveJsonKeyFile();
         }
       }
     } else {
-      // Si editingKeyId es null (e.g., después de handleCancelEdit o al abrir el diálogo)
-      // Resetear el formulario al estado por defecto "añadir nueva clave"
-      form.reset({
-        provider: '', api_key: '', nickname: '', project_id: '', location_id: '',
-        use_vertex_ai: false, model_name: '', json_key_file: undefined, json_key_content: undefined,
-        api_endpoint: '', is_global: false,
-      });
-      handleRemoveJsonKeyFile(); // También limpiar el input de archivo
+      // Solo resetear a los valores por defecto si no lo hemos hecho ya desde que editingKeyId se volvió null
+      if (!hasResetToDefaultRef.current) {
+        form.reset({
+          provider: '', api_key: '', nickname: '', project_id: '', location_id: '',
+          use_vertex_ai: false, model_name: '', json_key_file: undefined, json_key_content: undefined,
+          api_endpoint: '', is_global: false,
+        });
+        handleRemoveJsonKeyFile(); // También limpiar el input de archivo
+        hasResetToDefaultRef.current = true; // Establecer el semáforo a true después de resetear
+      }
     }
-  }, [editingKeyId, keys, form, handleRemoveJsonKeyFile]); // Dependencias son correctas aquí.
+  }, [editingKeyId, keys, form, handleRemoveJsonKeyFile]); // `keys` sigue siendo una dependencia para encontrar `keyToEdit`
 
-  // Efecto para cargar las claves y limpiar la búsqueda cuando el diálogo se abre
+  // Efecto para manejar la configuración inicial cuando el diálogo se abre
   useEffect(() => {
     if (open) {
-      fetchKeys();
-      setSearchQuery('');
-      // handleCancelEdit() se llama aquí para asegurar que editingKeyId sea null
-      // y así el useEffect anterior resetee el formulario al estado de "añadir nueva clave".
-      handleCancelEdit(); 
+      fetchKeys(); // Obtener las últimas claves
+      setSearchQuery(''); // Limpiar la búsqueda
+      handleCancelEdit(); // Esto establecerá editingKeyId a null, lo que a su vez activará el useEffect anterior para resetear el formulario
+      hasResetToDefaultRef.current = false; // Resetear el semáforo al abrir el diálogo, en caso de que estuviera en true
     }
   }, [open, fetchKeys, handleCancelEdit, setSearchQuery]);
 
