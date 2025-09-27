@@ -114,8 +114,22 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
           const now = new Date();
           if (now < unkickTime) {
             const duration = intervalToDuration({ start: now, end: unkickTime });
-            const formattedDuration = formatDuration(duration, { locale: es, zero: true, delimiter: ', ' });
-            newTimes.set(user.id, formattedDuration);
+            
+            const hours = duration.hours || 0;
+            const minutes = duration.minutes || 0;
+            const seconds = duration.seconds || 0;
+
+            let parts: string[] = [];
+            if (hours > 0) {
+                parts.push(`${hours} ${hours === 1 ? 'hora' : 'horas'}`);
+            }
+            if (minutes > 0) {
+                parts.push(`${minutes} ${minutes === 1 ? 'minuto' : 'minutos'}`);
+            }
+            // Always include seconds, padded to two digits
+            parts.push(`${seconds.toString().padStart(2, '0')} ${seconds === 1 ? 'segundo' : 'segundos'}`);
+            
+            newTimes.set(user.id, parts.join(', '));
           } else {
             newTimes.set(user.id, null); // Time expired
           }
