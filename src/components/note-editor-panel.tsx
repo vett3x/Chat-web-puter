@@ -67,18 +67,22 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
   const [showAiHint, setShowAiHint] = useState(false);
   const [noteContentForChat, setNoteContentForChat] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('saved');
-  const [isMounted, setIsMounted] = useState(false); // NEW state for client-side mount
+  const [isMounted, setIsMounted] = useState(false);
+  const [editorReady, setEditorReady] = useState(false); // NEW: State to track if BlockNote editor is ready
 
   useEffect(() => {
-    setIsMounted(true); // Set to true once component mounts on client
+    setIsMounted(true);
   }, []);
 
   const editor = useCreateBlockNote({
-    dictionary: locales[userLanguage as keyof typeof locales] || locales.es, // Dynamic dictionary
+    dictionary: locales[userLanguage as keyof typeof locales] || locales.es,
+    onEditorReady: () => { // NEW: Callback when editor is fully ready
+      setEditorReady(true);
+    }
   });
 
   const handleSave = useCallback(async () => {
-    if (!note || saveStatus === 'saving' || !editor) return;
+    if (!note || saveStatus === 'saving' || !editor || !editorReady) return; // Check editorReady
 
     setSaveStatus('saving');
     const currentContent = editor.topLevelBlocks;
@@ -93,10 +97,10 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
       setNote(prev => prev ? { ...prev, ...updatedData } : null);
       setSaveStatus('saved');
     }
-  }, [note, title, onNoteUpdated, editor, saveStatus]);
+  }, [note, title, onNoteUpdated, editor, editorReady, saveStatus]); // Add editorReady to dependencies
 
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || !editorReady) return; // Check editorReady
     let debounceTimeout: NodeJS.Timeout;
     const handleContentChange = () => {
       setSaveStatus('idle');
@@ -111,10 +115,10 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
     return () => {
       clearTimeout(debounceTimeout);
     };
-  }, [editor, handleSave]);
+  }, [editor, editorReady, handleSave]); // Add editorReady to dependencies
 
   const fetchNote = useCallback(async () => {
-    if (!session?.user?.id || !noteId || !editor) return;
+    if (!session?.user?.id || !noteId || !editor || !editorReady) return; // Check editorReady
     setIsLoading(true);
     const { data, error } = await supabase.from('notes').select('id, title, content, updated_at, chat_history').eq('id', noteId).eq('user_id', session.user.id).single();
     if (error) {
@@ -131,12 +135,17 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
       }
     }
     setIsLoading(false);
-  }, [noteId, session?.user?.id, editor]);
-
-  useEffect(() => { fetchNote(); }, [fetchNote]);
+  }, [noteId, session?.user?.id, editor, editorReady]); // Add editorReady to dependencies
 
   useEffect(() => {
-    if (initialContent && editor) {
+    // Only fetch note if editor is ready
+    if (editorReady) {
+      fetchNote();
+    }
+  }, [fetchNote, editorReady]); // Trigger fetchNote when editorReady changes
+
+  useEffect(() => {
+    if (initialContent && editor && editorReady) { // Only replace blocks if editor is ready
       const loadContent = async () => {
         editor.replaceBlocks(editor.topLevelBlocks, initialContent);
         const markdown = await editor.blocksToMarkdownLossy();
@@ -144,7 +153,7 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
       };
       loadContent();
     }
-  }, [initialContent, editor]);
+  }, [initialContent, editor, editorReady]); // Add editorReady to dependencies
 
   useEffect(() => {
     const hasSeenHint = localStorage.getItem('hasSeenNoteAiHint');
@@ -193,7 +202,7 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
         </div>
       </div>
       <div className="flex-1 overflow-y-auto">
-        {isMounted && editor ? (
+        {isMounted && editor && editorReady ? ( // Render only when editor is fully ready
           <BlockNoteView editor={editor} theme={theme === 'dark' ? customDarkTheme : 'light'} />
         ) : (
           <div className="flex items-center justify-center h-full">
