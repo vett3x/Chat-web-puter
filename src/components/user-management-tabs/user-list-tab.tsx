@@ -3,10 +3,10 @@
 import React, { useState, useEffect, useCallback, useImperativeHandle } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Users, Trash2, RefreshCw, AlertCircle, Eye, Search, Crown, Shield, Bot } from 'lucide-react'; // Import Bot icon
+import { Loader2, Users, Trash2, RefreshCw, AlertCircle, Eye, Search, Crown, Shield, Bot, LogOut, Ban, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSession } from '@/components/session-context-provider';
-import { SUPERUSER_EMAILS } from '@/lib/constants'; // Importación actualizada
+import { SUPERUSER_EMAILS } from '@/lib/constants';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,7 +24,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { UserDetailDialog } from './user-detail-dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator'; // Import Separator
+import { Separator } from '@/components/ui/separator';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 interface User {
   id: string;
@@ -32,26 +35,27 @@ interface User {
   first_name: string | null;
   last_name: string | null;
   avatar_url: string | null;
-  role: 'user' | 'admin' | 'super_admin'; // Added role
+  role: 'user' | 'admin' | 'super_admin';
+  status: 'active' | 'banned';
 }
 
-// Define the interface for the ref handle and export it
 export interface UserListTabRef {
   fetchUsers: () => void;
 }
 
 export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
-  const { session, isLoading: isSessionLoading, userRole: currentUserRole } = useSession(); // Get current user's role
+  const { session, isLoading: isSessionLoading, userRole: currentUserRole } = useSession();
   const currentUserId = session?.user?.id;
-  const [allUsers, setAllUsers] = useState<User[]>([]); // Store all fetched users
-  const [filteredUsers, setFilteredUsers] = useState<User[]>([]); // Users displayed after filter/search
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'user' | 'admin' | 'super_admin'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'banned'>('all');
 
   const fetchUsers = useCallback(async () => {
     setIsLoadingUsers(true);
@@ -70,7 +74,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
     } finally {
       setIsLoadingUsers(false);
     }
-  }, []); // Eliminado 'toast' de las dependencias
+  }, []);
 
   useImperativeHandle(ref, () => ({
     fetchUsers,
@@ -82,16 +86,10 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
     }
   }, [isSessionLoading, session, fetchUsers]);
 
-  // Effect to apply filters and search whenever allUsers, searchTerm, or roleFilter changes
   useEffect(() => {
     let tempUsers = allUsers;
-
-    // Apply role filter
-    if (roleFilter !== 'all') {
-      tempUsers = tempUsers.filter(user => user.role === roleFilter);
-    }
-
-    // Apply search term
+    if (roleFilter !== 'all') tempUsers = tempUsers.filter(user => user.role === roleFilter);
+    if (statusFilter !== 'all') tempUsers = tempUsers.filter(user => user.status === statusFilter);
     if (searchTerm) {
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
       tempUsers = tempUsers.filter(user =>
@@ -100,34 +98,41 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
         (user.last_name && user.last_name.toLowerCase().includes(lowerCaseSearchTerm))
       );
     }
-
     setFilteredUsers(tempUsers);
-  }, [allUsers, searchTerm, roleFilter]);
+  }, [allUsers, searchTerm, roleFilter, statusFilter]);
 
-  const getInitials = (firstName: string | null | undefined, lastName: string | null | undefined, email: string) => {
-    const first = firstName ? firstName.charAt(0) : '';
-    const last = lastName ? lastName.charAt(0) : '';
-    return (first + last).toUpperCase() || email.charAt(0).toUpperCase();
-  };
-
-  const handleDeleteUser = async (userId: string) => {
-    setIsDeleting(userId);
+  const handleUserStatusChange = async (userId: string, action: 'kick' | 'ban' | 'unban') => {
+    setIsActionLoading(userId);
     try {
-      const response = await fetch(`/api/users/${userId}`, {
-        method: 'DELETE',
+      const response = await fetch(`/api/users/${userId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
         credentials: 'include',
       });
       const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.message || `HTTP error! status: ${response.status}`);
-      }
-      toast.success(result.message || 'Usuario eliminado correctamente.');
+      if (!response.ok) throw new Error(result.message);
+      toast.success(result.message);
       fetchUsers();
     } catch (err: any) {
-      console.error('Error deleting user:', err);
-      toast.error(err.message || 'Error al eliminar el usuario.');
+      toast.error(`Error: ${err.message}`);
     } finally {
-      setIsDeleting(null);
+      setIsActionLoading(null);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    setIsActionLoading(userId);
+    try {
+      const response = await fetch(`/api/users/${userId}`, { method: 'DELETE', credentials: 'include' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message);
+      toast.success(result.message);
+      fetchUsers();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsActionLoading(null);
     }
   };
 
@@ -137,12 +142,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
   };
 
   if (isSessionLoading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="ml-2 text-muted-foreground">Cargando sesión...</p>
-      </div>
-    );
+    return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
 
   const isCurrentUserSuperAdmin = currentUserRole === 'super_admin';
@@ -150,96 +150,64 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
   const renderUserTable = (usersToRender: User[], title: string) => (
     <div className="mb-8">
       <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-        <Users className="h-5 w-5 text-muted-foreground" /> {title} ({usersToRender.length})
+        {title.includes('Baneados') ? <Ban className="h-5 w-5 text-muted-foreground" /> : <Users className="h-5 w-5 text-muted-foreground" />}
+        {title} ({usersToRender.length})
       </h3>
       {usersToRender.length === 0 ? (
         <p className="text-muted-foreground text-sm">No hay usuarios en esta categoría.</p>
       ) : (
         <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Usuario</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Rol</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
+          <TableHeader><TableRow><TableHead>Usuario</TableHead><TableHead>Email</TableHead><TableHead>Rol</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
           <TableBody>
             {usersToRender.map((user) => {
               const isCurrentUser = user.id === currentUserId;
               const isTargetUserSuperAdmin = user.role === 'super_admin';
+              const canPerformAction = isCurrentUserSuperAdmin && !isTargetUserSuperAdmin && !isCurrentUser;
 
               return (
-                <TableRow key={user.id}>
+                <TableRow key={user.id} className={cn(user.status === 'banned' && 'bg-muted/50 opacity-60')}>
                   <TableCell className="flex items-center gap-2">
-                    <Avatar className="h-8 w-8">
-                      {user.avatar_url && user.avatar_url !== '' ? ( // Updated condition
-                        <AvatarImage src={user.avatar_url} alt="Avatar" />
-                      ) : (
-                        <AvatarFallback className="bg-primary text-primary-foreground">
-                          <Bot className="h-4 w-4" />
-                        </AvatarFallback>
-                      )}
-                    </Avatar>
-                    <div>
-                      <p className="font-medium">{user.first_name || 'N/A'} {user.last_name || ''}</p>
-                    </div>
+                    <Avatar className="h-8 w-8"><AvatarImage src={user.avatar_url || ''} alt="Avatar" /><AvatarFallback className="bg-primary text-primary-foreground"><Bot className="h-4 w-4" /></AvatarFallback></Avatar>
+                    <div><p className="font-medium">{user.first_name || 'N/A'} {user.last_name || ''}</p></div>
                   </TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
-                    {user.role !== 'user' && ( // Only show role badge if not 'user'
-                      <span className={`flex items-center gap-1 text-xs font-semibold px-1 py-0.5 rounded-full capitalize w-fit
-                        ${user.role === 'super_admin' ? 'bg-yellow-500 text-yellow-900 dark:bg-yellow-400 dark:text-yellow-950' : ''}
-                        ${user.role === 'admin' ? 'bg-purple-500 text-purple-900 dark:bg-purple-400 dark:text-purple-950' : ''}
-                      `}>
-                        {user.role === 'super_admin' && <Crown className="h-3 w-3 fill-current" />}
-                        {user.role === 'admin' && <Shield className="h-3 w-3 fill-current" />}
-                        {user.role === 'super_admin' ? 'Super Admin' : user.role}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {user.role !== 'user' && (
+                        <Badge variant={user.role === 'super_admin' ? 'default' : 'secondary'} className={cn(user.role === 'super_admin' && 'bg-yellow-500 text-yellow-900')}>
+                          {user.role === 'super_admin' ? <Crown className="h-3 w-3 mr-1" /> : <Shield className="h-3 w-3 mr-1" />}
+                          {user.role === 'super_admin' ? 'Super Admin' : user.role}
+                        </Badge>
+                      )}
+                      {user.status === 'banned' && <Badge variant="destructive">Baneado</Badge>}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => handleOpenUserDetails(user)}
-                        title="Ver detalles del usuario"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="destructive"
-                            size="icon"
-                            className="h-8 w-8"
-                            disabled={isCurrentUser || isTargetUserSuperAdmin || isDeleting === user.id || !isCurrentUserSuperAdmin} // Only Super Admin can delete, and not themselves or other Super Admins
-                            title={isCurrentUser ? "No puedes eliminar tu propia cuenta" : (isTargetUserSuperAdmin ? "No puedes eliminar a otro Super Admin" : (isCurrentUserSuperAdmin ? "Eliminar usuario" : "No tienes permiso para eliminar usuarios"))}
-                          >
-                            {isDeleting === user.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>¿Estás seguro de eliminar este usuario?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta acción eliminará permanentemente al usuario "{user.first_name || user.email}" y todos sus datos asociados.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDeleteUser(user.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                              Eliminar
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      {isActionLoading === user.id ? <Loader2 className="h-5 w-5 animate-spin" /> : (
+                        <>
+                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleOpenUserDetails(user)}><Eye className="h-4 w-4" /></Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8" disabled={!canPerformAction}><Users className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleUserStatusChange(user.id, 'kick')}><LogOut className="mr-2 h-4 w-4" /> Expulsar</DropdownMenuItem>
+                              {user.status === 'banned' ? (
+                                <DropdownMenuItem onClick={() => handleUserStatusChange(user.id, 'unban')}><CheckCircle className="mr-2 h-4 w-4" /> Desbanear</DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem onClick={() => handleUserStatusChange(user.id, 'ban')} className="text-destructive focus:text-destructive"><Ban className="mr-2 h-4 w-4" /> Banear</DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Eliminar</DropdownMenuItem></AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader><AlertDialogTitle>¿Seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará permanentemente al usuario "{user.first_name || user.email}".</AlertDialogDescription></AlertDialogHeader>
+                                  <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteUser(user.id)} className="bg-destructive">Eliminar</AlertDialogAction></AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -251,79 +219,40 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
     </div>
   );
 
-  const superAdmins = filteredUsers.filter(user => user.role === 'super_admin');
-  const admins = filteredUsers.filter(user => user.role === 'admin');
-  const normalUsers = filteredUsers.filter(user => user.role === 'user');
+  const activeUsers = filteredUsers.filter(u => u.status === 'active');
+  const bannedUsers = filteredUsers.filter(u => u.status === 'banned');
 
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="flex items-center gap-2">
-          <Users className="h-5 w-5" /> Lista de Usuarios
-        </CardTitle>
-        <Button variant="ghost" size="icon" onClick={fetchUsers} disabled={isLoadingUsers} title="Refrescar">
-          {isLoadingUsers ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-        </Button>
+        <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" /> Lista de Usuarios</CardTitle>
+        <Button variant="ghost" size="icon" onClick={fetchUsers} disabled={isLoadingUsers}><RefreshCw className="h-4 w-4" /></Button>
       </CardHeader>
       <CardContent className="flex-1 overflow-hidden pt-0">
         <div className="flex flex-col sm:flex-row gap-4 mb-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar usuario por nombre o email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Select value={roleFilter} onValueChange={(value: typeof roleFilter) => setRoleFilter(value)}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filtrar por rol" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los Roles</SelectItem>
-              <SelectItem value="super_admin">Super Admin</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
-              <SelectItem value="user">Usuario</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" /></div>
+          <Select value={roleFilter} onValueChange={(v: any) => setRoleFilter(v)}><SelectTrigger className="w-[180px]"><SelectValue placeholder="Filtrar por rol" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los Roles</SelectItem><SelectItem value="super_admin">Super Admin</SelectItem><SelectItem value="admin">Admin</SelectItem><SelectItem value="user">Usuario</SelectItem></SelectContent></Select>
+          <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}><SelectTrigger className="w-[180px]"><SelectValue placeholder="Filtrar por estado" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los Estados</SelectItem><SelectItem value="active">Activo</SelectItem><SelectItem value="banned">Baneado</SelectItem></SelectContent></Select>
         </div>
-
         {isLoadingUsers && filteredUsers.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="ml-2 text-muted-foreground">Cargando usuarios...</p>
-          </div>
+          <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>
         ) : error && filteredUsers.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-destructive">
-            <AlertCircle className="h-6 w-6 mr-2" />
-            <p>{error}</p>
-          </div>
-        ) : filteredUsers.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-muted-foreground">
-            <p>No se encontraron usuarios que coincidan con los criterios.</p>
-          </div>
+          <div className="flex items-center justify-center h-full text-destructive"><AlertCircle className="h-6 w-6 mr-2" />{error}</div>
         ) : (
           <ScrollArea className="h-full w-full p-1">
             <div className="space-y-8">
-              {renderUserTable(superAdmins, 'Super Admins')}
+              {renderUserTable(activeUsers.filter(u => u.role === 'super_admin'), 'Super Admins')}
               <Separator />
-              {renderUserTable(admins, 'Admins')}
+              {renderUserTable(activeUsers.filter(u => u.role === 'admin'), 'Admins')}
               <Separator />
-              {renderUserTable(normalUsers, 'Usuarios')}
+              {renderUserTable(activeUsers.filter(u => u.role === 'user'), 'Usuarios')}
+              {bannedUsers.length > 0 && <Separator />}
+              {renderUserTable(bannedUsers, 'Usuarios Baneados')}
             </div>
           </ScrollArea>
         )}
       </CardContent>
-      {selectedUser && (
-        <UserDetailDialog
-          open={isDetailDialogOpen}
-          onOpenChange={setIsDetailDialogOpen}
-          user={selectedUser}
-          currentUserRole={currentUserRole} // Pass current user's role
-          onRoleUpdated={fetchUsers} // Pass fetchUsers as the callback
-        />
-      )}
+      {selectedUser && <UserDetailDialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen} user={selectedUser} currentUserRole={currentUserRole} onRoleUpdated={fetchUsers} />}
     </Card>
   );
 });
