@@ -201,7 +201,7 @@ export function useChat({
   }, [userId]);
 
   const getMessagesFromDB = useCallback(async (convId: string) => {
-    const { data, error } = await supabase.from('messages').select('id, content, role, model, created_at, conversation_id, type, is_construction_plan, plan_approved, is_correction_plan, correction_approved').eq('conversation_id', convId).eq('user_id', userId).order('created_at', { ascending: true });
+    const { data, error } = await supabase.from('messages').select('id, content, role, model, created_at, conversation_id, type, plan_approved, is_correction_plan, correction_approved').eq('conversation_id', convId).eq('user_id', userId).order('created_at', { ascending: true });
     if (error) {
       console.error('Error fetching messages:', error);
       toast.error('Error al cargar los mensajes.');
@@ -215,14 +215,14 @@ export function useChat({
       model: msg.model || undefined,
       timestamp: new Date(msg.created_at),
       type: msg.type as 'text' | 'multimodal',
-      isConstructionPlan: msg.is_construction_plan || false, // Use the value from DB
-      planApproved: msg.plan_approved || false,
-      isCorrectionPlan: msg.is_correction_plan || false,
-      correctionApproved: msg.correction_approved || false,
-      isErrorAnalysisRequest: typeof msg.content === 'string' && msg.content.includes('### 💡 Entendido!'), // This is still okay as it's a specific string format
-      isNew: false,
-      isTyping: false,
-      isAnimated: true,
+      isConstructionPlan: typeof msg.content === 'string' && msg.content.includes('### 1. Análisis del Requerimiento'), // Detect plan from DB
+      planApproved: msg.plan_approved || false, // NEW: Fetch plan_approved from DB
+      isCorrectionPlan: msg.is_correction_plan || false, // NEW: Fetch is_correction_plan from DB
+      correctionApproved: msg.correction_approved || false, // NEW: Fetch correction_approved from DB
+      isErrorAnalysisRequest: typeof msg.content === 'string' && msg.content.includes('### 💡 Entendido!'), // NEW: Detect error analysis request from DB
+      isNew: false, // Messages from DB are not 'new'
+      isTyping: false, // Messages from DB are not 'typing'
+      isAnimated: true, // Messages from DB are considered animated
     }));
   }, [userId]);
 
@@ -277,7 +277,6 @@ export function useChat({
       content: msg.content as any, 
       model: msg.model, 
       type: msg.type,
-      is_construction_plan: msg.isConstructionPlan, // NEW: Save isConstructionPlan status
       plan_approved: msg.planApproved, // NEW: Save planApproved status
       is_correction_plan: msg.isCorrectionPlan, // NEW: Save isCorrectionPlan status
       correction_approved: msg.correctionApproved, // NEW: Save correctionApproved status
@@ -337,7 +336,6 @@ export function useChat({
         controller.abort();
         reject(new Error('La IA tardó demasiado en responder. Por favor, inténtalo de nuevo.'));
       }, 30000); // 30 second timeout
-
     });
 
     try {
