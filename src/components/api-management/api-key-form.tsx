@@ -69,39 +69,9 @@ export function ApiKeyForm({
   const isGoogleGemini = selectedProvider === 'google_gemini';
   const isCustomEndpoint = selectedProvider === 'custom_endpoint';
 
-  const handleFormSubmit = (values: ApiKeyFormValues) => {
-    let hasValidationError = false;
-
-    // Manual validation for NEW keys or when specific fields are required
-    if (!editingKeyId) {
-      if (values.provider === 'google_gemini') {
-        if (values.use_vertex_ai) {
-          if (!values.model_name) { form.setError('model_name', { message: 'Debes seleccionar un modelo.' }); hasValidationError = true; }
-          if (!values.project_id) { form.setError('project_id', { message: 'Project ID es requerido.' }); hasValidationError = true; }
-          if (!values.location_id) { form.setError('location_id', { message: 'Location ID es requerido.' }); hasValidationError = true; }
-        } else {
-          if (!values.model_name) { form.setError('model_name', { message: 'Debes seleccionar un modelo.' }); hasValidationError = true; }
-          if (!values.api_key) { form.setError('api_key', { message: 'API Key es requerida.' }); hasValidationError = true; }
-        }
-      } else if (values.provider === 'custom_endpoint') {
-        if (!values.api_endpoint) { form.setError('api_endpoint', { message: 'El link del endpoint es requerido.' }); hasValidationError = true; }
-        if (!values.model_name) { form.setError('model_name', { message: 'El ID del modelo es requerido.' }); hasValidationError = true; }
-        if (!values.nickname) { form.setError('nickname', { message: 'El apodo es obligatorio.' }); hasValidationError = true; }
-        if (!values.api_key) { form.setError('api_key', { message: 'API Key es requerida.' }); hasValidationError = true; }
-      } else {
-        if (!values.api_key) { form.setError('api_key', { message: 'API Key es requerida.' }); hasValidationError = true; }
-      }
-    }
-    
-    if (hasValidationError) {
-      return;
-    }
-    onSubmit(values);
-  };
-
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <FormField control={form.control} name="provider" render={({ field }) => (
           <FormItem>
             <FormLabel>Proveedor</FormLabel>
