@@ -473,10 +473,13 @@ export function useChat({
       const isCorrectionPlan = fullResponseText.includes('### 💡 Error Detectado'); // NEW: Detect correction plan
       
       const finalContentForMessage = (isConstructionPlan || isErrorAnalysisRequest || isCorrectionPlan) ? fullResponseText : parseAiResponseToRenderableParts(fullResponseText, isAppChatModeBuild);
+      
+      // Initialize filesToWrite and commandsToExecute here, inside the try block
       const filesToWrite: { path: string; content: string }[] = [];
       const commandsToExecute: string[] = [];
 
       // MODIFICADO: Asegurarse de que solo se itere si finalContentForMessage es un array
+      // Este bloque solo debe ejecutarse si NO es un plan, sino código/comandos reales
       if (isAppChatModeBuild && !isConstructionPlan && !isErrorAnalysisRequest && !isCorrectionPlan && Array.isArray(finalContentForMessage)) {
         (finalContentForMessage as RenderablePart[]).forEach(part => {
           if (part.type === 'code' && appId) {
@@ -507,6 +510,7 @@ export function useChat({
       const savedData = await saveMessageToDB(convId, finalAssistantMessageData);
       setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, ...finalAssistantMessageData, id: savedData?.id || assistantMessageId, timestamp: savedData?.timestamp || new Date() } : m));
 
+      // Execute files and commands *after* the message is saved and displayed
       if (filesToWrite.length > 0) {
         await onWriteFiles(filesToWrite);
       }
@@ -515,11 +519,15 @@ export function useChat({
       }
 
       // Update autoFixStatus based on AI's response
-      if (isErrorAnalysisRequest || isConstructionPlan || isCorrectionPlan) {
-        setAutoFixStatus('plan_ready');
-      } else {
-        setAutoFixStatus('idle'); // Reset if AI didn't respond with a plan/request
-      }
+      setAutoFixStatus(prevStatus => {
+        if (prevStatus === 'fixing') {
+          return 'idle'; // Successfully applied the fix
+        }
+        if (isErrorAnalysisRequest || isConstructionPlan || isCorrectionPlan) {
+          return 'plan_ready'; // AI responded with a new plan/request
+        }
+        return 'idle'; // Default for regular chat responses
+      });
 
     } catch (error: any) {
       console.error('[API /ai/chat] Error:', error);
@@ -530,7 +538,7 @@ export function useChat({
     } finally {
       setIsLoading(false);
     }
-  }, [appId, appPrompt, userRole, onWriteFiles, selectedModel, userId, saveMessageToDB, chatMode, userApiKeys]);
+  }, [appId, appPrompt, userRole, onWriteFiles, selectedModel, userId, saveMessageToDB, chatMode, userApiKeys, autoFixStatus]); // Added autoFixStatus to dependencies
 
   const sendMessage = useCallback(async (content: PuterContentPart[], messageText: string) => {
     if (!userId) {
