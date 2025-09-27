@@ -16,6 +16,8 @@ export default function LoginPage() {
   const { theme, setTheme } = useTheme();
   const [isMounted, setIsMounted] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [usersDisabled, setUsersDisabled] = useState(false);
+  const [adminsDisabled, setAdminsDisabled] = useState(false);
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
   const searchParams = useSearchParams();
   const accountDisabledError = searchParams.get('error') === 'account_type_disabled';
@@ -27,6 +29,8 @@ export default function LoginPage() {
         const response = await fetch('/api/settings/public-status');
         const data = await response.json();
         setMaintenanceMode(data.maintenanceModeEnabled);
+        setUsersDisabled(data.usersDisabled);
+        setAdminsDisabled(data.adminsDisabled);
       } catch (error) {
         console.error("Failed to fetch public status, defaulting to off:", error);
       } finally {
@@ -94,9 +98,16 @@ export default function LoginPage() {
               <span>El inicio de sesión para tu tipo de cuenta está temporalmente desactivado.</span>
             </div>
           )}
-          {maintenanceMode && (
-            <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-center text-sm text-yellow-200">
-              El sistema está en mantenimiento. El acceso está restringido.
+          {usersDisabled && !maintenanceMode && (
+            <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-center text-sm text-yellow-200 flex items-center gap-2">
+              <Ban className="h-5 w-5" />
+              <span>El inicio de sesión para cuentas de <strong>Usuario</strong> está desactivado temporalmente.</span>
+            </div>
+          )}
+          {adminsDisabled && !maintenanceMode && (
+            <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-center text-sm text-yellow-200 flex items-center gap-2">
+              <Ban className="h-5 w-5" />
+              <span>El inicio de sesión para cuentas de <strong>Admin</strong> está desactivado temporalmente.</span>
             </div>
           )}
           <div className="mb-4 flex justify-end">
