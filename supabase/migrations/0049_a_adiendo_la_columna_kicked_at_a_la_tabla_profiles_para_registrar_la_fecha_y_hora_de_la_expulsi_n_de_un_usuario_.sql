@@ -1,0 +1,2 @@
+ALTER TABLE public.profiles
+ADD COLUMN kicked_at TIMESTAMP WITH TIME ZONE;
