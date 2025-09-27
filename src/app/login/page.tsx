@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Moon, Sun, ShieldAlert, Loader2, Ban, LogOut } from 'lucide-react'; // NEW: Import LogOut icon
 import { useTheme } from 'next-themes';
 import { useSearchParams } from 'next/navigation';
+import { formatDistanceToNow, addMinutes } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 export default function LoginPage() {
   const [currentLang, setCurrentLang] = useState('es');
@@ -21,8 +23,11 @@ export default function LoginPage() {
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
   const searchParams = useSearchParams();
   const accountDisabledError = searchParams.get('error') === 'account_type_disabled';
-  const accountBannedError = searchParams.get('error') === 'account_banned'; // NEW: Error for banned account
-  const accountKickedError = searchParams.get('error') === 'account_kicked'; // NEW: Error for kicked account
+  const accountBannedError = searchParams.get('error') === 'account_banned';
+  const accountKickedError = searchParams.get('error') === 'account_kicked';
+  const kickReason = searchParams.get('reason');
+  const kickedAt = searchParams.get('kicked_at');
+  const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -42,7 +47,33 @@ export default function LoginPage() {
     checkStatus();
   }, []);
 
-  // ... (spanishVariables and englishVariables remain the same)
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    if (accountKickedError && kickedAt) {
+      const kickTime = new Date(kickedAt);
+      const unkickTime = addMinutes(kickTime, 15);
+
+      const updateRemainingTime = () => {
+        const now = new Date();
+        if (now < unkickTime) {
+          setTimeRemaining(formatDistanceToNow(unkickTime, { addSuffix: true, locale: es }));
+        } else {
+          setTimeRemaining(null);
+          if (interval) clearInterval(interval);
+          // Optionally, redirect to login without error to clear params
+          window.location.href = '/login'; 
+        }
+      };
+
+      updateRemainingTime();
+      interval = setInterval(updateRemainingTime, 1000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [accountKickedError, kickedAt]);
+
   const spanishVariables = {
     sign_in: { email_label: 'Correo electrónico', password_label: 'Contraseña', email_input_placeholder: 'Tu correo electrónico', password_input_placeholder: 'Tu contraseña', button_label: 'Iniciar sesión', social_auth_typography: 'O continuar con', link_text: '¿Ya tienes una cuenta? Inicia sesión', forgotten_password_text: '¿Olvidaste tu contraseña?', no_account_text: '¿No tienes una cuenta? Regístrate', },
     sign_up: { email_label: 'Correo electrónico', password_label: 'Contraseña', email_input_placeholder: 'Tu correo electrónico', password_input_placeholder: 'Crea una contraseña', button_label: 'Registrarse', social_auth_typography: 'O continuar con', link_text: '¿Ya tienes una cuenta? Inicia sesión', },
@@ -100,16 +131,18 @@ export default function LoginPage() {
               <span>El inicio de sesión para tu tipo de cuenta está temporalmente desactivado.</span>
             </div>
           )}
-          {accountBannedError && ( // NEW: Message for banned account
+          {accountBannedError && (
             <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-center text-sm text-destructive-foreground flex items-center gap-2">
               <Ban className="h-5 w-5" />
-              <span>Tu cuenta ha sido baneada. Contacta al soporte para más información.</span>
+              <span>Tu cuenta ha sido baneada. {kickReason && `Razón: ${kickReason}`} Contacta al soporte para más información.</span>
             </div>
           )}
-          {accountKickedError && ( // NEW: Message for kicked account
-            <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-center text-sm text-yellow-200 flex items-center gap-2">
+          {accountKickedError && (
+            <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-center text-sm text-yellow-200 flex flex-col items-center gap-2">
               <LogOut className="h-5 w-5" />
-              <span>Has sido expulsado del sistema. Contacta al soporte para más información.</span>
+              <span>Has sido expulsado del sistema.</span>
+              {kickReason && <span className="font-semibold">Razón: {kickReason}</span>}
+              {timeRemaining && <span className="text-xs mt-1">Podrás volver a iniciar sesión {timeRemaining}.</span>}
             </div>
           )}
           {usersDisabled && !maintenanceMode && (

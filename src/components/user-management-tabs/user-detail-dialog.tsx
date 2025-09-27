@@ -11,7 +11,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { User, Server, Cloud, History, MessageSquare, HardDrive, Save, Loader2, ShieldCheck, KeyRound, Shield } from 'lucide-react';
+import { User, Server, Cloud, History, MessageSquare, HardDrive, Save, Loader2, ShieldCheck, KeyRound, Shield, LogOut } from 'lucide-react'; // Import LogOut
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { UserServersTab } from './user-servers-tab';
@@ -34,9 +34,11 @@ import { toast } from 'sonner';
 import { useSession } from '@/components/session-context-provider';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 type UserRole = 'user' | 'admin' | 'super_admin';
-type UserStatus = 'active' | 'banned' | 'kicked'; // NEW: Define UserStatus type
+type UserStatus = 'active' | 'banned' | 'kicked';
 
 interface UserDetailDialogProps {
   open: boolean;
@@ -47,7 +49,8 @@ interface UserDetailDialogProps {
     first_name: string | null;
     last_name: string | null;
     role: UserRole;
-    status: UserStatus; // NEW: Add status to user prop
+    status: UserStatus;
+    kicked_at: string | null; // NEW: Add kicked_at
   };
   currentUserRole: UserRole | null;
   onRoleUpdated: () => void;
@@ -148,6 +151,13 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
               </Button>
             )}
           </div>
+
+          {user.status === 'kicked' && user.kicked_at && (
+            <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-sm text-yellow-200 flex items-center gap-2">
+              <LogOut className="h-5 w-5" />
+              <span>Este usuario fue expulsado el {format(new Date(user.kicked_at), 'dd/MM/yyyy HH:mm', { locale: es })}. Su expulsión dura 15 minutos.</span>
+            </div>
+          )}
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col">
             <TabsList className="grid w-full grid-cols-8">

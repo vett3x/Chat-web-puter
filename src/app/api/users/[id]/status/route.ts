@@ -79,8 +79,8 @@ export async function PUT(req: NextRequest, context: any) {
     const actionText = { kick: 'expulsado', ban: 'baneado', unban: 'desbaneado' }[action];
 
     if (action === 'kick') {
-      // Actualizar el estado del perfil a 'kicked'
-      await supabaseAdmin.from('profiles').update({ status: 'kicked' }).eq('id', userIdToUpdate);
+      // Actualizar el estado del perfil a 'kicked' y registrar kicked_at
+      await supabaseAdmin.from('profiles').update({ status: 'kicked', kicked_at: new Date().toISOString() }).eq('id', userIdToUpdate);
       // Invalidate user's sessions by updating metadata. This is more reliable than signOut.
       const { error } = await supabaseAdmin.auth.admin.updateUserById(userIdToUpdate, {
         user_metadata: { kicked_at: new Date().toISOString() },
@@ -92,11 +92,11 @@ export async function PUT(req: NextRequest, context: any) {
         user_metadata: { banned_at: new Date().toISOString() }, // Also update metadata to invalidate session
       });
       if (banError) throw new Error(`Error al banear al usuario en Auth: ${banError.message}`);
-      await supabaseAdmin.from('profiles').update({ status: 'banned' }).eq('id', userIdToUpdate);
+      await supabaseAdmin.from('profiles').update({ status: 'banned', kicked_at: null }).eq('id', userIdToUpdate); // Clear kicked_at on ban
     } else if (action === 'unban') {
       const { error: unbanError } = await supabaseAdmin.auth.admin.updateUserById(userIdToUpdate, { ban_duration: 'none' });
       if (unbanError) throw new Error(`Error al desbanear al usuario en Auth: ${unbanError.message}`);
-      await supabaseAdmin.from('profiles').update({ status: 'active' }).eq('id', userIdToUpdate);
+      await supabaseAdmin.from('profiles').update({ status: 'active', kicked_at: null }).eq('id', userIdToUpdate);
     }
 
     // Log to both tables

@@ -39,7 +39,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     if (currentSession?.user?.id) {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('role, permissions, avatar_url, language, status') // NEW: Select status
+        .select('role, permissions, avatar_url, language, status, kicked_at') // NEW: Select kicked_at
         .eq('id', currentSession.user.id)
         .single();
 
@@ -48,6 +48,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       let determinedAvatarUrl: string | null = null;
       let determinedLanguage: string | null = 'es';
       let determinedStatus: UserStatus = 'active'; // Default to active
+      let determinedKickedAt: string | null = null; // NEW: For kicked_at
 
       if (error) {
         console.error('[SessionContext] Error fetching user profile:', error);
@@ -57,7 +58,8 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         determinedPermissions = profile.permissions || {};
         determinedAvatarUrl = profile.avatar_url;
         determinedLanguage = profile.language || 'es';
-        determinedStatus = profile.status as UserStatus; // NEW: Assign fetched status
+        determinedStatus = profile.status as UserStatus;
+        determinedKickedAt = profile.kicked_at; // NEW: Assign fetched kicked_at
       } else {
         determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
       }
@@ -77,18 +79,32 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         };
       }
       
+      // NEW: Logic to auto-unkick if 15 minutes have passed
+      if (determinedStatus === 'kicked' && determinedKickedAt) {
+        const kickedTime = new Date(determinedKickedAt).getTime();
+        const fifteenMinutesAgo = Date.now() - (15 * 60 * 1000);
+        if (kickedTime < fifteenMinutesAgo) {
+          console.log(`[SessionContext] User ${currentSession.user.id} was kicked, but 15 minutes have passed. Auto-unkicking.`);
+          await supabase.from('profiles').update({ status: 'active', kicked_at: null }).eq('id', currentSession.user.id);
+          await supabase.auth.admin.updateUserById(currentSession.user.id, { user_metadata: { kicked_at: null } });
+          determinedStatus = 'active';
+          determinedKickedAt = null;
+          toast.info("Tu expulsión ha expirado. Puedes volver a usar la aplicación.");
+        }
+      }
+
       setUserRole(determinedRole);
       setUserPermissions(determinedPermissions);
       setUserAvatarUrl(determinedAvatarUrl);
       setUserLanguage(determinedLanguage);
-      setUserStatus(determinedStatus); // NEW: Set user status
+      setUserStatus(determinedStatus);
 
     } else {
       setUserRole(null);
       setUserPermissions({});
       setUserAvatarUrl(null);
       setUserLanguage('es');
-      setUserStatus(null); // NEW: Clear user status
+      setUserStatus(null);
     }
   };
 
@@ -158,16 +174,29 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
           // Re-fetch profile status to ensure it's up-to-date
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select('status')
+            .select('status, kicked_at') // NEW: Select kicked_at
             .eq('id', session.user.id)
             .single();
 
           if (profileError || !profile) {
             console.error("[SessionContext] Error re-fetching user profile status:", profileError);
-            // If profile can't be fetched, assume active to avoid locking out
             setUserStatus('active'); 
           } else {
             setUserStatus(profile.status as UserStatus);
+            // NEW: Auto-unkick logic here as well for real-time checks
+            if (profile.status === 'kicked' && profile.kicked_at) {
+              const kickedTime = new Date(profile.kicked_at).getTime();
+              const fifteenMinutesAgo = Date.now() - (15 * 60 * 1000);
+              if (kickedTime < fifteenMinutesAgo) {
+                console.log(`[SessionContext] Real-time check: User ${session.user.id} was kicked, but 15 minutes have passed. Auto-unkicking.`);
+                await supabase.from('profiles').update({ status: 'active', kicked_at: null }).eq('id', session.user.id);
+                await supabase.auth.admin.updateUserById(session.user.id, { user_metadata: { kicked_at: null } });
+                setUserStatus('active');
+                toast.info("Tu expulsión ha expirado. Puedes volver a usar la aplicación.");
+                return; // Exit early as status changed
+              }
+            }
+
             if (profile.status === 'banned' || profile.status === 'kicked') {
               await supabase.auth.signOut();
               toast.error(`Tu cuenta ha sido ${profile.status === 'banned' ? 'baneada' : 'expulsada'}. Se ha cerrado tu sesión.`);
@@ -191,7 +220,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     const intervalId = setInterval(checkSessionAndGlobalStatus, 3000); // Check every 3 seconds
 
     return () => clearInterval(intervalId);
-  }, [session, userRole, router, userStatus]); // Added userStatus to dependencies
+  }, [session, userRole, router, userStatus]);
 
   if (isLoading) {
     return (

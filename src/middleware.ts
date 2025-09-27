@@ -26,16 +26,18 @@ export async function middleware(req: NextRequest) {
   const { data: { session } } = await supabase.auth.getSession();
 
   let userRole: 'user' | 'admin' | 'super_admin' | null = null;
-  let userStatus: 'active' | 'banned' | 'kicked' | null = null; // NEW: Fetch user status
+  let userStatus: 'active' | 'banned' | 'kicked' | null = null;
+  let kickedAt: string | null = null; // NEW: Fetch kicked_at
 
   if (session?.user?.id) {
     if (session.user.email && SUPERUSER_EMAILS.includes(session.user.email)) {
       userRole = 'super_admin';
-      userStatus = 'active'; // Super admins are always active
+      userStatus = 'active';
     } else {
-      const { data: profile } = await supabase.from('profiles').select('role, status').eq('id', session.user.id).single();
+      const { data: profile } = await supabase.from('profiles').select('role, status, kicked_at').eq('id', session.user.id).single(); // NEW: Select kicked_at
       userRole = profile ? profile.role as 'user' | 'admin' | 'super_admin' : 'user';
-      userStatus = profile ? profile.status as 'active' | 'banned' | 'kicked' : 'active'; // NEW: Get status from profile
+      userStatus = profile ? profile.status as 'active' | 'banned' | 'kicked' : 'active';
+      kickedAt = profile?.kicked_at || null; // NEW: Assign kickedAt
     }
   }
 
@@ -62,12 +64,56 @@ export async function middleware(req: NextRequest) {
 
   // NEW: Kick and disable logic
   if (session && !isSuperAdmin) {
-    const shouldBeKicked = (usersDisabled && userRole === 'user') || (adminsDisabled && userRole === 'admin') || userStatus === 'banned' || userStatus === 'kicked'; // NEW: Check for banned/kicked status
+    let shouldBeKicked = false;
+    let kickReason = '';
+
+    if (userStatus === 'banned') {
+      shouldBeKicked = true;
+      kickReason = 'account_banned';
+    } else if (userStatus === 'kicked') {
+      const kickedTime = kickedAt ? new Date(kickedAt).getTime() : 0;
+      const fifteenMinutesAgo = Date.now() - (15 * 60 * 1000); // 15 minutes in milliseconds
+
+      if (kickedTime > fifteenMinutesAgo) {
+        shouldBeKicked = true;
+        kickReason = 'account_kicked';
+      } else {
+        // If kicked status has expired, automatically unkick the user
+        await supabase.from('profiles').update({ status: 'active', kicked_at: null }).eq('id', session.user.id);
+        // Also update auth.users metadata to clear any kicked_at flag
+        await supabase.auth.admin.updateUserById(session.user.id, { user_metadata: { kicked_at: null } });
+        userStatus = 'active'; // Update local status for current request
+      }
+    } else if (usersDisabled && userRole === 'user') {
+      shouldBeKicked = true;
+      kickReason = 'account_type_disabled';
+    } else if (adminsDisabled && userRole === 'admin') {
+      shouldBeKicked = true;
+      kickReason = 'account_type_disabled';
+    }
+
     if (shouldBeKicked && !publicPaths.includes(req.nextUrl.pathname)) {
       await supabase.auth.signOut();
       const redirectUrl = req.nextUrl.clone();
       redirectUrl.pathname = '/login';
-      redirectUrl.searchParams.set('error', userStatus === 'banned' ? 'account_banned' : (userStatus === 'kicked' ? 'account_kicked' : 'account_type_disabled')); // NEW: Specific error messages
+      redirectUrl.searchParams.set('error', kickReason);
+      // Fetch the reason from moderation_logs if it's a specific kick/ban
+      if (kickReason === 'account_kicked' || kickReason === 'account_banned') {
+        const { data: moderationLog } = await supabase
+          .from('moderation_logs')
+          .select('reason')
+          .eq('target_user_id', session.user.id)
+          .eq('action', kickReason === 'account_kicked' ? 'kick' : 'ban')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        if (moderationLog?.reason) {
+          redirectUrl.searchParams.set('reason', moderationLog.reason);
+        }
+        if (kickedAt) {
+          redirectUrl.searchParams.set('kicked_at', kickedAt);
+        }
+      }
       return NextResponse.redirect(redirectUrl);
     }
   }

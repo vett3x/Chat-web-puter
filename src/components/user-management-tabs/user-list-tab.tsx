@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useImperativeHandle } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Users, Trash2, RefreshCw, AlertCircle, Eye, Search, Crown, Shield, Bot, LogOut, Ban, CheckCircle, UserCog } from 'lucide-react'; // <-- UserCog added here
+import { Loader2, Users, Trash2, RefreshCw, AlertCircle, Eye, Search, Crown, Shield, Bot, LogOut, Ban, CheckCircle, UserCog } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSession } from '@/components/session-context-provider';
 import { SUPERUSER_EMAILS } from '@/lib/constants';
@@ -29,6 +29,14 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { ReasonDialog } from './reason-dialog'; // Import the new dialog
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"; // <-- Tooltip components added here
 
 interface User {
   id: string;
@@ -37,7 +45,8 @@ interface User {
   last_name: string | null;
   avatar_url: string | null;
   role: 'user' | 'admin' | 'super_admin';
-  status: 'active' | 'banned' | 'kicked'; // NEW: Add 'kicked' status
+  status: 'active' | 'banned' | 'kicked';
+  kicked_at: string | null; // NEW: Add kicked_at
 }
 
 export interface UserListTabRef {
@@ -56,7 +65,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'user' | 'admin' | 'super_admin'>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'banned' | 'kicked'>('all'); // NEW: Add 'kicked' to filter
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'banned' | 'kicked'>('all');
   const [reasonDialogState, setReasonDialogState] = useState<{ isOpen: boolean; user: User | null; action: 'expulsar' | 'banear' | 'unban' | null }>({ isOpen: false, user: null, action: null });
 
   const fetchUsers = useCallback(async () => {
@@ -164,7 +173,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
         <p className="text-muted-foreground text-sm">No hay usuarios en esta categoría.</p>
       ) : (
         <Table>
-          <TableHeader><TableRow><TableHead>Usuario</TableHead><TableHead>Email</TableHead><TableHead>Rol</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Usuario</TableHead><TableHead>Email</TableHead><TableHead>Rol</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
           <TableBody>
             {usersToRender.map((user) => {
               const isCurrentUser = user.id === currentUserId;
@@ -190,8 +199,27 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
                           {user.role === 'super_admin' ? 'Super Admin' : user.role}
                         </Badge>
                       )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col items-start">
+                      {user.status === 'active' && <Badge>Activo</Badge>}
                       {user.status === 'banned' && <Badge variant="destructive">Baneado</Badge>}
-                      {user.status === 'kicked' && <Badge variant="warning">Expulsado</Badge>}
+                      {user.status === 'kicked' && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="warning" className="cursor-help">
+                                Expulsado
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Expulsado el: {user.kicked_at ? format(new Date(user.kicked_at), 'dd/MM/yyyy HH:mm', { locale: es }) : 'N/A'}</p>
+                              <p>Duración: 15 minutos</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
@@ -241,7 +269,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
 
   const activeUsers = filteredUsers.filter(u => u.status === 'active');
   const bannedUsers = filteredUsers.filter(u => u.status === 'banned');
-  const kickedUsers = filteredUsers.filter(u => u.status === 'kicked'); // NEW: Filter kicked users
+  const kickedUsers = filteredUsers.filter(u => u.status === 'kicked');
 
   return (
     <Card className="h-full flex flex-col">
