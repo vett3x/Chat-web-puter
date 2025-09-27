@@ -12,12 +12,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
-import { Moon, Sun, Settings, LogOut, User as UserIcon, Server, Users, Crown, Shield, Bot, GitPullRequest } from 'lucide-react'; // Corrected icon import
+import { Moon, Sun, Settings, LogOut, User as UserIcon, Server, Users, Crown, Shield, Bot, GitPullRequest } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 interface Profile {
   first_name: string | null;
@@ -113,14 +115,11 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
               {profile?.first_name && profile?.last_name ? `${profile.first_name} ${profile.last_name}` : session.user.email}
             </span>
             {userRole && userRole !== 'user' && (
-              <span className={`flex items-center gap-1 text-xs font-semibold px-1.5 py-0.5 rounded-full mt-1 capitalize
-                ${userRole === 'super_admin' ? 'bg-yellow-500 text-yellow-900 dark:bg-yellow-400 dark:text-yellow-950' : ''}
-                ${userRole === 'admin' ? 'bg-purple-500 text-purple-900 dark:bg-purple-400 dark:text-purple-950' : ''}
-              `}>
-                {userRole === 'super_admin' && <Crown className="h-3 w-3 fill-current" />}
-                {userRole === 'admin' && <Shield className="h-3 w-3 fill-current" />}
+              <Badge variant={userRole === 'admin' ? 'secondary' : 'default'} className={cn('capitalize mt-1', userRole === 'super_admin' && 'bg-yellow-500 text-yellow-900 dark:bg-yellow-400 dark:text-yellow-950')}>
+                {userRole === 'super_admin' && <Crown className="h-3 w-3 mr-1" />}
+                {userRole === 'admin' && <Shield className="h-3 w-3 mr-1" />}
                 {userRole === 'super_admin' ? 'Super Admin' : userRole}
-              </span>
+              </Badge>
             )}
           </div>
         </Button>
