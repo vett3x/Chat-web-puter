@@ -10,14 +10,14 @@ import { createClient } from '@supabase/supabase-js';
 const apiKeySchema = z.object({
   id: z.string().optional(), // Optional for POST, required for PUT
   provider: z.string().min(1),
-  api_key: z.string().optional(), // Make optional
-  nickname: z.string().optional(),
-  project_id: z.string().optional(),
-  location_id: z.string().optional(),
+  api_key: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional API key
+  nickname: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional nickname
+  project_id: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional project_id
+  location_id: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional location_id
   use_vertex_ai: z.boolean().optional(),
-  model_name: z.string().optional(), // This needs to be conditional
+  model_name: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional model_name
   json_key_content: z.string().optional(), // New: for Vertex AI JSON key content
-  api_endpoint: z.string().url({ message: 'URL de endpoint inválida.' }).optional(), // New: for custom endpoint
+  api_endpoint: z.string().trim().url({ message: 'URL de endpoint inválida.' }).optional().or(z.literal('')), // Changed: Allow empty string for optional api_endpoint
   is_global: z.boolean().optional(), // NEW: Add is_global to schema
 }).superRefine((data, ctx) => {
   if (data.provider === 'google_gemini') {
@@ -78,20 +78,19 @@ const apiKeySchema = z.object({
   }
 });
 
-// REMOVED superRefine from the update schema. The backend will now only validate the fields that are present in the PUT request payload.
-// This prevents validation errors when a user is only updating a single field like `is_global`.
+// The updateApiKeySchema should also be more flexible.
 const updateApiKeySchema = z.object({
   id: z.string().min(1, { message: 'ID de clave es requerido para actualizar.' }),
-  provider: z.string().min(1),
-  api_key: z.string().optional(), // API Key is optional for updates
-  nickname: z.string().optional(),
-  project_id: z.string().optional(),
-  location_id: z.string().optional(),
+  provider: z.string().min(1), // Provider should not be changed on update, but keep for validation
+  api_key: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional API key
+  nickname: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional nickname
+  project_id: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional project_id
+  location_id: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional location_id
   use_vertex_ai: z.boolean().optional(),
-  model_name: z.string().optional(),
-  json_key_file: z.any().optional(),
+  model_name: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional model_name
+  json_key_file: z.any().optional(), // This field is not actually used in the backend, can be removed or ignored
   json_key_content: z.string().optional(),
-  api_endpoint: z.string().url({ message: 'URL de endpoint inválida.' }).optional(), // New: for custom endpoint
+  api_endpoint: z.string().trim().url({ message: 'URL de endpoint inválida.' }).optional().or(z.literal('')), // Changed: Allow empty string for optional api_endpoint
   is_global: z.boolean().optional(), // NEW: Add is_global to schema
 });
 

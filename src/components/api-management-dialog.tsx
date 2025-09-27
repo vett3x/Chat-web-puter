@@ -28,21 +28,19 @@ import { Label } from '@/components/ui/label';
 import { AI_PROVIDERS, getModelLabel } from '@/lib/ai-models'; // Import AI_PROVIDERS
 import { useSession } from '@/components/session-context-provider'; // NEW: Import useSession
 
-// REMOVED superRefine from the schema. Stricter validation for NEW keys will be handled in the onSubmit function.
-// This prevents the form from blocking updates where not all fields are relevant (e.g., just toggling is_global).
 const apiKeySchema = z.object({
   id: z.string().optional(), // Added for editing existing keys
   provider: z.string().min(1, { message: 'Debes seleccionar un proveedor.' }),
-  api_key: z.string().optional(), // Make optional for Vertex AI
-  nickname: z.string().optional(),
+  api_key: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional API key
+  nickname: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional nickname
   // New fields for Vertex AI
-  project_id: z.string().optional(),
-  location_id: z.string().optional(),
+  project_id: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional project_id
+  location_id: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional location_id
   use_vertex_ai: z.boolean().optional(),
-  model_name: z.string().optional(), // This needs to be conditional
+  model_name: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional model_name
   json_key_file: z.any().optional(), // New: for file upload
   json_key_content: z.string().optional(), // Added for payload
-  api_endpoint: z.string().url({ message: 'URL de endpoint inválida.' }).optional(), // New: for custom endpoint
+  api_endpoint: z.string().trim().url({ message: 'URL de endpoint inválida.' }).optional().or(z.literal('')), // Changed: Allow empty string for optional api_endpoint
   is_global: z.boolean().optional(), // NEW: Add is_global to schema
 });
 
