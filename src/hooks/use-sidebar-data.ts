@@ -121,44 +121,56 @@ export function useSidebarData() {
     }
   }, [userId, isSessionLoading, fetchData]);
 
-  const createConversation = async (onSuccess: (newConversation: Conversation) => void) => {
-    if (!userId) return null;
+  const createConversation = async (onSuccess: (newConversation: Conversation) => void): Promise<string | null> => {
+    if (!userId) {
+      toast.error('Usuario no autenticado.');
+      return null;
+    }
     const { data, error } = await supabase.from('conversations').insert({ user_id: userId, title: 'Nueva conversación' }).select().single();
     if (error) {
       toast.error('Error al crear una nueva conversación.');
-      return null;
+      console.error('Supabase Error creating conversation:', error);
+      throw new Error(error.message); // Throw error for catch block in component
     }
     toast.success('Nueva conversación creada.');
     await fetchData();
     onSuccess(data);
-    return data;
+    return data.id;
   };
 
-  const createFolder = async (parentId: string | null = null) => {
-    if (!userId) return null;
+  const createFolder = async (parentId: string | null = null): Promise<string | null> => {
+    if (!userId) {
+      toast.error('Usuario no autenticado.');
+      return null;
+    }
     const newFolderName = parentId ? 'Nueva subcarpeta' : 'Nueva carpeta';
     const { data, error } = await supabase.from('folders').insert({ user_id: userId, name: newFolderName, parent_id: parentId }).select().single();
     if (error) {
       toast.error('Error al crear una nueva carpeta.');
-    } else {
-      toast.success(`${newFolderName} creada.`);
-      await fetchData();
+      console.error('Supabase Error creating folder:', error);
+      throw new Error(error.message); // Throw error for catch block in component
     }
-    return data;
+    toast.success(`${newFolderName} creada.`);
+    await fetchData();
+    return data.id;
   };
 
   // New function to create a note
-  const createNote = async (onSuccess: (newNote: Note) => void) => {
-    if (!userId) return null;
+  const createNote = async (onSuccess: (newNote: Note) => void): Promise<string | null> => {
+    if (!userId) {
+      toast.error('Usuario no autenticado.');
+      return null;
+    }
     const { data, error } = await supabase.from('notes').insert({ user_id: userId, title: 'Nueva nota' }).select().single();
     if (error) {
       toast.error('Error al crear una nueva nota.');
-      return null;
+      console.error('Supabase Error creating note:', error);
+      throw new Error(error.message); // Throw error for catch block in component
     }
     toast.success('Nueva nota creada.');
     await fetchData();
     onSuccess(data);
-    return data;
+    return data.id;
   };
 
   // Functions for moving items (conversations, notes, folders)
