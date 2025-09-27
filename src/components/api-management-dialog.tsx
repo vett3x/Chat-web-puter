@@ -129,6 +129,10 @@ const updateApiKeySchema = z.object({
   api_endpoint: z.string().url({ message: 'URL de endpoint inválida.' }).optional(), // New: for custom endpoint
   is_global: z.boolean().optional(), // NEW: Add is_global to schema
 }).superRefine((data, ctx) => {
+  // For updates, API key is only required if it's explicitly provided and not empty.
+  // If it's empty, it means the user doesn't want to change the existing key.
+  // The backend will handle not updating it if the field is missing from the payload.
+
   if (data.provider === 'google_gemini') {
     if (data.use_vertex_ai) {
       if (!data.model_name || data.model_name === '') {
@@ -160,14 +164,7 @@ const updateApiKeySchema = z.object({
           path: ['model_name'],
         });
       }
-      // API Key is optional for update if not changing
-      // if (!data.api_key || data.api_key === '') {
-      //   ctx.addIssue({
-      //     code: z.ZodIssueCode.custom,
-      //     message: 'API Key es requerida para la API pública de Gemini.',
-      //     path: ['api_key'],
-      //   });
-      // }
+      // Removed API key validation for updates here. Handled in onSubmit.
     }
   } else if (data.provider === 'custom_endpoint') { // New validation for custom_endpoint
     if (!data.api_endpoint || data.api_endpoint === '') {
@@ -177,13 +174,7 @@ const updateApiKeySchema = z.object({
         path: ['api_endpoint'],
       });
     }
-    if (!data.api_key || data.api_key === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'La API Key es requerida para un endpoint personalizado.',
-        path: ['api_key'],
-      });
-    }
+    // Removed API key validation for updates here. Handled in onSubmit.
     if (!data.model_name || data.model_name === '') {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -376,10 +367,32 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         payload.id = editingKeyId; // Ensure ID is in payload for PUT
       }
 
-      // If editing and API key is empty, don't send it to avoid overwriting with empty string
-      if (editingKeyId && !payload.api_key) {
-        delete payload.api_key;
+      // --- Custom validation for API Key based on mode (create vs. edit) ---
+      if (!editingKeyId) { // If creating a NEW key
+        if (payload.provider === 'google_gemini' && !payload.use_vertex_ai && (!payload.api_key || payload.api_key === '')) {
+          form.setError('api_key', { type: 'manual', message: 'API Key es requerida para la API pública de Gemini.' });
+          setIsSubmitting(false);
+          return;
+        }
+        if (payload.provider === 'custom_endpoint' && (!payload.api_key || payload.api_key === '')) {
+          form.setError('api_key', { type: 'manual', message: 'La API Key es requerida para un endpoint personalizado.' });
+          setIsSubmitting(false);
+          return;
+        }
+        // For other providers (if added later)
+        if (!isGoogleGemini && !isCustomEndpoint && (!payload.api_key || payload.api_key === '')) {
+          form.setError('api_key', { type: 'manual', message: 'API Key es requerida.' });
+          setIsSubmitting(false);
+          return;
+        }
+      } else { // If EDITING an existing key
+        // If api_key field is empty, delete it from payload so backend doesn't update it
+        if (payload.api_key === '') {
+          delete payload.api_key;
+        }
       }
+      // --- End custom validation ---
+
       // If using Vertex AI, ensure api_key is null/undefined
       if (payload.use_vertex_ai) {
         payload.api_key = undefined; // Will be stored as NULL in DB
@@ -396,7 +409,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         payload.api_endpoint = undefined;
       } else if (isCustomEndpoint) {
         // If using custom endpoint, clear Vertex AI specific fields and api_key
-        payload.api_key = values.api_key; // API key is required for custom endpoint
+        // payload.api_key is handled by the custom validation above
         payload.project_id = undefined;
         payload.location_id = undefined;
         payload.json_key_content = undefined;
