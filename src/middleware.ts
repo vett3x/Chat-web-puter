@@ -26,13 +26,16 @@ export async function middleware(req: NextRequest) {
   const { data: { session } } = await supabase.auth.getSession();
 
   let userRole: 'user' | 'admin' | 'super_admin' | null = null;
+  let userStatus: 'active' | 'banned' | 'kicked' | null = null; // NEW: Fetch user status
 
   if (session?.user?.id) {
     if (session.user.email && SUPERUSER_EMAILS.includes(session.user.email)) {
       userRole = 'super_admin';
+      userStatus = 'active'; // Super admins are always active
     } else {
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+      const { data: profile } = await supabase.from('profiles').select('role, status').eq('id', session.user.id).single();
       userRole = profile ? profile.role as 'user' | 'admin' | 'super_admin' : 'user';
+      userStatus = profile ? profile.status as 'active' | 'banned' | 'kicked' : 'active'; // NEW: Get status from profile
     }
   }
 
@@ -59,12 +62,12 @@ export async function middleware(req: NextRequest) {
 
   // NEW: Kick and disable logic
   if (session && !isSuperAdmin) {
-    const shouldBeKicked = (usersDisabled && userRole === 'user') || (adminsDisabled && userRole === 'admin');
+    const shouldBeKicked = (usersDisabled && userRole === 'user') || (adminsDisabled && userRole === 'admin') || userStatus === 'banned' || userStatus === 'kicked'; // NEW: Check for banned/kicked status
     if (shouldBeKicked && !publicPaths.includes(req.nextUrl.pathname)) {
       await supabase.auth.signOut();
       const redirectUrl = req.nextUrl.clone();
       redirectUrl.pathname = '/login';
-      redirectUrl.searchParams.set('error', 'account_type_disabled');
+      redirectUrl.searchParams.set('error', userStatus === 'banned' ? 'account_banned' : (userStatus === 'kicked' ? 'account_kicked' : 'account_type_disabled')); // NEW: Specific error messages
       return NextResponse.redirect(redirectUrl);
     }
   }

@@ -32,8 +32,11 @@ import {
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { useSession } from '@/components/session-context-provider';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 type UserRole = 'user' | 'admin' | 'super_admin';
+type UserStatus = 'active' | 'banned' | 'kicked'; // NEW: Define UserStatus type
 
 interface UserDetailDialogProps {
   open: boolean;
@@ -44,6 +47,7 @@ interface UserDetailDialogProps {
     first_name: string | null;
     last_name: string | null;
     role: UserRole;
+    status: UserStatus; // NEW: Add status to user prop
   };
   currentUserRole: UserRole | null;
   onRoleUpdated: () => void;
@@ -113,6 +117,8 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="h-6 w-6" /> Detalles del Usuario: {userName}
+            {user.status === 'banned' && <Badge variant="destructive" className="ml-2">BANEADO</Badge>}
+            {user.status === 'kicked' && <Badge variant="warning" className="ml-2">EXPULSADO</Badge>}
           </DialogTitle>
           <DialogDescription>
             Información detallada y gestión para el usuario {user.email}.

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useImperativeHandle } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Users, Trash2, RefreshCw, AlertCircle, Eye, Search, Crown, Shield, Bot, LogOut, Ban, CheckCircle } from 'lucide-react';
+import { Loader2, Users, Trash2, RefreshCw, AlertCircle, Eye, Search, Crown, Shield, Bot, LogOut, Ban, CheckCircle, UserCog } from 'lucide-react'; // <-- UserCog added here
 import { toast } from 'sonner';
 import { useSession } from '@/components/session-context-provider';
 import { SUPERUSER_EMAILS } from '@/lib/constants';
@@ -37,7 +37,7 @@ interface User {
   last_name: string | null;
   avatar_url: string | null;
   role: 'user' | 'admin' | 'super_admin';
-  status: 'active' | 'banned';
+  status: 'active' | 'banned' | 'kicked'; // NEW: Add 'kicked' status
 }
 
 export interface UserListTabRef {
@@ -56,7 +56,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'user' | 'admin' | 'super_admin'>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'banned'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'banned' | 'kicked'>('all'); // NEW: Add 'kicked' to filter
   const [reasonDialogState, setReasonDialogState] = useState<{ isOpen: boolean; user: User | null; action: 'expulsar' | 'banear' | 'unban' | null }>({ isOpen: false, user: null, action: null });
 
   const fetchUsers = useCallback(async () => {
@@ -157,7 +157,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
   const renderUserTable = (usersToRender: User[], title: string) => (
     <div className="mb-8">
       <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-        {title.includes('Baneados') ? <Ban className="h-5 w-5 text-muted-foreground" /> : <Users className="h-5 w-5 text-muted-foreground" />}
+        {title.includes('Baneados') ? <Ban className="h-5 w-5 text-muted-foreground" /> : (title.includes('Expulsados') ? <LogOut className="h-5 w-5 text-muted-foreground" /> : <Users className="h-5 w-5 text-muted-foreground" />)}
         {title} ({usersToRender.length})
       </h3>
       {usersToRender.length === 0 ? (
@@ -173,7 +173,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
               const canPerformModeration = canSuperAdminAct || canAdminAct;
 
               return (
-                <TableRow key={user.id} className={cn(user.status === 'banned' && 'bg-muted/50 opacity-60')}>
+                <TableRow key={user.id} className={cn(user.status === 'banned' && 'bg-destructive/10 opacity-60', user.status === 'kicked' && 'bg-warning/10 opacity-60')}>
                   <TableCell className="flex items-center gap-2">
                     <Avatar className="h-8 w-8"><AvatarImage src={user.avatar_url || ''} alt="Avatar" /><AvatarFallback className="bg-primary text-primary-foreground"><Bot className="h-4 w-4" /></AvatarFallback></Avatar>
                     <div><p className="font-medium">{user.first_name || 'N/A'} {user.last_name || ''}</p></div>
@@ -191,6 +191,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
                         </Badge>
                       )}
                       {user.status === 'banned' && <Badge variant="destructive">Baneado</Badge>}
+                      {user.status === 'kicked' && <Badge variant="warning">Expulsado</Badge>}
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
@@ -199,9 +200,13 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
                         <>
                           <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleOpenUserDetails(user)}><Eye className="h-4 w-4" /></Button>
                           <DropdownMenu>
-                            <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8" disabled={!canPerformModeration}><Users className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                            <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8" disabled={!canPerformModeration}><UserCog className="h-4 w-4" /></Button></DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openReasonDialog(user, 'expulsar')}><LogOut className="mr-2 h-4 w-4" /> Expulsar</DropdownMenuItem>
+                              {user.status !== 'kicked' ? (
+                                <DropdownMenuItem onClick={() => openReasonDialog(user, 'expulsar')}><LogOut className="mr-2 h-4 w-4" /> Expulsar</DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem onClick={() => handleUserStatusChange(user.id, 'unban', 'Reactivado por administrador.')}><CheckCircle className="mr-2 h-4 w-4" /> Reactivar</DropdownMenuItem>
+                              )}
                               {user.status === 'banned' ? (
                                 <DropdownMenuItem onClick={() => openReasonDialog(user, 'unban')}><CheckCircle className="mr-2 h-4 w-4" /> Desbanear</DropdownMenuItem>
                               ) : (
@@ -236,6 +241,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
 
   const activeUsers = filteredUsers.filter(u => u.status === 'active');
   const bannedUsers = filteredUsers.filter(u => u.status === 'banned');
+  const kickedUsers = filteredUsers.filter(u => u.status === 'kicked'); // NEW: Filter kicked users
 
   return (
     <Card className="h-full flex flex-col">
@@ -247,7 +253,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
         <div className="flex flex-col sm:flex-row gap-4 mb-4">
           <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" /></div>
           <Select value={roleFilter} onValueChange={(v: any) => setRoleFilter(v)}><SelectTrigger className="w-[180px]"><SelectValue placeholder="Filtrar por rol" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los Roles</SelectItem><SelectItem value="super_admin">Super Admin</SelectItem><SelectItem value="admin">Admin</SelectItem><SelectItem value="user">Usuario</SelectItem></SelectContent></Select>
-          <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}><SelectTrigger className="w-[180px]"><SelectValue placeholder="Filtrar por estado" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los Estados</SelectItem><SelectItem value="active">Activo</SelectItem><SelectItem value="banned">Baneado</SelectItem></SelectContent></Select>
+          <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}><SelectTrigger className="w-[180px]"><SelectValue placeholder="Filtrar por estado" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los Estados</SelectItem><SelectItem value="active">Activo</SelectItem><SelectItem value="banned">Baneado</SelectItem><SelectItem value="kicked">Expulsado</SelectItem></SelectContent></Select>
         </div>
         {isLoadingUsers && filteredUsers.length === 0 ? (
           <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>
@@ -260,7 +266,9 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
               <Separator />
               {renderUserTable(activeUsers.filter(u => u.role === 'admin'), 'Admins')}
               <Separator />
-              {renderUserTable(activeUsers.filter(u => u.role === 'user'), 'Usuarios')}
+              {renderUserTable(activeUsers.filter(u => u.role === 'user'), 'Usuarios Activos')}
+              {kickedUsers.length > 0 && <Separator />}
+              {renderUserTable(kickedUsers, 'Usuarios Expulsados')}
               {bannedUsers.length > 0 && <Separator />}
               {renderUserTable(bannedUsers, 'Usuarios Baneados')}
             </div>

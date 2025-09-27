@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Moon, Sun, ShieldAlert, Loader2, Ban } from 'lucide-react';
+import { Moon, Sun, ShieldAlert, Loader2, Ban, LogOut } from 'lucide-react'; // NEW: Import LogOut icon
 import { useTheme } from 'next-themes';
 import { useSearchParams } from 'next/navigation';
 
@@ -21,6 +21,8 @@ export default function LoginPage() {
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
   const searchParams = useSearchParams();
   const accountDisabledError = searchParams.get('error') === 'account_type_disabled';
+  const accountBannedError = searchParams.get('error') === 'account_banned'; // NEW: Error for banned account
+  const accountKickedError = searchParams.get('error') === 'account_kicked'; // NEW: Error for kicked account
 
   useEffect(() => {
     setIsMounted(true);
@@ -96,6 +98,18 @@ export default function LoginPage() {
             <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-center text-sm text-destructive-foreground flex items-center gap-2">
               <Ban className="h-5 w-5" />
               <span>El inicio de sesión para tu tipo de cuenta está temporalmente desactivado.</span>
+            </div>
+          )}
+          {accountBannedError && ( // NEW: Message for banned account
+            <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-center text-sm text-destructive-foreground flex items-center gap-2">
+              <Ban className="h-5 w-5" />
+              <span>Tu cuenta ha sido baneada. Contacta al soporte para más información.</span>
+            </div>
+          )}
+          {accountKickedError && ( // NEW: Message for kicked account
+            <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-center text-sm text-yellow-200 flex items-center gap-2">
+              <LogOut className="h-5 w-5" />
+              <span>Has sido expulsado del sistema. Contacta al soporte para más información.</span>
             </div>
           )}
           {usersDisabled && !maintenanceMode && (

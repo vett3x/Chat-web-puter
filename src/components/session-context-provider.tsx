@@ -9,6 +9,7 @@ import { SUPERUSER_EMAILS, PERMISSION_KEYS } from '@/lib/constants';
 import { toast } from 'sonner';
 
 type UserRole = 'user' | 'admin' | 'super_admin';
+type UserStatus = 'active' | 'banned' | 'kicked'; // NEW: Define UserStatus type
 type UserPermissions = Record<string, boolean>;
 
 interface SessionContextType {
@@ -18,6 +19,7 @@ interface SessionContextType {
   userPermissions: UserPermissions;
   userAvatarUrl: string | null;
   userLanguage: string | null;
+  userStatus: UserStatus | null; // NEW: Add userStatus to context
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -29,6 +31,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const [userPermissions, setUserPermissions] = useState<UserPermissions>({});
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
   const [userLanguage, setUserLanguage] = useState<string | null>('es');
+  const [userStatus, setUserStatus] = useState<UserStatus | null>(null); // NEW: State for user status
   const router = useRouter();
   const pathname = usePathname();
 
@@ -36,7 +39,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     if (currentSession?.user?.id) {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('role, permissions, avatar_url, language')
+        .select('role, permissions, avatar_url, language, status') // NEW: Select status
         .eq('id', currentSession.user.id)
         .single();
 
@@ -44,6 +47,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       let determinedPermissions: UserPermissions = {};
       let determinedAvatarUrl: string | null = null;
       let determinedLanguage: string | null = 'es';
+      let determinedStatus: UserStatus = 'active'; // Default to active
 
       if (error) {
         console.error('[SessionContext] Error fetching user profile:', error);
@@ -53,6 +57,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         determinedPermissions = profile.permissions || {};
         determinedAvatarUrl = profile.avatar_url;
         determinedLanguage = profile.language || 'es';
+        determinedStatus = profile.status as UserStatus; // NEW: Assign fetched status
       } else {
         determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
       }
@@ -62,6 +67,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         for (const key of Object.values(PERMISSION_KEYS)) {
           determinedPermissions[key] = true;
         }
+        determinedStatus = 'active'; // Super admins are always active
       } else if (!profile) {
         determinedPermissions = {
           can_create_server: false,
@@ -75,12 +81,14 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       setUserPermissions(determinedPermissions);
       setUserAvatarUrl(determinedAvatarUrl);
       setUserLanguage(determinedLanguage);
+      setUserStatus(determinedStatus); // NEW: Set user status
 
     } else {
       setUserRole(null);
       setUserPermissions({});
       setUserAvatarUrl(null);
       setUserLanguage('es');
+      setUserStatus(null); // NEW: Clear user status
     }
   };
 
@@ -136,7 +144,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         return;
       }
 
-      // 2. Secondary Check: Is the user's role globally disabled? (Only for non-super-admins)
+      // 2. Secondary Check: Is the user's role globally disabled or is their profile status 'banned'/'kicked'? (Only for non-super-admins)
       if (userRole !== 'super_admin') {
         try {
           const response = await fetch('/api/settings/public-status');
@@ -146,6 +154,26 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
           }
           const statusData = await response.json();
           const { usersDisabled, adminsDisabled } = statusData;
+
+          // Re-fetch profile status to ensure it's up-to-date
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('status')
+            .eq('id', session.user.id)
+            .single();
+
+          if (profileError || !profile) {
+            console.error("[SessionContext] Error re-fetching user profile status:", profileError);
+            // If profile can't be fetched, assume active to avoid locking out
+            setUserStatus('active'); 
+          } else {
+            setUserStatus(profile.status as UserStatus);
+            if (profile.status === 'banned' || profile.status === 'kicked') {
+              await supabase.auth.signOut();
+              toast.error(`Tu cuenta ha sido ${profile.status === 'banned' ? 'baneada' : 'expulsada'}. Se ha cerrado tu sesión.`);
+              return;
+            }
+          }
 
           if (usersDisabled && userRole === 'user') {
             await supabase.auth.signOut();
@@ -163,7 +191,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     const intervalId = setInterval(checkSessionAndGlobalStatus, 3000); // Check every 3 seconds
 
     return () => clearInterval(intervalId);
-  }, [session, userRole, router]);
+  }, [session, userRole, router, userStatus]); // Added userStatus to dependencies
 
   if (isLoading) {
     return (
@@ -175,7 +203,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   }
   
   return (
-    <SessionContext.Provider value={{ session, isLoading, userRole, userPermissions, userAvatarUrl, userLanguage }}>
+    <SessionContext.Provider value={{ session, isLoading, userRole, userPermissions, userAvatarUrl, userLanguage, userStatus }}>
       {children}
     </SessionContext.Provider>
   );
