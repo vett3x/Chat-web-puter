@@ -19,12 +19,70 @@ const apiKeySchema = z.object({
   json_key_content: z.string().optional(), // New: for Vertex AI JSON key content
   api_endpoint: z.string().url({ message: 'URL de endpoint inválida.' }).optional(), // New: for custom endpoint
   is_global: z.boolean().optional(), // NEW: Add is_global to schema
+}).superRefine((data, ctx) => {
+  if (data.provider === 'google_gemini') {
+    if (data.use_vertex_ai) {
+      if (!data.model_name || data.model_name === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Debes seleccionar un modelo para usar Vertex AI.',
+          path: ['model_name'],
+        });
+      }
+      if (!data.project_id) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Project ID es requerido para usar Vertex AI.',
+          path: ['project_id'],
+        });
+      }
+      if (!data.location_id) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Location ID es requerido para usar Vertex AI.',
+          path: ['location_id'],
+        });
+      }
+    } else { // Public API
+      if (!data.model_name || data.model_name === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Debes seleccionar un modelo para la API pública de Gemini.',
+          path: ['model_name'],
+        });
+      }
+      // REMOVED: API key validation for adding new keys from here. It's now handled manually in onSubmit.
+    }
+  } else if (data.provider === 'custom_endpoint') { // New validation for custom_endpoint
+    if (!data.api_endpoint || data.api_endpoint === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El link del endpoint es requerido para un endpoint personalizado.',
+        path: ['api_endpoint'],
+      });
+    }
+    // REMOVED: API key validation for adding new keys from here. It's now handled manually in onSubmit.
+    if (!data.model_name || data.model_name === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El ID del modelo es requerido para un endpoint personalizado.',
+        path: ['model_name'],
+      });
+    }
+    if (!data.nickname || data.nickname === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El apodo es obligatorio para un endpoint personalizado.',
+        path: ['nickname'],
+      });
+    }
+  }
 });
 
 const updateApiKeySchema = z.object({
-  id: z.string().min(1, { message: 'ID de clave es requerido para actualizar.' }), // Required for PUT
+  id: z.string().min(1, { message: 'ID de clave es requerido para actualizar.' }),
   provider: z.string().min(1),
-  api_key: z.string().optional(),
+  api_key: z.string().optional(), // API Key is optional for updates
   nickname: z.string().optional(),
   project_id: z.string().optional(),
   location_id: z.string().optional(),
@@ -34,6 +92,82 @@ const updateApiKeySchema = z.object({
   json_key_content: z.string().optional(),
   api_endpoint: z.string().url({ message: 'URL de endpoint inválida.' }).optional(), // New: for custom endpoint
   is_global: z.boolean().optional(), // NEW: Add is_global to schema
+}).superRefine((data, ctx) => {
+  // For updates, API key is only required if it's explicitly provided and not empty.
+  // If it's empty, it means the user doesn't want to change the existing key.
+  // The backend will handle not updating it if the field is missing from the payload.
+
+  if (data.provider === 'google_gemini') {
+    if (data.use_vertex_ai) {
+      if (!data.model_name || data.model_name === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Debes seleccionar un modelo para usar Vertex AI.',
+          path: ['model_name'],
+        });
+      }
+      if (!data.project_id) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Project ID es requerido para usar Vertex AI.',
+          path: ['project_id'],
+        });
+      }
+      if (!data.location_id) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Location ID es requerido para usar Vertex AI.',
+          path: ['location_id'],
+        });
+      }
+    } else { // Public API
+      if (!data.model_name || data.model_name === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Debes seleccionar un modelo para la API pública de Gemini.',
+          path: ['model_name'],
+        });
+      }
+      // API Key is optional for update if not changing
+      // if (!data.api_key || data.api_key === '') {
+      //   ctx.addIssue({
+      //     code: z.ZodIssueCode.custom,
+      //     message: 'API Key es requerida para la API pública de Gemini.',
+      //     path: ['api_key'],
+      //   });
+      // }
+    }
+  } else if (data.provider === 'custom_endpoint') { // New validation for custom_endpoint
+    if (!data.api_endpoint || data.api_endpoint === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El link del endpoint es requerido para un endpoint personalizado.',
+        path: ['api_endpoint'],
+      });
+    }
+    // API Key is optional for update if not changing
+    // if (!data.api_key || data.api_key === '') {
+    //   ctx.addIssue({
+    //     code: z.ZodIssueCode.custom,
+    //     message: 'La API Key es requerida para un endpoint personalizado.',
+    //     path: ['api_key'],
+    //   });
+    // }
+    if (!data.model_name || data.model_name === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El ID del modelo es requerido para un endpoint personalizado.',
+        path: ['model_name'],
+      });
+    }
+    if (!data.nickname || data.nickname === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El apodo es obligatorio para un endpoint personalizado.',
+        path: ['nickname'],
+      });
+    }
+  }
 });
 
 // Helper function to get the session and user role
@@ -246,7 +380,7 @@ export async function PUT(req: NextRequest) {
       nickname: nickname || null,
       model_name: model_name || null,
       is_global: is_global !== undefined ? is_global : currentKey.is_global, // NEW: Update is_global if provided, else keep current
-      user_id: is_global ? null : session.user.id, // NEW: Set user_id to null if becoming global
+      user_id: is_global ? null : currentKey.user_id, // NEW: Set user_id to null if becoming global, otherwise keep current
     };
     
     // Handle API Key update: only if provided and not empty
