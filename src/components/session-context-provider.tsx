@@ -121,34 +121,44 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     };
   }, [router, pathname]);
 
-  // Real-time status check to kick users if their role is disabled
+  // Real-time status check to kick users if their role is disabled or session is invalidated
   useEffect(() => {
-    const checkGlobalStatus = async () => {
-      if (!session || userRole === 'super_admin') return;
+    const checkSessionAndGlobalStatus = async () => {
+      if (!session) return;
 
-      try {
-        const response = await fetch('/api/settings/public-status');
-        if (!response.ok) {
-          console.warn('Could not fetch public status for real-time check.');
-          return;
+      // 1. Primary Check: Is the current session token still valid on the server?
+      const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !currentSession) {
+        await supabase.auth.signOut();
+        toast.error("Tu sesión ha sido invalidada por un administrador o ha expirado.");
+        return; // Stop further checks
+      }
+
+      // 2. Secondary Check: Is the user's role globally disabled? (Only for non-super-admins)
+      if (userRole !== 'super_admin') {
+        try {
+          const response = await fetch('/api/settings/public-status');
+          if (!response.ok) {
+            console.warn('Could not fetch public status for real-time check.');
+            return;
+          }
+          const data = await response.json();
+          const { usersDisabled, adminsDisabled } = data;
+
+          if (usersDisabled && userRole === 'user') {
+            await supabase.auth.signOut();
+            toast.error("El acceso para cuentas de Usuario ha sido desactivado. Se ha cerrado tu sesión.");
+          } else if (adminsDisabled && userRole === 'admin') {
+            await supabase.auth.signOut();
+            toast.error("El acceso para cuentas de Admin ha sido desactivado. Se ha cerrado tu sesión.");
+          }
+        } catch (error) {
+          console.error("Error checking global status in real-time:", error);
         }
-
-        const data = await response.json();
-        const { usersDisabled, adminsDisabled } = data;
-
-        if (usersDisabled && userRole === 'user') {
-          await supabase.auth.signOut();
-          toast.error("El acceso para cuentas de Usuario ha sido desactivado globalmente. Se ha cerrado tu sesión.");
-        } else if (adminsDisabled && userRole === 'admin') {
-          await supabase.auth.signOut();
-          toast.error("El acceso para cuentas de Admin ha sido desactivado globalmente. Se ha cerrado tu sesión.");
-        }
-      } catch (error) {
-        console.error("Error checking global status in real-time:", error);
       }
     };
 
-    const intervalId = setInterval(checkGlobalStatus, 15000); // Check every 15 seconds
+    const intervalId = setInterval(checkSessionAndGlobalStatus, 15000); // Check every 15 seconds
 
     return () => clearInterval(intervalId);
   }, [session, userRole, router]);
