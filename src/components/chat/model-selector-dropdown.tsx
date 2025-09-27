@@ -141,7 +141,7 @@ export function ModelSelectorDropdown({
                   <DropdownMenuLabel className={cn("flex items-center gap-2 font-bold text-foreground px-2 py-1.5", !hasAnyKey && "text-muted-foreground")}>
                     <span>{providerGroup.company}</span>
                     <providerGroup.logo className="h-4 w-4" />
-                    {!hasAnyKey && <span title="Requiere API Key"><KeyRound className="h-4 w-4 text-muted-foreground" /></span>}
+                    {/* REMOVED: Conditional KeyRound icon here */}
                   </DropdownMenuLabel>
                   {hasAnyKey ? (
                     filteredKeys.map(key => {
