@@ -578,8 +578,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                     )} />
                   )}
                   
-                  {/* Only show for Super Admins */}
-                  {isSuperAdmin && (
+                  {isSuperAdmin && ( // NEW: Only show for Super Admins
                     <FormField control={form.control} name="is_global" render={({ field }) => (
                       <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
                         <div className="space-y-0.5">
@@ -646,66 +645,68 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                   ) : filteredKeys.length === 0 ? (
                     <TableRow><TableCell colSpan={isSuperAdmin ? 5 : 4} className="text-center text-muted-foreground">No hay claves que coincidan con la búsqueda.</TableCell></TableRow>
                   ) : (
-                    filteredKeys.map(key => {
-                      // Determine if the current user can edit/delete this key
-                      const canManageKey = isSuperAdmin || (!key.is_global && key.user_id === currentUserId);
+                    filteredKeys
+                      .filter(key => isSuperAdmin || !key.is_global) // NEW: Filter out global keys for non-Super Admins in the table
+                      .map(key => {
+                        // Determine if the current user can edit/delete this key
+                        const canManageKey = isSuperAdmin || (!key.is_global && key.user_id === currentUserId);
 
-                      return (
-                        <TableRow key={key.id}>
-                          <TableCell>{key.nickname || 'N/A'}</TableCell>
-                          <TableCell>{providerOptions.find(p => p.value === key.provider)?.label || key.provider}</TableCell>
-                          <TableCell className="font-mono text-xs">
-                            {key.provider === 'custom_endpoint' ? (
-                              <div className="flex flex-col">
-                                <span>Endpoint: {key.api_endpoint || 'N/A'}</span>
-                                <span className="text-muted-foreground">Modelo ID: {key.model_name || 'N/A'}</span>
-                                <span className="text-muted-foreground">API Key: {key.api_key ? `${key.api_key.substring(0, 4)}...${key.api_key.substring(key.api_key.length - 4)}` : 'N/A'}</span>
-                              </div>
-                            ) : key.use_vertex_ai ? (
-                              <div className="flex flex-col">
-                                <span>Vertex AI (Activo)</span>
-                                <span className="text-muted-foreground">Project: {key.project_id || 'N/A'}</span>
-                                <span className="text-muted-foreground">Location: {key.location_id || 'N/A'}</span>
-                                <span className="text-muted-foreground">Modelo: {getModelLabel(key.model_name ?? undefined) || 'N/A'}</span>
-                                {key.json_key_content && <span className="text-muted-foreground">JSON Key: Subido</span>}
-                              </div>
-                            ) : (
-                              <div className="flex flex-col">
-                                <span>{key.api_key}</span>
-                                <span className="text-muted-foreground">Modelo: {getModelLabel(key.model_name ?? undefined) || 'N/A'}</span>
-                              </div>
-                            )}
-                          </TableCell>
-                          {isSuperAdmin && (
-                            <TableCell>
-                              {key.is_global ? 'Sí' : 'No'}
+                        return (
+                          <TableRow key={key.id}>
+                            <TableCell>{key.nickname || 'N/A'}</TableCell>
+                            <TableCell>{providerOptions.find(p => p.value === key.provider)?.label || key.provider}</TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {key.provider === 'custom_endpoint' ? (
+                                <div className="flex flex-col">
+                                  <span>Endpoint: {key.api_endpoint || 'N/A'}</span>
+                                  <span className="text-muted-foreground">Modelo ID: {key.model_name || 'N/A'}</span>
+                                  <span className="text-muted-foreground">API Key: {key.api_key ? `${key.api_key.substring(0, 4)}...${key.api_key.substring(key.api_key.length - 4)}` : 'N/A'}</span>
+                                </div>
+                              ) : key.use_vertex_ai ? (
+                                <div className="flex flex-col">
+                                  <span>Vertex AI (Activo)</span>
+                                  <span className="text-muted-foreground">Project: {key.project_id || 'N/A'}</span>
+                                  <span className="text-muted-foreground">Location: {key.location_id || 'N/A'}</span>
+                                  <span className="text-muted-foreground">Modelo: {getModelLabel(key.model_name ?? undefined) || 'N/A'}</span>
+                                  {key.json_key_content && <span className="text-muted-foreground">JSON Key: Subido</span>}
+                                </div>
+                              ) : (
+                                <div className="flex flex-col">
+                                  <span>{key.api_key}</span>
+                                  <span className="text-muted-foreground">Modelo: {getModelLabel(key.model_name ?? undefined) || 'N/A'}</span>
+                                </div>
+                              )}
                             </TableCell>
-                          )}
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button 
-                                variant="outline" 
-                                size="icon" 
-                                onClick={() => handleEditKey(key)} 
-                                disabled={editingKeyId !== null || !canManageKey}
-                                title={!canManageKey ? "No tienes permiso para editar esta clave" : "Editar clave"}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="destructive" 
-                                size="icon" 
-                                onClick={() => handleDelete(key.id)} 
-                                disabled={editingKeyId !== null || !canManageKey}
-                                title={!canManageKey ? "No tienes permiso para eliminar esta clave" : "Eliminar clave"}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
+                            {isSuperAdmin && (
+                              <TableCell>
+                                {key.is_global ? 'Sí' : 'No'}
+                              </TableCell>
+                            )}
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button 
+                                  variant="outline" 
+                                  size="icon" 
+                                  onClick={() => handleEditKey(key)} 
+                                  disabled={editingKeyId !== null || !canManageKey}
+                                  title={!canManageKey ? "No tienes permiso para editar esta clave" : "Editar clave"}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="destructive" 
+                                  size="icon" 
+                                  onClick={() => handleDelete(key.id)} 
+                                  disabled={editingKeyId !== null || !canManageKey}
+                                  title={!canManageKey ? "No tienes permiso para eliminar esta clave" : "Eliminar clave"}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                   )}
                 </TableBody>
               </Table>
