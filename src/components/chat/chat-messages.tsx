@@ -21,8 +21,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ConstructionPlan } from './construction-plan';
-import { Message } from '@/hooks/use-chat';
+import { Message } from '@/hooks/use-general-chat'; // Corrected import path for Message
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { RenderablePart } from '@/lib/utils'; // Import RenderablePart
 
 interface ChatMessagesProps {
   messages: Message[];
@@ -125,12 +126,12 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
                 (message.content.endsWith('[USER_APPROVED_PLAN]') || 
                  message.content.endsWith('[USER_REQUESTED_BUILD_FIX]') || 
                  message.content.endsWith('[USER_REPORTED_WEB_ERROR]') ||
-                 message.content.endsWith('[USER_APPROVED_CORRECTION_PLAN]'))) { // NEW: Add correction plan approval message
+                 message.content.endsWith('[USER_APPROVED_CORRECTION_PLAN]'))) {
               return null;
             }
 
             const isLastMessage = index === displayedMessages.length - 1 && messages.length === displayedMessages.length;
-            const hasFiles = Array.isArray(message.content) && message.content.some(part => (part as any).type === 'code' && (part as any).filename);
+            const hasFiles = Array.isArray(message.content) && message.content.some((part: RenderablePart) => part.type === 'code' && part.filename);
 
             return (
               <div

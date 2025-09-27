@@ -2,12 +2,13 @@
 
 import React, { useState, useImperativeHandle, forwardRef } from 'react';
 import { Loader2 } from 'lucide-react';
-import { useChat, AutoFixStatus } from '@/hooks/use-chat'; // Import AutoFixStatus type
+import { useChat } from '@/hooks/use-chat'; // Import useChat dispatcher
+import { AutoFixStatus, Message } from '@/hooks/use-general-chat'; // Import types from use-general-chat
 import { ChatMessages } from '@/components/chat/chat-messages';
 import { ChatInput, ChatMode } from '@/components/chat/chat-input';
 import { ApiKey } from '@/hooks/use-user-api-keys';
 import { useSession } from './session-context-provider';
-import { AutoFixStatus as AutoFixStatusComponent } from './chat/auto-fix-status'; // NEW: Import AutoFixStatus
+import { AutoFixStatus as AutoFixStatusComponent } from './chat/auto-fix-status';
 
 interface ChatInterfaceProps {
   userId: string | undefined;
@@ -63,13 +64,14 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
     clearChat,
     approvePlan,
     autoFixStatus,
-    triggerFixBuildError, // NEW: Get triggerFixBuildError from hook
-    triggerReportWebError, // NEW: Get triggerReportWebError from hook
+    triggerFixBuildError,
+    triggerReportWebError,
   } = useChat({
     userId,
     conversationId,
     onNewConversationCreated,
     onConversationTitleUpdate,
+    aiResponseSpeed, // Pass aiResponseSpeed
     appPrompt,
     appId,
     onWriteFiles,
@@ -77,6 +79,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
     userApiKeys,
     isLoadingApiKeys,
     chatMode,
+    isAppChat,
   });
 
   // Expose autoFixStatus and trigger functions via ref
@@ -143,7 +146,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
           isAppChat={isAppChat}
           onSuggestionClick={(prompt: string) => sendMessage([{ type: 'text', text: prompt }], prompt)}
         />
-        <AutoFixStatusComponent status={autoFixStatus} /> {/* NEW: Add AutoFixStatus component */}
+        <AutoFixStatusComponent status={autoFixStatus} />
         <ChatInput
           isLoading={isLoading}
           selectedModel={selectedModel}

@@ -1,8 +1,8 @@
 "use client";
 
-import React from 'react';
+import React from 'react'; // Import React
 import { Loader2, Wand2, AlertTriangle } from 'lucide-react';
-import { AutoFixStatus as AutoFixStatusType } from '@/hooks/use-chat';
+import { AutoFixStatus as AutoFixStatusType } from '@/hooks/use-general-chat'; // Corrected import path
 
 interface AutoFixStatusProps {
   status: AutoFixStatusType;
@@ -13,7 +13,12 @@ export function AutoFixStatus({ status }: AutoFixStatusProps) {
     return null;
   }
 
-  const statusConfig = {
+  const statusConfig: Record<AutoFixStatusType, { icon: React.JSX.Element; text: string; bgColor: string; }> = {
+    idle: { // Added idle state
+      icon: <></>,
+      text: '',
+      bgColor: '',
+    },
     analyzing: {
       icon: <Loader2 className="h-4 w-4 animate-spin text-yellow-400" />,
       text: 'Compilación fallida. Analizando error...',
