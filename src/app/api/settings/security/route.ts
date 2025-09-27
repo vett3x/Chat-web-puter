@@ -9,7 +9,9 @@ import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/consta
 
 const updateSecuritySchema = z.object({
   security_enabled: z.boolean().optional(),
-  maintenance_mode_enabled: z.boolean().optional(), // NEW: Add maintenance_mode_enabled
+  maintenance_mode_enabled: z.boolean().optional(),
+  users_disabled: z.boolean().optional(), // NEW
+  admins_disabled: z.boolean().optional(), // NEW
 });
 
 async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null; userPermissions: UserPermissions }> {
@@ -24,7 +26,7 @@ async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | '
         remove(name: string, options: CookieOptions) {},
       },
     }
-  ); // REMOVED: .schema('public')
+  );
   const { data: { session } } = await supabase.auth.getSession();
 
   let userRole: 'user' | 'admin' | 'super_admin' | null = null;
@@ -58,7 +60,7 @@ async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | '
   return { session, userRole, userPermissions };
 }
 
-const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!); // REMOVED: .schema('public')
+const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
 export async function GET(req: NextRequest) {
   const { session, userRole } = await getSessionAndRole();
@@ -69,14 +71,16 @@ export async function GET(req: NextRequest) {
   try {
     const { data, error } = await supabaseAdmin
       .from('global_settings')
-      .select('security_enabled, maintenance_mode_enabled') // NEW: Select maintenance_mode_enabled
+      .select('security_enabled, maintenance_mode_enabled, users_disabled, admins_disabled')
       .single();
 
     if (error) throw error;
 
     return NextResponse.json({ 
       security_enabled: data?.security_enabled ?? true,
-      maintenance_mode_enabled: data?.maintenance_mode_enabled ?? false, // NEW: Return maintenance_mode_enabled
+      maintenance_mode_enabled: data?.maintenance_mode_enabled ?? false,
+      users_disabled: data?.users_disabled ?? false, // NEW
+      admins_disabled: data?.admins_disabled ?? false, // NEW
     });
   } catch (error: any) {
     console.error('[API /settings/security GET] Error fetching security setting:', error);
@@ -94,45 +98,53 @@ export async function PUT(req: NextRequest) {
     const body = await req.json();
     const parsedBody = updateSecuritySchema.parse(body);
 
-    const updateData: { security_enabled?: boolean; maintenance_mode_enabled?: boolean; updated_at: string } = {
+    const updateData: { [key: string]: any } = { // Use a flexible type for updateData
       updated_at: new Date().toISOString(),
     };
 
     if (parsedBody.security_enabled !== undefined) {
       updateData.security_enabled = parsedBody.security_enabled;
     }
-    if (parsedBody.maintenance_mode_enabled !== undefined) { // NEW: Handle maintenance_mode_enabled
+    if (parsedBody.maintenance_mode_enabled !== undefined) {
       updateData.maintenance_mode_enabled = parsedBody.maintenance_mode_enabled;
+    }
+    if (parsedBody.users_disabled !== undefined) { // NEW
+      updateData.users_disabled = parsedBody.users_disabled;
+    }
+    if (parsedBody.admins_disabled !== undefined) { // NEW
+      updateData.admins_disabled = parsedBody.admins_disabled;
     }
 
     const { data, error } = await supabaseAdmin
       .from('global_settings')
       .update(updateData)
-      .eq('id', '00000000-0000-0000-0000-000000000000') // Assuming a fixed ID for the single row, or fetch it
-      .select('security_enabled, maintenance_mode_enabled') // NEW: Select both fields
+      .eq('id', '00000000-0000-0000-0000-000000000000')
+      .select('security_enabled, maintenance_mode_enabled, users_disabled, admins_disabled')
       .single();
 
     if (error) throw error;
 
+    // Logging logic
+    const logEntries = [];
     if (parsedBody.security_enabled !== undefined) {
-      await supabaseAdmin.from('server_events_log').insert({
-        user_id: session.user.id,
-        event_type: 'security_setting_updated',
-        description: `Sistema de seguridad de comandos ${parsedBody.security_enabled ? 'activado' : 'desactivado'} por Super Admin '${session.user.email}'.`,
-      });
+      logEntries.push({ user_id: session.user.id, event_type: 'security_setting_updated', description: `Sistema de seguridad de comandos ${parsedBody.security_enabled ? 'activado' : 'desactivado'}.` });
     }
-    if (parsedBody.maintenance_mode_enabled !== undefined) { // NEW: Log maintenance mode changes
-      await supabaseAdmin.from('server_events_log').insert({
-        user_id: session.user.id,
-        event_type: 'maintenance_mode_updated',
-        description: `Modo Mantenimiento ${parsedBody.maintenance_mode_enabled ? 'activado' : 'desactivado'} por Super Admin '${session.user.email}'.`,
-      });
+    if (parsedBody.maintenance_mode_enabled !== undefined) {
+      logEntries.push({ user_id: session.user.id, event_type: 'maintenance_mode_updated', description: `Modo Mantenimiento ${parsedBody.maintenance_mode_enabled ? 'activado' : 'desactivado'}.` });
+    }
+    if (parsedBody.users_disabled !== undefined) { // NEW
+      logEntries.push({ user_id: session.user.id, event_type: 'user_accounts_toggled', description: `Cuentas de Usuario ${parsedBody.users_disabled ? 'desactivadas' : 'activadas'}.` });
+    }
+    if (parsedBody.admins_disabled !== undefined) { // NEW
+      logEntries.push({ user_id: session.user.id, event_type: 'admin_accounts_toggled', description: `Cuentas de Admin ${parsedBody.admins_disabled ? 'desactivadas' : 'activadas'}.` });
+    }
+    if (logEntries.length > 0) {
+      await supabaseAdmin.from('server_events_log').insert(logEntries);
     }
 
     return NextResponse.json({ 
       message: `Configuración actualizada.`, 
-      security_enabled: data.security_enabled,
-      maintenance_mode_enabled: data.maintenance_mode_enabled, // NEW: Return updated maintenance_mode_enabled
+      ...data
     });
   } catch (error: any) {
     if (error instanceof z.ZodError) {

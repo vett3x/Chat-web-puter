@@ -10,7 +10,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
-import { Loader2, Shield, PlusCircle, Trash2, RefreshCw, ToggleLeft, ToggleRight, Hammer } from 'lucide-react';
+import { Loader2, Shield, PlusCircle, Trash2, RefreshCw, Users, UserCog } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -50,10 +50,14 @@ export function SecurityTab() {
   const [isSubmittingCommand, setIsSubmittingCommand] = useState(false);
 
   const [securityEnabled, setSecurityEnabled] = useState(true);
-  const [maintenanceModeEnabled, setMaintenanceModeEnabled] = useState(false); // NEW: State for maintenance mode
-  const [isLoadingSettings, setIsLoadingSettings] = useState(true); // Combined loading state for settings
+  const [maintenanceModeEnabled, setMaintenanceModeEnabled] = useState(false);
+  const [usersDisabled, setUsersDisabled] = useState(false); // NEW
+  const [adminsDisabled, setAdminsDisabled] = useState(false); // NEW
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
   const [isTogglingSecurity, setIsTogglingSecurity] = useState(false);
-  const [isTogglingMaintenance, setIsTogglingMaintenance] = useState(false); // NEW: State for toggling maintenance
+  const [isTogglingMaintenance, setIsTogglingMaintenance] = useState(false);
+  const [isTogglingUsers, setIsTogglingUsers] = useState(false); // NEW
+  const [isTogglingAdmins, setIsTogglingAdmins] = useState(false); // NEW
 
   const form = useForm<CommandFormValues>({
     resolver: zodResolver(commandSchema),
@@ -64,12 +68,8 @@ export function SecurityTab() {
     setIsLoadingCommands(true);
     try {
       const response = await fetch('/api/security/allowed-commands');
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al cargar los comandos.');
-      }
-      const data: AllowedCommand[] = await response.json();
-      setCommands(data);
+      if (!response.ok) throw new Error((await response.json()).message || 'Error al cargar los comandos.');
+      setCommands(await response.json());
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -77,23 +77,18 @@ export function SecurityTab() {
     }
   }, []);
 
-  const fetchGlobalSettings = useCallback(async () => { // NEW: Combined fetch for global settings
+  const fetchGlobalSettings = useCallback(async () => {
     setIsLoadingSettings(true);
     try {
       const response = await fetch('/api/settings/security');
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al cargar la configuración de seguridad.');
-      }
+      if (!response.ok) throw new Error((await response.json()).message || 'Error al cargar la configuración.');
       const data = await response.json();
       setSecurityEnabled(data.security_enabled);
-      setMaintenanceModeEnabled(data.maintenance_mode_enabled); // NEW: Set maintenance mode state
+      setMaintenanceModeEnabled(data.maintenance_mode_enabled);
+      setUsersDisabled(data.users_disabled); // NEW
+      setAdminsDisabled(data.admins_disabled); // NEW
     } catch (err: any) {
-      if (isSuperAdmin) {
-        toast.error(err.message);
-      }
-      setSecurityEnabled(true); // Default to enabled on error or no access
-      setMaintenanceModeEnabled(false); // Default to disabled on error or no access
+      if (isSuperAdmin) toast.error(err.message);
     } finally {
       setIsLoadingSettings(false);
     }
@@ -101,7 +96,7 @@ export function SecurityTab() {
 
   useEffect(() => {
     if (isSuperAdmin) {
-      fetchGlobalSettings(); // Fetch all global settings
+      fetchGlobalSettings();
     }
     fetchCommands();
   }, [fetchCommands, fetchGlobalSettings, isSuperAdmin]);
@@ -109,11 +104,7 @@ export function SecurityTab() {
   const onSubmit = async (values: CommandFormValues) => {
     setIsSubmittingCommand(true);
     try {
-      const response = await fetch('/api/security/allowed-commands', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values),
-      });
+      const response = await fetch('/api/security/allowed-commands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message);
       toast.success(result.message);
@@ -138,41 +129,27 @@ export function SecurityTab() {
     }
   };
 
-  const handleToggleSecurity = async (checked: boolean) => {
-    setIsTogglingSecurity(true);
+  const handleToggleSetting = async (
+    setting: 'security_enabled' | 'maintenance_mode_enabled' | 'users_disabled' | 'admins_disabled',
+    checked: boolean,
+    setLoading: React.Dispatch<React.SetStateAction<boolean>>,
+    setValue: React.Dispatch<React.SetStateAction<boolean>>
+  ) => {
+    setLoading(true);
     try {
       const response = await fetch('/api/settings/security', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ security_enabled: checked }),
+        body: JSON.stringify({ [setting]: checked }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message);
-      setSecurityEnabled(result.security_enabled);
-      toast.success(result.message);
+      setValue(result[setting]);
+      toast.success(result.message || 'Configuración actualizada.');
     } catch (err: any) {
       toast.error(err.message);
     } finally {
-      setIsTogglingSecurity(false);
-    }
-  };
-
-  const handleToggleMaintenanceMode = async (checked: boolean) => { // NEW: Handler for maintenance mode
-    setIsTogglingMaintenance(true);
-    try {
-      const response = await fetch('/api/settings/security', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ maintenance_mode_enabled: checked }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message);
-      setMaintenanceModeEnabled(result.maintenance_mode_enabled);
-      toast.success(result.message);
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setIsTogglingMaintenance(false);
+      setLoading(false);
     }
   };
 
@@ -181,49 +158,40 @@ export function SecurityTab() {
       {isSuperAdmin && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-6 w-6" /> Control del Sistema de Seguridad
-            </CardTitle>
+            <CardTitle className="flex items-center gap-2"><Shield className="h-6 w-6" /> Control del Sistema</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoadingSettings ? (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" /> Cargando configuración...
-              </div>
+              <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Cargando configuración...</div>
             ) : (
               <div className="space-y-4">
                 <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
                   <div className="space-y-0.5">
-                    <Label htmlFor="security-toggle" className="text-base">
-                      Activar Sistema de Seguridad de Comandos
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Cuando está desactivado, la IA puede ejecutar cualquier comando en los contenedores. Úsalo con precaución y solo para diagnóstico.
-                    </p>
+                    <Label htmlFor="security-toggle" className="text-base">Activar Sistema de Seguridad de Comandos</Label>
+                    <p className="text-sm text-muted-foreground">Cuando está desactivado, la IA puede ejecutar cualquier comando. Úsalo con precaución.</p>
                   </div>
-                  <Switch
-                    id="security-toggle"
-                    checked={securityEnabled}
-                    onCheckedChange={handleToggleSecurity}
-                    disabled={isTogglingSecurity}
-                  />
+                  <Switch id="security-toggle" checked={securityEnabled} onCheckedChange={(c) => handleToggleSetting('security_enabled', c, setIsTogglingSecurity, setSecurityEnabled)} disabled={isTogglingSecurity} />
                 </div>
-                {/* NEW: Maintenance Mode Toggle */}
                 <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
                   <div className="space-y-0.5">
-                    <Label htmlFor="maintenance-toggle" className="text-base">
-                      Activar Modo Mantenimiento
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Expulsa a todos los usuarios (excepto Super Admins) y muestra una página de mantenimiento.
-                    </p>
+                    <Label htmlFor="maintenance-toggle" className="text-base">Activar Modo Mantenimiento</Label>
+                    <p className="text-sm text-muted-foreground">Expulsa a todos (excepto Super Admins) y muestra una página de mantenimiento.</p>
                   </div>
-                  <Switch
-                    id="maintenance-toggle"
-                    checked={maintenanceModeEnabled}
-                    onCheckedChange={handleToggleMaintenanceMode}
-                    disabled={isTogglingMaintenance}
-                  />
+                  <Switch id="maintenance-toggle" checked={maintenanceModeEnabled} onCheckedChange={(c) => handleToggleSetting('maintenance_mode_enabled', c, setIsTogglingMaintenance, setMaintenanceModeEnabled)} disabled={isTogglingMaintenance} />
+                </div>
+                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="users-disabled-toggle" className="text-base">Desactivar Cuentas de Usuario</Label>
+                    <p className="text-sm text-muted-foreground">Expulsa a todos los usuarios con rol 'user' y les impide iniciar sesión.</p>
+                  </div>
+                  <Switch id="users-disabled-toggle" checked={usersDisabled} onCheckedChange={(c) => handleToggleSetting('users_disabled', c, setIsTogglingUsers, setUsersDisabled)} disabled={isTogglingUsers} />
+                </div>
+                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="admins-disabled-toggle" className="text-base">Desactivar Cuentas de Admin</Label>
+                    <p className="text-sm text-muted-foreground">Expulsa a todos los usuarios con rol 'admin' y les impide iniciar sesión.</p>
+                  </div>
+                  <Switch id="admins-disabled-toggle" checked={adminsDisabled} onCheckedChange={(c) => handleToggleSetting('admins_disabled', c, setIsTogglingAdmins, setAdminsDisabled)} disabled={isTogglingAdmins} />
                 </div>
               </div>
             )}
@@ -233,9 +201,7 @@ export function SecurityTab() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <PlusCircle className="h-6 w-6" /> Añadir Comando a la Lista Blanca
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2"><PlusCircle className="h-6 w-6" /> Añadir Comando a la Lista Blanca</CardTitle>
         </CardHeader>
         <CardContent>
           {!isSuperAdmin ? (
@@ -243,24 +209,9 @@ export function SecurityTab() {
           ) : (
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField control={form.control} name="command" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Comando</FormLabel>
-                    <FormControl><Input placeholder="ej: npm" {...field} disabled={isSubmittingCommand} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="description" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Descripción (Opcional)</FormLabel>
-                    <FormControl><Input placeholder="ej: Node Package Manager" {...field} disabled={isSubmittingCommand} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <Button type="submit" disabled={isSubmittingCommand}>
-                  {isSubmittingCommand ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
-                  Añadir Comando
-                </Button>
+                <FormField control={form.control} name="command" render={({ field }) => (<FormItem><FormLabel>Comando</FormLabel><FormControl><Input placeholder="ej: npm" {...field} disabled={isSubmittingCommand} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Descripción (Opcional)</FormLabel><FormControl><Input placeholder="ej: Node Package Manager" {...field} disabled={isSubmittingCommand} /></FormControl><FormMessage /></FormItem>)} />
+                <Button type="submit" disabled={isSubmittingCommand}>{isSubmittingCommand ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />} Añadir Comando</Button>
               </form>
             </Form>
           )}
@@ -271,25 +222,15 @@ export function SecurityTab() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-6 w-6" /> Comandos Permitidos
-          </CardTitle>
-          <Button variant="ghost" size="icon" onClick={fetchCommands} disabled={isLoadingCommands}>
-            {isLoadingCommands ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          </Button>
+          <CardTitle className="flex items-center gap-2"><Shield className="h-6 w-6" /> Comandos Permitidos</CardTitle>
+          <Button variant="ghost" size="icon" onClick={fetchCommands} disabled={isLoadingCommands}>{isLoadingCommands ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}</Button>
         </CardHeader>
         <CardContent>
           {isLoadingCommands ? (
             <div className="flex items-center justify-center py-4"><Loader2 className="h-6 w-6 animate-spin" /></div>
           ) : (
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Comando</TableHead>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
+              <TableHeader><TableRow><TableHead>Comando</TableHead><TableHead>Descripción</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
               <TableBody>
                 {commands.map((cmd) => (
                   <TableRow key={cmd.command}>
@@ -297,24 +238,10 @@ export function SecurityTab() {
                     <TableCell>{cmd.description || 'N/A'}</TableCell>
                     <TableCell className="text-right">
                       <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="destructive" size="icon" className="h-8 w-8" disabled={!isSuperAdmin}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
+                        <AlertDialogTrigger asChild><Button variant="destructive" size="icon" className="h-8 w-8" disabled={!isSuperAdmin}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
                         <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Eliminar "{cmd.command}" impedirá que la IA lo ejecute. Esta acción es irreversible.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDelete(cmd.command)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                              Eliminar
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
+                          <AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription>Eliminar "{cmd.command}" impedirá que la IA lo ejecute. Esta acción es irreversible.</AlertDialogDescription></AlertDialogHeader>
+                          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(cmd.command)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
                     </TableCell>
