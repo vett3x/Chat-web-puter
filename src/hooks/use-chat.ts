@@ -62,8 +62,8 @@ export interface Message {
   planApproved: boolean; // Changed from optional to required boolean
   isCorrectionPlan: boolean; // Changed from optional to required boolean
   correctionApproved: boolean; // Changed from optional to required boolean
-  isAnimated: boolean; // NEW: Flag to track if message has been animated
   isErrorAnalysisRequest: boolean; // NEW: Flag to detect error analysis request
+  isAnimated: boolean; // NEW: Flag to track if message has been animated
 }
 
 export type AutoFixStatus = 'idle' | 'analyzing' | 'plan_ready' | 'fixing' | 'failed';
@@ -308,6 +308,7 @@ export function useChat({
       if (!restartResponse.ok) {
         throw new Error(restartResult.message || 'Error al reiniciar el servidor.');
       }
+      
       toast.success('¡Listo! Actualizando vista previa...', { id: toastId });
       // The parent component will handle the preview refresh.
     } catch (error: any) {
@@ -357,7 +358,7 @@ export function useChat({
             ### 🧠 Análisis de la IA
             [Tu análisis de la causa raíz del error]
             ### 🛠️ Plan de Corrección
-            [Pasos detallados para corregir el error. Si hay código, usa bloques \`\`\`language:ruta/del/archivo.tsx\`\`\`. Si hay comandos, usa bloques \`\`\`bash:exec\`\`\`.]
+            [Pasos detallados para corregir el error, incluyendo modificaciones de código si es necesario. Si hay código, usa bloques \`\`\`language:ruta/del/archivo.tsx\`\`\`. Si la corrección implica ejecutar comandos de terminal (como \`npm install\` o \`rm -rf node_modules\`), genera un bloque de código con el formato \`\`\`bash:exec\`\`\` que contenga los comandos a ejecutar. NO generes archivos de código en este caso.]
             ### ✅ Confirmación
             [Pregunta de confirmación al usuario para aplicar el arreglo]
         2.  **ESPERAR APROBACIÓN DE CORRECCIÓN:** Después de enviar un plan de corrección, detente y espera. El usuario te responderá con "[USER_APPROVED_CORRECTION_PLAN]".
@@ -387,6 +388,7 @@ export function useChat({
             ### ✅ Confirmación
             [Pregunta de confirmación al usuario para aplicar el arreglo]`;
         } else if (lastUserMessageContent.includes('[USER_REPORTED_WEB_ERROR]')) {
+          systemPromptContent += `\n\nEl usuario ha reportado un error en la vista previa web de la aplicación. Aquí están los logs de actividad recientes del servidor:\n\n\`\`\`text\n${lastUserMessageContent.split('[USER_REPORTED_WEB_ERROR]')[0].split('Aquí están los logs de actividad recientes del servidor:')[1].trim() || 'No se encontraron logs de actividad recientes.'}\n\`\`\`\n\n[USER_REPORTED_WEB_ERROR]`; // Internal prompt for AI
           systemPromptContent += `\n\nEl usuario ha reportado un error en la vista previa web. Analiza los logs de actividad del servidor proporcionados en el último mensaje del usuario. Luego, solicita al usuario que describa el error visual o de comportamiento que está viendo en la vista previa web. Utiliza el siguiente formato Markdown exacto:
             ### 💡 Entendido! Has reportado un error en la web.
             ### 📄 Contexto del Error
@@ -474,7 +476,8 @@ export function useChat({
       const filesToWrite: { path: string; content: string }[] = [];
       const commandsToExecute: string[] = [];
 
-      if (isAppChatModeBuild && !isConstructionPlan && !isErrorAnalysisRequest) {
+      // MODIFICADO: Asegurarse de que solo se itere si finalContentForMessage es un array
+      if (isAppChatModeBuild && !isConstructionPlan && !isErrorAnalysisRequest && !isCorrectionPlan && Array.isArray(finalContentForMessage)) {
         (finalContentForMessage as RenderablePart[]).forEach(part => {
           if (part.type === 'code' && appId) {
             if (part.language === 'bash' && part.filename === 'exec' && part.code) {
