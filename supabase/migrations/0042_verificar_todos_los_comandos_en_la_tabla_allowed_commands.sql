@@ -1,0 +1,1 @@
+SELECT * FROM public.allowed_commands ORDER BY command;
