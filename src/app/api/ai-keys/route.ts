@@ -248,7 +248,7 @@ export async function GET(req: NextRequest) {
 
   let query = supabaseAdmin
     .from('user_api_keys')
-    .select('id, provider, api_key, is_active, created_at, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint, is_global') // NEW: Select is_global
+    .select('id, provider, api_key, is_active, created_at, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint, is_global')
     .order('created_at', { ascending: false });
 
   // All roles (user, admin, super_admin) should see their own keys OR global keys
@@ -355,7 +355,6 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    console.log("[API /ai-keys PUT] Received body:", body); // NEW: Log received body
     const { id, provider, api_key, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint, is_global } = updateApiKeySchema.parse(body); // NEW: Parse is_global
 
     // Fetch current key details to determine existing provider, use_vertex_ai status, user_id, and is_global
@@ -424,7 +423,8 @@ export async function PUT(req: NextRequest) {
       .from('user_api_keys')
       .update(updateData)
       .eq('id', id)
-      .single(); // Removed user_id filter here, as admin can update global keys
+      .select()
+      .single();
 
     if (error) {
       console.error("[API /ai-keys PUT] Error updating key:", error);
