@@ -133,7 +133,7 @@ export function useSidebarData() {
       throw new Error(error.message); // Throw error for catch block in component
     }
     toast.success('Nueva conversación creada.');
-    setConversations(prev => [data, ...prev]); // Optimistic update
+    await fetchData(); // Re-fetch all data to ensure consistency
     onSuccess(data);
     return data.id;
   };
@@ -151,7 +151,7 @@ export function useSidebarData() {
       throw new Error(error.message); // Throw error for catch block in component
     }
     toast.success(`${newFolderName} creada.`);
-    setFolders(prev => [data, ...prev]); // Optimistic update
+    await fetchData(); // Re-fetch all data
     return data.id;
   };
 
@@ -168,7 +168,7 @@ export function useSidebarData() {
       throw new Error(error.message); // Throw error for catch block in component
     }
     toast.success('Nueva nota creada.');
-    setNotes(prev => [data, ...prev]); // Optimistic update
+    await fetchData(); // Re-fetch all data
     onSuccess(data);
     return data.id;
   };
