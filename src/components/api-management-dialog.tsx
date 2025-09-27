@@ -118,7 +118,7 @@ const apiKeySchema = z.object({
 const updateApiKeySchema = z.object({
   id: z.string().min(1, { message: 'ID de clave es requerido para actualizar.' }),
   provider: z.string().min(1),
-  api_key: z.string().optional(),
+  api_key: z.string().optional(), // API Key is optional for updates
   nickname: z.string().optional(),
   project_id: z.string().optional(),
   location_id: z.string().optional(),
@@ -164,7 +164,14 @@ const updateApiKeySchema = z.object({
           path: ['model_name'],
         });
       }
-      // Removed API key validation for updates here. Handled in onSubmit.
+      // API Key is optional for update if not changing
+      // if (!data.api_key || data.api_key === '') {
+      //   ctx.addIssue({
+      //     code: z.ZodIssueCode.custom,
+      //     message: 'API Key es requerida para la API pública de Gemini.',
+      //     path: ['api_key'],
+      //   });
+      // }
     }
   } else if (data.provider === 'custom_endpoint') { // New validation for custom_endpoint
     if (!data.api_endpoint || data.api_endpoint === '') {
@@ -174,7 +181,14 @@ const updateApiKeySchema = z.object({
         path: ['api_endpoint'],
       });
     }
-    // Removed API key validation for updates here. Handled in onSubmit.
+    // API Key is optional for update if not changing
+    // if (!data.api_key || data.api_key === '') {
+    //   ctx.addIssue({
+    //     code: z.ZodIssueCode.custom,
+    //     message: 'La API Key es requerida para un endpoint personalizado.',
+    //     path: ['api_key'],
+    //   });
+    // }
     if (!data.model_name || data.model_name === '') {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -409,7 +423,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         payload.api_endpoint = undefined;
       } else if (isCustomEndpoint) {
         // If using custom endpoint, clear Vertex AI specific fields and api_key
-        // payload.api_key is handled by the custom validation above
+        payload.api_key = values.api_key; // API key is required for custom endpoint
         payload.project_id = undefined;
         payload.location_id = undefined;
         payload.json_key_content = undefined;
