@@ -20,18 +20,18 @@ echo "--- Initial apt update... ---"
 apt-get update -y || { echo "ERROR: initial apt-get update failed"; exit 1; }
 echo "--- Initial apt update complete. ---"
 
-echo "--- Installing sudo... ---"
-apt-get install -y sudo || { echo "ERROR: sudo installation failed"; exit 1; }
-echo "--- sudo installed. ---"
+echo "--- Installing sudo (if not present)... ---"
+apt-get install -y sudo || { echo "WARNING: sudo installation failed or already present. Continuing..."; }
+echo "--- sudo check complete. ---"
 
 echo "--- Installing core dependencies (curl, gnupg, lsb-release, apt-utils, git)..."
 sudo apt-get install -y curl gnupg lsb-release apt-utils git || { echo "ERROR: core dependencies installation failed"; exit 1; }
 echo "--- Core dependencies installed. ---"
 
 echo "--- Verifying Node.js and npm installation... ---"
-echo "Node.js version: $(node -v)"
-echo "npm version: $(npm -v)"
-echo "--- Node.js and npm are pre-installed. ---"
+node -v || { echo "ERROR: Node.js not found. Base image issue?"; exit 1; }
+npm -v || { echo "ERROR: npm not found. Base image issue?"; exit 1; }
+echo "--- Node.js and npm are present. ---"
 
 echo "--- Installing cloudflared... ---"
 # Add cloudflare gpg key
@@ -52,12 +52,13 @@ echo "--- cloudflared installed and verified. ---"
 
 echo "--- Creating Next.js 'hello-world' app in /app directory... ---"
 # Run as root, so no sudo needed here. Use --yes to skip prompts.
-cd /
-npx --yes create-next-app@latest app --use-npm --example "https://github.com/vercel/next.js/tree/canary/examples/hello-world" || { echo "ERROR: create-next-app failed"; exit 1; }
+# Ensure /app exists and is writable, then create app inside.
+mkdir -p /app || { echo "ERROR: mkdir /app failed"; exit 1; }
+cd /app
+npx --yes create-next-app@latest . --use-npm --example "https://github.com/vercel/next.js/tree/canary/examples/hello-world" || { echo "ERROR: create-next-app failed"; exit 1; }
 echo "--- Next.js app created. ---"
 
 echo "--- Installing Next.js app dependencies... ---"
-cd /app
 npm install || { echo "ERROR: npm install failed"; exit 1; }
 echo "--- Dependencies installed. ---"
 
