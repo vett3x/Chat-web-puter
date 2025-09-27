@@ -54,11 +54,9 @@ export async function GET(req: NextRequest, context: any) {
         action,
         reason,
         moderator:profiles!moderator_user_id (
+          id,
           first_name,
-          last_name,
-          auth_users:auth.users (
-            email
-          )
+          last_name
         )
       `)
       .eq('target_user_id', userIdToFetch)
@@ -66,11 +64,19 @@ export async function GET(req: NextRequest, context: any) {
 
     if (error) throw error;
 
-    const formattedLogs = data.map((log: any) => {
+    const formattedLogs = await Promise.all(data.map(async (log: any) => {
       const moderator = log.moderator;
-      const moderatorName = moderator?.first_name && moderator?.last_name
-        ? `${moderator.first_name} ${moderator.last_name}`
-        : moderator?.auth_users?.email || 'Usuario Desconocido';
+      let moderatorName = 'Usuario Desconocido';
+      if (moderator) {
+        if (moderator.first_name && moderator.last_name) {
+          moderatorName = `${moderator.first_name} ${moderator.last_name}`;
+        } else {
+          const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(moderator.id);
+          if (!userError && userData.user) {
+            moderatorName = userData.user.email || 'Email no disponible';
+          }
+        }
+      }
       return {
         id: log.id,
         created_at: log.created_at,
@@ -78,7 +84,7 @@ export async function GET(req: NextRequest, context: any) {
         reason: log.reason,
         moderator_name: moderatorName,
       };
-    });
+    }));
 
     return NextResponse.json(formattedLogs);
   } catch (error: any) {
