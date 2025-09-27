@@ -44,6 +44,13 @@ interface ApiManagementDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+// Define default values once outside the component to ensure stability
+const DEFAULT_FORM_VALUES: ApiKeyFormValues = {
+  provider: '', api_key: '', nickname: '', project_id: '', location_id: '',
+  use_vertex_ai: false, model_name: '', json_key_file: undefined, json_key_content: undefined,
+  api_endpoint: '', is_global: false,
+};
+
 export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogProps) {
   const {
     keys,
@@ -67,19 +74,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
 
   const form = useForm<ApiKeyFormValues>({
     resolver: zodResolver(apiKeySchema),
-    defaultValues: {
-      provider: '',
-      api_key: '',
-      nickname: '',
-      project_id: '',
-      location_id: '',
-      use_vertex_ai: false,
-      model_name: '',
-      json_key_file: undefined,
-      json_key_content: undefined,
-      api_endpoint: '',
-      is_global: false,
-    },
+    defaultValues: DEFAULT_FORM_VALUES, // Use the stable default values
   });
 
   // Este ref actuará como un semáforo para controlar el reseteo del formulario a su estado por defecto.
@@ -88,7 +83,8 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
   // Efecto para manejar la población/reseteo del formulario basado en editingKeyId
   useEffect(() => {
     if (editingKeyId) {
-      hasResetToDefaultRef.current = false; // Resetear el semáforo cuando entramos en modo edición
+      // Cuando entramos en modo edición, resetear el semáforo para permitir el reseteo a default al salir
+      hasResetToDefaultRef.current = false; 
       const keyToEdit = keys.find(k => k.id === editingKeyId);
       if (keyToEdit) {
         form.reset({
@@ -109,20 +105,21 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         if (!(keyToEdit.use_vertex_ai && keyToEdit.json_key_content)) {
             handleRemoveJsonKeyFile();
         }
+      } else {
+        // Si editingKeyId está establecido pero keyToEdit no se encuentra (ej. fue eliminada),
+        // revertir a modo de añadir llamando a handleCancelEdit.
+        handleCancelEdit();
       }
     } else {
-      // Solo resetear a los valores por defecto si no lo hemos hecho ya desde que editingKeyId se volvió null
+      // Si editingKeyId es null, resetear a los valores por defecto del formulario de añadir.
+      // Solo resetear si no lo hemos hecho ya desde que editingKeyId se volvió null.
       if (!hasResetToDefaultRef.current) {
-        form.reset({
-          provider: '', api_key: '', nickname: '', project_id: '', location_id: '',
-          use_vertex_ai: false, model_name: '', json_key_file: undefined, json_key_content: undefined,
-          api_endpoint: '', is_global: false,
-        });
+        form.reset(DEFAULT_FORM_VALUES); // Usar valores por defecto estables
         handleRemoveJsonKeyFile(); // También limpiar el input de archivo
-        hasResetToDefaultRef.current = true; // Establecer el semáforo a true después de resetear
+        hasResetToDefaultRef.current = true; // Marcar como reseteado a default
       }
     }
-  }, [editingKeyId, keys, form, handleRemoveJsonKeyFile]); // `keys` sigue siendo una dependencia para encontrar `keyToEdit`
+  }, [editingKeyId, keys, form, handleRemoveJsonKeyFile, handleCancelEdit]); // `keys` es una dependencia para encontrar `keyToEdit`
 
   // Efecto para manejar la configuración inicial cuando el diálogo se abre
   useEffect(() => {
