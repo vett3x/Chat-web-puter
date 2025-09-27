@@ -22,7 +22,7 @@ export async function middleware(req: NextRequest) {
         },
       },
     }
-  );
+  ); // REMOVED: .schema('public')
 
   const {
     data: { session },

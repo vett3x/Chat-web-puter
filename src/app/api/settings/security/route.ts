@@ -24,7 +24,7 @@ async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | '
         remove(name: string, options: CookieOptions) {},
       },
     }
-  );
+  ); // REMOVED: .schema('public')
   const { data: { session } } = await supabase.auth.getSession();
 
   let userRole: 'user' | 'admin' | 'super_admin' | null = null;
@@ -58,7 +58,7 @@ async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | '
   return { session, userRole, userPermissions };
 }
 
-const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!); // REMOVED: .schema('public')
 
 export async function GET(req: NextRequest) {
   const { session, userRole } = await getSessionAndRole();
