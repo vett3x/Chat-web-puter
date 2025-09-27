@@ -11,7 +11,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { User, Server, Cloud, History, MessageSquare, HardDrive, Save, Loader2, ShieldCheck, KeyRound, Shield, LogOut } from 'lucide-react';
+import { User, Server, Cloud, History, MessageSquare, HardDrive, Save, Loader2, ShieldCheck, KeyRound, Shield, LogOut, Clock } from 'lucide-react'; // Import Clock icon
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { UserServersTab } from './user-servers-tab';
@@ -34,8 +34,9 @@ import { toast } from 'sonner';
 import { useSession } from '@/components/session-context-provider';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, addMinutes } from 'date-fns'; // Import addMinutes
 import { es } from 'date-fns/locale';
+import { Input } from '@/components/ui/input'; // Import Input for extend kick
 
 type UserRole = 'user' | 'admin' | 'super_admin';
 type UserStatus = 'active' | 'banned' | 'kicked';
@@ -50,7 +51,7 @@ interface UserDetailDialogProps {
     last_name: string | null;
     role: UserRole;
     status: UserStatus;
-    kicked_at: string | null; // NEW: Add kicked_at
+    kicked_at: string | null;
   };
   currentUserRole: UserRole | null;
   onRoleUpdated: () => void;
@@ -61,6 +62,8 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
   const [activeTab, setActiveTab] = useState('servers');
   const [selectedRole, setSelectedRole] = useState<UserRole>(user.role);
   const [isUpdatingRole, setIsUpdatingRole] = useState(false);
+  const [extendMinutes, setExtendMinutes] = useState<number>(15); // State for extending kick
+  const [isExtendingKick, setIsExtendingKick] = useState(false); // State for loading during kick extension
 
   useEffect(() => {
     setSelectedRole(user.role);
@@ -73,29 +76,6 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
   const isCurrentUserSuperAdmin = currentUserRole === 'super_admin';
   const isTargetUserSuperAdmin = user.role === 'super_admin';
   const isChangingOwnRole = user.id === session?.user?.id;
-
-  // NEW: Access check for viewing Super Admin details
-  if (!isCurrentUserSuperAdmin && isTargetUserSuperAdmin) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[425px] p-6">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <Shield className="h-6 w-6" /> Acceso Denegado
-            </DialogTitle>
-            <DialogDescription>
-              No tienes permiso para ver los detalles de un Super Admin.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">Cerrar</Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  }
 
   const handleRoleChange = async () => {
     if (!isCurrentUserSuperAdmin || isChangingOwnRole || selectedRole === user.role) {
@@ -134,6 +114,32 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
       toast.error(`Error al actualizar el rol: ${error.message}`);
     } finally {
       setIsUpdatingRole(false);
+    }
+  };
+
+  const handleExtendKick = async () => {
+    if (!isCurrentUserSuperAdmin || user.status !== 'kicked' || !user.kicked_at || extendMinutes <= 0) {
+      toast.error('Acción no válida para extender la expulsión.');
+      return;
+    }
+
+    setIsExtendingKick(true);
+    try {
+      const response = await fetch(`/api/users/${user.id}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'extend_kick', extend_minutes: extendMinutes, reason: `Expulsión extendida por ${extendMinutes} minutos.` }),
+        credentials: 'include',
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message);
+      toast.success(result.message);
+      onRoleUpdated(); // Refresh user data to show new kicked_at
+      onOpenChange(false);
+    } catch (err: any) {
+      toast.error(`Error al extender la expulsión: ${err.message}`);
+    } finally {
+      setIsExtendingKick(false);
     }
   };
 
@@ -176,9 +182,37 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
           </div>
 
           {user.status === 'kicked' && user.kicked_at && (
-            <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-sm text-yellow-200 flex items-center gap-2">
-              <LogOut className="h-5 w-5" />
-              <span>Este usuario fue expulsado el {format(new Date(user.kicked_at), 'dd/MM/yyyy HH:mm', { locale: es })}. Su expulsión dura 15 minutos.</span>
+            <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-sm text-yellow-200 flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <LogOut className="h-5 w-5" />
+                <span>Este usuario fue expulsado el {format(new Date(user.kicked_at), 'dd/MM/yyyy HH:mm', { locale: es })}. Su expulsión dura 15 minutos.</span>
+              </div>
+              {isCurrentUserSuperAdmin && (
+                <div className="flex items-center gap-2 mt-2">
+                  <Label htmlFor="extend-kick-minutes" className="text-base flex items-center gap-1">
+                    <Clock className="h-4 w-4" /> Extender por:
+                  </Label>
+                  <Input
+                    id="extend-kick-minutes"
+                    type="number"
+                    min="1"
+                    value={extendMinutes}
+                    onChange={(e) => setExtendMinutes(parseInt(e.target.value) || 0)}
+                    className="w-24 bg-yellow-900/20 border-yellow-700/50 text-yellow-100"
+                    disabled={isExtendingKick}
+                  />
+                  <span className="text-xs">minutos</span>
+                  <Button
+                    onClick={handleExtendKick}
+                    disabled={isExtendingKick || extendMinutes <= 0}
+                    size="sm"
+                    className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                  >
+                    {isExtendingKick ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Clock className="mr-2 h-4 w-4" />}
+                    Extender
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
