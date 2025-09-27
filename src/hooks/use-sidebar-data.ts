@@ -126,7 +126,8 @@ export function useSidebarData() {
       toast.error('Usuario no autenticado.');
       return null;
     }
-    const { data, error } = await supabase.from('conversations').insert({ user_id: userId, title: 'Nueva conversación' }).select().single();
+    // REMOVED: user_id from insert payload. DB will handle it.
+    const { data, error } = await supabase.from('conversations').insert({ title: 'Nueva conversación' }).select().single();
     if (error) {
       toast.error('Error al crear una nueva conversación.');
       console.error('Supabase Error creating conversation:', error);
@@ -144,7 +145,8 @@ export function useSidebarData() {
       return null;
     }
     const newFolderName = parentId ? 'Nueva subcarpeta' : 'Nueva carpeta';
-    const { data, error } = await supabase.from('folders').insert({ user_id: userId, name: newFolderName, parent_id: parentId }).select().single();
+    // REMOVED: user_id from insert payload. DB will handle it.
+    const { data, error } = await supabase.from('folders').insert({ name: newFolderName, parent_id: parentId }).select().single();
     if (error) {
       toast.error('Error al crear una nueva carpeta.');
       console.error('Supabase Error creating folder:', error);
@@ -161,7 +163,8 @@ export function useSidebarData() {
       toast.error('Usuario no autenticado.');
       return null;
     }
-    const { data, error } = await supabase.from('notes').insert({ user_id: userId, title: 'Nueva nota' }).select().single();
+    // REMOVED: user_id from insert payload. DB will handle it.
+    const { data, error } = await supabase.from('notes').insert({ title: 'Nueva nota' }).select().single();
     if (error) {
       toast.error('Error al crear una nueva nota.');
       console.error('Supabase Error creating note:', error);
