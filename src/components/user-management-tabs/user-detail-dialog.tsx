@@ -11,7 +11,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { User, Server, Cloud, History, MessageSquare, HardDrive, Save, Loader2, ShieldCheck, KeyRound, Shield, LogOut } from 'lucide-react'; // Import LogOut
+import { User, Server, Cloud, History, MessageSquare, HardDrive, Save, Loader2, ShieldCheck, KeyRound, Shield, LogOut } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { UserServersTab } from './user-servers-tab';
@@ -73,6 +73,29 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
   const isCurrentUserSuperAdmin = currentUserRole === 'super_admin';
   const isTargetUserSuperAdmin = user.role === 'super_admin';
   const isChangingOwnRole = user.id === session?.user?.id;
+
+  // NEW: Access check for viewing Super Admin details
+  if (!isCurrentUserSuperAdmin && isTargetUserSuperAdmin) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[425px] p-6">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Shield className="h-6 w-6" /> Acceso Denegado
+            </DialogTitle>
+            <DialogDescription>
+              No tienes permiso para ver los detalles de un Super Admin.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cerrar</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   const handleRoleChange = async () => {
     if (!isCurrentUserSuperAdmin || isChangingOwnRole || selectedRole === user.role) {

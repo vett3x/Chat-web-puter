@@ -75,16 +75,17 @@ interface SupabaseProfile {
   last_name: string | null;
   avatar_url: string | null;
   role: 'user' | 'admin' | 'super_admin';
-  status: 'active' | 'banned';
+  status: 'active' | 'banned' | 'kicked';
+  kicked_at: string | null; // NEW: Add kicked_at
 }
 
 export async function GET(req: NextRequest) {
-  const { session, userRole } = await getSessionAndRole();
-  if (!session || !userRole) {
+  const { session, userRole: currentUserRole } = await getSessionAndRole();
+  if (!session || !currentUserRole) {
     return NextResponse.json({ message: 'Acceso denegado. No autenticado.' }, { status: 401 });
   }
   // Allow Admins and Super Admins to view users
-  if (userRole !== 'admin' && userRole !== 'super_admin') {
+  if (currentUserRole !== 'admin' && currentUserRole !== 'super_admin') {
     return NextResponse.json({ message: 'Acceso denegado. Se requiere rol de Admin o Super Admin.' }, { status: 403 });
   }
 
@@ -102,7 +103,7 @@ export async function GET(req: NextRequest) {
     // 1. Fetch all profiles
     const { data: profiles, error: profilesError } = await supabaseAdmin
       .from('profiles')
-      .select(`id, first_name, last_name, avatar_url, role, status`); // Select role and status
+      .select(`id, first_name, last_name, avatar_url, role, status, kicked_at`); // Select role, status, and kicked_at
 
     if (profilesError) {
       console.error('Supabase query error fetching profiles in GET /api/users:', profilesError);
@@ -123,6 +124,7 @@ export async function GET(req: NextRequest) {
           email: 'N/A (Error al obtener email)',
           role: profile.role,
           status: profile.status,
+          kicked_at: profile.kicked_at,
         };
       }
 
@@ -134,8 +136,14 @@ export async function GET(req: NextRequest) {
         email: userData.user?.email || 'N/A',
         role: profile.role,
         status: profile.status,
+        kicked_at: profile.kicked_at,
       };
     }));
+
+    // NEW: Filter out Super Admins if the requesting user is a regular Admin
+    if (currentUserRole === 'admin') {
+      return NextResponse.json(formattedUsers.filter(user => user.role !== 'super_admin'), { status: 200 });
+    }
 
     return NextResponse.json(formattedUsers, { status: 200 });
 

@@ -79,6 +79,7 @@ export async function middleware(req: NextRequest) {
         kickReason = 'account_kicked';
       } else {
         // If kicked status has expired, automatically unkick the user
+        console.log(`[Middleware] User ${session.user.id} was kicked, but 15 minutes have passed. Auto-unkicking.`);
         await supabase.from('profiles').update({ status: 'active', kicked_at: null }).eq('id', session.user.id);
         // Also update auth.users metadata to clear any kicked_at flag
         await supabase.auth.admin.updateUserById(session.user.id, { user_metadata: { kicked_at: null } });
@@ -93,6 +94,7 @@ export async function middleware(req: NextRequest) {
     }
 
     if (shouldBeKicked && !publicPaths.includes(req.nextUrl.pathname)) {
+      console.log(`[Middleware] User ${session.user.id} (Role: ${userRole}, Status: ${userStatus}) should be kicked. Redirecting to /login with error: ${kickReason}`);
       await supabase.auth.signOut();
       const redirectUrl = req.nextUrl.clone();
       redirectUrl.pathname = '/login';
@@ -119,6 +121,7 @@ export async function middleware(req: NextRequest) {
   }
 
   if (!session && !publicPaths.includes(req.nextUrl.pathname)) {
+    console.log(`[Middleware] No session found. Redirecting to /login from ${req.nextUrl.pathname}`);
     const redirectUrl = req.nextUrl.clone();
     redirectUrl.pathname = '/login';
     redirectUrl.searchParams.set(`redirectedFrom`, req.nextUrl.pathname);

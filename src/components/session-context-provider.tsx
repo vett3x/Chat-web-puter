@@ -110,34 +110,41 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      console.log(`[SessionContext] Auth state changed: ${event}`);
       setSession(currentSession);
       await fetchUserProfileAndRole(currentSession);
       setIsLoading(false);
 
       if (event === 'SIGNED_OUT' || !currentSession) {
         if (pathname !== '/login') {
+          console.log('[SessionContext] Redirecting to /login due to SIGNED_OUT or no session.');
           router.push('/login');
         }
       } else if (currentSession) {
         if (pathname === '/login') {
+          console.log('[SessionContext] Redirecting to / from /login due to active session.');
           router.push('/');
         }
       }
     });
 
     supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
+      console.log('[SessionContext] Initial session check.');
       setSession(initialSession);
       await fetchUserProfileAndRole(initialSession);
       setIsLoading(false);
 
       if (!initialSession && pathname !== '/login') {
+        console.log('[SessionContext] Initial: No session, redirecting to /login.');
         router.push('/login');
       } else if (initialSession && pathname === '/login') {
+        console.log('[SessionContext] Initial: Session active on /login, redirecting to /.');
         router.push('/');
       }
     }).catch(error => {
       setIsLoading(false);
       toast.error("Error al cargar la sesión: " + error.message);
+      console.error('[SessionContext] Error fetching initial session:', error);
     });
 
     return () => {
@@ -149,6 +156,8 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   useEffect(() => {
     const checkSessionAndGlobalStatus = async () => {
       if (!session) return;
+
+      console.log(`[SessionContext] Real-time status check for user ${session.user.id}. Current role: ${userRole}, status: ${userStatus}`);
 
       // 1. Primary Check: Force a token refresh to see if the session was invalidated on the server.
       const { data, error: refreshError } = await supabase.auth.refreshSession();
@@ -198,6 +207,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
             }
 
             if (profile.status === 'banned' || profile.status === 'kicked') {
+              console.log(`[SessionContext] Real-time check: User ${session.user.id} is ${profile.status}. Signing out.`);
               await supabase.auth.signOut();
               toast.error(`Tu cuenta ha sido ${profile.status === 'banned' ? 'baneada' : 'expulsada'}. Se ha cerrado tu sesión.`);
               return;
@@ -205,9 +215,11 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
           }
 
           if (usersDisabled && userRole === 'user') {
+            console.log(`[SessionContext] Real-time check: User ${session.user.id} (role: user) is disabled. Signing out.`);
             await supabase.auth.signOut();
             toast.error("El acceso para cuentas de Usuario ha sido desactivado. Se ha cerrado tu sesión.");
           } else if (adminsDisabled && userRole === 'admin') {
+            console.log(`[SessionContext] Real-time check: User ${session.user.id} (role: admin) is disabled. Signing out.`);
             await supabase.auth.signOut();
             toast.error("El acceso para cuentas de Admin ha sido desactivado. Se ha cerrado tu sesión.");
           }
