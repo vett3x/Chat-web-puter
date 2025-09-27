@@ -67,6 +67,11 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
   const [showAiHint, setShowAiHint] = useState(false);
   const [noteContentForChat, setNoteContentForChat] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('saved');
+  const [isMounted, setIsMounted] = useState(false); // NEW state for client-side mount
+
+  useEffect(() => {
+    setIsMounted(true); // Set to true once component mounts on client
+  }, []);
 
   const editor = useCreateBlockNote({
     dictionary: locales[userLanguage as keyof typeof locales] || locales.es, // Dynamic dictionary
@@ -188,7 +193,14 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
         </div>
       </div>
       <div className="flex-1 overflow-y-auto">
-        <BlockNoteView editor={editor} theme={theme === 'dark' ? customDarkTheme : 'light'} />
+        {isMounted && editor ? (
+          <BlockNoteView editor={editor} theme={theme === 'dark' ? customDarkTheme : 'light'} />
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <Loader2 className="h-8 w-8 animate-spin" />
+            <p className="ml-2 text-muted-foreground">Cargando editor...</p>
+          </div>
+        )}
       </div>
       {showAiHint && (<div className="absolute bottom-20 right-4 bg-info text-info-foreground p-2 rounded-md shadow-lg text-sm animate-in fade-in slide-in-from-bottom-2 flex items-center gap-2 z-10"><span>¡Usa la IA para chatear con tu nota!</span><Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setShowAiHint(false)}><X className="h-3 w-3" /></Button></div>)}
       <Button variant="destructive" size="icon" onClick={() => setIsAiChatOpen(prev => !prev)} className="absolute bottom-4 right-4 rounded-full h-12 w-12 animate-pulse-red z-10" title="Asistente de Nota"><Wand2 className="h-6 w-6" /></Button>
