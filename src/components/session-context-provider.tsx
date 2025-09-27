@@ -158,7 +158,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       }
     };
 
-    const intervalId = setInterval(checkSessionAndGlobalStatus, 15000); // Check every 15 seconds
+    const intervalId = setInterval(checkSessionAndGlobalStatus, 3000); // Check every 3 seconds
 
     return () => clearInterval(intervalId);
   }, [session, userRole, router]);
