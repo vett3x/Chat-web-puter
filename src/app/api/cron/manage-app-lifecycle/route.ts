@@ -11,6 +11,7 @@ export async function GET() {
   let statsCollectedCount = 0;
   let hibernatedCount = 0;
   let suspendedCount = 0;
+  let unkickedCount = 0;
 
   try {
     // --- STATS COLLECTION LOGIC ---
@@ -136,11 +137,44 @@ export async function GET() {
       }
     }
 
+    // --- AUTO-UNKICK LOGIC ---
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    const { data: kickedUsers, error: findKickedError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, kicked_at')
+      .eq('status', 'kicked')
+      .lt('kicked_at', fifteenMinutesAgo);
+
+    if (findKickedError) {
+      console.error('[CRON LIFECYCLE] Error finding users to un-kick:', findKickedError);
+    } else if (kickedUsers && kickedUsers.length > 0) {
+      for (const user of kickedUsers) {
+        try {
+          // Update profile status
+          await supabaseAdmin
+            .from('profiles')
+            .update({ status: 'active', kicked_at: null })
+            .eq('id', user.id);
+
+          // Update auth metadata to clear session invalidation flag
+          await supabaseAdmin.auth.admin.updateUserById(user.id, {
+            user_metadata: { kicked_at: null },
+          });
+          
+          unkickedCount++;
+          console.log(`[CRON LIFECYCLE] Auto-unkicked user ${user.id}`);
+        } catch (error: any) {
+          console.error(`[CRON LIFECYCLE] Failed to auto-unkick user ${user.id}:`, error.message);
+        }
+      }
+    }
+
     return NextResponse.json({ 
       message: 'Lifecycle management and stats collection complete.',
       stats_collected_for: statsCollectedCount,
       hibernated: hibernatedCount,
       suspended: suspendedCount,
+      unkicked: unkickedCount,
     });
 
   } catch (error: any) {
