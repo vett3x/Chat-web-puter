@@ -29,17 +29,44 @@ async function updateAppStatus(appId: string, status: 'ready' | 'failed', detail
   }
 }
 
+// Helper to append to the server's provisioning log
+async function appendToServerProvisioningLog(serverId: string | null, logContent: string) {
+  if (!serverId) {
+    console.warn(`[App Provisioning] No serverId available for logging: ${logContent}`);
+    return;
+  }
+  const { error } = await supabaseAdmin.rpc('append_to_provisioning_log', {
+    server_id: serverId,
+    log_content: logContent,
+  });
+  if (error) {
+    console.error(`[App Provisioning] Error appending to server ${serverId} log:`, error);
+  }
+}
+
 export async function provisionApp(data: AppProvisioningData) {
   const { appId, userId, appName, conversationId, prompt } = data;
   let containerId: string | undefined;
   let server: any;
   let containerName: string | undefined;
+  let serverIdForLog: string | null = null; // Initialize to null
 
   try {
     // FASE 1: Configuración del Entorno
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: userId,
+      event_type: 'app_provisioning_started',
+      description: `Iniciando aprovisionamiento para la aplicación '${appName}' (ID: ${appId}).`,
+    });
+
     const { data: serverData, error: serverError } = await supabaseAdmin.from('user_servers').select('id, ip_address, ssh_port, ssh_username, ssh_password, name').eq('status', 'ready').limit(1).single();
-    if (serverError || !serverData) throw new Error('No hay servidores listos disponibles.');
+    if (serverError || !serverData) {
+      throw new Error('No hay servidores listos disponibles. Asegúrate de haber añadido y aprovisionado un servidor.');
+    }
     server = serverData;
+    serverIdForLog = server.id; // Assign value here
+
+    await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Servidor '${server.name || server.ip_address}' seleccionado.\n`);
 
     const containerPort = 3000;
     const hostPort = generateRandomPort();
@@ -55,36 +82,71 @@ export async function provisionApp(data: AppProvisioningData) {
 
     const runCommand = `docker run -d --name ${containerName} -p ${hostPort}:${containerPort} ${securityFlags} -v ${containerName}-app-data:/app --entrypoint tail node:lts-bookworm -f /dev/null`;
     
+    await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Ejecutando comando Docker para crear contenedor: ${runCommand}\n`);
     const { stdout: newContainerId, stderr: runStderr, code: runCode } = await executeSshCommand(server, runCommand);
-    if (runCode !== 0) throw new Error(`Error al crear el contenedor: ${runStderr}`);
+    if (runCode !== 0) {
+      throw new Error(`Error al crear el contenedor Docker: ${runStderr}`);
+    }
     containerId = newContainerId.trim();
+    await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Contenedor Docker creado. ID: ${containerId}\n`);
 
     await supabaseAdmin.from('user_apps').update({ server_id: server.id, container_id: containerId }).eq('id', appId);
 
     // FASE 2: Instalación de Dependencias y App "Hello World" (usando el script completo)
+    await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Ejecutando script de instalación de dependencias en el contenedor ${containerId.substring(0,12)}...\n`);
     const finalInstallScript = DEFAULT_INSTALL_DEPS_SCRIPT.replace(/__CONTAINER_PORT__/g, String(containerPort));
     const encodedScript = Buffer.from(finalInstallScript).toString('base64');
-    const { stderr: installStderr, code: installCode } = await executeSshCommand(server, `docker exec ${containerId} bash -c "echo '${encodedScript}' | base64 -d | bash"`);
-    if (installCode !== 0) throw new Error(`Error al instalar dependencias en el contenedor: ${installStderr}`);
+    const { stdout: installStdout, stderr: installStderr, code: installCode } = await executeSshCommand(server, `docker exec ${containerId} bash -c "echo '${encodedScript}' | base64 -d | bash"`);
+    if (installCode !== 0) {
+      await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] STDERR del script de instalación:\n${installStderr}\n`);
+      throw new Error(`Error al instalar dependencias en el contenedor: ${installStderr || installStdout}`);
+    }
+    await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Script de instalación completado. STDOUT:\n${installStdout}\n`);
 
     // FASE 3: Despliegue y Finalización
+    await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Buscando dominios de Cloudflare configurados...\n`);
     const { data: cfDomain, error: cfDomainError } = await supabaseAdmin.from('cloudflare_domains').select('id, domain_name, api_token, zone_id, account_id').limit(1).single();
-    if (cfDomainError || !cfDomain) throw new Error('No hay dominios de Cloudflare configurados.');
+    if (cfDomainError || !cfDomain) {
+      throw new Error('No hay dominios de Cloudflare configurados. Asegúrate de añadir uno en la gestión de servidores.');
+    }
+    await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Dominio de Cloudflare '${cfDomain.domain_name}' encontrado.\n`);
 
+    await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Creando y aprovisionando túnel Cloudflare...\n`);
     const { tunnelData } = await createAndProvisionCloudflareTunnel({ userId, serverId: server.id, containerId, cloudflareDomainId: cfDomain.id, containerPort, hostPort, subdomain: containerName, serverDetails: server, cloudflareDomainDetails: cfDomain });
+    await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Túnel Cloudflare '${tunnelData.full_domain}' aprovisionado.\n`);
 
     await updateAppStatus(appId, 'ready', { url: `https://${tunnelData.full_domain}`, tunnel_id: tunnelData.id });
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: userId,
+      event_type: 'app_provisioning_succeeded',
+      description: `Aplicación '${appName}' (ID: ${appId}) aprovisionada exitosamente. URL: ${tunnelData.full_domain}`,
+      server_id: serverIdForLog,
+      command_details: `Container ID: ${containerId}, Host Port: ${hostPort}, Tunnel ID: ${tunnelData.id}`,
+    });
+    await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Aprovisionamiento de la aplicación completado exitosamente.\n`);
 
   } catch (error: any) {
-    console.error(`[Provisioning] Failed for app ${appId}:`, error);
+    console.error(`[App Provisioning] Failed for app ${appId}:`, error);
     await updateAppStatus(appId, 'failed');
+    
+    // Log the specific error to server_events_log
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: userId,
+      event_type: 'app_provisioning_failed',
+      description: `Fallo en el aprovisionamiento de la aplicación '${appName}' (ID: ${appId}). Error: ${error.message}`,
+      server_id: serverIdForLog, // Use the stored serverId
+      command_details: `Container ID: ${containerId || 'N/A'}`,
+    });
+
     if (containerId && server && containerName) {
       try {
-        // Also remove the named volume associated with the container
+        await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Limpiando recursos del contenedor ${containerId.substring(0,12)} debido a un fallo...\n`);
         await executeSshCommand(server, `docker rm -f ${containerId}`);
         await executeSshCommand(server, `docker volume rm ${containerName}-app-data`);
+        await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Recursos del contenedor limpiados.\n`);
       } catch (cleanupError) {
-        console.error(`[Provisioning] Failed to cleanup container ${containerId} for failed app ${appId}:`, cleanupError);
+        console.error(`[App Provisioning] Failed to cleanup container ${containerId} for failed app ${appId}:`, cleanupError);
+        await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] ERROR al limpiar recursos del contenedor: ${cleanupError}\n`);
       }
     }
   }
