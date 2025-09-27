@@ -15,7 +15,7 @@ const apiKeySchema = z.object({
   project_id: z.string().optional(),
   location_id: z.string().optional(),
   use_vertex_ai: z.boolean().optional(),
-  model_name: z.string().optional(), // New: model_name
+  model_name: z.string().optional(), // This needs to be conditional
   json_key_content: z.string().optional(), // New: for Vertex AI JSON key content
   api_endpoint: z.string().url({ message: 'URL de endpoint inválida.' }).optional(), // New: for custom endpoint
   is_global: z.boolean().optional(), // NEW: Add is_global to schema
@@ -248,13 +248,17 @@ export async function GET(req: NextRequest) {
 
   let query = supabaseAdmin
     .from('user_api_keys')
-    .select('id, provider, api_key, is_active, created_at, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint, is_global') // NEW: Select is_global
+    .select('id, provider, api_key, is_active, created_at, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint, is_global')
     .order('created_at', { ascending: false });
 
-  if (userRole !== 'super_admin') {
-    // Non-super-admins only see their own non-global keys
+  if (userRole === 'user') {
+    // Regular users only see their own non-global keys
     query = query.eq('user_id', session.user.id).eq('is_global', false);
+  } else if (userRole === 'admin') {
+    // Admins see their own keys OR global keys
+    query = query.or(`user_id.eq.${session.user.id},is_global.eq.true`);
   }
+  // If userRole is 'super_admin', no additional filter is applied, so they see all.
 
   const { data, error } = await query;
 
