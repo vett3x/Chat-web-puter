@@ -17,7 +17,7 @@ interface SessionContextType {
   userRole: UserRole | null;
   userPermissions: UserPermissions;
   userAvatarUrl: string | null;
-  userLanguage: string | null; // NEW: Add userLanguage to context
+  userLanguage: string | null;
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -28,35 +28,32 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [userPermissions, setUserPermissions] = useState<UserPermissions>({});
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
-  const [userLanguage, setUserLanguage] = useState<string | null>('es'); // NEW: State for userLanguage, default to 'es'
+  const [userLanguage, setUserLanguage] = useState<string | null>('es');
   const router = useRouter();
   const pathname = usePathname();
 
   const fetchUserProfileAndRole = async (currentSession: Session | null) => {
-    console.log("[SessionContext] fetchUserProfileAndRole called with session:", currentSession?.user?.id);
     if (currentSession?.user?.id) {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('role, permissions, avatar_url, language') // NEW: Select language
+        .select('role, permissions, avatar_url, language')
         .eq('id', currentSession.user.id)
         .single();
 
       let determinedRole: UserRole | null = null;
       let determinedPermissions: UserPermissions = {};
       let determinedAvatarUrl: string | null = null;
-      let determinedLanguage: string | null = 'es'; // NEW: Variable for language, default to 'es'
+      let determinedLanguage: string | null = 'es';
 
       if (error) {
         console.error('[SessionContext] Error fetching user profile:', error);
         determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
       } else if (profile) {
-        console.log("[SessionContext] Profile fetched:", profile);
         determinedRole = profile.role as UserRole;
         determinedPermissions = profile.permissions || {};
         determinedAvatarUrl = profile.avatar_url;
-        determinedLanguage = profile.language || 'es'; // NEW: Set language, fallback to 'es'
+        determinedLanguage = profile.language || 'es';
       } else {
-        console.log("[SessionContext] Profile not found, falling back to email check.");
         determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
       }
 
@@ -77,65 +74,85 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       setUserRole(determinedRole);
       setUserPermissions(determinedPermissions);
       setUserAvatarUrl(determinedAvatarUrl);
-      setUserLanguage(determinedLanguage); // NEW: Set user language state
+      setUserLanguage(determinedLanguage);
 
     } else {
-      console.log("[SessionContext] No current session for profile fetch.");
       setUserRole(null);
       setUserPermissions({});
       setUserAvatarUrl(null);
-      setUserLanguage('es'); // NEW: Clear language
+      setUserLanguage('es');
     }
   };
 
   useEffect(() => {
-    console.log("[SessionContext] useEffect started.");
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      console.log(`[SessionContext] onAuthStateChange event: ${event}, session: ${currentSession?.user?.id}`);
       setSession(currentSession);
-      setIsLoading(false);
       await fetchUserProfileAndRole(currentSession);
+      setIsLoading(false);
 
       if (event === 'SIGNED_OUT' || !currentSession) {
         if (pathname !== '/login') {
-          console.log("[SessionContext] Redirecting to /login due to SIGNED_OUT or no session.");
           router.push('/login');
         }
       } else if (currentSession) {
         if (pathname === '/login') {
-          console.log("[SessionContext] Redirecting to / due to active session on /login page.");
           router.push('/');
         }
       }
     });
 
     supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
-      console.log(`[SessionContext] getSession().then() resolved. Initial session: ${initialSession?.user?.id}`);
       setSession(initialSession);
-      setIsLoading(false);
       await fetchUserProfileAndRole(initialSession);
+      setIsLoading(false);
 
       if (!initialSession && pathname !== '/login') {
-        console.log("[SessionContext] Redirecting to /login due to no initial session.");
         router.push('/login');
       } else if (initialSession && pathname === '/login') {
-        console.log("[SessionContext] Redirecting to / due to initial active session on /login page.");
         router.push('/');
       }
     }).catch(error => {
-      console.error("[SessionContext] Error in getSession():", error);
       setIsLoading(false);
       toast.error("Error al cargar la sesión: " + error.message);
     });
 
     return () => {
-      console.log("[SessionContext] useEffect cleanup.");
       subscription.unsubscribe();
     };
   }, [router, pathname]);
 
+  // Real-time status check to kick users if their role is disabled
+  useEffect(() => {
+    const checkGlobalStatus = async () => {
+      if (!session || userRole === 'super_admin') return;
+
+      try {
+        const response = await fetch('/api/settings/public-status');
+        if (!response.ok) {
+          console.warn('Could not fetch public status for real-time check.');
+          return;
+        }
+
+        const data = await response.json();
+        const { usersDisabled, adminsDisabled } = data;
+
+        const shouldBeKicked = (usersDisabled && userRole === 'user') || (adminsDisabled && userRole === 'admin');
+
+        if (shouldBeKicked) {
+          await supabase.auth.signOut();
+          toast.error("Tu tipo de cuenta ha sido desactivada por un administrador. Se ha cerrado tu sesión.");
+        }
+      } catch (error) {
+        console.error("Error checking global status in real-time:", error);
+      }
+    };
+
+    const intervalId = setInterval(checkGlobalStatus, 15000); // Check every 15 seconds
+
+    return () => clearInterval(intervalId);
+  }, [session, userRole, router]);
+
   if (isLoading) {
-    console.log("[SessionContext] Rendering loading state.");
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -143,7 +160,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       </div>
     );
   }
-  console.log("[SessionContext] Rendering children.");
+  
   return (
     <SessionContext.Provider value={{ session, isLoading, userRole, userPermissions, userAvatarUrl, userLanguage }}>
       {children}
