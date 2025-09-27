@@ -67,8 +67,9 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
   const [timeRemaining, setTimeRemaining] = useState<string | null>(null); // NEW: State for remaining kick time
 
   useEffect(() => {
+    console.log("[UserDetailDialog] User prop:", user); // Debug log
     setSelectedRole(user.role);
-  }, [user.role]);
+  }, [user.role, user]); // Added user to dependency array
 
   // NEW: Effect to update time remaining
   useEffect(() => {
@@ -218,7 +219,7 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
               <div className="flex items-center gap-2">
                 <LogOut className="h-5 w-5" />
                 <span>Este usuario fue expulsado el {format(new Date(user.kicked_at), 'dd/MM/yyyy HH:mm', { locale: es })}.</span>
-                {timeRemaining && <span className="font-semibold">Tiempo restante: {timeRemaining}</span>}
+                <span className="font-semibold">Tiempo restante: {timeRemaining || 'Calculando...'}</span> {/* Always show, for debugging */}
               </div>
               {isCurrentUserSuperAdmin && (
                 <div className="flex items-center gap-2 mt-2">

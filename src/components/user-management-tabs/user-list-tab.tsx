@@ -83,6 +83,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
       const data: User[] = await response.json();
+      console.log("[UserListTab] Fetched users data:", data); // Debug log
       setAllUsers(data);
     } catch (err: any) {
       console.error('Error fetching users:', err);
@@ -249,7 +250,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
                             </TooltipTrigger>
                             <TooltipContent>
                               <p>Expulsado el: {user.kicked_at ? format(new Date(user.kicked_at), 'dd/MM/yyyy HH:mm', { locale: es }) : 'N/A'}</p>
-                              {remainingTime && <p>Tiempo restante: {remainingTime}</p>}
+                              <p>Tiempo restante: {remainingTime || 'Calculando...'}</p> {/* Always show, for debugging */}
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
