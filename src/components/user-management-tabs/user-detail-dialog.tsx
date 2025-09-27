@@ -11,7 +11,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { User, Server, Cloud, History, MessageSquare, HardDrive, Save, Loader2, ShieldCheck } from 'lucide-react';
+import { User, Server, Cloud, History, MessageSquare, HardDrive, Save, Loader2, ShieldCheck, KeyRound } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { UserServersTab } from './user-servers-tab';
@@ -19,7 +19,8 @@ import { UserCloudflareTab } from './user-cloudflare-tab';
 import { UserConversationsTab } from './user-conversations-tab';
 import { UserResourcesTab } from './user-resources-tab';
 import { UserActivityTab } from './user-activity-tab';
-import { UserPermissionsTab } from './user-permissions-tab'; // Import the new tab
+import { UserPermissionsTab } from './user-permissions-tab';
+import { UserAccountTab } from './user-account-tab'; // Import the new tab
 import {
   Select,
   SelectContent,
@@ -29,7 +30,7 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { useSession } from '@/components/session-context-provider'; // Import useSession
+import { useSession } from '@/components/session-context-provider';
 
 type UserRole = 'user' | 'admin' | 'super_admin';
 
@@ -41,20 +42,20 @@ interface UserDetailDialogProps {
     email: string;
     first_name: string | null;
     last_name: string | null;
-    role: UserRole; // Added role to user prop
+    role: UserRole;
   };
-  currentUserRole: UserRole | null; // Role of the currently logged-in user
-  onRoleUpdated: () => void; // New prop: Callback to refresh user list
+  currentUserRole: UserRole | null;
+  onRoleUpdated: () => void;
 }
 
 export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, onRoleUpdated }: UserDetailDialogProps) {
-  const { session } = useSession(); // Use useSession hook
+  const { session } = useSession();
   const [activeTab, setActiveTab] = useState('servers');
   const [selectedRole, setSelectedRole] = useState<UserRole>(user.role);
   const [isUpdatingRole, setIsUpdatingRole] = useState(false);
 
   useEffect(() => {
-    setSelectedRole(user.role); // Reset selected role when user prop changes
+    setSelectedRole(user.role);
   }, [user.role]);
 
   const userName = user.first_name && user.last_name 
@@ -67,7 +68,7 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
 
   const handleRoleChange = async () => {
     if (!isCurrentUserSuperAdmin || isChangingOwnRole || selectedRole === user.role) {
-      return; // Prevent unauthorized changes, changing own role, or no change
+      return;
     }
 
     setIsUpdatingRole(true);
@@ -79,7 +80,6 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
         credentials: 'include',
       });
 
-      // Leer la respuesta como texto primero para depuración
       const responseText = await response.text();
       console.log('Raw API response for role update:', responseText);
 
@@ -96,8 +96,8 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
       }
 
       toast.success(result.message || `Rol de usuario actualizado a '${selectedRole}'.`);
-      onRoleUpdated(); // Notify parent to refresh user list
-      onOpenChange(false); // Close dialog after successful update
+      onRoleUpdated();
+      onOpenChange(false);
     } catch (error: any) {
       console.error('Error updating user role:', error);
       toast.error(`Error al actualizar el rol: ${error.message}`);
@@ -143,7 +143,7 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-6"> {/* Increased grid-cols to 6 */}
+            <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="servers" className="flex items-center gap-2">
                 <Server className="h-4 w-4" /> Servidores
               </TabsTrigger>
@@ -159,8 +159,11 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
               <TabsTrigger value="activity" className="flex items-center gap-2">
                 <History className="h-4 w-4" /> Actividad
               </TabsTrigger>
-              <TabsTrigger value="permissions" className="flex items-center gap-2"> {/* New tab */}
+              <TabsTrigger value="permissions" className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4" /> Permisos
+              </TabsTrigger>
+              <TabsTrigger value="account" className="flex items-center gap-2">
+                <KeyRound className="h-4 w-4" /> Cuenta
               </TabsTrigger>
             </TabsList>
             <div className="flex-1 py-4 overflow-hidden">
@@ -180,12 +183,21 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
                 <TabsContent value="activity" className="h-full">
                   <UserActivityTab userId={user.id} />
                 </TabsContent>
-                <TabsContent value="permissions" className="h-full"> {/* New tab content */}
+                <TabsContent value="permissions" className="h-full">
                   <UserPermissionsTab
                     userId={user.id}
                     targetUserRole={user.role}
                     currentUserRole={currentUserRole}
-                    onPermissionsUpdated={onRoleUpdated} // Use the same callback to refresh parent data
+                    onPermissionsUpdated={onRoleUpdated}
+                  />
+                </TabsContent>
+                <TabsContent value="account" className="h-full">
+                  <UserAccountTab
+                    userId={user.id}
+                    userEmail={user.email}
+                    currentUserRole={currentUserRole}
+                    targetUserRole={user.role}
+                    onAccountUpdated={onRoleUpdated}
                   />
                 </TabsContent>
               </ScrollArea>
