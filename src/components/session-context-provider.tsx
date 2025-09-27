@@ -20,7 +20,7 @@ interface SessionContextType {
   userAvatarUrl: string | null;
   userLanguage: string | null;
   userStatus: UserStatus | null;
-  isUserTemporarilyDisabled: boolean; // NEW: Add to context
+  isUserTemporarilyDisabled: boolean;
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -33,9 +33,11 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
   const [userLanguage, setUserLanguage] = useState<string | null>('es');
   const [userStatus, setUserStatus] = useState<UserStatus | null>(null);
-  const [isUserTemporarilyDisabled, setIsUserTemporarilyDisabled] = useState(false); // NEW: State for temporary disable
   const router = useRouter();
   const pathname = usePathname();
+
+  // DERIVED STATE: This is the fix. isUserTemporarilyDisabled is now derived directly from userStatus.
+  const isUserTemporarilyDisabled = userStatus === 'banned' || userStatus === 'kicked';
 
   const fetchUserProfileAndRole = async (currentSession: Session | null) => {
     if (currentSession?.user?.id) {
@@ -81,14 +83,14 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         };
       }
       
-      // Logic to auto-unkick if 15 minutes have passed
       if (determinedStatus === 'kicked' && determinedKickedAt) {
         const kickedTime = new Date(determinedKickedAt).getTime();
         const fifteenMinutesAgo = Date.now() - (15 * 60 * 1000);
         if (kickedTime < fifteenMinutesAgo) {
           console.log(`[SessionContext] User ${currentSession.user.id} was kicked, but 15 minutes have passed. Auto-unkicking.`);
           await supabase.from('profiles').update({ status: 'active', kicked_at: null }).eq('id', currentSession.user.id);
-          await supabase.auth.admin.updateUserById(currentSession.user.id, { user_metadata: { kicked_at: null } });
+          // This part requires an admin client, so we'll rely on the server-side cron/middleware to handle it.
+          // For the client, we can optimistically set the status to active.
           determinedStatus = 'active';
           determinedKickedAt = null;
           toast.info("Tu expulsión ha expirado. Puedes volver a usar la aplicación.");
@@ -100,7 +102,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       setUserAvatarUrl(determinedAvatarUrl);
       setUserLanguage(determinedLanguage);
       setUserStatus(determinedStatus);
-      setIsUserTemporarilyDisabled(determinedStatus === 'banned' || determinedStatus === 'kicked'); // NEW: Set temporary disable state
 
     } else {
       setUserRole(null);
@@ -108,7 +109,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       setUserAvatarUrl(null);
       setUserLanguage('es');
       setUserStatus(null);
-      setIsUserTemporarilyDisabled(false); // NEW: Clear temporary disable state
     }
   };
 
@@ -156,14 +156,12 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     };
   }, [router, pathname]);
 
-  // Real-time status check to kick users if their role is disabled or session is invalidated
   useEffect(() => {
     const checkSessionAndGlobalStatus = async () => {
       if (!session) return;
 
       console.log(`[SessionContext] Real-time status check for user ${session.user.id}. Current role: ${userRole}, status: ${userStatus}`);
 
-      // 1. Primary Check: Force a token refresh to see if the session was invalidated on the server.
       const { data, error: refreshError } = await supabase.auth.refreshSession();
       
       if (refreshError || !data.session) {
@@ -173,7 +171,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         return;
       }
 
-      // 2. Secondary Check: Is the user's role globally disabled or is their profile status 'banned'/'kicked'? (Only for non-super-admins)
       if (userRole !== 'super_admin') {
         try {
           const response = await fetch('/api/settings/public-status');
@@ -184,7 +181,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
           const statusData = await response.json();
           const { usersDisabled, adminsDisabled } = statusData;
 
-          // Re-fetch profile status to ensure it's up-to-date
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('status, kicked_at')
@@ -195,28 +191,15 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
             console.error("[SessionContext] Error re-fetching user profile status:", profileError);
             setUserStatus('active'); 
           } else {
-            setUserStatus(profile.status as UserStatus);
-            // Auto-unkick logic here as well for real-time checks
+            let currentStatus = profile.status as UserStatus;
             if (profile.status === 'kicked' && profile.kicked_at) {
               const kickedTime = new Date(profile.kicked_at).getTime();
               const fifteenMinutesAgo = Date.now() - (15 * 60 * 1000);
               if (kickedTime < fifteenMinutesAgo) {
-                console.log(`[SessionContext] Real-time check: User ${session.user.id} was kicked, but 15 minutes have passed. Auto-unkicking.`);
-                await supabase.from('profiles').update({ status: 'active', kicked_at: null }).eq('id', session.user.id);
-                await supabase.auth.admin.updateUserById(session.user.id, { user_metadata: { kicked_at: null } });
-                setUserStatus('active');
-                toast.info("Tu expulsión ha expirado. Puedes volver a usar la aplicación.");
-                setIsUserTemporarilyDisabled(false); // NEW: Update temporary disable state
-                return; // Exit early as status changed
+                currentStatus = 'active';
               }
             }
-
-            if (profile.status === 'banned' || profile.status === 'kicked') {
-              console.log(`[SessionContext] Real-time check: User ${session.user.id} is ${profile.status}. Signing out.`);
-              await supabase.auth.signOut();
-              toast.error(`Tu cuenta ha sido ${profile.status === 'banned' ? 'baneada' : 'expulsada'}. Se ha cerrado tu sesión.`);
-              return;
-            }
+            setUserStatus(currentStatus);
           }
 
           if (usersDisabled && userRole === 'user') {
@@ -234,7 +217,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       }
     };
 
-    const intervalId = setInterval(checkSessionAndGlobalStatus, 3000); // Check every 3 seconds
+    const intervalId = setInterval(checkSessionAndGlobalStatus, 3000);
 
     return () => clearInterval(intervalId);
   }, [session, userRole, router, userStatus]);
