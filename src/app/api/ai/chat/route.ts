@@ -152,16 +152,21 @@ export async function POST(req: NextRequest) {
 
     console.log("[API /ai/chat] Received rawMessages:", JSON.stringify(rawMessages, null, 2)); // ADD THIS LOG
 
+    // Fetch key details by ID first
     const { data: keyDetails, error: keyError } = await supabase
       .from('user_api_keys')
-      .select('provider, api_key, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint')
+      .select('provider, api_key, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint, is_global, user_id')
       .eq('id', selectedKeyId)
-      .eq('user_id', session.user.id)
       .eq('is_active', true)
       .single();
 
     if (keyError || !keyDetails) {
-      throw new Error('No se encontró una API key activa con el ID proporcionado para este usuario. Por favor, verifica la Gestión de API Keys.');
+      throw new Error('No se encontró una API key activa con el ID proporcionado. Por favor, verifica la Gestión de API Keys.');
+    }
+
+    // NEW: Authorization check for the fetched key
+    if (!keyDetails.is_global && keyDetails.user_id !== session.user.id) {
+      throw new Error('Acceso denegado. No tienes permiso para usar esta clave.');
     }
 
     let finalModel = keyDetails.model_name;
