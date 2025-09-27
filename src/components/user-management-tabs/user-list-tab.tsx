@@ -161,8 +161,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
           <TableBody>
             {usersToRender.map((user) => {
               const isCurrentUser = user.id === currentUserId;
-              const isTargetUserSuperAdmin = user.role === 'super_admin';
-              const canPerformAction = isCurrentUserSuperAdmin && !isTargetUserSuperAdmin && !isCurrentUser;
+              const canPerformAction = isCurrentUserSuperAdmin && user.role !== 'super_admin' && !isCurrentUser;
 
               return (
                 <TableRow key={user.id} className={cn(user.status === 'banned' && 'bg-muted/50 opacity-60')}>
@@ -174,7 +173,10 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       {user.role !== 'user' && (
-                        <Badge variant={user.role === 'admin' ? 'secondary' : 'default'} className={cn(user.role === 'super_admin' && 'bg-yellow-500 text-yellow-900 dark:bg-yellow-400 dark:text-yellow-950')}>
+                        <Badge className={cn(
+                          user.role === 'super_admin' && 'bg-yellow-500 text-yellow-900 dark:bg-yellow-400 dark:text-yellow-950 border-transparent',
+                          user.role === 'admin' && 'bg-primary-light-purple text-white border-transparent'
+                        )}>
                           {user.role === 'super_admin' ? <Crown className="h-3 w-3 mr-1" /> : <Shield className="h-3 w-3 mr-1" />}
                           {user.role === 'super_admin' ? 'Super Admin' : user.role}
                         </Badge>

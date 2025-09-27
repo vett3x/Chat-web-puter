@@ -115,7 +115,10 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
               {profile?.first_name && profile?.last_name ? `${profile.first_name} ${profile.last_name}` : session.user.email}
             </span>
             {userRole && userRole !== 'user' && (
-              <Badge variant={userRole === 'admin' ? 'secondary' : 'default'} className={cn('capitalize mt-1', userRole === 'super_admin' && 'bg-yellow-500 text-yellow-900 dark:bg-yellow-400 dark:text-yellow-950')}>
+              <Badge className={cn('capitalize mt-1', 
+                userRole === 'super_admin' && 'bg-yellow-500 text-yellow-900 dark:bg-yellow-400 dark:text-yellow-950 border-transparent',
+                userRole === 'admin' && 'bg-primary-light-purple text-white border-transparent'
+              )}>
                 {userRole === 'super_admin' && <Crown className="h-3 w-3 mr-1" />}
                 {userRole === 'admin' && <Shield className="h-3 w-3 mr-1" />}
                 {userRole === 'super_admin' ? 'Super Admin' : userRole}
