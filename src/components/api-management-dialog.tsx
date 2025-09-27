@@ -26,176 +26,22 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { AI_PROVIDERS, getModelLabel } from '@/lib/ai-models'; // Import AI_PROVIDERS
+import { useSession } from '@/components/session-context-provider'; // NEW: Import useSession
 
 const apiKeySchema = z.object({
   id: z.string().optional(), // Added for editing existing keys
   provider: z.string().min(1, { message: 'Debes seleccionar un proveedor.' }),
-  api_key: z.string().optional(), // Make optional for Vertex AI
-  nickname: z.string().optional(),
+  api_key: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional API key
+  nickname: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional nickname
   // New fields for Vertex AI
-  project_id: z.string().optional(),
-  location_id: z.string().optional(),
+  project_id: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional project_id
+  location_id: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional location_id
   use_vertex_ai: z.boolean().optional(),
-  model_name: z.string().optional(), // This needs to be conditional
+  model_name: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional model_name
   json_key_file: z.any().optional(), // New: for file upload
   json_key_content: z.string().optional(), // Added for payload
-  api_endpoint: z.string().url({ message: 'URL de endpoint inválida.' }).optional(), // New: for custom endpoint
-}).superRefine((data, ctx) => {
-  if (data.provider === 'google_gemini') {
-    if (data.use_vertex_ai) {
-      if (!data.model_name || data.model_name === '') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Debes seleccionar un modelo para usar Vertex AI.',
-          path: ['model_name'],
-        });
-      }
-      if (!data.project_id) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Project ID es requerido para usar Vertex AI.',
-          path: ['project_id'],
-        });
-      }
-      if (!data.location_id) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Location ID es requerido para usar Vertex AI.',
-          path: ['location_id'],
-        });
-      }
-    } else { // Public API
-      if (!data.model_name || data.model_name === '') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Debes seleccionar un modelo para la API pública de Gemini.',
-          path: ['model_name'],
-        });
-      }
-      if (!data.api_key || data.api_key === '') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'API Key es requerida para la API pública de Gemini.',
-          path: ['api_key'],
-        });
-      }
-    }
-  } else if (data.provider === 'custom_endpoint') { // New validation for custom_endpoint
-    if (!data.api_endpoint || data.api_endpoint === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'El link del endpoint es requerido para un endpoint personalizado.',
-        path: ['api_endpoint'],
-      });
-    }
-    if (!data.api_key || data.api_key === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'La API Key es requerida para un endpoint personalizado.',
-        path: ['api_key'],
-      });
-    }
-    if (!data.model_name || data.model_name === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'El ID del modelo es requerido para un endpoint personalizado.',
-        path: ['model_name'],
-      });
-    }
-    if (!data.nickname || data.nickname === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'El apodo es obligatorio para un endpoint personalizado.',
-        path: ['nickname'],
-      });
-    }
-  }
-});
-
-// Apply the same superRefine to updateApiKeySchema
-const updateApiKeySchema = z.object({
-  id: z.string().min(1, { message: 'ID de clave es requerido para actualizar.' }),
-  provider: z.string().min(1),
-  api_key: z.string().optional(),
-  nickname: z.string().optional(),
-  project_id: z.string().optional(),
-  location_id: z.string().optional(),
-  use_vertex_ai: z.boolean().optional(),
-  model_name: z.string().optional(),
-  json_key_file: z.any().optional(),
-  json_key_content: z.string().optional(),
-  api_endpoint: z.string().url({ message: 'URL de endpoint inválida.' }).optional(), // New: for custom endpoint
-}).superRefine((data, ctx) => {
-  if (data.provider === 'google_gemini') {
-    if (data.use_vertex_ai) {
-      if (!data.model_name || data.model_name === '') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Debes seleccionar un modelo para usar Vertex AI.',
-          path: ['model_name'],
-        });
-      }
-      if (!data.project_id) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Project ID es requerido para usar Vertex AI.',
-          path: ['project_id'],
-        });
-      }
-      if (!data.location_id) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Location ID es requerido para usar Vertex AI.',
-          path: ['location_id'],
-        });
-      }
-    } else { // Public API
-      if (!data.model_name || data.model_name === '') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Debes seleccionar un modelo para la API pública de Gemini.',
-          path: ['model_name'],
-        });
-      }
-      // API Key is optional for update if not changing
-      // if (!data.api_key || data.api_key === '') {
-      //   ctx.addIssue({
-      //     code: z.ZodIssueCode.custom,
-      //     message: 'API Key es requerida para la API pública de Gemini.',
-      //     path: ['api_key'],
-      //   });
-      // }
-    }
-  } else if (data.provider === 'custom_endpoint') { // New validation for custom_endpoint
-    if (!data.api_endpoint || data.api_endpoint === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'El link del endpoint es requerido para un endpoint personalizado.',
-        path: ['api_endpoint'],
-      });
-    }
-    if (!data.api_key || data.api_key === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'La API Key es requerida para un endpoint personalizado.',
-        path: ['api_key'],
-      });
-    }
-    if (!data.model_name || data.model_name === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'El ID del modelo es requerido para un endpoint personalizado.',
-        path: ['model_name'],
-      });
-    }
-    if (!data.nickname || data.nickname === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'El apodo es obligatorio para un endpoint personalizado.',
-        path: ['nickname'],
-      });
-    }
-  }
+  api_endpoint: z.string().trim().url({ message: 'URL de endpoint inválida.' }).optional().or(z.literal('')), // Changed: Allow empty string for optional api_endpoint
+  is_global: z.boolean().optional(), // NEW: Add is_global to schema
 });
 
 type ApiKeyFormValues = z.infer<typeof apiKeySchema>;
@@ -212,6 +58,8 @@ interface ApiKey {
   model_name: string | null; // New
   json_key_content: string | null; // New: to check if content exists
   api_endpoint: string | null; // New: for custom endpoint
+  is_global: boolean; // NEW: Add is_global
+  user_id: string | null; // NEW: Add user_id for permission checks
 }
 
 const providerOptions = AI_PROVIDERS.filter(p => p.source === 'user_key').map(p => ({
@@ -226,6 +74,10 @@ interface ApiManagementDialogProps {
 }
 
 export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogProps) {
+  const { session, userRole } = useSession(); // NEW: Get userRole
+  const isSuperAdmin = userRole === 'super_admin'; // NEW: Check if Super Admin
+  const currentUserId = session?.user?.id;
+
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -247,7 +99,8 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       model_name: '',
       json_key_file: undefined,
       json_key_content: undefined,
-      api_endpoint: '', // Default for new field
+      api_endpoint: '',
+      is_global: false, // NEW: Default to false
     },
   });
 
@@ -285,6 +138,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         json_key_file: undefined,
         json_key_content: undefined,
         api_endpoint: '',
+        is_global: false, // NEW: Reset is_global
       });
       setEditingKeyId(null);
       setSelectedJsonKeyFile(null);
@@ -307,6 +161,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       json_key_file: undefined,
       json_key_content: undefined, // Don't pre-fill content, user must re-upload if needed
       api_endpoint: key.api_endpoint || '', // Pre-fill api_endpoint
+      is_global: key.is_global, // NEW: Pre-fill is_global
     });
     setSelectedJsonKeyFile(null);
     setJsonKeyFileName(key.use_vertex_ai && key.json_key_content ? 'Archivo JSON existente' : null); // Indicate if JSON key exists
@@ -325,6 +180,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       json_key_file: undefined,
       json_key_content: undefined,
       api_endpoint: '',
+      is_global: false, // NEW: Reset is_global
     });
     setSelectedJsonKeyFile(null);
     setJsonKeyFileName(null);
@@ -357,18 +213,47 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
 
   const onSubmit = async (values: ApiKeyFormValues) => {
     setIsSubmitting(true);
+    let hasValidationError = false;
+
+    // --- Manual validation for NEW keys or when specific fields are required ---
+    if (!editingKeyId) { // Stricter validation for creating NEW keys
+      if (values.provider === 'google_gemini') {
+        if (values.use_vertex_ai) {
+          if (!values.model_name) { form.setError('model_name', { message: 'Debes seleccionar un modelo.' }); hasValidationError = true; }
+          if (!values.project_id) { form.setError('project_id', { message: 'Project ID es requerido.' }); hasValidationError = true; }
+          if (!values.location_id) { form.setError('location_id', { message: 'Location ID es requerido.' }); hasValidationError = true; }
+        } else {
+          if (!values.model_name) { form.setError('model_name', { message: 'Debes seleccionar un modelo.' }); hasValidationError = true; }
+          if (!values.api_key) { form.setError('api_key', { message: 'API Key es requerida.' }); hasValidationError = true; }
+        }
+      } else if (values.provider === 'custom_endpoint') {
+        if (!values.api_endpoint) { form.setError('api_endpoint', { message: 'El link del endpoint es requerido.' }); hasValidationError = true; }
+        if (!values.model_name) { form.setError('model_name', { message: 'El ID del modelo es requerido.' }); hasValidationError = true; }
+        if (!values.nickname) { form.setError('nickname', { message: 'El apodo es obligatorio.' }); hasValidationError = true; }
+        if (!values.api_key) { form.setError('api_key', { message: 'API Key es requerida.' }); hasValidationError = true; }
+      } else { // Other providers
+        if (!values.api_key) { form.setError('api_key', { message: 'API Key es requerida.' }); hasValidationError = true; }
+      }
+    }
+    
+    if (hasValidationError) {
+      setIsSubmitting(false);
+      return;
+    }
+    // --- End manual validation ---
+
     try {
       const method = editingKeyId ? 'PUT' : 'POST';
       const payload: ApiKeyFormValues = { ...values };
       
       if (editingKeyId) {
         payload.id = editingKeyId; // Ensure ID is in payload for PUT
+        // If api_key field is empty during an update, delete it from payload so backend doesn't update it to an empty string
+        if (payload.api_key === '') {
+          delete payload.api_key;
+        }
       }
 
-      // If editing and API key is empty, don't send it to avoid overwriting with empty string
-      if (editingKeyId && !payload.api_key) {
-        delete payload.api_key;
-      }
       // If using Vertex AI, ensure api_key is null/undefined
       if (payload.use_vertex_ai) {
         payload.api_key = undefined; // Will be stored as NULL in DB
@@ -384,15 +269,11 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         // Clear custom endpoint fields if switching to Vertex AI
         payload.api_endpoint = undefined;
       } else if (isCustomEndpoint) {
-        // If using custom endpoint, clear Vertex AI specific fields and api_key
-        payload.api_key = values.api_key; // API key is required for custom endpoint
+        // If using custom endpoint, clear Vertex AI specific fields
         payload.project_id = undefined;
         payload.location_id = undefined;
         payload.json_key_content = undefined;
         payload.use_vertex_ai = false;
-        // Ensure nickname and model_name are present for custom endpoint
-        if (!payload.nickname) payload.nickname = 'Endpoint Personalizado';
-        if (!payload.model_name) payload.model_name = 'custom-model';
       } else {
         // If not using Vertex AI or custom endpoint, clear Vertex AI specific fields and custom endpoint fields
         payload.project_id = undefined;
@@ -407,13 +288,29 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message);
+      
+      const responseText = await response.text(); // Read response text first
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (jsonError) {
+        throw new Error(`Respuesta inesperada del servidor: ${responseText.substring(0, 100)}...`);
+      }
+
+      if (!response.ok) {
+        // If there are validation errors from the backend, display them
+        if (result.errors) {
+          result.errors.forEach((err: any) => {
+            form.setError(err.path[0], { message: err.message });
+          });
+        }
+        throw new Error(result.message || `Error HTTP: ${response.status}`);
+      }
       toast.success(`API Key ${editingKeyId ? 'actualizada' : 'guardada'}.`);
       handleCancelEdit(); // Clear form and editing state
       fetchKeys();
     } catch (error: any) {
-      toast.error(`Error: ${error.message}`);
+      toast.error(`Error: ${error.message || 'Ocurrió un error desconocido al guardar la clave.'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -681,10 +578,30 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                     )} />
                   )}
                   
+                  {isSuperAdmin && ( // NEW: Only show for Super Admins
+                    <FormField control={form.control} name="is_global" render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                        <div className="space-y-0.5">
+                          <FormLabel>Clave Global</FormLabel>
+                          <FormDescription>
+                            Si está activado, esta clave estará disponible para todos los usuarios.
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            disabled={isSubmitting}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )} />
+                  )}
+
                   <div className="flex gap-2">
                     <Button type="submit" disabled={isSubmitting || !selectedProvider}>
                       {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingKeyId ? <Edit className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />)}
-                      {editingKeyId ? 'Actualizar Clave' : 'Añadir Clave'}
+                      {editingKeyId ? 'Actualizar' : 'Añadir Clave'}
                     </Button>
                     {editingKeyId && (
                       <Button type="button" variant="outline" onClick={handleCancelEdit} disabled={isSubmitting}>
@@ -718,53 +635,78 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                     <TableHead>Apodo</TableHead>
                     <TableHead>Proveedor</TableHead>
                     <TableHead>Clave / Configuración</TableHead>
+                    {isSuperAdmin && <TableHead>Global</TableHead>}
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={4} className="text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={isSuperAdmin ? 5 : 4} className="text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
                   ) : filteredKeys.length === 0 ? (
-                    <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No hay claves que coincidan con la búsqueda.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={isSuperAdmin ? 5 : 4} className="text-center text-muted-foreground">No hay claves que coincidan con la búsqueda.</TableCell></TableRow>
                   ) : (
-                    filteredKeys.map(key => (
-                      <TableRow key={key.id}>
-                        <TableCell>{key.nickname || 'N/A'}</TableCell>
-                        <TableCell>{providerOptions.find(p => p.value === key.provider)?.label || key.provider}</TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {key.provider === 'custom_endpoint' ? (
-                            <div className="flex flex-col">
-                              <span>Endpoint: {key.api_endpoint || 'N/A'}</span>
-                              <span className="text-muted-foreground">Modelo ID: {key.model_name || 'N/A'}</span>
-                              <span className="text-muted-foreground">API Key: {key.api_key ? `${key.api_key.substring(0, 4)}...${key.api_key.substring(key.api_key.length - 4)}` : 'N/A'}</span>
-                            </div>
-                          ) : key.use_vertex_ai ? (
-                            <div className="flex flex-col">
-                              <span>Vertex AI (Activo)</span>
-                              <span className="text-muted-foreground">Project: {key.project_id || 'N/A'}</span>
-                              <span className="text-muted-foreground">Location: {key.location_id || 'N/A'}</span>
-                              <span className="text-muted-foreground">Modelo: {getModelLabel(key.model_name ?? undefined) || 'N/A'}</span>
-                              {key.json_key_content && <span className="text-muted-foreground">JSON Key: Subido</span>}
-                            </div>
-                          ) : (
-                            <div className="flex flex-col">
-                              <span>{key.api_key}</span>
-                              <span className="text-muted-foreground">Modelo: {getModelLabel(key.model_name ?? undefined) || 'N/A'}</span>
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button variant="outline" size="icon" onClick={() => handleEditKey(key)} disabled={editingKeyId !== null}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="destructive" size="icon" onClick={() => handleDelete(key.id)} disabled={editingKeyId !== null}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    filteredKeys
+                      .filter(key => isSuperAdmin || !key.is_global) // NEW: Filter out global keys for non-Super Admins in the table
+                      .map(key => {
+                        // Determine if the current user can edit/delete this key
+                        const canManageKey = isSuperAdmin || (!key.is_global && key.user_id === currentUserId);
+
+                        return (
+                          <TableRow key={key.id}>
+                            <TableCell>{key.nickname || 'N/A'}</TableCell>
+                            <TableCell>{providerOptions.find(p => p.value === key.provider)?.label || key.provider}</TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {key.provider === 'custom_endpoint' ? (
+                                <div className="flex flex-col">
+                                  <span>Endpoint: {key.api_endpoint || 'N/A'}</span>
+                                  <span className="text-muted-foreground">Modelo ID: {key.model_name || 'N/A'}</span>
+                                  <span className="text-muted-foreground">API Key: {key.api_key ? `${key.api_key.substring(0, 4)}...${key.api_key.substring(key.api_key.length - 4)}` : 'N/A'}</span>
+                                </div>
+                              ) : key.use_vertex_ai ? (
+                                <div className="flex flex-col">
+                                  <span>Vertex AI (Activo)</span>
+                                  <span className="text-muted-foreground">Project: {key.project_id || 'N/A'}</span>
+                                  <span className="text-muted-foreground">Location: {key.location_id || 'N/A'}</span>
+                                  <span className="text-muted-foreground">Modelo: {getModelLabel(key.model_name ?? undefined) || 'N/A'}</span>
+                                  {key.json_key_content && <span className="text-muted-foreground">JSON Key: Subido</span>}
+                                </div>
+                              ) : (
+                                <div className="flex flex-col">
+                                  <span>{key.api_key}</span>
+                                  <span className="text-muted-foreground">Modelo: {getModelLabel(key.model_name ?? undefined) || 'N/A'}</span>
+                                </div>
+                              )}
+                            </TableCell>
+                            {isSuperAdmin && (
+                              <TableCell>
+                                {key.is_global ? 'Sí' : 'No'}
+                              </TableCell>
+                            )}
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button 
+                                  variant="outline" 
+                                  size="icon" 
+                                  onClick={() => handleEditKey(key)} 
+                                  disabled={editingKeyId !== null || !canManageKey}
+                                  title={!canManageKey ? "No tienes permiso para editar esta clave" : "Editar clave"}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="destructive" 
+                                  size="icon" 
+                                  onClick={() => handleDelete(key.id)} 
+                                  disabled={editingKeyId !== null || !canManageKey}
+                                  title={!canManageKey ? "No tienes permiso para eliminar esta clave" : "Eliminar clave"}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                   )}
                 </TableBody>
               </Table>

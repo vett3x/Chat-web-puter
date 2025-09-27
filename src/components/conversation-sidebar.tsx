@@ -63,9 +63,9 @@ interface ConversationSidebarProps {
   onOpenApiManagement: () => void;
   onOpenAlerts: () => void; // Added missing prop
   refreshData: () => void;
-  createConversation: (onSuccess: (newItem: Conversation) => void) => void;
-  createFolder: (parentId?: string | null) => void;
-  createNote: (onSuccess: (newItem: Note) => void) => void;
+  createConversation: (onSuccess: (newItem: Conversation) => void) => Promise<string | null>; // Updated return type
+  createFolder: (parentId?: string | null) => Promise<string | null>; // Updated return type
+  createNote: (onSuccess: (newItem: Note) => void) => Promise<string | null>; // Updated return type
   moveItem: (itemId: string, itemType: 'conversation' | 'note' | 'folder', targetFolderId: string | null) => void;
   onDeleteApp: (appId: string) => void;
   isDeletingAppId: string | null;
@@ -116,20 +116,38 @@ export function ConversationSidebar({
 
   const handleCreateConversation = async () => {
     setIsCreatingConversation(true);
-    await createConversation((newItem) => onSelectItem(newItem.id, 'conversation'));
-    setIsCreatingConversation(false);
+    try {
+      await createConversation((newItem) => onSelectItem(newItem.id, 'conversation'));
+    } catch (error) {
+      console.error("Error creating conversation:", error);
+      toast.error("Error al crear la conversación.");
+    } finally {
+      setIsCreatingConversation(false);
+    }
   };
 
   const handleCreateFolder = async (parentId: string | null = null) => {
     setIsCreatingFolder(true);
-    await createFolder(parentId);
-    setIsCreatingFolder(false);
+    try {
+      await createFolder(parentId);
+    } catch (error) {
+      console.error("Error creating folder:", error);
+      toast.error("Error al crear la carpeta.");
+    } finally {
+      setIsCreatingFolder(false);
+    }
   };
 
   const handleCreateNote = async () => {
     setIsCreatingNote(true);
-    await createNote((newItem) => onSelectItem(newItem.id, 'note'));
-    setIsCreatingNote(false);
+    try {
+      await createNote((newItem) => onSelectItem(newItem.id, 'note'));
+    } catch (error) {
+      console.error("Error creating note:", error);
+      toast.error("Error al crear la nota.");
+    } finally {
+      setIsCreatingNote(false);
+    }
   };
 
   const handleDragStart = (e: React.DragEvent, id: string, type: 'conversation' | 'note' | 'folder') => {

@@ -100,15 +100,14 @@ export function DraggableConversationCard({
     const { error } = await supabase
       .from('conversations')
       .update({ title: editingTitle })
-      .eq('id', conversation.id)
-      .eq('user_id', userId);
+      .eq('id', conversation.id);
 
     if (error) {
       console.error('Error updating conversation title:', error);
-      toast.error('Error al actualizar el título de la conversación.');
+      toast.error(`Error al actualizar: ${error.message}`);
     } else {
       toast.success('Título de conversación actualizado.');
-      onConversationUpdated(conversation.id, { title: editingTitle }); // Use new prop
+      onConversationUpdated(conversation.id, { title: editingTitle });
       setIsEditing(false);
     }
   };
@@ -118,24 +117,42 @@ export function DraggableConversationCard({
       toast.error('Usuario no autenticado.');
       return;
     }
+    setIsDeleting(true);
 
-    const { error } = await supabase
-      .from('conversations')
-      .delete()
-      .eq('id', conversation.id)
-      .eq('user_id', userId);
+    try {
+      // Step 1: Delete all messages associated with the conversation
+      const { error: messagesError } = await supabase
+        .from('messages')
+        .delete()
+        .eq('conversation_id', conversation.id);
 
-    if (error) {
-      console.error('Error deleting conversation:', error);
-      toast.error('Error al eliminar la conversación.');
-    } else {
+      if (messagesError) {
+        console.error('Supabase Error deleting messages:', messagesError);
+        throw new Error(`Error al eliminar los mensajes del chat: ${messagesError.message}`);
+      }
+
+      // Step 2: Delete the conversation itself
+      const { error: conversationError } = await supabase
+        .from('conversations')
+        .delete()
+        .eq('id', conversation.id);
+
+      if (conversationError) {
+        console.error('Supabase Error deleting conversation:', conversationError);
+        throw new Error(`Error al eliminar la conversación: ${conversationError.message}`);
+      }
+
       toast.success('Conversación eliminada.');
-      onConversationDeleted(conversation.id); // Use new prop
+      onConversationDeleted(conversation.id);
       if (selectedConversationId === conversation.id) {
         onSelectConversation(null);
       }
+    } catch (error: any) {
+      console.error('Error during conversation deletion:', error);
+      toast.error(error.message || 'Ocurrió un error inesperado.');
+    } finally {
+      setIsDeleting(false);
     }
-    setIsDeleting(false);
   };
 
   const paddingLeft = `${level * 1.25 + 0.5}rem`; // Indent based on level
