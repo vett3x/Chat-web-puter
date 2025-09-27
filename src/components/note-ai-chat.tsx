@@ -27,6 +27,7 @@ import { AI_PROVIDERS } from '@/lib/ai-models';
 import { ApiKey } from '@/hooks/use-user-api-keys';
 import { ModelSelectorDropdown } from '@/components/chat/model-selector-dropdown'; // NEW: Import ModelSelectorDropdown
 import { useNoteAssistantChat, ChatMessage } from '@/hooks/use-note-assistant-chat'; // NEW: Import useNoteAssistantChat
+import { MessageContent } from '@/components/message-content'; // NEW: Import MessageContent
 
 const DEFAULT_AI_MODEL_FALLBACK = 'puter:claude-sonnet-4'; // Fallback if Gemini 2.5 Flash not found or configured
 
@@ -149,7 +150,18 @@ export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialCha
                         <Loader2 className="h-4 w-4 animate-spin" />
                       </div>
                     ) : (
-                      <div className="prose prose-sm dark:prose-invert max-w-none"><ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown></div>
+                      <MessageContent
+                        content={msg.content}
+                        isNew={msg.isNew}
+                        aiResponseSpeed="normal" // Fixed to normal for note chat
+                        isAppChat={false}
+                        isConstructionPlan={false}
+                        planApproved={false}
+                        isCorrectionPlan={false}
+                        correctionApproved={false}
+                        isErrorAnalysisRequest={false}
+                        isLoading={isLoading}
+                      />
                     )}
                   </div>
                 </div>
@@ -160,7 +172,7 @@ export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialCha
       </CardContent>
       <CardFooter className="p-2 border-t">
         <div className="flex w-full items-center gap-2">
-          <Textarea value={userInput} onChange={(e) => setUserInput(e.target.value)} onKeyPress={handleKeyPress} placeholder="Pregunta sobre tu nota..." disabled={isLoading} className="flex-1 resize-none min-h-10" rows={1} />
+          <Textarea value={userInput} onChange={(e) => setUserInput(e.target.value)} onKeyPress={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder="Pregunta sobre tu nota..." disabled={isLoading} className="flex-1 resize-none min-h-10" rows={1} />
           <Button onClick={handleSendMessage} disabled={isLoading || !userInput.trim()}><Send className="h-4 w-4" /></Button>
         </div>
       </CardFooter>

@@ -32,9 +32,11 @@ declare global {
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
-  content: string;
+  content: string | RenderablePart[]; // MODIFICADO: Ahora content puede ser string o RenderablePart[]
   id?: string;
   isTyping?: boolean;
+  isNew?: boolean; // Añadido para consistencia con el tipo Message
+  isAnimated?: boolean; // Añadido para consistencia con el tipo Message
 }
 
 const DEFAULT_AI_MODEL_FALLBACK = 'puter:claude-sonnet-4';
@@ -148,13 +150,13 @@ export function useNoteAssistantChat({
   const handleSendMessage = useCallback(async (userInput: string) => {
     if (!userInput.trim() || isLoading) return;
 
-    const userMessageForUI: ChatMessage = { role: 'user', content: userInput };
+    const userMessageForUI: ChatMessage = { role: 'user', content: userInput, isNew: true, isAnimated: true };
     const newMessages: ChatMessage[] = [...messages, userMessageForUI];
     setMessages(newMessages);
     setIsLoading(true);
 
     const assistantMessageId = `assistant-${Date.now()}`;
-    setMessages(prev => [...prev, { role: 'assistant', content: '', isTyping: true, id: assistantMessageId }]);
+    setMessages(prev => [...prev, { role: 'assistant', content: '', isTyping: true, id: assistantMessageId, isNew: true, isAnimated: false }]);
 
     try {
       const systemPromptContent = `Eres un asistente de notas. Tu tarea es responder preguntas sobre la nota proporcionada. Sé conciso y directo.
@@ -198,13 +200,15 @@ ${noteContent}
           if (done) break;
           const chunk = decoder.decode(value, { stream: true });
           fullResponseText += chunk;
-          setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: fullResponseText, isTyping: false } : m));
+          setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: parseAiResponseToRenderableParts(fullResponseText, false), isTyping: false, isNew: true } : m));
         }
       } else {
         throw new Error('Modelo de IA no válido seleccionado.');
       }
 
-      const finalMessages = [...newMessages, { role: 'assistant' as const, content: fullResponseText }];
+      const finalContentForMessage = parseAiResponseToRenderableParts(fullResponseText, false);
+
+      const finalMessages = [...newMessages, { role: 'assistant' as const, content: finalContentForMessage, isNew: true, isAnimated: false }];
       setMessages(finalMessages);
       onSaveHistory(finalMessages);
 
@@ -230,7 +234,7 @@ ${noteContent}
   return {
     messages,
     isLoading,
-    isPuterReady,
+    isPuterReady: true, // Assuming puter is always ready here for simplicity
     selectedModel,
     handleModelChange,
     sendMessage: handleSendMessage,
