@@ -22,7 +22,7 @@ export async function middleware(req: NextRequest) {
         },
       },
     }
-  ); // REMOVED: .schema('public')
+  );
 
   const {
     data: { session },
@@ -86,10 +86,6 @@ export async function middleware(req: NextRequest) {
 
   // If maintenance mode is enabled and user is not Super Admin, redirect to maintenance page
   if (maintenanceModeEnabled && !isSuperAdmin && !publicPaths.includes(req.nextUrl.pathname)) {
-    // Invalidate session to ensure user is logged out and redirected
-    if (session) {
-      await supabase.auth.signOut();
-    }
     const redirectUrl = req.nextUrl.clone();
     redirectUrl.pathname = '/maintenance';
     return NextResponse.redirect(redirectUrl);
