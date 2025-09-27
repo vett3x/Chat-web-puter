@@ -276,7 +276,13 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
           action={reasonDialogState.action!}
           onSubmit={(reason) => {
             if (reasonDialogState.user && reasonDialogState.action) {
-              handleUserStatusChange(reasonDialogState.user.id, reasonDialogState.action as 'kick' | 'ban' | 'unban', reason);
+              const apiActionMap = {
+                expulsar: 'kick',
+                banear: 'ban',
+                unban: 'unban'
+              };
+              const apiAction = apiActionMap[reasonDialogState.action];
+              handleUserStatusChange(reasonDialogState.user.id, apiAction as 'kick' | 'ban' | 'unban', reason);
             }
           }}
         />
