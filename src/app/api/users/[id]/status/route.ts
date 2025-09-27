@@ -9,7 +9,7 @@ import { SUPERUSER_EMAILS } from '@/lib/constants';
 
 const updateStatusSchema = z.object({
   action: z.enum(['kick', 'ban', 'unban']),
-  reason: z.string().optional(), // Reason is optional for super admins
+  reason: z.string().min(1, { message: 'Se requiere una razón para esta acción.' }),
 });
 
 async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null }> {
@@ -76,14 +76,7 @@ export async function PUT(req: NextRequest, context: any) {
     const body = await req.json();
     const { action, reason } = updateStatusSchema.parse(body);
 
-    if (currentUserRole === 'admin' && (!reason || reason.trim() === '')) {
-      return NextResponse.json({ message: 'Se requiere una razón para realizar esta acción.' }, { status: 400 });
-    }
-
-    let logDescription = '';
-    let successMessage = '';
     const actionText = { kick: 'expulsado', ban: 'baneado', unban: 'desbaneado' }[action];
-    const reasonText = reason ? ` Razón: ${reason}` : '';
 
     if (action === 'kick') {
       const { error } = await supabaseAdmin.auth.admin.signOut(userIdToUpdate);
@@ -99,16 +92,23 @@ export async function PUT(req: NextRequest, context: any) {
       await supabaseAdmin.from('profiles').update({ status: 'active' }).eq('id', userIdToUpdate);
     }
 
-    logDescription = `Usuario ${userIdToUpdate} ${actionText} por ${session.user.email}.${reasonText}`;
-    successMessage = `Usuario ${actionText} correctamente.`;
-
+    // Log to both tables
+    const logDescription = `Usuario ${userIdToUpdate} ${actionText} por ${session.user.email}. Razón: ${reason}`;
+    
     await supabaseAdmin.from('server_events_log').insert({
       user_id: session.user.id,
       event_type: `user_${action}`,
       description: logDescription,
     });
 
-    return NextResponse.json({ message: successMessage });
+    await supabaseAdmin.from('moderation_logs').insert({
+      target_user_id: userIdToUpdate,
+      moderator_user_id: session.user.id,
+      action: action,
+      reason: reason,
+    });
+
+    return NextResponse.json({ message: `Usuario ${actionText} correctamente.` });
 
   } catch (error: any) {
     if (error instanceof z.ZodError) {

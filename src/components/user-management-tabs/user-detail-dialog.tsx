@@ -11,7 +11,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { User, Server, Cloud, History, MessageSquare, HardDrive, Save, Loader2, ShieldCheck, KeyRound } from 'lucide-react';
+import { User, Server, Cloud, History, MessageSquare, HardDrive, Save, Loader2, ShieldCheck, KeyRound, Shield } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { UserServersTab } from './user-servers-tab';
@@ -20,7 +20,8 @@ import { UserConversationsTab } from './user-conversations-tab';
 import { UserResourcesTab } from './user-resources-tab';
 import { UserActivityTab } from './user-activity-tab';
 import { UserPermissionsTab } from './user-permissions-tab';
-import { UserAccountTab } from './user-account-tab'; // Import the new tab
+import { UserAccountTab } from './user-account-tab';
+import { UserModerationHistoryTab } from './user-moderation-history-tab'; // Import the new tab
 import {
   Select,
   SelectContent,
@@ -143,7 +144,7 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-7">
+            <TabsList className="grid w-full grid-cols-8">
               <TabsTrigger value="servers" className="flex items-center gap-2">
                 <Server className="h-4 w-4" /> Servidores
               </TabsTrigger>
@@ -164,6 +165,9 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
               </TabsTrigger>
               <TabsTrigger value="account" className="flex items-center gap-2">
                 <KeyRound className="h-4 w-4" /> Cuenta
+              </TabsTrigger>
+              <TabsTrigger value="moderation" className="flex items-center gap-2">
+                <Shield className="h-4 w-4" /> Moderación
               </TabsTrigger>
             </TabsList>
             <div className="flex-1 py-4 overflow-hidden">
@@ -199,6 +203,9 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
                     targetUserRole={user.role}
                     onAccountUpdated={onRoleUpdated}
                   />
+                </TabsContent>
+                <TabsContent value="moderation" className="h-full">
+                  <UserModerationHistoryTab userId={user.id} />
                 </TabsContent>
               </ScrollArea>
             </div>

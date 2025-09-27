@@ -103,7 +103,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
     setFilteredUsers(tempUsers);
   }, [allUsers, searchTerm, roleFilter, statusFilter]);
 
-  const handleUserStatusChange = async (userId: string, action: 'kick' | 'ban' | 'unban', reason?: string) => {
+  const handleUserStatusChange = async (userId: string, action: 'kick' | 'ban' | 'unban', reason: string) => {
     setIsActionLoading(userId);
     try {
       const response = await fetch(`/api/users/${userId}/status`, {
@@ -201,11 +201,11 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8" disabled={!canPerformModeration}><Users className="h-4 w-4" /></Button></DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => isCurrentUserSuperAdmin ? handleUserStatusChange(user.id, 'kick') : openReasonDialog(user, 'expulsar')}><LogOut className="mr-2 h-4 w-4" /> Expulsar</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openReasonDialog(user, 'expulsar')}><LogOut className="mr-2 h-4 w-4" /> Expulsar</DropdownMenuItem>
                               {user.status === 'banned' ? (
-                                <DropdownMenuItem onClick={() => handleUserStatusChange(user.id, 'unban')}><CheckCircle className="mr-2 h-4 w-4" /> Desbanear</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => openReasonDialog(user, 'unban' as any)}><CheckCircle className="mr-2 h-4 w-4" /> Desbanear</DropdownMenuItem>
                               ) : (
-                                <DropdownMenuItem onClick={() => isCurrentUserSuperAdmin ? handleUserStatusChange(user.id, 'ban') : openReasonDialog(user, 'banear')} className="text-destructive focus:text-destructive"><Ban className="mr-2 h-4 w-4" /> Banear</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => openReasonDialog(user, 'banear')} className="text-destructive focus:text-destructive"><Ban className="mr-2 h-4 w-4" /> Banear</DropdownMenuItem>
                               )}
                               {isCurrentUserSuperAdmin && (
                                 <>
