@@ -40,23 +40,76 @@ async function getSupabaseClient() {
     {
       cookies: {
         get: (name: string) => cookieStore.get(name)?.value,
+        set: (name: string, value: string, options: CookieOptions) => {},
+        remove: (name: string, options: CookieOptions) => {},
       },
     }
   );
 }
 
 // Helper to convert internal content parts to a string for token counting and custom endpoints
-function messageContentToString(content: string | MessageContentPart[]): string {
+function messageContentToString(content: any): string { // Change type to any for robustness
   if (typeof content === 'string') {
     return content;
   }
-  return content.map(part => {
-    if (part.type === 'text') return part.text;
-    if (part.type === 'code') return `\`\`\`${part.language || ''}${part.filename ? `:${part.filename}` : ''}\n${part.code || ''}\n\`\`\``;
-    if (part.type === 'image_url') return `[Imagen: ${part.image_url.url.substring(0, 30)}...]`;
-    return '';
-  }).join('\n\n');
+  if (Array.isArray(content)) {
+    // Explicitly convert to array to ensure it has .map method
+    const contentArray = Array.from(content); 
+    return contentArray.map((part: any) => { // Cast part to any
+      if (part && typeof part === 'object' && 'type' in part) {
+        if (part.type === 'text') return part.text;
+        if (part.type === 'code') return `\`\`\`${part.language || ''}${part.filename ? `:${part.filename}` : ''}\n${part.code || ''}\n\`\`\``;
+        if (part.type === 'image_url') return `[Imagen: ${part.image_url.url.substring(0, 30)}...]`;
+      }
+      console.warn("Skipping invalid message content part in messageContentToString:", part);
+      return '';
+    }).join('\n\n');
+  }
+  // If content is not a string and not an array, log and return empty string
+  console.warn("Unexpected content type in messageContentToString (not string or array):", typeof content, content);
+  return '';
 }
+
+// Helper to convert internal content parts to Gemini API parts
+const convertToGeminiParts = (content: any): Part[] => { // Change type to any for robustness
+  const parts: Part[] = [];
+  if (typeof content === 'string') {
+    parts.push({ text: content });
+  } else if (Array.isArray(content)) {
+    // Explicitly convert to array to ensure it has .forEach method
+    const contentArray = Array.from(content);
+    for (const part of contentArray) { // Iterate over the guaranteed array
+      if (part && typeof part === 'object' && 'type' in part) {
+        if (part.type === 'text') {
+          parts.push({ text: part.text });
+        } else if (part.type === 'image_url') {
+          const url = part.image_url.url;
+          const match = url.match(/^data:(image\/\w+);base64,(.*)$/);
+          if (!match) {
+            console.warn("Skipping invalid image data URL format for Gemini:", url.substring(0, 50) + '...');
+            parts.push({ text: "[Unsupported Image]" });
+          } else {
+            const mimeType = match[1] || 'application/octet-stream'; // Provide a default mimeType
+            const data = match[2] || ''; // Provide a default data
+            parts.push({ inlineData: { mimeType, data } });
+          }
+        } else if (part.type === 'code') {
+          const codePart = part as CodePart;
+          const lang = codePart.language || '';
+          const filename = codePart.filename ? `:${codePart.filename}` : '';
+          parts.push({ text: `\`\`\`${lang}${filename}\n${codePart.code || ''}\n\`\`\`` });
+        }
+      } else {
+        console.warn("Skipping invalid message content part in convertToGeminiParts:", part);
+        parts.push({ text: "[Invalid Content Part]" });
+      }
+    }
+  } else {
+    // If content is not a string and not an array, log and return empty parts
+    console.warn("Unexpected content type in convertToGeminiParts (not string or array):", typeof content, content);
+  }
+  return parts;
+};
 
 // Helper to estimate token count (simple heuristic)
 const estimateTokens = (text: string) => Math.ceil(text.length / 4);
@@ -86,37 +139,6 @@ function truncateMessagesByTokenLimit(messages: any[], limit: number, systemProm
 }
 
 
-// Helper to convert internal content parts to Gemini API parts
-const convertToGeminiParts = (content: string | MessageContentPart[]): Part[] => {
-  const parts: Part[] = [];
-  if (typeof content === 'string') {
-    parts.push({ text: content });
-  } else if (Array.isArray(content)) {
-    for (const part of content) {
-      if (part.type === 'text') {
-        parts.push({ text: part.text });
-      } else if (part.type === 'image_url') {
-        const url = part.image_url.url;
-        const match = url.match(/^data:(image\/\w+);base64,(.*)$/);
-        if (!match) {
-          console.warn("Skipping invalid image data URL format for Gemini:", url.substring(0, 50) + '...');
-          parts.push({ text: "[Unsupported Image]" });
-        } else {
-          const mimeType = match[1];
-          const data = match[2];
-          parts.push({ inlineData: { mimeType, data } });
-        }
-      } else if (part.type === 'code') {
-        const codePart = part as CodePart;
-        const lang = codePart.language || '';
-        const filename = codePart.filename ? `:${codePart.filename}` : '';
-        parts.push({ text: `\`\`\`${lang}${filename}\n${codePart.code || ''}\n\`\`\`` });
-      }
-    }
-  }
-  return parts;
-};
-
 export async function POST(req: NextRequest) {
   const supabase = await getSupabaseClient();
   const { data: { session } } = await supabase.auth.getSession();
@@ -127,6 +149,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { messages: rawMessages, selectedKeyId, stream } = chatRequestSchema.parse(body);
+
+    console.log("[API /ai/chat] Received rawMessages:", JSON.stringify(rawMessages, null, 2)); // ADD THIS LOG
 
     const { data: keyDetails, error: keyError } = await supabase
       .from('user_api_keys')
