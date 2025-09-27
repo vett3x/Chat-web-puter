@@ -7,6 +7,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
 import { createClient } from '@supabase/supabase-js';
+import path from 'path'; // Import path module for path manipulation
 
 const execSchema = z.object({
   command: z.string().min(1, { message: 'El comando es requerido.' }),
@@ -22,6 +23,21 @@ async function getUserId() {
   return session.user.id;
 }
 
+// Helper to check if a path is within /app and not a critical system path
+function isPathSafeForFileOperation(filePath: string): boolean {
+  const normalizedPath = path.posix.normalize(filePath);
+  // Must start with /app/ or be exactly /app
+  if (!normalizedPath.startsWith('/app/') && normalizedPath !== '/app') {
+    return false;
+  }
+  // Disallow paths that try to escape /app or target root/system directories
+  // This is a basic check, more sophisticated path traversal prevention might be needed for production.
+  if (normalizedPath.includes('..') || normalizedPath.startsWith('/etc') || normalizedPath.startsWith('/bin') || normalizedPath.startsWith('/usr') || normalizedPath.startsWith('/var') || normalizedPath === '/') {
+    return false;
+  }
+  return true;
+}
+
 /**
  * Validates if a command is safe to execute based on a whitelist and specific rules.
  * @param command The command string to validate.
@@ -30,7 +46,8 @@ async function getUserId() {
  */
 function isCommandSafe(command: string, allowedCommands: string[]): boolean {
   const trimmedCommand = command.trim();
-  const mainCommand = trimmedCommand.split(' ')[0];
+  const parts = trimmedCommand.split(/\s+/); // Split by one or more spaces
+  const mainCommand = parts[0];
 
   if (!allowedCommands.includes(mainCommand)) {
     return false; // Not in the basic whitelist
@@ -39,15 +56,90 @@ function isCommandSafe(command: string, allowedCommands: string[]): boolean {
   // Specific, stricter rules for potentially dangerous commands
   switch (mainCommand) {
     case 'rm':
-      // Only allow 'rm -rf' or 'rm -r' on specific, non-critical subdirectories within /app
-      const safeRmPattern = /^rm\s+(-r|-f|-rf|-fr)\s+(node_modules|\.next|build|dist)(\/.*)?$/;
-      if (!safeRmPattern.test(trimmedCommand.replace('/app/', ''))) {
-        console.warn(`[SECURITY] Blocked unsafe 'rm' command: "${trimmedCommand}"`);
+    case 'mv':
+    case 'cp':
+      // For file operations, ensure all paths involved are safe
+      const fileOperationPaths = parts.slice(1).filter(p => p && !p.startsWith('-')); // Filter out options
+      for (const p of fileOperationPaths) {
+        if (!isPathSafeForFileOperation(p)) {
+          console.warn(`[SECURITY] Blocked unsafe file operation path: "${p}" in command "${trimmedCommand}"`);
+          return false;
+        }
+      }
+      break;
+    case 'docker':
+      const dockerSubcommand = parts[1];
+      switch (dockerSubcommand) {
+        case 'run':
+        case 'start':
+        case 'stop':
+        case 'restart':
+        case 'ps':
+        case 'logs':
+        case 'inspect':
+        case 'pull':
+        case 'build':
+        case 'rmi':
+        case 'volume':
+        case 'rm': // Added 'rm' here
+          // These subcommands are generally allowed.
+          // For 'docker rm', ensure it targets a specific container ID/name.
+          if (dockerSubcommand === 'rm') {
+            const rmContainerPattern = /^docker\s+rm\s+(-f)?\s+([a-zA-Z0-9_-]+)$/;
+            if (!rmContainerPattern.test(trimmedCommand)) {
+              console.warn(`[SECURITY] Blocked unsafe 'docker rm' command (must target specific container): "${trimmedCommand}"`);
+              return false;
+            }
+          }
+          break;
+        case 'exec':
+          // For 'docker exec', we need to parse the command *inside* the exec.
+          // This is a recursive call to isCommandSafe.
+          // The format is typically `docker exec <containerId> <command>`.
+          // Or `docker exec <containerId> bash -c "<innerCommand>"`.
+          const execCommandIndex = parts.indexOf('exec');
+          if (execCommandIndex !== -1 && parts.length > execCommandIndex + 2) {
+            const innerCommandParts = parts.slice(execCommandIndex + 2);
+            let innerCommand = innerCommandParts.join(' ');
+
+            // If it's `bash -c "..."`, extract the command inside quotes
+            const bashCmatch = innerCommand.match(/^bash\s+-c\s+"(.*)"$/);
+            if (bashCmatch && bashCmatch[1]) {
+              innerCommand = bashCmatch[1];
+            }
+            
+            // Recursively check the inner command
+            if (!isCommandSafe(innerCommand, allowedCommands)) {
+              console.warn(`[SECURITY] Blocked unsafe inner command in 'docker exec': "${innerCommand}"`);
+              return false;
+            }
+          } else {
+            console.warn(`[SECURITY] Blocked malformed 'docker exec' command: "${trimmedCommand}"`);
+            return false;
+          }
+          break;
+        default:
+          console.warn(`[SECURITY] Blocked unknown docker subcommand: "${trimmedCommand}"`);
+          return false; // Block unknown docker subcommands
+      }
+      break;
+    case 'pkill':
+      const safePkillPattern = /^pkill\s+(-f)?\s+(npm\s+run\s+dev|cloudflared)$/;
+      if (!safePkillPattern.test(trimmedCommand)) {
+        console.warn(`[SECURITY] Blocked unsafe 'pkill' command: "${trimmedCommand}"`);
         return false;
       }
       break;
-    // Add other specific command rules here if needed in the future
-    // e.g., for 'mv', 'cp', etc.
+    case 'apt-get':
+    case 'curl':
+    case 'sudo': 
+      // These are generally safe for installation/download within a container.
+      // We assume the AI won't try to download/install malicious software.
+      break;
+    // Other commands like npm, npx, git, ls, cd, pwd, cat, echo, mkdir, grep, find, touch, chmod, chown
+    // are allowed by default if they are in `allowedCommands` and don't fall into the above dangerous categories.
+    default:
+      break;
   }
 
   return true; // Command is in the whitelist and passes specific rules
