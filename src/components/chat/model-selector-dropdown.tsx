@@ -15,6 +15,7 @@ import { Check, KeyRound, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AI_PROVIDERS, getModelLabel } from '@/lib/ai-models';
 import { ApiKey } from '@/hooks/use-user-api-keys'; // Import ApiKey type
+import { useSession } from '@/components/session-context-provider'; // NEW: Import useSession
 
 interface ModelSelectorDropdownProps {
   selectedModel: string;
@@ -33,6 +34,9 @@ export function ModelSelectorDropdown({
   isAppChat = false,
   SelectedModelIcon,
 }: ModelSelectorDropdownProps) {
+  const { userRole } = useSession(); // NEW: Get userRole
+  const isSuperAdmin = userRole === 'super_admin'; // NEW: Check if Super Admin
+
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredProviderGroups = AI_PROVIDERS.filter(providerGroup => {
@@ -46,7 +50,11 @@ export function ModelSelectorDropdown({
 
       // Filter by user API key nicknames or model names for user_key models
       if (providerGroup.source === 'user_key') {
-        const userKeysForProvider = userApiKeys.filter(key => key.provider === providerGroup.value);
+        // NEW: Filter out global custom endpoints for non-Super Admins
+        const userKeysForProvider = userApiKeys.filter(key => 
+          key.provider === providerGroup.value && 
+          (isSuperAdmin || !key.is_global || key.provider !== 'custom_endpoint') // Only show global custom endpoints to Super Admins
+        );
         if (userKeysForProvider.some(key => 
           (key.nickname && key.nickname.toLowerCase().includes(matchesSearch)) ||
           (key.model_name && getModelLabel(key.model_name, userApiKeys).toLowerCase().includes(matchesSearch))
@@ -111,7 +119,11 @@ export function ModelSelectorDropdown({
                 </React.Fragment>
               );
             } else if (providerGroup.source === 'user_key') {
-              const userKeysForProvider = userApiKeys.filter(key => key.provider === providerGroup.value);
+              // NEW: Filter out global custom endpoints for non-Super Admins
+              const userKeysForProvider = userApiKeys.filter(key => 
+                key.provider === providerGroup.value && 
+                (isSuperAdmin || !key.is_global || key.provider !== 'custom_endpoint')
+              );
               const hasAnyKey = userKeysForProvider.length > 0;
 
               const filteredKeys = userKeysForProvider.filter(key =>
@@ -136,6 +148,7 @@ export function ModelSelectorDropdown({
                       let displayLabelContent: string;
                       if (key.provider === 'custom_endpoint') {
                         displayLabelContent = key.nickname || `Endpoint Personalizado (${key.id.substring(0, 8)}...)`;
+                        if (key.is_global) displayLabelContent += ' (Global)'; // NEW: Indicate global status
                       } else if (key.nickname) {
                         displayLabelContent = key.nickname;
                       } else {

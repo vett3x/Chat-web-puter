@@ -4,6 +4,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
+import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
+import { createClient } from '@supabase/supabase-js';
 
 const apiKeySchema = z.object({
   id: z.string().optional(), // Optional for POST, required for PUT
@@ -16,6 +18,7 @@ const apiKeySchema = z.object({
   model_name: z.string().optional(), // New: model_name
   json_key_content: z.string().optional(), // New: for Vertex AI JSON key content
   api_endpoint: z.string().url({ message: 'URL de endpoint inválida.' }).optional(), // New: for custom endpoint
+  is_global: z.boolean().optional(), // NEW: Add is_global to schema
 });
 
 const updateApiKeySchema = z.object({
@@ -30,35 +33,96 @@ const updateApiKeySchema = z.object({
   json_key_file: z.any().optional(),
   json_key_content: z.string().optional(),
   api_endpoint: z.string().url({ message: 'URL de endpoint inválida.' }).optional(), // New: for custom endpoint
+  is_global: z.boolean().optional(), // NEW: Add is_global to schema
 });
 
-async function getSupabaseClient() {
+// Helper function to get the session and user role
+async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null; userPermissions: UserPermissions }> {
   const cookieStore = cookies() as any;
-  return createServerClient(
+  const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: (name: string) => cookieStore.get(name)?.value,
-        set: (name: string, value: string, options: CookieOptions) => {},
-        remove: (name: string, options: CookieOptions) => {},
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set(name: string, value: string, options: CookieOptions) {},
+        remove(name: string, options: CookieOptions) {},
       },
     }
   );
+  const { data: { session } } = await supabase.auth.getSession();
+
+  let userRole: 'user' | 'admin' | 'super_admin' | null = null;
+  let userPermissions: UserPermissions = {};
+
+  if (session?.user?.id) {
+    // First, determine the role, prioritizing SUPERUSER_EMAILS
+    if (session.user.email && SUPERUSER_EMAILS.includes(session.user.email)) {
+      userRole = 'super_admin';
+    } else {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('role') // Only need role for initial determination
+        .eq('id', session.user.id)
+        .single();
+      if (profile) {
+        userRole = profile.role as 'user' | 'admin' | 'super_admin';
+      } else {
+        userRole = 'user'; // Default to user if no profile found and not superuser email
+      }
+    }
+
+    // Then, fetch permissions from profile, or set all if super_admin
+    if (userRole === 'super_admin') {
+      for (const key of Object.values(PERMISSION_KEYS)) {
+        userPermissions[key] = true;
+      }
+    } else {
+      const { data: profilePermissions, error: permissionsError } = await supabase
+        .from('profiles')
+        .select('permissions')
+        .eq('id', session.user.id)
+        .single();
+      if (profilePermissions) {
+        userPermissions = profilePermissions.permissions || {};
+      } else {
+        // Default permissions for non-super-admin if profile fetch failed
+        userPermissions = {
+          [PERMISSION_KEYS.CAN_CREATE_SERVER]: false,
+          [PERMISSION_KEYS.CAN_MANAGE_DOCKER_CONTAINERS]: false,
+          [PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_DOMAINS]: false,
+          [PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_TUNNELS]: false,
+        };
+      }
+    }
+  }
+  return { session, userRole, userPermissions };
 }
 
 export async function GET(req: NextRequest) {
-  const supabase = await getSupabaseClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { session, userRole } = await getSessionAndRole();
   if (!session) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 401 });
   }
 
-  const { data, error } = await supabase
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  let query = supabaseAdmin
     .from('user_api_keys')
-    .select('id, provider, api_key, is_active, created_at, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint') // Select model_name, json_key_content, api_endpoint
-    .eq('user_id', session.user.id)
+    .select('id, provider, api_key, is_active, created_at, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint, is_global') // NEW: Select is_global
     .order('created_at', { ascending: false });
+
+  if (userRole !== 'super_admin') {
+    // Non-super-admins only see their own non-global keys
+    query = query.eq('user_id', session.user.id).eq('is_global', false);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("[API /ai-keys GET] Error fetching keys:", error);
@@ -76,22 +140,31 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await getSupabaseClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { session, userRole } = await getSessionAndRole();
   if (!session) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 401 });
   }
 
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
   try {
     const body = await req.json();
-    const { provider, api_key, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint } = apiKeySchema.parse(body);
+    const { provider, api_key, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint, is_global } = apiKeySchema.parse(body); // NEW: Parse is_global
+
+    if (is_global && userRole !== 'super_admin') {
+      return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden crear claves globales.' }, { status: 403 });
+    }
 
     const insertData: any = {
-      user_id: session.user.id,
+      user_id: is_global ? null : session.user.id, // NEW: Set user_id to null if global
       provider,
       nickname: nickname || null,
       model_name: model_name || null,
       is_active: true, // Default to active
+      is_global: is_global || false, // NEW: Set is_global
     };
 
     if (provider === 'google_gemini') {
@@ -113,7 +186,7 @@ export async function POST(req: NextRequest) {
       insertData.use_vertex_ai = false; // Ensure false
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('user_api_keys')
       .insert(insertData)
       .select()
@@ -135,31 +208,47 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const supabase = await getSupabaseClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { session, userRole } = await getSessionAndRole();
   if (!session) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 401 });
   }
 
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
   try {
     const body = await req.json();
-    const { id, provider, api_key, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint } = updateApiKeySchema.parse(body);
+    const { id, provider, api_key, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint, is_global } = updateApiKeySchema.parse(body); // NEW: Parse is_global
 
-    const updateData: any = {
-      nickname: nickname || null,
-      model_name: model_name || null,
-    };
-    
-    // Fetch current key details to determine existing provider and use_vertex_ai status
-    const { data: currentKey, error: currentKeyError } = await supabase
+    // Fetch current key details to determine existing provider, use_vertex_ai status, user_id, and is_global
+    const { data: currentKey, error: currentKeyError } = await supabaseAdmin
       .from('user_api_keys')
-      .select('provider, use_vertex_ai')
+      .select('provider, use_vertex_ai, user_id, is_global') // NEW: Select user_id and is_global
       .eq('id', id)
-      .eq('user_id', session.user.id)
       .single();
 
     if (currentKeyError || !currentKey) throw new Error('Clave no encontrada para verificar el estado.');
 
+    // Authorization checks
+    if (currentKey.is_global && userRole !== 'super_admin') {
+      return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden modificar claves globales.' }, { status: 403 });
+    }
+    if (!currentKey.is_global && currentKey.user_id !== session.user.id && userRole !== 'super_admin') {
+      return NextResponse.json({ message: 'Acceso denegado. No tienes permiso para modificar esta clave.' }, { status: 403 });
+    }
+    if (is_global !== undefined && is_global !== currentKey.is_global && userRole !== 'super_admin') {
+      return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden cambiar el estado global de una clave.' }, { status: 403 });
+    }
+
+    const updateData: any = {
+      nickname: nickname || null,
+      model_name: model_name || null,
+      is_global: is_global !== undefined ? is_global : currentKey.is_global, // NEW: Update is_global if provided, else keep current
+      user_id: is_global ? null : session.user.id, // NEW: Set user_id to null if becoming global
+    };
+    
     // Handle API Key update: only if provided and not empty
     if (api_key !== undefined && api_key !== '') {
       updateData.api_key = api_key;
@@ -195,13 +284,11 @@ export async function PUT(req: NextRequest) {
       updateData.api_endpoint = null;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('user_api_keys')
       .update(updateData)
       .eq('id', id)
-      .eq('user_id', session.user.id)
-      .select()
-      .single();
+      .single(); // Removed user_id filter here, as admin can update global keys
 
     if (error) {
       console.error("[API /ai-keys PUT] Error updating key:", error);
@@ -219,11 +306,15 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const supabase = await getSupabaseClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { session, userRole } = await getSessionAndRole();
   if (!session) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 401 });
   }
+
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
@@ -232,11 +323,27 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ message: 'ID de la clave no proporcionado.' }, { status: 400 });
   }
 
-  const { error } = await supabase
+  // Fetch current key details to check its is_global status and user_id
+  const { data: currentKey, error: currentKeyError } = await supabaseAdmin
+    .from('user_api_keys')
+    .select('user_id, is_global')
+    .eq('id', id)
+    .single();
+
+  if (currentKeyError || !currentKey) throw new Error('Clave no encontrada para verificar el estado.');
+
+  // Authorization checks
+  if (currentKey.is_global && userRole !== 'super_admin') {
+    return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden eliminar claves globales.' }, { status: 403 });
+  }
+  if (!currentKey.is_global && currentKey.user_id !== session.user.id && userRole !== 'super_admin') {
+    return NextResponse.json({ message: 'Acceso denegado. No tienes permiso para eliminar esta clave.' }, { status: 403 });
+  }
+
+  const { error } = await supabaseAdmin
     .from('user_api_keys')
     .delete()
-    .eq('id', id)
-    .eq('user_id', session.user.id);
+    .eq('id', id); // Removed user_id filter here, as admin can delete global keys
 
   if (error) {
     console.error("[API /ai-keys DELETE] Error deleting key:", error);

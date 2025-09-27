@@ -26,6 +26,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { AI_PROVIDERS, getModelLabel } from '@/lib/ai-models'; // Import AI_PROVIDERS
+import { useSession } from '@/components/session-context-provider'; // NEW: Import useSession
 
 const apiKeySchema = z.object({
   id: z.string().optional(), // Added for editing existing keys
@@ -40,6 +41,7 @@ const apiKeySchema = z.object({
   json_key_file: z.any().optional(), // New: for file upload
   json_key_content: z.string().optional(), // Added for payload
   api_endpoint: z.string().url({ message: 'URL de endpoint inválida.' }).optional(), // New: for custom endpoint
+  is_global: z.boolean().optional(), // NEW: Add is_global to schema
 }).superRefine((data, ctx) => {
   if (data.provider === 'google_gemini') {
     if (data.use_vertex_ai) {
@@ -125,6 +127,7 @@ const updateApiKeySchema = z.object({
   json_key_file: z.any().optional(),
   json_key_content: z.string().optional(),
   api_endpoint: z.string().url({ message: 'URL de endpoint inválida.' }).optional(), // New: for custom endpoint
+  is_global: z.boolean().optional(), // NEW: Add is_global to schema
 }).superRefine((data, ctx) => {
   if (data.provider === 'google_gemini') {
     if (data.use_vertex_ai) {
@@ -212,6 +215,7 @@ interface ApiKey {
   model_name: string | null; // New
   json_key_content: string | null; // New: to check if content exists
   api_endpoint: string | null; // New: for custom endpoint
+  is_global: boolean; // NEW: Add is_global
 }
 
 const providerOptions = AI_PROVIDERS.filter(p => p.source === 'user_key').map(p => ({
@@ -226,6 +230,9 @@ interface ApiManagementDialogProps {
 }
 
 export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogProps) {
+  const { userRole } = useSession(); // NEW: Get userRole
+  const isSuperAdmin = userRole === 'super_admin'; // NEW: Check if Super Admin
+
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -247,7 +254,8 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       model_name: '',
       json_key_file: undefined,
       json_key_content: undefined,
-      api_endpoint: '', // Default for new field
+      api_endpoint: '',
+      is_global: false, // NEW: Default to false
     },
   });
 
@@ -285,6 +293,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         json_key_file: undefined,
         json_key_content: undefined,
         api_endpoint: '',
+        is_global: false, // NEW: Reset is_global
       });
       setEditingKeyId(null);
       setSelectedJsonKeyFile(null);
@@ -307,6 +316,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       json_key_file: undefined,
       json_key_content: undefined, // Don't pre-fill content, user must re-upload if needed
       api_endpoint: key.api_endpoint || '', // Pre-fill api_endpoint
+      is_global: key.is_global, // NEW: Pre-fill is_global
     });
     setSelectedJsonKeyFile(null);
     setJsonKeyFileName(key.use_vertex_ai && key.json_key_content ? 'Archivo JSON existente' : null); // Indicate if JSON key exists
@@ -325,6 +335,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       json_key_file: undefined,
       json_key_content: undefined,
       api_endpoint: '',
+      is_global: false, // NEW: Reset is_global
     });
     setSelectedJsonKeyFile(null);
     setJsonKeyFileName(null);
@@ -681,6 +692,26 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                     )} />
                   )}
                   
+                  {isSuperAdmin && ( // NEW: Only show for Super Admins
+                    <FormField control={form.control} name="is_global" render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                        <div className="space-y-0.5">
+                          <FormLabel>Clave Global</FormLabel>
+                          <FormDescription>
+                            Si está activado, esta clave estará disponible para todos los usuarios.
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            disabled={isSubmitting}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )} />
+                  )}
+
                   <div className="flex gap-2">
                     <Button type="submit" disabled={isSubmitting || !selectedProvider}>
                       {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingKeyId ? <Edit className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />)}
@@ -718,14 +749,15 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                     <TableHead>Apodo</TableHead>
                     <TableHead>Proveedor</TableHead>
                     <TableHead>Clave / Configuración</TableHead>
+                    {isSuperAdmin && <TableHead>Global</TableHead>} {/* NEW: Show Global column for Super Admins */}
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={4} className="text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={isSuperAdmin ? 5 : 4} className="text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
                   ) : filteredKeys.length === 0 ? (
-                    <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No hay claves que coincidan con la búsqueda.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={isSuperAdmin ? 5 : 4} className="text-center text-muted-foreground">No hay claves que coincidan con la búsqueda.</TableCell></TableRow>
                   ) : (
                     filteredKeys.map(key => (
                       <TableRow key={key.id}>
@@ -753,6 +785,11 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                             </div>
                           )}
                         </TableCell>
+                        {isSuperAdmin && ( // NEW: Show Global status for Super Admins
+                          <TableCell>
+                            {key.is_global ? 'Sí' : 'No'}
+                          </TableCell>
+                        )}
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button variant="outline" size="icon" onClick={() => handleEditKey(key)} disabled={editingKeyId !== null}>
