@@ -7,7 +7,8 @@ import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Save, Loader2, Wand2, X, Check } from 'lucide-react';
-import { NoteAiChat, ChatMessage } from '@/hooks/use-note-assistant-chat'; // Corrected import path for ChatMessage
+import { NoteAiChat } from './note-ai-chat'; // Corrected import path for NoteAiChat component
+import { ChatMessage } from '@/hooks/use-note-assistant-chat'; // ChatMessage is still from the hook
 import { ApiKey } from '@/hooks/use-user-api-keys';
 
 // BlockNote imports
