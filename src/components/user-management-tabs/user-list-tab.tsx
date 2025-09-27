@@ -255,8 +255,10 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
                           </Tooltip>
                         </TooltipProvider>
                       )}
-                      {user.status === 'kicked' && remainingTime && (
-                        <span className="text-xs text-muted-foreground">({remainingTime})</span>
+                      {user.status === 'kicked' && (
+                        <span className="text-xs text-muted-foreground ml-2 min-w-[120px] whitespace-nowrap">
+                          ({remainingTime || 'Calculando...'})
+                        </span>
                       )}
                     </div>
                   </TableCell>
