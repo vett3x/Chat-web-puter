@@ -13,11 +13,23 @@ import {
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, ShieldAlert, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Loader2, ShieldAlert, RefreshCw, AlertTriangle, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { useSession } from '@/components/session-context-provider';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface Alert {
   id: string;
@@ -34,8 +46,12 @@ interface AlertsDialogProps {
 }
 
 export function AlertsDialog({ open, onOpenChange }: AlertsDialogProps) {
+  const { userRole } = useSession();
+  const isSuperAdmin = userRole === 'super_admin';
+
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isClearingAll, setIsClearingAll] = useState(false);
 
   const fetchAlerts = useCallback(async () => {
     setIsLoading(true);
@@ -60,6 +76,23 @@ export function AlertsDialog({ open, onOpenChange }: AlertsDialogProps) {
     }
   }, [open, fetchAlerts]);
 
+  const handleClearAllAlerts = async () => {
+    setIsClearingAll(true);
+    try {
+      const response = await fetch('/api/alerts', { method: 'DELETE' });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || 'Error al limpiar el historial.');
+      }
+      toast.success(result.message || 'Historial de alertas limpiado correctamente.');
+      fetchAlerts(); // Refresh the list
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsClearingAll(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[90vw] p-6 h-[90vh] flex flex-col">
@@ -72,8 +105,32 @@ export function AlertsDialog({ open, onOpenChange }: AlertsDialogProps) {
           </DialogDescription>
         </DialogHeader>
         <div className="flex-1 py-4 overflow-hidden">
-          <div className="flex justify-end mb-2">
-            <Button variant="ghost" size="icon" onClick={fetchAlerts} disabled={isLoading}>
+          <div className="flex justify-end gap-2 mb-2">
+            {isSuperAdmin && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm" disabled={isLoading || isClearingAll || alerts.length === 0}>
+                    {isClearingAll ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                    Limpiar Todo el Historial
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>¿Estás seguro de limpiar todo el historial de alertas?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta acción eliminará permanentemente todos los registros de alertas críticas. Esta acción no se puede deshacer.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleClearAllAlerts} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Limpiar Todo
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+            <Button variant="ghost" size="icon" onClick={fetchAlerts} disabled={isLoading || isClearingAll}>
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             </Button>
           </div>
