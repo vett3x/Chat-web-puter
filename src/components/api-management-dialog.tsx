@@ -340,18 +340,34 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         payload.api_endpoint = undefined;
       }
 
+      // --- NEW: Log payload before sending ---
+      console.log("[ApiManagementDialog] Sending payload:", payload);
+
       const response = await fetch('/api/ai-keys', {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message);
+      
+      const responseText = await response.text(); // Read response text first
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (jsonError) {
+        console.error("[ApiManagementDialog] Failed to parse JSON response:", jsonError, "Raw response:", responseText);
+        throw new Error(`Respuesta inesperada del servidor: ${responseText.substring(0, 100)}...`);
+      }
+
+      if (!response.ok) {
+        console.error("[ApiManagementDialog] API call failed:", result);
+        throw new Error(result.message || `Error HTTP: ${response.status}`);
+      }
       toast.success(`API Key ${editingKeyId ? 'actualizada' : 'guardada'}.`);
       handleCancelEdit(); // Clear form and editing state
       fetchKeys();
     } catch (error: any) {
-      toast.error(`Error: ${error.message}`);
+      console.error("[ApiManagementDialog] Error in onSubmit:", error);
+      toast.error(`Error: ${error.message || 'Ocurrió un error desconocido al guardar la clave.'}`);
     } finally {
       setIsSubmitting(false);
     }
