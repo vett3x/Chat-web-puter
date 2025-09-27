@@ -4,184 +4,61 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
-import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
-import { createClient } from '@supabase/supabase-js';
 
 const apiKeySchema = z.object({
   id: z.string().optional(), // Optional for POST, required for PUT
   provider: z.string().min(1),
-  api_key: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional API key
-  nickname: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional nickname
-  project_id: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional project_id
-  location_id: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional location_id
+  api_key: z.string().optional(), // Make optional
+  nickname: z.string().optional(),
+  project_id: z.string().optional(),
+  location_id: z.string().optional(),
   use_vertex_ai: z.boolean().optional(),
-  model_name: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional model_name
+  model_name: z.string().optional(), // New: model_name
   json_key_content: z.string().optional(), // New: for Vertex AI JSON key content
-  api_endpoint: z.string().trim().url({ message: 'URL de endpoint inválida.' }).optional().or(z.literal('')), // Changed: Allow empty string for optional api_endpoint
-  is_global: z.boolean().optional(), // NEW: Add is_global to schema
-}).superRefine((data, ctx) => {
-  if (data.provider === 'google_gemini') {
-    if (data.use_vertex_ai) {
-      if (!data.model_name || data.model_name === '') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Debes seleccionar un modelo para usar Vertex AI.',
-          path: ['model_name'],
-        });
-      }
-      if (!data.project_id) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Project ID es requerido para usar Vertex AI.',
-          path: ['project_id'],
-        });
-      }
-      if (!data.location_id) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Location ID es requerido para usar Vertex AI.',
-          path: ['location_id'],
-        });
-      }
-    } else { // Public API
-      if (!data.model_name || data.model_name === '') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Debes seleccionar un modelo para la API pública de Gemini.',
-          path: ['model_name'],
-        });
-      }
-      // API key validation for adding new keys is now handled in the frontend onSubmit.
-    }
-  } else if (data.provider === 'custom_endpoint') { // New validation for custom_endpoint
-    if (!data.api_endpoint || data.api_endpoint === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'El link del endpoint es requerido para un endpoint personalizado.',
-        path: ['api_endpoint'],
-      });
-    }
-    if (!data.model_name || data.model_name === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'El ID del modelo es requerido para un endpoint personalizado.',
-        path: ['model_name'],
-      });
-    }
-    if (!data.nickname || data.nickname === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'El apodo es obligatorio para un endpoint personalizado.',
-        path: ['nickname'],
-      });
-    }
-  }
+  api_endpoint: z.string().url({ message: 'URL de endpoint inválida.' }).optional(), // New: for custom endpoint
 });
 
-// The updateApiKeySchema should also be more flexible.
 const updateApiKeySchema = z.object({
-  id: z.string().min(1, { message: 'ID de clave es requerido para actualizar.' }),
-  provider: z.string().min(1), // Provider should not be changed on update, but keep for validation
-  api_key: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional API key
-  nickname: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional nickname
-  project_id: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional project_id
-  location_id: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional location_id
+  id: z.string().min(1, { message: 'ID de clave es requerido para actualizar.' }), // Required for PUT
+  provider: z.string().min(1),
+  api_key: z.string().optional(),
+  nickname: z.string().optional(),
+  project_id: z.string().optional(),
+  location_id: z.string().optional(),
   use_vertex_ai: z.boolean().optional(),
-  model_name: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional model_name
-  json_key_file: z.any().optional(), // This field is not actually used in the backend, can be removed or ignored
+  model_name: z.string().optional(),
+  json_key_file: z.any().optional(),
   json_key_content: z.string().optional(),
-  api_endpoint: z.string().trim().url({ message: 'URL de endpoint inválida.' }).optional().or(z.literal('')), // Changed: Allow empty string for optional api_endpoint
-  is_global: z.boolean().optional(), // NEW: Add is_global to schema
+  api_endpoint: z.string().url({ message: 'URL de endpoint inválida.' }).optional(), // New: for custom endpoint
 });
 
-// Helper function to get the session and user role
-async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null; userPermissions: UserPermissions }> {
+async function getSupabaseClient() {
   const cookieStore = cookies() as any;
-  const supabase = createServerClient(
+  return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-        set(name: string, value: string, options: CookieOptions) {},
-        remove(name: string, options: CookieOptions) {},
+        get: (name: string) => cookieStore.get(name)?.value,
+        set: (name: string, value: string, options: CookieOptions) => {},
+        remove: (name: string, options: CookieOptions) => {},
       },
     }
   );
-  const { data: { session } } = await supabase.auth.getSession();
-
-  let userRole: 'user' | 'admin' | 'super_admin' | null = null;
-  let userPermissions: UserPermissions = {};
-
-  if (session?.user?.id) {
-    // First, determine the role, prioritizing SUPERUSER_EMAILS
-    if (session.user.email && SUPERUSER_EMAILS.includes(session.user.email)) {
-      userRole = 'super_admin';
-    } else {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('role') // Only need role for initial determination
-        .eq('id', session.user.id)
-        .single();
-      if (profile) {
-        userRole = profile.role as 'user' | 'admin' | 'super_admin';
-      } else {
-        userRole = 'user'; // Default to user if no profile found and not superuser email
-      }
-    }
-
-    // Then, fetch permissions from profile, or set all if super_admin
-    if (userRole === 'super_admin') {
-      for (const key of Object.values(PERMISSION_KEYS)) {
-        userPermissions[key] = true;
-      }
-    } else {
-      const { data: profilePermissions, error: permissionsError } = await supabase
-        .from('profiles')
-        .select('permissions')
-        .eq('id', session.user.id)
-        .single();
-      if (profilePermissions) {
-        userPermissions = profilePermissions.permissions || {};
-      } else {
-        // Default permissions for non-super-admin if profile fetch failed
-        userPermissions = {
-          [PERMISSION_KEYS.CAN_CREATE_SERVER]: false,
-          [PERMISSION_KEYS.CAN_MANAGE_DOCKER_CONTAINERS]: false,
-          [PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_DOMAINS]: false,
-          [PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_TUNNELS]: false,
-        };
-      }
-    }
-  }
-  return { session, userRole, userPermissions };
 }
 
 export async function GET(req: NextRequest) {
-  const { session, userRole } = await getSessionAndRole();
+  const supabase = await getSupabaseClient();
+  const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 401 });
   }
 
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
-  let query = supabaseAdmin
+  const { data, error } = await supabase
     .from('user_api_keys')
-    .select('id, provider, api_key, is_active, created_at, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint, is_global, user_id')
+    .select('id, provider, api_key, is_active, created_at, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint') // Select model_name, json_key_content, api_endpoint
+    .eq('user_id', session.user.id)
     .order('created_at', { ascending: false });
-
-  // All roles (user, admin, super_admin) should see their own keys OR global keys
-  if (userRole === 'user' || userRole === 'admin') {
-    query = query.or(`user_id.eq.${session.user.id},is_global.eq.true`);
-  }
-  // If userRole is 'super_admin', no additional filter is applied, so they see all.
-
-  const { data, error } = await query;
 
   if (error) {
     console.error("[API /ai-keys GET] Error fetching keys:", error);
@@ -199,31 +76,22 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { session, userRole } = await getSessionAndRole();
+  const supabase = await getSupabaseClient();
+  const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 401 });
   }
 
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
   try {
     const body = await req.json();
-    const { provider, api_key, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint, is_global } = apiKeySchema.parse(body); // NEW: Parse is_global
-
-    if (is_global && userRole !== 'super_admin') {
-      return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden crear claves globales.' }, { status: 403 });
-    }
+    const { provider, api_key, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint } = apiKeySchema.parse(body);
 
     const insertData: any = {
-      user_id: is_global ? null : session.user.id, // NEW: Set user_id to null if global
+      user_id: session.user.id,
       provider,
       nickname: nickname || null,
       model_name: model_name || null,
       is_active: true, // Default to active
-      is_global: is_global || false, // NEW: Set is_global
     };
 
     if (provider === 'google_gemini') {
@@ -245,7 +113,7 @@ export async function POST(req: NextRequest) {
       insertData.use_vertex_ai = false; // Ensure false
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('user_api_keys')
       .insert(insertData)
       .select()
@@ -267,47 +135,31 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const { session, userRole } = await getSessionAndRole();
+  const supabase = await getSupabaseClient();
+  const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 401 });
   }
 
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
   try {
     const body = await req.json();
-    const { id, provider, api_key, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint, is_global } = updateApiKeySchema.parse(body); // NEW: Parse is_global
-
-    // Fetch current key details to determine existing provider, use_vertex_ai status, user_id, and is_global
-    const { data: currentKey, error: currentKeyError } = await supabaseAdmin
-      .from('user_api_keys')
-      .select('provider, use_vertex_ai, user_id, is_global') // NEW: Select user_id and is_global
-      .eq('id', id)
-      .single();
-
-    if (currentKeyError || !currentKey) throw new Error('Clave no encontrada para verificar el estado.');
-
-    // Authorization checks
-    if (currentKey.is_global && userRole !== 'super_admin') {
-      return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden modificar claves globales.' }, { status: 403 });
-    }
-    if (!currentKey.is_global && currentKey.user_id !== session.user.id && userRole !== 'super_admin') {
-      return NextResponse.json({ message: 'Acceso denegado. No tienes permiso para modificar esta clave.' }, { status: 403 });
-    }
-    if (is_global !== undefined && is_global !== currentKey.is_global && userRole !== 'super_admin') {
-      return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden cambiar el estado global de una clave.' }, { status: 403 });
-    }
+    const { id, provider, api_key, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint } = updateApiKeySchema.parse(body);
 
     const updateData: any = {
       nickname: nickname || null,
       model_name: model_name || null,
-      is_global: is_global !== undefined ? is_global : currentKey.is_global, // NEW: Update is_global if provided, else keep current
-      user_id: is_global ? null : currentKey.user_id, // NEW: Set user_id to null if becoming global, otherwise keep current
     };
     
+    // Fetch current key details to determine existing provider and use_vertex_ai status
+    const { data: currentKey, error: currentKeyError } = await supabase
+      .from('user_api_keys')
+      .select('provider, use_vertex_ai')
+      .eq('id', id)
+      .eq('user_id', session.user.id)
+      .single();
+
+    if (currentKeyError || !currentKey) throw new Error('Clave no encontrada para verificar el estado.');
+
     // Handle API Key update: only if provided and not empty
     if (api_key !== undefined && api_key !== '') {
       updateData.api_key = api_key;
@@ -343,10 +195,11 @@ export async function PUT(req: NextRequest) {
       updateData.api_endpoint = null;
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('user_api_keys')
       .update(updateData)
       .eq('id', id)
+      .eq('user_id', session.user.id)
       .select()
       .single();
 
@@ -366,15 +219,11 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const { session, userRole } = await getSessionAndRole();
+  const supabase = await getSupabaseClient();
+  const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 401 });
   }
-
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
 
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
@@ -383,27 +232,11 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ message: 'ID de la clave no proporcionado.' }, { status: 400 });
   }
 
-  // Fetch current key details to check its is_global status and user_id
-  const { data: currentKey, error: currentKeyError } = await supabaseAdmin
-    .from('user_api_keys')
-    .select('user_id, is_global')
-    .eq('id', id)
-    .single();
-
-  if (currentKeyError || !currentKey) throw new Error('Clave no encontrada para verificar el estado.');
-
-  // Authorization checks
-  if (currentKey.is_global && userRole !== 'super_admin') {
-    return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden eliminar claves globales.' }, { status: 403 });
-  }
-  if (!currentKey.is_global && currentKey.user_id !== session.user.id && userRole !== 'super_admin') {
-    return NextResponse.json({ message: 'Acceso denegado. No tienes permiso para eliminar esta clave.' }, { status: 403 });
-  }
-
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from('user_api_keys')
     .delete()
-    .eq('id', id); // Removed user_id filter here, as admin can delete global keys
+    .eq('id', id)
+    .eq('user_id', session.user.id);
 
   if (error) {
     console.error("[API /ai-keys DELETE] Error deleting key:", error);

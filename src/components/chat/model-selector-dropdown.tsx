@@ -13,9 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Check, KeyRound, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { AI_PROVIDERS, getModelLabel } from '@/lib/ai-models'; // Import AI_PROVIDERS
-import { useSession } from '@/components/session-context-provider'; // NEW: Import useSession
-import { ApiKey } from '@/hooks/use-user-api-keys'; // Import ApiKey interface
+import { AI_PROVIDERS, getModelLabel } from '@/lib/ai-models';
+import { ApiKey } from '@/hooks/use-user-api-keys'; // Import ApiKey type
 
 interface ModelSelectorDropdownProps {
   selectedModel: string;
@@ -34,9 +33,6 @@ export function ModelSelectorDropdown({
   isAppChat = false,
   SelectedModelIcon,
 }: ModelSelectorDropdownProps) {
-  const { userRole } = useSession(); // NEW: Get userRole
-  const isSuperAdmin = userRole === 'super_admin'; // NEW: Check if Super Admin
-
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredProviderGroups = AI_PROVIDERS.filter(providerGroup => {
@@ -48,11 +44,9 @@ export function ModelSelectorDropdown({
       // Filter by model labels for puter models
       if (providerGroup.source === 'puter' && providerGroup.models.some(model => model.label.toLowerCase().includes(matchesSearch))) return true;
 
-      // Filter by user API key nicknames or model names for user_key providers
+      // Filter by user API key nicknames or model names for user_key models
       if (providerGroup.source === 'user_key') {
-        const userKeysForProvider = userApiKeys.filter(key => 
-          key.provider === providerGroup.value
-        );
+        const userKeysForProvider = userApiKeys.filter(key => key.provider === providerGroup.value);
         if (userKeysForProvider.some(key => 
           (key.nickname && key.nickname.toLowerCase().includes(matchesSearch)) ||
           (key.model_name && getModelLabel(key.model_name, userApiKeys).toLowerCase().includes(matchesSearch))
@@ -117,11 +111,7 @@ export function ModelSelectorDropdown({
                 </React.Fragment>
               );
             } else if (providerGroup.source === 'user_key') {
-              // The userApiKeys array already contains the correct set of keys (user's own non-global keys + all global keys).
-              // So, we just need to filter by providerGroup.value and then by search term.
-              const userKeysForProvider = userApiKeys.filter(key => 
-                key.provider === providerGroup.value
-              );
+              const userKeysForProvider = userApiKeys.filter(key => key.provider === providerGroup.value);
               const hasAnyKey = userKeysForProvider.length > 0;
 
               const filteredKeys = userKeysForProvider.filter(key =>
@@ -139,13 +129,13 @@ export function ModelSelectorDropdown({
                   <DropdownMenuLabel className={cn("flex items-center gap-2 font-bold text-foreground px-2 py-1.5", !hasAnyKey && "text-muted-foreground")}>
                     <span>{providerGroup.company}</span>
                     <providerGroup.logo className="h-4 w-4" />
+                    {!hasAnyKey && <span title="Requiere API Key"><KeyRound className="h-4 w-4 text-muted-foreground" /></span>}
                   </DropdownMenuLabel>
                   {hasAnyKey ? (
                     filteredKeys.map(key => {
                       let displayLabelContent: string;
                       if (key.provider === 'custom_endpoint') {
                         displayLabelContent = key.nickname || `Endpoint Personalizado (${key.id.substring(0, 8)}...)`;
-                        if (key.is_global) displayLabelContent += ' (Global)'; // NEW: Indicate global status
                       } else if (key.nickname) {
                         displayLabelContent = key.nickname;
                       } else {

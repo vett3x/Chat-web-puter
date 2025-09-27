@@ -150,25 +150,18 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { messages: rawMessages, selectedKeyId, stream } = chatRequestSchema.parse(body);
 
-    console.log("[API /ai/chat] Received rawMessages:", JSON.stringify(rawMessages, null, 2));
+    console.log("[API /ai/chat] Received rawMessages:", JSON.stringify(rawMessages, null, 2)); // ADD THIS LOG
 
-    // Fetch key details by ID first
     const { data: keyDetails, error: keyError } = await supabase
       .from('user_api_keys')
-      .select('provider, api_key, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint, is_global, user_id')
+      .select('provider, api_key, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint')
       .eq('id', selectedKeyId)
+      .eq('user_id', session.user.id)
       .eq('is_active', true)
       .single();
 
     if (keyError || !keyDetails) {
-      console.error("[API /ai/chat] Key details fetch error:", keyError);
-      throw new Error('No se encontró una API key activa con el ID proporcionado. Por favor, verifica la Gestión de API Keys.');
-    }
-
-    // Authorization check for the fetched key
-    if (!keyDetails.is_global && keyDetails.user_id !== session.user.id) {
-      console.warn(`[API /ai/chat] Access denied for key ${selectedKeyId}: not global and user_id mismatch.`);
-      throw new Error('Acceso denegado. No tienes permiso para usar esta clave.');
+      throw new Error('No se encontró una API key activa con el ID proporcionado para este usuario. Por favor, verifica la Gestión de API Keys.');
     }
 
     let finalModel = keyDetails.model_name;
@@ -230,9 +223,8 @@ export async function POST(req: NextRequest) {
       const customEndpointUrl = keyDetails.api_endpoint;
       const customModelId = keyDetails.model_name;
 
-      if (!customEndpointUrl || !customModelId) { // Removed customApiKey from this check
-        console.error("[API /ai/chat] Custom endpoint configuration incomplete:", { customEndpointUrl, customModelId });
-        throw new Error('Configuración incompleta para el endpoint personalizado (URL o ID de modelo faltante).');
+      if (!customEndpointUrl || !customApiKey || !customModelId) {
+        throw new Error('Configuración incompleta para el endpoint personalizado.');
       }
 
       const customApiMessages = [
@@ -243,48 +235,35 @@ export async function POST(req: NextRequest) {
         })),
       ];
 
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      };
-
-      if (customApiKey) { // Conditionally add Authorization header
-        headers['Authorization'] = `Bearer ${customApiKey}`;
-      }
-
-      console.log(`[API /ai/chat] Calling custom endpoint: ${customEndpointUrl} with model: ${customModelId}`);
       const customEndpointResponse = await fetch(customEndpointUrl, {
         method: 'POST',
-        headers: headers, // Use the conditionally built headers
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${customApiKey}`,
+        },
         body: JSON.stringify({
           model: customModelId,
           messages: customApiMessages,
           stream: false, // Force non-streaming for custom endpoints
         }),
-        signal: AbortSignal.timeout(30000) // 30 seconds timeout for external API call
       });
-
-      console.log(`[API /ai/chat] Custom endpoint response status: ${customEndpointResponse.status}`);
 
       if (!customEndpointResponse.ok) {
         const errorText = await customEndpointResponse.text();
-        console.error(`[API /ai/chat] Custom Endpoint API returned an error: ${customEndpointResponse.status} - ${errorText.substring(0, 500)}...`);
         throw new Error(`Custom Endpoint API returned an error: ${customEndpointResponse.status} - ${errorText.substring(0, 200)}...`);
       }
 
       const result = await customEndpointResponse.json();
-      console.log("[API /ai/chat] Custom endpoint response body:", JSON.stringify(result, null, 2));
-
       const content = result.choices[0]?.message?.content || '';
       
       return NextResponse.json({ message: { content } });
 
     } else {
-      console.error(`[API /ai/chat] Invalid AI provider selected: ${keyDetails.provider}`);
       throw new Error('Proveedor de IA no válido seleccionado.');
     }
 
   } catch (error: any) {
-    console.error('[API /ai/chat] Unhandled error:', error);
+    console.error('[API /ai/chat] Error:', error);
     let userFriendlyMessage = `Error en la API de IA: ${error.message}`;
     return NextResponse.json({ message: userFriendlyMessage }, { status: 500 });
   }
