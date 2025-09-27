@@ -231,9 +231,20 @@ export function useChat({
       if (conversationId && userId) {
         setIsLoading(true);
         const details = await getConversationDetails(conversationId);
-        if (details?.model) {
+        
+        // NEW VALIDATION LOGIC
+        if (details?.model && (details.model.startsWith('puter:') || details.model.startsWith('user_key:'))) {
+          // It looks like a valid model format, set it for now.
+          // The other useEffect will validate if the user_key still exists.
           setSelectedModel(details.model);
+        } else {
+          // If conversation model is null, empty, or invalid format,
+          // fall back to the last used model from localStorage.
+          // The other useEffect will validate this one too.
+          const lastUsedModel = localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FALLBACK;
+          setSelectedModel(lastUsedModel);
         }
+
         const fetchedMsgs = await getMessagesFromDB(conversationId);
         if (!isSendingFirstMessage || fetchedMsgs.length > 0) setMessages(fetchedMsgs);
         setIsLoading(false);
@@ -677,11 +688,21 @@ export function useChat({
 
   const regenerateLastResponse = useCallback(async () => {
     if (isLoading) return;
-    const lastUserMessageIndex = messages.findLastIndex(m => m.role === 'user');
+    
+    // Find the index of the last user message
+    let lastUserMessageIndex = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        lastUserMessageIndex = i;
+        break;
+      }
+    }
+
     if (lastUserMessageIndex === -1) {
       toast.info("No hay nada que regenerar.");
       return;
     }
+    
     const historyForRegen = messages.slice(0, lastUserMessageIndex + 1);
     setMessages(historyForRegen);
     const convId = historyForRegen[0]?.conversation_id;
