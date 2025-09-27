@@ -136,11 +136,12 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         const data = await response.json();
         const { usersDisabled, adminsDisabled } = data;
 
-        const shouldBeKicked = (usersDisabled && userRole === 'user') || (adminsDisabled && userRole === 'admin');
-
-        if (shouldBeKicked) {
+        if (usersDisabled && userRole === 'user') {
           await supabase.auth.signOut();
-          toast.error("Tu tipo de cuenta ha sido desactivada por un administrador. Se ha cerrado tu sesión.");
+          toast.error("El acceso para cuentas de Usuario ha sido desactivado globalmente. Se ha cerrado tu sesión.");
+        } else if (adminsDisabled && userRole === 'admin') {
+          await supabase.auth.signOut();
+          toast.error("El acceso para cuentas de Admin ha sido desactivado globalmente. Se ha cerrado tu sesión.");
         }
       } catch (error) {
         console.error("Error checking global status in real-time:", error);
