@@ -578,7 +578,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                     )} />
                   )}
                   
-                  {isSuperAdmin && ( // NEW: Only show for Super Admins
+                  {isSuperAdmin && ( // Only show for Super Admins
                     <FormField control={form.control} name="is_global" render={({ field }) => (
                       <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
                         <div className="space-y-0.5">
@@ -617,7 +617,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
           <div className="flex-1 flex flex-col">
             <div className="flex justify-between items-center mb-2">
               <h3 className="text-lg font-semibold">Claves Guardadas</h3>
-              <div className="relative flex-1 max-w-xs ml-auto"> {/* Added ml-auto to push to right */}
+              <div className="relative flex-1 max-w-xs ml-auto">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Buscar clave..."
@@ -646,7 +646,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                     <TableRow><TableCell colSpan={isSuperAdmin ? 5 : 4} className="text-center text-muted-foreground">No hay claves que coincidan con la búsqueda.</TableCell></TableRow>
                   ) : (
                     filteredKeys
-                      .filter(key => isSuperAdmin || !key.is_global) // NEW: Filter out global keys for non-Super Admins in the table
+                      // REMOVED: .filter(key => isSuperAdmin || !key.is_global) // This line was preventing non-admins from seeing global keys
                       .map(key => {
                         // Determine if the current user can edit/delete this key
                         const canManageKey = isSuperAdmin || (!key.is_global && key.user_id === currentUserId);
