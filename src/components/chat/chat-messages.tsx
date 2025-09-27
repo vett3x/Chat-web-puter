@@ -124,7 +124,8 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
             if (typeof message.content === 'string' && 
                 (message.content.endsWith('[USER_APPROVED_PLAN]') || 
                  message.content.endsWith('[USER_REQUESTED_BUILD_FIX]') || 
-                 message.content.endsWith('[USER_REPORTED_WEB_ERROR]'))) {
+                 message.content.endsWith('[USER_REPORTED_WEB_ERROR]') ||
+                 message.content.endsWith('[USER_APPROVED_CORRECTION_PLAN]'))) { // NEW: Add correction plan approval message
               return null;
             }
 
