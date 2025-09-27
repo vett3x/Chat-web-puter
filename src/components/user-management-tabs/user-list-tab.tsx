@@ -250,10 +250,13 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
                             </TooltipTrigger>
                             <TooltipContent>
                               <p>Expulsado el: {user.kicked_at ? format(new Date(user.kicked_at), 'dd/MM/yyyy HH:mm', { locale: es }) : 'N/A'}</p>
-                              <p>Tiempo restante: {remainingTime || 'Calculando...'}</p> {/* Always show, for debugging */}
+                              {remainingTime && <p>Tiempo restante: {remainingTime}</p>}
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
+                      )}
+                      {user.status === 'kicked' && remainingTime && (
+                        <span className="text-xs text-muted-foreground mt-1">({remainingTime})</span>
                       )}
                     </div>
                   </TableCell>
