@@ -74,13 +74,7 @@ const apiKeySchema = z.object({
           path: ['model_name'],
         });
       }
-      if (!data.api_key || data.api_key === '') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'API Key es requerida para la API pública de Gemini.',
-          path: ['api_key'],
-        });
-      }
+      // REMOVED: API key validation for adding new keys from here. It's now handled manually in onSubmit.
     }
   } else if (data.provider === 'custom_endpoint') { // New validation for custom_endpoint
     if (!data.api_endpoint || data.api_endpoint === '') {
@@ -90,13 +84,7 @@ const apiKeySchema = z.object({
         path: ['api_endpoint'],
       });
     }
-    if (!data.api_key || data.api_key === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'La API Key es requerida para un endpoint personalizado.',
-        path: ['api_key'],
-      });
-    }
+    // REMOVED: API key validation for adding new keys from here. It's now handled manually in onSubmit.
     if (!data.model_name || data.model_name === '') {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -114,97 +102,9 @@ const apiKeySchema = z.object({
   }
 });
 
-// Apply the same superRefine to updateApiKeySchema
-const updateApiKeySchema = z.object({
-  id: z.string().min(1, { message: 'ID de clave es requerido para actualizar.' }),
-  provider: z.string().min(1),
-  api_key: z.string().optional(), // API Key is optional for updates
-  nickname: z.string().optional(),
-  project_id: z.string().optional(),
-  location_id: z.string().optional(),
-  use_vertex_ai: z.boolean().optional(),
-  model_name: z.string().optional(),
-  json_key_file: z.any().optional(),
-  json_key_content: z.string().optional(),
-  api_endpoint: z.string().url({ message: 'URL de endpoint inválida.' }).optional(), // New: for custom endpoint
-  is_global: z.boolean().optional(), // NEW: Add is_global to schema
-}).superRefine((data, ctx) => {
-  // For updates, API key is only required if it's explicitly provided and not empty.
-  // If it's empty, it means the user doesn't want to change the existing key.
-  // The backend will handle not updating it if the field is missing from the payload.
-
-  if (data.provider === 'google_gemini') {
-    if (data.use_vertex_ai) {
-      if (!data.model_name || data.model_name === '') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Debes seleccionar un modelo para usar Vertex AI.',
-          path: ['model_name'],
-        });
-      }
-      if (!data.project_id) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Project ID es requerido para usar Vertex AI.',
-          path: ['project_id'],
-        });
-      }
-      if (!data.location_id) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Location ID es requerido para usar Vertex AI.',
-          path: ['location_id'],
-        });
-      }
-    } else { // Public API
-      if (!data.model_name || data.model_name === '') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Debes seleccionar un modelo para la API pública de Gemini.',
-          path: ['model_name'],
-        });
-      }
-      // API Key is optional for update if not changing
-      // if (!data.api_key || data.api_key === '') {
-      //   ctx.addIssue({
-      //     code: z.ZodIssueCode.custom,
-      //     message: 'API Key es requerida para la API pública de Gemini.',
-      //     path: ['api_key'],
-      //   });
-      // }
-    }
-  } else if (data.provider === 'custom_endpoint') { // New validation for custom_endpoint
-    if (!data.api_endpoint || data.api_endpoint === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'El link del endpoint es requerido para un endpoint personalizado.',
-        path: ['api_endpoint'],
-      });
-    }
-    // API Key is optional for update if not changing
-    // if (!data.api_key || data.api_key === '') {
-    //   ctx.addIssue({
-    //     code: z.ZodIssueCode.custom,
-    //     message: 'La API Key es requerida para un endpoint personalizado.',
-    //     path: ['api_key'],
-    //   });
-    // }
-    if (!data.model_name || data.model_name === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'El ID del modelo es requerido para un endpoint personalizado.',
-        path: ['model_name'],
-      });
-    }
-    if (!data.nickname || data.nickname === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'El apodo es obligatorio para un endpoint personalizado.',
-        path: ['nickname'],
-      });
-    }
-  }
-});
+// The updateApiKeySchema is not used by useForm, so its superRefine doesn't matter for the form validation.
+// I will remove it to avoid confusion.
+// REMOVED updateApiKeySchema entirely.
 
 type ApiKeyFormValues = z.infer<typeof apiKeySchema>;
 
@@ -381,7 +281,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         payload.id = editingKeyId; // Ensure ID is in payload for PUT
       }
 
-      // --- Custom validation for API Key based on mode (create vs. edit) ---
+      // --- Manual validation for API Key when CREATING a NEW key ---
       if (!editingKeyId) { // If creating a NEW key
         if (payload.provider === 'google_gemini' && !payload.use_vertex_ai && (!payload.api_key || payload.api_key === '')) {
           form.setError('api_key', { type: 'manual', message: 'API Key es requerida para la API pública de Gemini.' });
@@ -405,7 +305,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
           delete payload.api_key;
         }
       }
-      // --- End custom validation ---
+      // --- End manual validation ---
 
       // If using Vertex AI, ensure api_key is null/undefined
       if (payload.use_vertex_ai) {
