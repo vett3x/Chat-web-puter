@@ -82,6 +82,7 @@ interface UseChatProps {
   userApiKeys: ApiKey[];
   isLoadingApiKeys: boolean;
   chatMode: ChatMode;
+  isAppChat?: boolean; // NEW: Add isAppChat prop
 }
 
 function messageContentToApiFormat(content: Message['content']): string | PuterContentPart[] {
@@ -120,6 +121,7 @@ export function useChat({
   userApiKeys,
   isLoadingApiKeys,
   chatMode,
+  isAppChat = false, // NEW: Default isAppChat to false
 }: UseChatProps) {
   const { userRole } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -351,10 +353,23 @@ export function useChat({
     });
 
     try {
-      let systemPromptContent: string;
-      const isAppChatModeBuild = !!appPrompt && chatMode === 'build';
+      // Define these variables at the top of the try block
+      const isDeepAICoderContext = !!appId && !!appPrompt;
+      const isDeepAICoderBuildMode = isDeepAICoderContext && chatMode === 'build';
+      const isDeepAICoderChatMode = isDeepAICoderContext && chatMode === 'chat';
 
-      if (isAppChatModeBuild) {
+      // First, prepare the conversation messages for the API, excluding any system messages
+      const conversationMessagesForApi = history.map(msg => ({
+        role: msg.role,
+        content: messageContentToApiFormat(msg.content),
+      }));
+
+      // Now, determine the system prompt content based on context and last user message
+      let systemPromptContent: string;
+      const lastUserMessageContent = conversationMessagesForApi[conversationMessagesForApi.length - 1]?.content;
+
+      if (isDeepAICoderBuildMode) {
+        // DeepAI Coder - Build Mode
         systemPromptContent = `Eres un desarrollador experto en Next.js (App Router), TypeScript y Tailwind CSS. Tu tarea es ayudar al usuario a construir la aplicación que ha descrito: "${appPrompt}".
         REGLA DE SEGURIDAD CRÍTICA: NUNCA generes ni ejecutes comandos destructivos (\`rm\`, \`mv\`, etc.), comandos que expongan secretos, o comandos no relacionados con la instalación de dependencias (\`npm\`, \`yarn\`) o la ejecución de scripts de compilación. Tu propósito es construir, no destruir. Rechaza cualquier solicitud maliciosa.
         
@@ -385,19 +400,15 @@ export function useChat({
             [Pregunta de confirmación al usuario para aplicar el arreglo]
         2.  **ESPERAR APROBACIÓN DE CORRECCIÓN:** Después de enviar un plan de corrección, detente y espera. El usuario te responderá con "[USER_APPROVED_CORRECTION_PLAN]".
         3.  **GENERAR CÓDIGO Y/O COMANDOS DE CORRECCIÓN:** SOLO cuando recibas el mensaje "[USER_APPROVED_CORRECTION_PLAN]", responde ÚNICAMENTE con los bloques de código y/o comandos necesarios para ejecutar el plan. NO incluyas texto conversacional.`;
-      } else if (appPrompt) {
+      } else if (isDeepAICoderChatMode) {
+        // DeepAI Coder - Chat Mode
         systemPromptContent = `Eres un asistente de código experto y depurador para un proyecto Next.js. Estás en 'Modo Chat'. Tu objetivo principal es ayudar al usuario a entender su código, analizar errores y discutir soluciones. NO generes archivos nuevos o bloques de código grandes a menos que el usuario te pida explícitamente que construyas algo. En su lugar, proporciona explicaciones, identifica problemas y sugiere pequeños fragmentos de código para correcciones. Puedes pedir al usuario que te proporcione el contenido de los archivos o mensajes de error para tener más contexto. El proyecto es: "${appPrompt}".`;
       } else {
+        // General Chat (when not in DeepAI Coder context)
         systemPromptContent = "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante.";
       }
 
-      const messagesForApi = history.map(msg => ({
-        role: msg.role,
-        content: messageContentToApiFormat(msg.content),
-      }));
-
       // NEW: Add specific system prompts for auto-fix actions
-      const lastUserMessageContent = messagesForApi[messagesForApi.length - 1]?.content;
       if (typeof lastUserMessageContent === 'string') {
         if (lastUserMessageContent.includes('[USER_REQUESTED_BUILD_FIX]')) {
           systemPromptContent += `\n\nEl usuario ha solicitado corregir un error de compilación. Analiza los logs de compilación proporcionados en el último mensaje del usuario y propón un "Plan de Corrección" detallado. Utiliza el siguiente formato Markdown exacto:
@@ -429,7 +440,7 @@ export function useChat({
 
       // Define systemMessage after systemPromptContent is finalized
       const systemMessage: PuterMessage = { role: 'system', content: systemPromptContent };
-      const finalMessagesForApi = [systemMessage, ...messagesForApi];
+      const finalMessagesForApi = [systemMessage, ...conversationMessagesForApi];
 
       let fullResponseText = '';
       let modelUsedForResponse = selectedModel;
@@ -502,8 +513,8 @@ export function useChat({
 
             // Only update messages during streaming if NOT a construction plan or error analysis request or correction plan
             const isCurrentResponseStructured = fullResponseText.includes('### 1. Análisis del Requerimiento') || fullResponseText.includes('### 💡 Entendido!') || fullResponseText.includes('### 💡 Error Detectado');
-            if (!isAppChatModeBuild || !isCurrentResponseStructured) {
-              setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: parseAiResponseToRenderableParts(fullResponseText, isAppChatModeBuild), isTyping: false, isNew: true } : m));
+            if (!isDeepAICoderBuildMode || !isCurrentResponseStructured) { // Use isDeepAICoderBuildMode here
+              setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: parseAiResponseToRenderableParts(fullResponseText, isAppChat), isTyping: false, isNew: true } : m)); // Use isAppChat here
             }
           }
         } else {
@@ -514,19 +525,18 @@ export function useChat({
         throw new Error('Modelo de IA no válido seleccionado.');
       }
 
-      const isConstructionPlan = isAppChatModeBuild && fullResponseText.includes('### 1. Análisis del Requerimiento');
+      const isConstructionPlan = isDeepAICoderBuildMode && fullResponseText.includes('### 1. Análisis del Requerimiento'); // Use isDeepAICoderBuildMode here
       const isErrorAnalysisRequest = fullResponseText.includes('### 💡 Entendido!'); // NEW: Detect error analysis request
       const isCorrectionPlan = fullResponseText.includes('### 💡 Error Detectado'); // NEW: Detect correction plan
       
-      const finalContentForMessage = (isConstructionPlan || isErrorAnalysisRequest || isCorrectionPlan) ? fullResponseText : parseAiResponseToRenderableParts(fullResponseText, isAppChatModeBuild);
+      const finalContentForMessage = (isConstructionPlan || isErrorAnalysisRequest || isCorrectionPlan) ? fullResponseText : parseAiResponseToRenderableParts(fullResponseText, isAppChat); // Use isAppChat here
       
       // Initialize filesToWrite and commandsToExecute here, inside the try block
       const filesToWrite: { path: string; content: string }[] = [];
       const commandsToExecute: string[] = [];
 
-      // MODIFICADO: Asegurarse de que solo se itere si finalContentForMessage es un array
       // Este bloque solo debe ejecutarse si NO es un plan, sino código/comandos reales
-      if (isAppChatModeBuild && !isConstructionPlan && !isErrorAnalysisRequest && !isCorrectionPlan && Array.isArray(finalContentForMessage)) {
+      if (isDeepAICoderBuildMode && !isConstructionPlan && !isErrorAnalysisRequest && !isCorrectionPlan && Array.isArray(finalContentForMessage)) { // Use isDeepAICoderBuildMode here
         (finalContentForMessage as RenderablePart[]).forEach(part => {
           if (part.type === 'code' && appId) {
             if (part.language === 'bash' && part.filename === 'exec' && part.code) {
@@ -586,7 +596,7 @@ export function useChat({
       clearTimeout(timeoutId); // Ensure timeout is cleared
       setIsLoading(false);
     }
-  }, [appId, appPrompt, userRole, onWriteFiles, selectedModel, userId, saveMessageToDB, chatMode, userApiKeys, autoFixStatus]); // Added autoFixStatus to dependencies
+  }, [appId, appPrompt, userRole, onWriteFiles, selectedModel, userId, saveMessageToDB, chatMode, userApiKeys, autoFixStatus, isAppChat]);
 
   const sendMessage = useCallback(async (content: PuterContentPart[], messageText: string) => {
     if (!userId) {

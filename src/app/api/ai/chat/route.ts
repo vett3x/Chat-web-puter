@@ -198,7 +198,7 @@ export async function POST(req: NextRequest) {
     // Determine token limit based on provider
     const tokenLimit = keyDetails.provider === 'google_gemini' ? 1000000 : 200000;
 
-    // The system prompt is handled separately and always included
+    // Extract system prompt and filter it out from conversation messages
     const systemPromptMessage = rawMessages.find(m => m.role === 'system');
     const systemPrompt = systemPromptMessage ? messageContentToString(systemPromptMessage.content) : '';
     const conversationMessages = rawMessages.filter(m => m.role !== 'system');
@@ -208,15 +208,15 @@ export async function POST(req: NextRequest) {
 
     if (keyDetails.provider === 'google_gemini') {
       const geminiFormattedMessages: { role: 'user' | 'model'; parts: Part[] }[] = [];
+      // Add system prompt as a text part in the first user message
+      if (systemPrompt) {
+        geminiFormattedMessages.push({ role: 'user', parts: [{ text: systemPrompt }] });
+      }
+
       for (let i = 0; i < truncatedMessages.length; i++) {
         const msg = truncatedMessages[i];
         if (msg.role === 'user') {
-          let userParts = convertToGeminiParts(msg.content);
-          // Prepend system prompt to the first user message
-          if (i === 0 && systemPrompt) {
-            userParts = [{ text: systemPrompt + "\n\n" }, ...userParts];
-          }
-          geminiFormattedMessages.push({ role: 'user', parts: userParts });
+          geminiFormattedMessages.push({ role: 'user', parts: convertToGeminiParts(msg.content) });
         } else if (msg.role === 'assistant') {
           geminiFormattedMessages.push({ role: 'model', parts: convertToGeminiParts(msg.content) });
         }

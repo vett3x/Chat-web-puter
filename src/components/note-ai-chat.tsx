@@ -129,19 +129,18 @@ export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialCha
     setMessages(prev => [...prev, { role: 'assistant', content: '', isTyping: true, id: assistantMessageId }]);
 
     try {
-      // The actual content sent to the AI includes the note's context
-      const fullUserInput = `Basado en el siguiente contexto de mi nota, responde a mi pregunta. Sé conciso y directo.
+      // Construct system prompt specifically for Note AI Chat
+      const systemPromptContent = `Eres un asistente de notas. Tu tarea es responder preguntas sobre la nota proporcionada. Sé conciso y directo.
 ---
 Título: ${noteTitle}
 Contenido:
 ${noteContent}
----
-
-Mi pregunta es: ${userInput}`;
+---`;
 
       const messagesForApi: PuterMessage[] = [
+        { role: 'system', content: systemPromptContent }, // Add system prompt here
         ...messages.map(msg => ({ role: msg.role, content: msg.content })),
-        { role: 'user', content: fullUserInput }
+        { role: 'user', content: userInput } // Only the user's direct question
       ];
 
       let fullResponseText = '';
