@@ -172,13 +172,12 @@ export async function GET(req: NextRequest) {
 
   let query = supabaseAdmin
     .from('user_api_keys')
-    .select('id, provider, api_key, is_active, created_at, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint, is_global, user_id')
+    .select('id, provider, api_key, is_active, created_at, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint, is_global, user_id') // NEW: Select user_id
     .order('created_at', { ascending: false });
 
-  // MODIFIED: Stricter visibility for 'user' and 'admin' roles
+  // All roles (user, admin, super_admin) should see their own keys OR global keys
   if (userRole === 'user' || userRole === 'admin') {
-    // They should only see keys they own, and NOT global keys.
-    query = query.eq('user_id', session.user.id);
+    query = query.or(`user_id.eq.${session.user.id},is_global.eq.true`);
   }
   // If userRole is 'super_admin', no additional filter is applied, so they see all.
 
