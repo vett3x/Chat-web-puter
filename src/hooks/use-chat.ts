@@ -328,6 +328,12 @@ export function useChat({
       await saveMessageToDB(convId, userMessageToSave);
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+      toast.error('La IA tardó demasiado en responder. Por favor, inténtalo de nuevo.');
+    }, 30000); // 30 second timeout
+
     try {
       let systemPromptContent: string;
       const isAppChatModeBuild = !!appPrompt && chatMode === 'build';
@@ -426,6 +432,7 @@ export function useChat({
               selectedKeyId: selectedModel.substring(9),
               stream: false, // Request non-streaming for custom endpoint
             }),
+            signal: controller.signal, // Pass the signal
           });
           response = await apiResponse.json();
           if (!apiResponse.ok) throw new Error(response.message || 'Error en la API de IA.');
@@ -444,6 +451,7 @@ export function useChat({
             selectedKeyId: selectedModel.substring(9),
             stream: true, // Request streaming for Gemini
           }),
+          signal: controller.signal, // Pass the signal
         });
         if (!apiResponse.ok || !apiResponse.body) {
           const errorData = await apiResponse.json();
@@ -531,11 +539,12 @@ export function useChat({
 
     } catch (error: any) {
       console.error('[API /ai/chat] Error:', error);
-      let userFriendlyMessage = `Error en la API de IA: ${error.message}`;
+      let userFriendlyMessage = `Error en la API de IA: ${error.name === 'AbortError' ? 'La IA tardó demasiado en responder.' : error.message}`;
       setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: userFriendlyMessage, isTyping: false, isNew: true, isConstructionPlan: false, planApproved: false, isCorrectionPlan: false, correctionApproved: false, isErrorAnalysisRequest: false, isAnimated: false } : m));
       toast.error(userFriendlyMessage);
       setAutoFixStatus('failed'); // Set status to failed on error
     } finally {
+      clearTimeout(timeoutId); // Ensure timeout is cleared
       setIsLoading(false);
     }
   }, [appId, appPrompt, userRole, onWriteFiles, selectedModel, userId, saveMessageToDB, chatMode, userApiKeys, autoFixStatus]); // Added autoFixStatus to dependencies
