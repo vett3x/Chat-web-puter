@@ -16,11 +16,11 @@ import { Card } from '@/components/ui/card';
 import { KeyRound } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import * => z from 'zod';
+import * as z from 'zod'; // CORREGIDO: Sintaxis de importación de zod
 
 import { useApiKeysManagement } from '@/hooks/use-api-keys-management';
-import { ApiKeyForm } from '@/components/api-management/api-key-form.tsx';
-import { ApiKeyTable } from '@/components/api-management/api-key-table.tsx';
+import { ApiKeyForm } from '@/components/api-management/api-key-form'; // CORREGIDO: Eliminada extensión .tsx
+import { ApiKeyTable } from '@/components/api-management/api-key-table'; // CORREGIDO: Eliminada extensión .tsx
 
 const apiKeySchema = z.object({
   id: z.string().optional(),
