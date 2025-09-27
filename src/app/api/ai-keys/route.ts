@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
-import { SUPERUSER_EMAILS, PERMISSION_KEYS, UserPermissions } from '@/lib/constants'; // Importación actualizada
+import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
 import { createClient } from '@supabase/supabase-js';
 
 const apiKeySchema = z.object({
@@ -88,6 +88,7 @@ const updateApiKeySchema = z.object({
   location_id: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional location_id
   use_vertex_ai: z.boolean().optional(),
   model_name: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional model_name
+  json_key_file: z.any().optional(), // This field is not actually used in the backend, can be removed or ignored
   json_key_content: z.string().optional(),
   api_endpoint: z.string().trim().url({ message: 'URL de endpoint inválida.' }).optional().or(z.literal('')), // Changed: Allow empty string for optional api_endpoint
   is_global: z.boolean().optional(), // NEW: Add is_global to schema
@@ -301,15 +302,15 @@ export async function PUT(req: NextRequest) {
     }
 
     const updateData: any = {
-      nickname: nickname, // Use the parsed value directly, null if empty string from frontend
-      model_name: model_name, // Use the parsed value directly, null if empty string from frontend
+      nickname: nickname || null,
+      model_name: model_name || null,
       is_global: is_global !== undefined ? is_global : currentKey.is_global, // NEW: Update is_global if provided, else keep current
       user_id: is_global ? null : currentKey.user_id, // NEW: Set user_id to null if becoming global, otherwise keep current
     };
     
-    // Handle API Key update: only if provided and not empty string (which means it was deleted from payload in frontend)
-    if (api_key !== undefined) { // Check if it was explicitly sent (even if null)
-      updateData.api_key = api_key; // Will be null if frontend sent null, or actual key
+    // Handle API Key update: only if provided and not empty
+    if (api_key !== undefined && api_key !== '') {
+      updateData.api_key = api_key;
     }
 
     // Logic based on provider and use_vertex_ai flag
@@ -317,10 +318,10 @@ export async function PUT(req: NextRequest) {
       updateData.use_vertex_ai = use_vertex_ai; // Always update this flag if present in payload
       if (use_vertex_ai) { // If switching to or already using Vertex AI
         updateData.api_key = null; // Clear public API key
-        updateData.project_id = project_id; // Use parsed value
-        updateData.location_id = location_id; // Use parsed value
-        if (json_key_content !== undefined) { // Only update if new content is provided (or explicitly null)
-          updateData.json_key_content = json_key_content;
+        updateData.project_id = project_id || null;
+        updateData.location_id = location_id || null;
+        if (json_key_content !== undefined) { // Only update if new content is provided
+          updateData.json_key_content = json_key_content || null;
         }
       } else { // If switching from or already using public API
         updateData.project_id = null;
@@ -329,7 +330,7 @@ export async function PUT(req: NextRequest) {
       }
       updateData.api_endpoint = null; // Clear custom endpoint for Gemini
     } else if (currentKey.provider === 'custom_endpoint') {
-      updateData.api_endpoint = api_endpoint; // Use parsed value
+      updateData.api_endpoint = api_endpoint || null;
       updateData.project_id = null;
       updateData.location_id = null;
       updateData.json_key_content = null;
