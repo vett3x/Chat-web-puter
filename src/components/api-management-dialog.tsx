@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { KeyRound, PlusCircle, Trash2, Loader2, RefreshCw, Edit, Upload, XCircle, Search } from 'lucide-react';
+import { KeyRound, PlusCircle, Trash2, Loader2, RefreshCw, Edit, Upload, XCircle, Search } from 'lucide-react'; // Import Search icon
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -25,67 +25,26 @@ import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { AI_PROVIDERS, getModelLabel } from '@/lib/ai-models';
-import { useSession } from '@/components/session-context-provider';
-import { ApiKeyFormFields } from './api-management/api-key-form-fields'; // Import the new component
+import { AI_PROVIDERS, getModelLabel } from '@/lib/ai-models'; // Import AI_PROVIDERS
+import { useSession } from '@/components/session-context-provider'; // NEW: Import useSession
 
-// Schema for API Key form validation
 const apiKeySchema = z.object({
-  id: z.string().optional(),
+  id: z.string().optional(), // Added for editing existing keys
   provider: z.string().min(1, { message: 'Debes seleccionar un proveedor.' }),
-  api_key: z.string().trim().optional().or(z.literal('')),
-  nickname: z.string().trim().optional().or(z.literal('')),
-  project_id: z.string().trim().optional().or(z.literal('')),
-  location_id: z.string().trim().optional().or(z.literal('')),
+  api_key: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional API key
+  nickname: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional nickname
+  // New fields for Vertex AI
+  project_id: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional project_id
+  location_id: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional location_id
   use_vertex_ai: z.boolean().optional(),
-  model_name: z.string().trim().optional().or(z.literal('')),
-  json_key_file: z.any().optional(),
-  json_key_content: z.string().optional(),
-  api_endpoint: z.string().trim().url({ message: 'URL de endpoint inválida.' }).optional().or(z.literal('')),
-  is_global: z.boolean().optional(),
-}).superRefine((data, ctx) => {
-  if (data.provider === 'google_gemini') {
-    if (data.use_vertex_ai) {
-      if (!data.model_name || data.model_name === '') {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Debes seleccionar un modelo para usar Vertex AI.', path: ['model_name'] });
-      }
-      if (!data.project_id || data.project_id === '') {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Project ID es requerido para usar Vertex AI.', path: ['project_id'] });
-      }
-      if (!data.location_id || data.location_id === '') {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Location ID es requerido para usar Vertex AI.', path: ['location_id'] });
-      }
-      // For new keys, json_key_file is required. For existing, it's optional if content already exists.
-      // This specific check is better handled in onSubmit based on editingKeyId and existing content.
-    } else { // Public API
-      if (!data.model_name || data.model_name === '') {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Debes seleccionar un modelo para la API pública de Gemini.', path: ['model_name'] });
-      }
-      if (!data.api_key || data.api_key === '') {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'API Key es requerida para la API pública de Gemini.', path: ['api_key'] });
-      }
-    }
-  } else if (data.provider === 'custom_endpoint') {
-    if (!data.api_endpoint || data.api_endpoint === '') {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'El link del endpoint es requerido para un endpoint personalizado.', path: ['api_endpoint'] });
-    }
-    if (!data.model_name || data.model_name === '') {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'El ID del modelo es requerido para un endpoint personalizado.', path: ['model_name'] });
-    }
-    if (!data.nickname || data.nickname === '') {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'El apodo es obligatorio para un endpoint personalizado.', path: ['nickname'] });
-    }
-    if (!data.api_key || data.api_key === '') {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'API Key es requerida para un endpoint personalizado.', path: ['api_key'] });
-    }
-  } else { // Other providers
-    if (!data.api_key || data.api_key === '') {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'API Key es requerida para este proveedor.', path: ['api_key'] });
-    }
-  }
+  model_name: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional model_name
+  json_key_file: z.any().optional(), // New: for file upload
+  json_key_content: z.string().optional(), // Added for payload
+  api_endpoint: z.string().trim().url({ message: 'URL de endpoint inválida.' }).optional().or(z.literal('')), // Changed: Allow empty string for optional api_endpoint
+  is_global: z.boolean().optional(), // NEW: Add is_global to schema
 });
 
-export type ApiKeyFormValues = z.infer<typeof apiKeySchema>;
+type ApiKeyFormValues = z.infer<typeof apiKeySchema>;
 
 interface ApiKey {
   id: string;
@@ -93,15 +52,21 @@ interface ApiKey {
   api_key: string; // Masked
   nickname: string | null;
   created_at: string;
-  project_id: string | null;
-  location_id: string | null;
-  use_vertex_ai: boolean;
-  model_name: string | null;
-  json_key_content: string | null; // To check if content exists
-  api_endpoint: string | null;
-  is_global: boolean;
-  user_id: string | null;
+  project_id: string | null; // New
+  location_id: string | null; // New
+  use_vertex_ai: boolean; // New
+  model_name: string | null; // New
+  json_key_content: string | null; // New: to check if content exists
+  api_endpoint: string | null; // New: for custom endpoint
+  is_global: boolean; // NEW: Add is_global
+  user_id: string | null; // NEW: Add user_id for permission checks
 }
+
+const providerOptions = AI_PROVIDERS.filter(p => p.source === 'user_key').map(p => ({
+  value: p.value,
+  label: p.company,
+  models: p.models, // Include models for public API
+}));
 
 interface ApiManagementDialogProps {
   open: boolean;
@@ -109,18 +74,18 @@ interface ApiManagementDialogProps {
 }
 
 export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogProps) {
-  const { session, userRole } = useSession();
-  const isSuperAdmin = userRole === 'super_admin';
+  const { session, userRole } = useSession(); // NEW: Get userRole
+  const isSuperAdmin = userRole === 'super_admin'; // NEW: Check if Super Admin
   const currentUserId = session?.user?.id;
 
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [editingKeyId, setEditingKeyId] = useState<string | null>(null);
+  const [editingKeyId, setEditingKeyId] = useState<string | null>(null); // Track which key is being edited
   const jsonKeyFileInputRef = useRef<HTMLInputElement>(null);
   const [selectedJsonKeyFile, setSelectedJsonKeyFile] = useState<File | null>(null);
   const [jsonKeyFileName, setJsonKeyFileName] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(''); // New state for search query
 
   const form = useForm<ApiKeyFormValues>({
     resolver: zodResolver(apiKeySchema),
@@ -135,13 +100,15 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       json_key_file: undefined,
       json_key_content: undefined,
       api_endpoint: '',
-      is_global: false,
+      is_global: false, // NEW: Default to false
     },
   });
 
   const selectedProvider = form.watch('provider');
-  const useVertexAI = !!form.watch('use_vertex_ai'); // Fixed: Ensure boolean type
+  const useVertexAI = form.watch('use_vertex_ai');
+  const currentProviderModels = providerOptions.find(p => p.value === selectedProvider)?.models || [];
   const isGoogleGemini = selectedProvider === 'google_gemini';
+  const isCustomEndpoint = selectedProvider === 'custom_endpoint';
 
   const fetchKeys = useCallback(async () => {
     setIsLoading(true);
@@ -171,12 +138,12 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         json_key_file: undefined,
         json_key_content: undefined,
         api_endpoint: '',
-        is_global: false,
+        is_global: false, // NEW: Reset is_global
       });
       setEditingKeyId(null);
       setSelectedJsonKeyFile(null);
       setJsonKeyFileName(null);
-      setSearchQuery('');
+      setSearchQuery(''); // Reset search query on dialog open
     }
   }, [open, fetchKeys, form]);
 
@@ -186,18 +153,18 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       id: key.id,
       provider: key.provider,
       nickname: key.nickname || '',
-      api_key: '',
+      api_key: '', // API key is masked, so don't pre-fill
       project_id: key.project_id || '',
       location_id: key.location_id || '',
       use_vertex_ai: key.use_vertex_ai || false,
-      model_name: key.model_name || '',
+      model_name: key.model_name || '', // Pre-fill model_name
       json_key_file: undefined,
-      json_key_content: undefined,
-      api_endpoint: key.api_endpoint || '',
-      is_global: key.is_global,
+      json_key_content: undefined, // Don't pre-fill content, user must re-upload if needed
+      api_endpoint: key.api_endpoint || '', // Pre-fill api_endpoint
+      is_global: key.is_global, // NEW: Pre-fill is_global
     });
     setSelectedJsonKeyFile(null);
-    setJsonKeyFileName(key.use_vertex_ai && key.json_key_content ? 'Archivo JSON existente' : null);
+    setJsonKeyFileName(key.use_vertex_ai && key.json_key_content ? 'Archivo JSON existente' : null); // Indicate if JSON key exists
   };
 
   const handleCancelEdit = () => {
@@ -213,7 +180,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       json_key_file: undefined,
       json_key_content: undefined,
       api_endpoint: '',
-      is_global: false,
+      is_global: false, // NEW: Reset is_global
     });
     setSelectedJsonKeyFile(null);
     setJsonKeyFileName(null);
@@ -246,35 +213,69 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
 
   const onSubmit = async (values: ApiKeyFormValues) => {
     setIsSubmitting(true);
+    let hasValidationError = false;
+
+    // --- Manual validation for NEW keys or when specific fields are required ---
+    if (!editingKeyId) { // Stricter validation for creating NEW keys
+      if (values.provider === 'google_gemini') {
+        if (values.use_vertex_ai) {
+          if (!values.model_name) { form.setError('model_name', { message: 'Debes seleccionar un modelo.' }); hasValidationError = true; }
+          if (!values.project_id) { form.setError('project_id', { message: 'Project ID es requerido.' }); hasValidationError = true; }
+          if (!values.location_id) { form.setError('location_id', { message: 'Location ID es requerido.' }); hasValidationError = true; }
+        } else {
+          if (!values.model_name) { form.setError('model_name', { message: 'Debes seleccionar un modelo.' }); hasValidationError = true; }
+          if (!values.api_key) { form.setError('api_key', { message: 'API Key es requerida.' }); hasValidationError = true; }
+        }
+      } else if (values.provider === 'custom_endpoint') {
+        if (!values.api_endpoint) { form.setError('api_endpoint', { message: 'El link del endpoint es requerido.' }); hasValidationError = true; }
+        if (!values.model_name) { form.setError('model_name', { message: 'El ID del modelo es requerido.' }); hasValidationError = true; }
+        if (!values.nickname) { form.setError('nickname', { message: 'El apodo es obligatorio.' }); hasValidationError = true; }
+        if (!values.api_key) { form.setError('api_key', { message: 'API Key es requerida.' }); hasValidationError = true; }
+      } else { // Other providers
+        if (!values.api_key) { form.setError('api_key', { message: 'API Key es requerida.' }); hasValidationError = true; }
+      }
+    }
+    
+    if (hasValidationError) {
+      setIsSubmitting(false);
+      return;
+    }
+    // --- End manual validation ---
 
     try {
       const method = editingKeyId ? 'PUT' : 'POST';
       const payload: ApiKeyFormValues = { ...values };
       
       if (editingKeyId) {
-        payload.id = editingKeyId;
+        payload.id = editingKeyId; // Ensure ID is in payload for PUT
+        // If api_key field is empty during an update, delete it from payload so backend doesn't update it to an empty string
         if (payload.api_key === '') {
           delete payload.api_key;
         }
       }
 
+      // If using Vertex AI, ensure api_key is null/undefined
       if (payload.use_vertex_ai) {
-        payload.api_key = undefined;
+        payload.api_key = undefined; // Will be stored as NULL in DB
         if (selectedJsonKeyFile) {
-          payload.json_key_content = await selectedJsonKeyFile.text();
+          payload.json_key_content = await selectedJsonKeyFile.text(); // Read file content
         } else if (editingKeyId && !selectedJsonKeyFile && jsonKeyFileName === 'Archivo JSON existente') {
           // If editing, using Vertex AI, no new file, and old file existed, keep existing content
-          // By not including json_key_content in payload, it won't be updated to null
+          // Do nothing, json_key_content will not be in payload, so it won't be updated to null
         } else {
+          // If editing, using Vertex AI, no new file, and no old file, set to undefined
           payload.json_key_content = undefined;
         }
+        // Clear custom endpoint fields if switching to Vertex AI
         payload.api_endpoint = undefined;
-      } else if (selectedProvider === 'custom_endpoint') {
+      } else if (isCustomEndpoint) {
+        // If using custom endpoint, clear Vertex AI specific fields
         payload.project_id = undefined;
         payload.location_id = undefined;
         payload.json_key_content = undefined;
         payload.use_vertex_ai = false;
       } else {
+        // If not using Vertex AI or custom endpoint, clear Vertex AI specific fields and custom endpoint fields
         payload.project_id = undefined;
         payload.location_id = undefined;
         payload.json_key_content = undefined;
@@ -288,7 +289,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         body: JSON.stringify(payload),
       });
       
-      const responseText = await response.text();
+      const responseText = await response.text(); // Read response text first
       let result;
       try {
         result = JSON.parse(responseText);
@@ -297,6 +298,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       }
 
       if (!response.ok) {
+        // If there are validation errors from the backend, display them
         if (result.errors) {
           result.errors.forEach((err: any) => {
             form.setError(err.path[0], { message: err.message });
@@ -305,7 +307,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         throw new Error(result.message || `Error HTTP: ${response.status}`);
       }
       toast.success(`API Key ${editingKeyId ? 'actualizada' : 'guardada'}.`);
-      handleCancelEdit();
+      handleCancelEdit(); // Clear form and editing state
       fetchKeys();
     } catch (error: any) {
       toast.error(`Error: ${error.message || 'Ocurrió un error desconocido al guardar la clave.'}`);
@@ -331,7 +333,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
 
   const filteredKeys = keys.filter(key => {
     const lowerCaseQuery = searchQuery.toLowerCase();
-    const providerLabel = AI_PROVIDERS.find(p => p.value === key.provider)?.company || key.provider;
+    const providerLabel = providerOptions.find(p => p.value === key.provider)?.label || key.provider;
     
     return (
       (key.nickname && key.nickname.toLowerCase().includes(lowerCaseQuery)) ||
@@ -362,19 +364,240 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
             <CardContent>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <ApiKeyFormFields
-                    form={form}
-                    isSubmitting={isSubmitting}
-                    selectedProvider={selectedProvider}
-                    useVertexAI={useVertexAI}
-                    jsonKeyFileInputRef={jsonKeyFileInputRef}
-                    selectedJsonKeyFile={selectedJsonKeyFile}
-                    jsonKeyFileName={jsonKeyFileName}
-                    handleJsonKeyFileChange={handleJsonKeyFileChange}
-                    handleRemoveJsonKeyFile={handleRemoveJsonKeyFile}
-                    isSuperAdmin={isSuperAdmin}
-                    editingKeyId={editingKeyId}
-                  />
+                  <FormField control={form.control} name="provider" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Proveedor</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || editingKeyId !== null}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un proveedor" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          {providerOptions.map(opt => (
+                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                  {isGoogleGemini && (
+                    <>
+                      <FormField control={form.control} name="use_vertex_ai" render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                          <div className="space-y-0.5">
+                            <FormLabel>Usar Vertex AI</FormLabel>
+                            <FormDescription>
+                              Habilita esta opción para usar Google Vertex AI en lugar de la API pública de Gemini.
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={(checked) => {
+                                field.onChange(checked);
+                                // Clear file selection if switching off Vertex AI
+                                if (!checked) {
+                                  setSelectedJsonKeyFile(null);
+                                  setJsonKeyFileName(null);
+                                  if (jsonKeyFileInputRef.current) {
+                                    jsonKeyFileInputRef.current.value = '';
+                                  }
+                                }
+                              }}
+                              disabled={isSubmitting}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )} />
+
+                      {useVertexAI ? (
+                        <>
+                          <FormField control={form.control} name="project_id" render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Google Cloud Project ID</FormLabel>
+                              <FormControl><Input placeholder="tu-id-de-proyecto" {...field} disabled={isSubmitting} /></FormControl>
+                              <FormDescription>
+                                Puedes encontrar tu Project ID en el <a href="https://console.cloud.google.com/welcome" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Dashboard de Google Cloud Console</a>.
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                          <FormField control={form.control} name="location_id" render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Google Cloud Location ID</FormLabel>
+                              <FormControl><Input placeholder="ej: us-central1 o global" {...field} disabled={isSubmitting} /></FormControl>
+                              <FormDescription>
+                                Consulta las <a href="https://cloud.google.com/vertex-ai/docs/general/locations" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">ubicaciones disponibles para Vertex AI</a>.
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                          <FormField control={form.control} name="model_name" render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Modelo de Gemini (Vertex AI)</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
+                                <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
+                                <SelectContent>
+                                  {currentProviderModels.filter(m => m.apiType === 'vertex').map(model => (
+                                    <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                          <FormItem>
+                            <FormLabel>Archivo JSON de Cuenta de Servicio</FormLabel>
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                id="json_key_file"
+                                type="file"
+                                accept="application/json"
+                                onChange={handleJsonKeyFileChange}
+                                ref={jsonKeyFileInputRef}
+                                className="hidden"
+                                disabled={isSubmitting}
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => jsonKeyFileInputRef.current?.click()}
+                                disabled={isSubmitting}
+                                className="flex-1"
+                              >
+                                <Upload className="mr-2 h-4 w-4" /> {jsonKeyFileName ? jsonKeyFileName : "Subir archivo JSON"}
+                              </Button>
+                              {jsonKeyFileName && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={handleRemoveJsonKeyFile}
+                                  disabled={isSubmitting}
+                                >
+                                  <XCircle className="h-4 w-4 text-destructive" />
+                                </Button>
+                              )}
+                            </div>
+                            <FormDescription>
+                              Sube el archivo JSON de tu cuenta de servicio de Google Cloud.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        </>
+                      ) : (
+                        <>
+                          <FormField control={form.control} name="api_key" render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>API Key</FormLabel>
+                              <FormControl><Input type="password" placeholder={editingKeyId ? "Dejar en blanco para no cambiar" : "Pega tu API key aquí"} {...field} disabled={isSubmitting} /></FormControl>
+                              <FormDescription>
+                                Obtén tu API Key desde <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Google AI Studio</a>.
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                          <FormField control={form.control} name="model_name" render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Modelo de Gemini</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
+                                <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
+                                <SelectContent>
+                                  {currentProviderModels.filter(m => m.apiType === 'public').map(model => (
+                                    <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                        </>
+                      )}
+                    </>
+                  )}
+
+                  {isCustomEndpoint && (
+                    <>
+                      <FormField control={form.control} name="nickname" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Apodo</FormLabel>
+                          <FormControl><Input placeholder="Ej: Mi LLM Personalizado" {...field} disabled={isSubmitting} /></FormControl>
+                          <FormDescription>
+                            Este apodo se mostrará en el selector de modelos del chat.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={form.control} name="api_endpoint" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Link del Endpoint</FormLabel>
+                          <FormControl><Input placeholder="https://tu-api.com/v1/chat/completions" {...field} disabled={isSubmitting} /></FormControl>
+                          <FormDescription>
+                            La URL completa de tu endpoint de chat (ej. compatible con OpenAI API).
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={form.control} name="api_key" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>API Key</FormLabel>
+                          <FormControl><Input type="password" placeholder={editingKeyId ? "Dejar en blanco para no cambiar" : "Pega tu API key aquí"} {...field} disabled={isSubmitting} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={form.control} name="model_name" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>ID del Modelo</FormLabel>
+                          <FormControl><Input placeholder="Ej: gpt-4o, llama3-8b-chat" {...field} disabled={isSubmitting} /></FormControl>
+                          <FormDescription>
+                            El ID del modelo que tu endpoint espera (ej. 'gpt-4o').
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    </>
+                  )}
+
+                  {!isGoogleGemini && !isCustomEndpoint && (
+                    <FormField control={form.control} name="api_key" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>API Key</FormLabel>
+                        <FormControl><Input type="password" placeholder={editingKeyId ? "Dejar en blanco para no cambiar" : "Pega tu API key aquí"} {...field} disabled={isSubmitting} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  )}
+
+                  {/* Conditional rendering for Nickname field (only for non-Google Gemini and non-Custom Endpoint) */}
+                  {!isGoogleGemini && !isCustomEndpoint && (
+                    <FormField control={form.control} name="nickname" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Apodo (Opcional)</FormLabel>
+                        <FormControl><Input placeholder="Ej: Clave personal, Clave de equipo" {...field} disabled={isSubmitting} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  )}
+                  
+                  {isSuperAdmin && ( // Only show for Super Admins
+                    <FormField control={form.control} name="is_global" render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                        <div className="space-y-0.5">
+                          <FormLabel>Clave Global</FormLabel>
+                          <FormDescription>
+                            Si está activado, esta clave estará disponible para todos los usuarios.
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            disabled={isSubmitting}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )} />
+                  )}
+
                   <div className="flex gap-2">
                     <Button type="submit" disabled={isSubmitting || !selectedProvider}>
                       {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingKeyId ? <Edit className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />)}
@@ -423,13 +646,15 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                     <TableRow><TableCell colSpan={isSuperAdmin ? 5 : 4} className="text-center text-muted-foreground">No hay claves que coincidan con la búsqueda.</TableCell></TableRow>
                   ) : (
                     filteredKeys
+                      // REMOVED: .filter(key => isSuperAdmin || !key.is_global) // This line was preventing non-admins from seeing global keys
                       .map(key => {
+                        // Determine if the current user can edit/delete this key
                         const canManageKey = isSuperAdmin || (!key.is_global && key.user_id === currentUserId);
 
                         return (
                           <TableRow key={key.id}>
                             <TableCell>{key.nickname || 'N/A'}</TableCell>
-                            <TableCell>{AI_PROVIDERS.find(p => p.value === key.provider)?.company || key.provider}</TableCell>
+                            <TableCell>{providerOptions.find(p => p.value === key.provider)?.label || key.provider}</TableCell>
                             <TableCell className="font-mono text-xs">
                               {key.provider === 'custom_endpoint' ? (
                                 <div className="flex flex-col">
