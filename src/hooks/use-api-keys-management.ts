@@ -76,8 +76,6 @@ export function useApiKeysManagement() {
 
   const handleEditKey = useCallback((key: ApiKey) => {
     setEditingKeyId(key.id);
-    // Reset form values in the component using this hook
-    // For now, we just set the editingKeyId and the component will react
     setSelectedJsonKeyFile(null);
     setJsonKeyFileName(key.use_vertex_ai && key.json_key_content ? 'Archivo JSON existente' : null);
   }, []);
