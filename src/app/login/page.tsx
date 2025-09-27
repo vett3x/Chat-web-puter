@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Moon, Sun, ShieldAlert, Loader2, Ban, LogOut } from 'lucide-react';
+import { Moon, Sun, ShieldAlert, Loader2, Ban, LogOut } from 'lucide-react'; // NEW: Import LogOut icon
 import { useTheme } from 'next-themes';
 import { useSearchParams } from 'next/navigation';
 import { formatDistanceToNow, addMinutes } from 'date-fns';
@@ -22,15 +22,12 @@ export default function LoginPage() {
   const [adminsDisabled, setAdminsDisabled] = useState(false);
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
   const searchParams = useSearchParams();
-  
-  // State to hold kick info, independent of URL params
-  const [kickInfo, setKickInfo] = useState<{ reason: string | null; kickedAt: string | null } | null>(null);
-  const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
-
-  // Errors from URL params (for non-kick related issues)
   const accountDisabledError = searchParams.get('error') === 'account_type_disabled';
   const accountBannedError = searchParams.get('error') === 'account_banned';
-  const banReason = searchParams.get('reason'); // Reason for ban
+  const accountKickedError = searchParams.get('error') === 'account_kicked';
+  const kickReason = searchParams.get('reason');
+  const kickedAt = searchParams.get('kicked_at');
+  const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -50,43 +47,10 @@ export default function LoginPage() {
     checkStatus();
   }, []);
 
-  // Effect to load kickInfo from sessionStorage on component mount
-  useEffect(() => {
-    const storedInfo = sessionStorage.getItem('kickInfo');
-    if (storedInfo) {
-      try {
-        const parsedInfo = JSON.parse(storedInfo);
-        if (parsedInfo.reason && parsedInfo.kickedAt) {
-          setKickInfo(parsedInfo);
-        }
-      } catch (e) {
-        console.error("Failed to parse kickInfo from sessionStorage on mount", e);
-        sessionStorage.removeItem('kickInfo');
-      }
-    }
-  }, []); // Empty dependency array for mount only
-
-  // Effect to update kickInfo if new URL params are present
-  useEffect(() => {
-    const errorParam = searchParams.get('error');
-    const reasonParam = searchParams.get('reason');
-    const kickedAtParam = searchParams.get('kicked_at');
-
-    if (errorParam === 'account_kicked' && reasonParam && kickedAtParam) {
-      const info = { reason: reasonParam, kickedAt: kickedAtParam };
-      sessionStorage.setItem('kickInfo', JSON.stringify(info));
-      setKickInfo(info);
-    }
-    // IMPORTANT: Do NOT set kickInfo to null here if URL params are missing.
-    // The timer effect is responsible for clearing kickInfo when it expires.
-    // If URL params are missing, we should rely on the kickInfo already in state (from sessionStorage or previous URL).
-  }, [searchParams]); // Dependency on searchParams
-
-  // Effect for countdown timer, now based on state
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
-    if (kickInfo && kickInfo.kickedAt) {
-      const kickTime = new Date(kickInfo.kickedAt);
+    if (accountKickedError && kickedAt) {
+      const kickTime = new Date(kickedAt);
       const unkickTime = addMinutes(kickTime, 15);
 
       const updateRemainingTime = () => {
@@ -94,16 +58,10 @@ export default function LoginPage() {
         if (now < unkickTime) {
           setTimeRemaining(formatDistanceToNow(unkickTime, { addSuffix: true, locale: es }));
         } else {
-          // Kick expired
           setTimeRemaining(null);
-          setKickInfo(null); // <-- This clears kickInfo state
-          sessionStorage.removeItem('kickInfo'); // <-- This clears sessionStorage
           if (interval) clearInterval(interval);
-          // Redirect to clear any lingering error params from the URL
-          // Only redirect if there's an error param related to kick, otherwise it might cause infinite redirects
-          if (searchParams.get('error') === 'account_kicked') {
-            window.location.href = '/login'; // Force a full reload to clear URL params
-          }
+          // Optionally, redirect to login without error to clear params
+          window.location.href = '/login'; 
         }
       };
 
@@ -114,7 +72,7 @@ export default function LoginPage() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [kickInfo, searchParams]); // Dependency on kickInfo and searchParams
+  }, [accountKickedError, kickedAt]);
 
   const spanishVariables = {
     sign_in: { email_label: 'Correo electrónico', password_label: 'Contraseña', email_input_placeholder: 'Tu correo electrónico', password_input_placeholder: 'Tu contraseña', button_label: 'Iniciar sesión', social_auth_typography: 'O continuar con', link_text: '¿Ya tienes una cuenta? Inicia sesión', forgotten_password_text: '¿Olvidaste tu contraseña?', no_account_text: '¿No tienes una cuenta? Regístrate', },
@@ -176,14 +134,14 @@ export default function LoginPage() {
           {accountBannedError && (
             <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-center text-sm text-destructive-foreground flex items-center gap-2">
               <Ban className="h-5 w-5" />
-              <span>Tu cuenta ha sido baneada. {banReason && `Razón: ${banReason}`} Contacta al soporte para más información.</span>
+              <span>Tu cuenta ha sido baneada. {kickReason && `Razón: ${kickReason}`} Contacta al soporte para más información.</span>
             </div>
           )}
-          {kickInfo && (
+          {accountKickedError && (
             <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-center text-sm text-yellow-200 flex flex-col items-center gap-2">
               <LogOut className="h-5 w-5" />
               <span>Has sido expulsado del sistema.</span>
-              {kickInfo.reason && <span className="font-semibold">Razón: {kickInfo.reason}</span>}
+              {kickReason && <span className="font-semibold">Razón: {kickReason}</span>}
               {timeRemaining && <span className="text-xs mt-1">Podrás volver a iniciar sesión {timeRemaining}.</span>}
             </div>
           )}
