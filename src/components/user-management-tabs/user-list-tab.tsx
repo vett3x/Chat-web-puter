@@ -29,7 +29,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { ReasonDialog } from './reason-dialog'; // Import the new dialog
-import { format } from 'date-fns';
+import { format, addMinutes, intervalToDuration, formatDuration } from 'date-fns'; // Import addMinutes, intervalToDuration, formatDuration
 import { es } from 'date-fns/locale';
 import {
   Tooltip,
@@ -54,7 +54,7 @@ export interface UserListTabRef {
 }
 
 interface UserListTabProps {
-  isUserTemporarilyDisabled: boolean; // Ensure this prop is declared
+  isUserTemporarilyDisabled: boolean; // NEW prop
 }
 
 export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({ isUserTemporarilyDisabled }, ref) => {
@@ -71,6 +71,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
   const [roleFilter, setRoleFilter] = useState<'all' | 'user' | 'admin' | 'super_admin'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'banned' | 'kicked'>('all');
   const [reasonDialogState, setReasonDialogState] = useState<{ isOpen: boolean; user: User | null; action: 'expulsar' | 'banear' | 'unban' | null }>({ isOpen: false, user: null, action: null });
+  const [kickedUsersTimeRemaining, setKickedUsersTimeRemaining] = useState<Map<string, string | null>>(new Map()); // NEW: State for kicked users' remaining time
 
   const fetchUsers = useCallback(async () => {
     setIsLoadingUsers(true);
@@ -100,6 +101,33 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
       fetchUsers();
     }
   }, [isSessionLoading, session, fetchUsers]);
+
+  // NEW: Effect to update remaining time for kicked users
+  useEffect(() => {
+    const updateTimes = () => {
+      const newTimes = new Map<string, string | null>();
+      allUsers.forEach(user => {
+        if (user.status === 'kicked' && user.kicked_at) {
+          const kickTime = new Date(user.kicked_at);
+          const unkickTime = addMinutes(kickTime, 15); // Assuming 15 minutes default kick duration
+          const now = new Date();
+          if (now < unkickTime) {
+            const duration = intervalToDuration({ start: now, end: unkickTime });
+            const formattedDuration = formatDuration(duration, { locale: es, zero: true, delimiter: ', ' });
+            newTimes.set(user.id, formattedDuration);
+          } else {
+            newTimes.set(user.id, null); // Time expired
+          }
+        }
+      });
+      setKickedUsersTimeRemaining(newTimes);
+    };
+
+    updateTimes(); // Initial update
+    const interval = setInterval(updateTimes, 1000); // Update every second
+
+    return () => clearInterval(interval);
+  }, [allUsers]); // Re-run when allUsers changes
 
   useEffect(() => {
     let tempUsers = allUsers;
@@ -185,6 +213,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
               const canAdminAct = isCurrentUserAdmin && user.role === 'user' && !isCurrentUser;
               const canPerformModeration = canSuperAdminAct || canAdminAct;
               const canViewDetails = isCurrentUserSuperAdmin || (isCurrentUserAdmin && user.role !== 'super_admin'); // Admins can't view Super Admin details
+              const remainingTime = kickedUsersTimeRemaining.get(user.id);
 
               return (
                 <TableRow key={user.id} className={cn(user.status === 'banned' && 'bg-destructive/10 opacity-60', user.status === 'kicked' && 'bg-warning/10 opacity-60')}>
@@ -220,7 +249,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
                             </TooltipTrigger>
                             <TooltipContent>
                               <p>Expulsado el: {user.kicked_at ? format(new Date(user.kicked_at), 'dd/MM/yyyy HH:mm', { locale: es }) : 'N/A'}</p>
-                              <p>Duración: 15 minutos</p>
+                              {remainingTime && <p>Tiempo restante: {remainingTime}</p>}
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>

@@ -34,7 +34,7 @@ import { toast } from 'sonner';
 import { useSession } from '@/components/session-context-provider';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { format, addMinutes } from 'date-fns'; // Import addMinutes
+import { format, addMinutes, intervalToDuration, formatDuration } from 'date-fns'; // Import addMinutes, intervalToDuration, formatDuration
 import { es } from 'date-fns/locale';
 import { Input } from '@/components/ui/input'; // Import Input for extend kick
 
@@ -64,10 +64,42 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
   const [isUpdatingRole, setIsUpdatingRole] = useState(false);
   const [extendMinutes, setExtendMinutes] = useState<number>(15); // State for extending kick
   const [isExtendingKick, setIsExtendingKick] = useState(false); // State for loading during kick extension
+  const [timeRemaining, setTimeRemaining] = useState<string | null>(null); // NEW: State for remaining kick time
 
   useEffect(() => {
     setSelectedRole(user.role);
   }, [user.role]);
+
+  // NEW: Effect to update time remaining
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    if (user.status === 'kicked' && user.kicked_at) {
+      const kickTime = new Date(user.kicked_at);
+      const unkickTime = addMinutes(kickTime, 15); // Assuming 15 minutes default kick duration
+
+      const updateRemainingTime = () => {
+        const now = new Date();
+        if (now < unkickTime) {
+          const duration = intervalToDuration({ start: now, end: unkickTime });
+          const formattedDuration = formatDuration(duration, { locale: es, zero: true, delimiter: ', ' });
+          setTimeRemaining(formattedDuration);
+        } else {
+          setTimeRemaining(null);
+          if (interval) clearInterval(interval);
+          onRoleUpdated(); // Refresh user list to reflect unkick
+        }
+      };
+
+      updateRemainingTime();
+      interval = setInterval(updateRemainingTime, 1000);
+    } else {
+      setTimeRemaining(null);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [user.status, user.kicked_at, onRoleUpdated]);
 
   const userName = user.first_name && user.last_name 
     ? `${user.first_name} ${user.last_name}` 
@@ -135,7 +167,7 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
       if (!response.ok) throw new Error(result.message);
       toast.success(result.message);
       onRoleUpdated(); // Refresh user data to show new kicked_at
-      onOpenChange(false);
+      // No need to close dialog, user might want to extend again
     } catch (err: any) {
       toast.error(`Error al extender la expulsión: ${err.message}`);
     } finally {
@@ -185,7 +217,8 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
             <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-sm text-yellow-200 flex flex-col gap-2">
               <div className="flex items-center gap-2">
                 <LogOut className="h-5 w-5" />
-                <span>Este usuario fue expulsado el {format(new Date(user.kicked_at), 'dd/MM/yyyy HH:mm', { locale: es })}. Su expulsión dura 15 minutos.</span>
+                <span>Este usuario fue expulsado el {format(new Date(user.kicked_at), 'dd/MM/yyyy HH:mm', { locale: es })}.</span>
+                {timeRemaining && <span className="font-semibold">Tiempo restante: {timeRemaining}</span>}
               </div>
               {isCurrentUserSuperAdmin && (
                 <div className="flex items-center gap-2 mt-2">
