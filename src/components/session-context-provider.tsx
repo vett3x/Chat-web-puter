@@ -162,14 +162,8 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
       console.log(`[SessionContext] Real-time status check for user ${session.user.id}. Current role: ${userRole}, status: ${userStatus}`);
 
-      const { data, error: refreshError } = await supabase.auth.refreshSession();
-      
-      if (refreshError || !data.session) {
-        console.warn("[SessionContext] Session refresh failed or returned null session. Signing out.", refreshError?.message);
-        await supabase.auth.signOut();
-        toast.error("Tu sesión ha sido invalidada por un administrador o ha expirado.");
-        return;
-      }
+      // REMOVED: The aggressive supabase.auth.refreshSession() call.
+      // The Supabase client handles this automatically.
 
       if (userRole !== 'super_admin') {
         try {
