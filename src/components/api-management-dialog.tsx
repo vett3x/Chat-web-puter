@@ -136,7 +136,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[95vw] p-6 h-[95vh] flex flex-col"> {/* Adjusted max-width and height */}
+      <DialogContent className="sm:max-w-[700px] p-6 max-h-[90vh] overflow-y-auto flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <KeyRound className="h-6 w-6" /> Gestión de API Keys de IA
