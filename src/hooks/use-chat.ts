@@ -323,7 +323,8 @@ export function useChat({
     // Add a placeholder message immediately
     setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant', content: '', isTyping: true, isNew: true, isConstructionPlan: false, planApproved: false, isCorrectionPlan: false, correctionApproved: false, isErrorAnalysisRequest: false, isAnimated: false, timestamp: new Date() }]);
     
-    const userMessageToSave = history.findLast(m => m.role === 'user');
+    const userMessages = history.filter(m => m.role === 'user');
+    const userMessageToSave = userMessages.length > 0 ? userMessages[userMessages.length - 1] : undefined;
     if (userMessageToSave) {
       await saveMessageToDB(convId, userMessageToSave);
     }
