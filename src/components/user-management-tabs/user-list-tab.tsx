@@ -237,7 +237,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-col items-start">
+                    <div className="flex items-center gap-2"> {/* Use flex to keep badge and text inline */}
                       {user.status === 'active' && <Badge>Activo</Badge>}
                       {user.status === 'banned' && <Badge variant="destructive">Baneado</Badge>}
                       {user.status === 'kicked' && (
@@ -250,13 +250,13 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
                             </TooltipTrigger>
                             <TooltipContent>
                               <p>Expulsado el: {user.kicked_at ? format(new Date(user.kicked_at), 'dd/MM/yyyy HH:mm', { locale: es }) : 'N/A'}</p>
-                              {remainingTime && <p>Tiempo restante: {remainingTime}</p>}
+                              <p>Tiempo restante: {remainingTime || 'Calculando...'}</p>
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
                       )}
                       {user.status === 'kicked' && remainingTime && (
-                        <span className="text-xs text-muted-foreground mt-1">({remainingTime})</span>
+                        <span className="text-xs text-muted-foreground">({remainingTime})</span>
                       )}
                     </div>
                   </TableCell>
