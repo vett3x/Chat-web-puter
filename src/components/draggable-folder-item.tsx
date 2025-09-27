@@ -145,22 +145,62 @@ export function DraggableFolderItem({
 
   const handleDeleteFolder = async () => {
     if (!userId) return;
-    // Move conversations and notes to root
-    await supabase.from('conversations').update({ folder_id: null }).eq('folder_id', folder.id).eq('user_id', userId);
-    await supabase.from('notes').update({ folder_id: null }).eq('folder_id', folder.id).eq('user_id', userId);
+
+    // Check for subfolders first
     if (filteredSubfolders.length > 0) {
       toast.error('No se puede eliminar una carpeta que contiene subcarpetas. Vacíalas primero.');
       setIsDeleting(false);
       return;
     }
-    const { error } = await supabase.from('folders').delete().eq('id', folder.id).eq('user_id', userId);
-    if (error) {
-      toast.error('Error al eliminar la carpeta.');
-    } else {
+
+    setIsDeleting(true); // Set deleting state
+
+    try {
+      // 1. Move conversations to root
+      const { error: convMoveError } = await supabase
+        .from('conversations')
+        .update({ folder_id: null })
+        .eq('folder_id', folder.id)
+        .eq('user_id', userId);
+      if (convMoveError) throw new Error(`Error al mover conversaciones: ${convMoveError.message}`);
+
+      // 2. Move notes to root
+      const { error: noteMoveError } = await supabase
+        .from('notes')
+        .update({ folder_id: null })
+        .eq('folder_id', folder.id)
+        .eq('user_id', userId);
+      if (noteMoveError) throw new Error(`Error al mover notas: ${noteMoveError.message}`);
+
+      // 3. Delete the folder
+      const { error: folderDeleteError } = await supabase
+        .from('folders')
+        .delete()
+        .eq('id', folder.id)
+        .eq('user_id', userId);
+      if (folderDeleteError) throw new Error(`Error al eliminar la carpeta: ${folderDeleteError.message}`);
+
       toast.success('Carpeta eliminada y contenido movido a la raíz.');
-      onFolderDeleted(folder.id, true); // Use new prop, indicate refresh needed
+
+      // Update local state directly to avoid full refresh
+      onFolderDeleted(folder.id, false); // Pass false to indicate no full refresh needed
+
+      // Update local state for moved conversations and notes
+      // We need to iterate through the *original* filteredConversations and filteredNotes
+      // to update their folder_id to null in the parent's state.
+      filteredConversations.forEach(conv => {
+        onConversationUpdated(conv.id, { folder_id: null });
+      });
+      filteredNotes.forEach(noteItem => {
+        onNoteUpdated(noteItem.id, { folder_id: null });
+      });
+
+    } catch (error: any) {
+      console.error('Error deleting folder:', error);
+      toast.error(error.message || 'Error al eliminar la carpeta.');
+    } finally {
+      setIsDeleting(false);
     }
-    setIsDeleting(false);
   };
 
   const paddingLeft = `${level * 1.25 + 0.5}rem`;
