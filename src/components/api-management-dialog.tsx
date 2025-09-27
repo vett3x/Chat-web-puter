@@ -28,6 +28,8 @@ import { Label } from '@/components/ui/label';
 import { AI_PROVIDERS, getModelLabel } from '@/lib/ai-models'; // Import AI_PROVIDERS
 import { useSession } from '@/components/session-context-provider'; // NEW: Import useSession
 
+// REMOVED superRefine from the schema. Stricter validation for NEW keys will be handled in the onSubmit function.
+// This prevents the form from blocking updates where not all fields are relevant (e.g., just toggling is_global).
 const apiKeySchema = z.object({
   id: z.string().optional(), // Added for editing existing keys
   provider: z.string().min(1, { message: 'Debes seleccionar un proveedor.' }),
@@ -42,69 +44,7 @@ const apiKeySchema = z.object({
   json_key_content: z.string().optional(), // Added for payload
   api_endpoint: z.string().url({ message: 'URL de endpoint inválida.' }).optional(), // New: for custom endpoint
   is_global: z.boolean().optional(), // NEW: Add is_global to schema
-}).superRefine((data, ctx) => {
-  if (data.provider === 'google_gemini') {
-    if (data.use_vertex_ai) {
-      if (!data.model_name || data.model_name === '') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Debes seleccionar un modelo para usar Vertex AI.',
-          path: ['model_name'],
-        });
-      }
-      if (!data.project_id) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Project ID es requerido para usar Vertex AI.',
-          path: ['project_id'],
-        });
-      }
-      if (!data.location_id) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Location ID es requerido para usar Vertex AI.',
-          path: ['location_id'],
-        });
-      }
-    } else { // Public API
-      if (!data.model_name || data.model_name === '') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Debes seleccionar un modelo para la API pública de Gemini.',
-          path: ['model_name'],
-        });
-      }
-      // REMOVED: API key validation for adding new keys from here. It's now handled manually in onSubmit.
-    }
-  } else if (data.provider === 'custom_endpoint') { // New validation for custom_endpoint
-    if (!data.api_endpoint || data.api_endpoint === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'El link del endpoint es requerido para un endpoint personalizado.',
-        path: ['api_endpoint'],
-      });
-    }
-    // REMOVED: API key validation for adding new keys from here. It's now handled manually in onSubmit.
-    if (!data.model_name || data.model_name === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'El ID del modelo es requerido para un endpoint personalizado.',
-        path: ['model_name'],
-      });
-    }
-    if (!data.nickname || data.nickname === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'El apodo es obligatorio para un endpoint personalizado.',
-        path: ['nickname'],
-      });
-    }
-  }
 });
-
-// The updateApiKeySchema is not used by useForm, so its superRefine doesn't matter for the form validation.
-// I will remove it to avoid confusion.
-// REMOVED updateApiKeySchema entirely.
 
 type ApiKeyFormValues = z.infer<typeof apiKeySchema>;
 
@@ -273,39 +213,46 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
 
   const onSubmit = async (values: ApiKeyFormValues) => {
     setIsSubmitting(true);
+    let hasValidationError = false;
+
+    // --- Manual validation for NEW keys or when specific fields are required ---
+    if (!editingKeyId) { // Stricter validation for creating NEW keys
+      if (values.provider === 'google_gemini') {
+        if (values.use_vertex_ai) {
+          if (!values.model_name) { form.setError('model_name', { message: 'Debes seleccionar un modelo.' }); hasValidationError = true; }
+          if (!values.project_id) { form.setError('project_id', { message: 'Project ID es requerido.' }); hasValidationError = true; }
+          if (!values.location_id) { form.setError('location_id', { message: 'Location ID es requerido.' }); hasValidationError = true; }
+        } else {
+          if (!values.model_name) { form.setError('model_name', { message: 'Debes seleccionar un modelo.' }); hasValidationError = true; }
+          if (!values.api_key) { form.setError('api_key', { message: 'API Key es requerida.' }); hasValidationError = true; }
+        }
+      } else if (values.provider === 'custom_endpoint') {
+        if (!values.api_endpoint) { form.setError('api_endpoint', { message: 'El link del endpoint es requerido.' }); hasValidationError = true; }
+        if (!values.model_name) { form.setError('model_name', { message: 'El ID del modelo es requerido.' }); hasValidationError = true; }
+        if (!values.nickname) { form.setError('nickname', { message: 'El apodo es obligatorio.' }); hasValidationError = true; }
+        if (!values.api_key) { form.setError('api_key', { message: 'API Key es requerida.' }); hasValidationError = true; }
+      } else { // Other providers
+        if (!values.api_key) { form.setError('api_key', { message: 'API Key es requerida.' }); hasValidationError = true; }
+      }
+    }
+    
+    if (hasValidationError) {
+      setIsSubmitting(false);
+      return;
+    }
+    // --- End manual validation ---
+
     try {
       const method = editingKeyId ? 'PUT' : 'POST';
       const payload: ApiKeyFormValues = { ...values };
       
       if (editingKeyId) {
         payload.id = editingKeyId; // Ensure ID is in payload for PUT
-      }
-
-      // --- Manual validation for API Key when CREATING a NEW key ---
-      if (!editingKeyId) { // If creating a NEW key
-        if (payload.provider === 'google_gemini' && !payload.use_vertex_ai && (!payload.api_key || payload.api_key === '')) {
-          form.setError('api_key', { type: 'manual', message: 'API Key es requerida para la API pública de Gemini.' });
-          setIsSubmitting(false);
-          return;
-        }
-        if (payload.provider === 'custom_endpoint' && (!payload.api_key || payload.api_key === '')) {
-          form.setError('api_key', { type: 'manual', message: 'La API Key es requerida para un endpoint personalizado.' });
-          setIsSubmitting(false);
-          return;
-        }
-        // For other providers (if added later)
-        if (!isGoogleGemini && !isCustomEndpoint && (!payload.api_key || payload.api_key === '')) {
-          form.setError('api_key', { type: 'manual', message: 'API Key es requerida.' });
-          setIsSubmitting(false);
-          return;
-        }
-      } else { // If EDITING an existing key
-        // If api_key field is empty, delete it from payload so backend doesn't update it
+        // If api_key field is empty during an update, delete it from payload so backend doesn't update it to an empty string
         if (payload.api_key === '') {
           delete payload.api_key;
         }
       }
-      // --- End manual validation ---
 
       // If using Vertex AI, ensure api_key is null/undefined
       if (payload.use_vertex_ai) {
@@ -323,14 +270,10 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         payload.api_endpoint = undefined;
       } else if (isCustomEndpoint) {
         // If using custom endpoint, clear Vertex AI specific fields
-        // payload.api_key is handled by the custom validation above
         payload.project_id = undefined;
         payload.location_id = undefined;
         payload.json_key_content = undefined;
         payload.use_vertex_ai = false;
-        // Ensure nickname and model_name are present for custom endpoint
-        if (!payload.nickname) payload.nickname = 'Endpoint Personalizado';
-        if (!payload.model_name) payload.model_name = 'custom-model';
       } else {
         // If not using Vertex AI or custom endpoint, clear Vertex AI specific fields and custom endpoint fields
         payload.project_id = undefined;
@@ -355,6 +298,12 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       }
 
       if (!response.ok) {
+        // If there are validation errors from the backend, display them
+        if (result.errors) {
+          result.errors.forEach((err: any) => {
+            form.setError(err.path[0], { message: err.message });
+          });
+        }
         throw new Error(result.message || `Error HTTP: ${response.status}`);
       }
       toast.success(`API Key ${editingKeyId ? 'actualizada' : 'guardada'}.`);
