@@ -9,7 +9,7 @@ import { SUPERUSER_EMAILS, PERMISSION_KEYS } from '@/lib/constants';
 import { toast } from 'sonner';
 
 type UserRole = 'user' | 'admin' | 'super_admin';
-type UserStatus = 'active' | 'banned' | 'kicked'; // NEW: Define UserStatus type
+type UserStatus = 'active' | 'banned' | 'kicked';
 type UserPermissions = Record<string, boolean>;
 
 interface SessionContextType {
@@ -19,7 +19,8 @@ interface SessionContextType {
   userPermissions: UserPermissions;
   userAvatarUrl: string | null;
   userLanguage: string | null;
-  userStatus: UserStatus | null; // NEW: Add userStatus to context
+  userStatus: UserStatus | null;
+  isUserTemporarilyDisabled: boolean; // NEW: Add to context
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -31,7 +32,8 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const [userPermissions, setUserPermissions] = useState<UserPermissions>({});
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
   const [userLanguage, setUserLanguage] = useState<string | null>('es');
-  const [userStatus, setUserStatus] = useState<UserStatus | null>(null); // NEW: State for user status
+  const [userStatus, setUserStatus] = useState<UserStatus | null>(null);
+  const [isUserTemporarilyDisabled, setIsUserTemporarilyDisabled] = useState(false); // NEW: State for temporary disable
   const router = useRouter();
   const pathname = usePathname();
 
@@ -39,7 +41,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     if (currentSession?.user?.id) {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('role, permissions, avatar_url, language, status, kicked_at') // NEW: Select kicked_at
+        .select('role, permissions, avatar_url, language, status, kicked_at')
         .eq('id', currentSession.user.id)
         .single();
 
@@ -47,8 +49,8 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       let determinedPermissions: UserPermissions = {};
       let determinedAvatarUrl: string | null = null;
       let determinedLanguage: string | null = 'es';
-      let determinedStatus: UserStatus = 'active'; // Default to active
-      let determinedKickedAt: string | null = null; // NEW: For kicked_at
+      let determinedStatus: UserStatus = 'active';
+      let determinedKickedAt: string | null = null;
 
       if (error) {
         console.error('[SessionContext] Error fetching user profile:', error);
@@ -59,7 +61,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         determinedAvatarUrl = profile.avatar_url;
         determinedLanguage = profile.language || 'es';
         determinedStatus = profile.status as UserStatus;
-        determinedKickedAt = profile.kicked_at; // NEW: Assign fetched kicked_at
+        determinedKickedAt = profile.kicked_at;
       } else {
         determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
       }
@@ -69,7 +71,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         for (const key of Object.values(PERMISSION_KEYS)) {
           determinedPermissions[key] = true;
         }
-        determinedStatus = 'active'; // Super admins are always active
+        determinedStatus = 'active';
       } else if (!profile) {
         determinedPermissions = {
           can_create_server: false,
@@ -79,7 +81,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         };
       }
       
-      // NEW: Logic to auto-unkick if 15 minutes have passed
+      // Logic to auto-unkick if 15 minutes have passed
       if (determinedStatus === 'kicked' && determinedKickedAt) {
         const kickedTime = new Date(determinedKickedAt).getTime();
         const fifteenMinutesAgo = Date.now() - (15 * 60 * 1000);
@@ -98,6 +100,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       setUserAvatarUrl(determinedAvatarUrl);
       setUserLanguage(determinedLanguage);
       setUserStatus(determinedStatus);
+      setIsUserTemporarilyDisabled(determinedStatus === 'banned' || determinedStatus === 'kicked'); // NEW: Set temporary disable state
 
     } else {
       setUserRole(null);
@@ -105,6 +108,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       setUserAvatarUrl(null);
       setUserLanguage('es');
       setUserStatus(null);
+      setIsUserTemporarilyDisabled(false); // NEW: Clear temporary disable state
     }
   };
 
@@ -183,7 +187,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
           // Re-fetch profile status to ensure it's up-to-date
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select('status, kicked_at') // NEW: Select kicked_at
+            .select('status, kicked_at')
             .eq('id', session.user.id)
             .single();
 
@@ -192,7 +196,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
             setUserStatus('active'); 
           } else {
             setUserStatus(profile.status as UserStatus);
-            // NEW: Auto-unkick logic here as well for real-time checks
+            // Auto-unkick logic here as well for real-time checks
             if (profile.status === 'kicked' && profile.kicked_at) {
               const kickedTime = new Date(profile.kicked_at).getTime();
               const fifteenMinutesAgo = Date.now() - (15 * 60 * 1000);
@@ -202,6 +206,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
                 await supabase.auth.admin.updateUserById(session.user.id, { user_metadata: { kicked_at: null } });
                 setUserStatus('active');
                 toast.info("Tu expulsión ha expirado. Puedes volver a usar la aplicación.");
+                setIsUserTemporarilyDisabled(false); // NEW: Update temporary disable state
                 return; // Exit early as status changed
               }
             }
@@ -244,7 +249,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   }
   
   return (
-    <SessionContext.Provider value={{ session, isLoading, userRole, userPermissions, userAvatarUrl, userLanguage, userStatus }}>
+    <SessionContext.Provider value={{ session, isLoading, userRole, userPermissions, userAvatarUrl, userLanguage, userStatus, isUserTemporarilyDisabled }}>
       {children}
     </SessionContext.Provider>
   );

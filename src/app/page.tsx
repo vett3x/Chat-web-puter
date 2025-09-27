@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/resizable";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, ShieldAlert } from "lucide-react"; // Import ShieldAlert
 import { useSidebarData } from "@/hooks/use-sidebar-data";
 import { useUserApiKeys } from "@/hooks/use-user-api-keys";
 import { format } from 'date-fns';
@@ -58,7 +58,7 @@ interface RetryState {
 }
 
 export default function Home() {
-  const { session, isLoading: isSessionLoading, userRole, userLanguage } = useSession();
+  const { session, isLoading: isSessionLoading, userRole, userLanguage, isUserTemporarilyDisabled } = useSession(); // NEW: Get isUserTemporarilyDisabled
   const userId = session?.user?.id;
   
   const {
@@ -88,7 +88,7 @@ export default function Home() {
   const [isDeepAiCoderOpen, setIsDeepAiCoderOpen] = useState(false);
   const [isUpdateManagerOpen, setIsUpdateManagerOpen] = useState(false);
   const [isApiManagementOpen, setIsApiManagementOpen] = useState(false);
-  const [isAlertsOpen, setIsAlertsOpen] = useState(false); // New state for alerts dialog
+  const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   
   const [aiResponseSpeed, setAiResponseSpeed] = useState<'slow' | 'normal' | 'fast'>(() => {
     if (typeof window !== 'undefined') {
@@ -303,8 +303,8 @@ export default function Home() {
   const handleOpenDeepAiCoder = () => setIsDeepAiCoderOpen(true);
   const handleOpenUpdateManager = () => setIsUpdateManagerOpen(true);
   const handleOpenApiManagement = () => setIsApiManagementOpen(true);
-  const handleOpenAlerts = () => setIsAlertsOpen(true); // New handler
-
+  const handleOpenAlerts = () => setIsAlertsOpen(true);
+  
   const handleAiResponseSpeedChange = (speed: 'slow' | 'normal' | 'fast') => {
     setAiResponseSpeed(speed);
   };
@@ -332,7 +332,21 @@ export default function Home() {
   };
 
   return (
-    <div className="h-screen bg-background flex">
+    <div className="h-screen bg-background flex relative"> {/* Added relative for overlay positioning */}
+      {isUserTemporarilyDisabled && (
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-4 pointer-events-auto">
+          <ShieldAlert className="h-16 w-16 text-destructive mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-destructive">Acceso Restringido</h2>
+          <p className="text-muted-foreground mt-2">
+            Tu cuenta ha sido temporalmente deshabilitada o expulsada.
+            Por favor, contacta al soporte para más información.
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Se ha cerrado tu sesión. Recarga la página o intenta iniciar sesión de nuevo.
+          </p>
+        </div>
+      )}
+
       <div className="w-[320px] flex-shrink-0">
         <ConversationSidebar
           apps={apps}
@@ -350,7 +364,7 @@ export default function Home() {
           onOpenDeepAiCoder={handleOpenDeepAiCoder}
           onOpenUpdateManager={handleOpenUpdateManager}
           onOpenApiManagement={handleOpenApiManagement}
-          onOpenAlerts={handleOpenAlerts} // Pass new handler
+          onOpenAlerts={handleOpenAlerts}
           refreshData={refreshSidebarData}
           createConversation={createConversation as any}
           createFolder={createFolder}
@@ -426,7 +440,7 @@ export default function Home() {
       {isAdmin && <ServerManagementDialog open={isServerManagementOpen} onOpenChange={setIsServerManagementOpen} />}
       {isAdmin && <UserManagementDialog open={isUserManagementOpen} onOpenChange={setIsUserManagementOpen} />}
       {isAdmin && <ApiManagementDialog open={isApiManagementOpen} onOpenChange={setIsApiManagementOpen} />}
-      {isAdmin && <AlertsDialog open={isAlertsOpen} onOpenChange={setIsAlertsOpen} />} {/* Render new dialog */}
+      {isAdmin && <AlertsDialog open={isAlertsOpen} onOpenChange={setIsAlertsOpen} />}
       <DeepAiCoderDialog open={isDeepAiCoderOpen} onOpenChange={setIsDeepAiCoderOpen} onAppCreated={handleAppCreated} />
       <RetryUploadDialog
         open={retryState.isOpen}

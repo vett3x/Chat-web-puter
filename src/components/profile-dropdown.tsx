@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
-import { Moon, Sun, Settings, LogOut, User as UserIcon, Server, Users, Crown, Shield, Bot, GitPullRequest } from 'lucide-react';
+import { Moon, Sun, Settings, LogOut, User as UserIcon, Server, Users, Crown, Shield, Bot, GitPullRequest, Ban, LogOut as LogOutIcon } from 'lucide-react'; // Import Ban and LogOut as LogOutIcon
 import { useTheme } from 'next-themes';
 import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,11 +32,11 @@ interface ProfileDropdownProps {
   onOpenAppSettings: () => void;
   onOpenServerManagement: () => void;
   onOpenUserManagement: () => void;
-  onOpenUpdateManager: () => void; // New prop for update manager
+  onOpenUpdateManager: () => void;
 }
 
 export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOpenServerManagement, onOpenUserManagement, onOpenUpdateManager }: ProfileDropdownProps) {
-  const { session, userRole } = useSession();
+  const { session, userRole, userStatus } = useSession(); // NEW: Get userStatus
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -89,7 +89,8 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
   }
 
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
-  const isSuperAdmin = userRole === 'super_admin'; // Helper for super admin
+  const isSuperAdmin = userRole === 'super_admin';
+  const isBannedOrKicked = userStatus === 'banned' || userStatus === 'kicked'; // NEW: Check if banned or kicked
 
   return (
     <DropdownMenu>
@@ -122,6 +123,12 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
                 {userRole === 'super_admin' && <Crown className="h-3 w-3 mr-1" />}
                 {userRole === 'admin' && <Shield className="h-3 w-3 mr-1" />}
                 {userRole === 'super_admin' ? 'Super Admin' : userRole}
+              </Badge>
+            )}
+            {isBannedOrKicked && ( // NEW: Display badge if banned or kicked
+              <Badge variant={userStatus === 'banned' ? 'destructive' : 'warning'} className="capitalize mt-1">
+                {userStatus === 'banned' ? <Ban className="h-3 w-3 mr-1" /> : <LogOutIcon className="h-3 w-3 mr-1" />}
+                {userStatus === 'banned' ? 'Baneado' : 'Expulsado'}
               </Badge>
             )}
           </div>
@@ -176,7 +183,7 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
             </div>
           </DropdownMenuItem>
         )}
-        {isSuperAdmin && ( // New item for Super Admins
+        {isSuperAdmin && (
           <DropdownMenuItem onClick={onOpenUpdateManager} className="flex items-center cursor-pointer">
             <div className="flex items-center">
               <GitPullRequest className="mr-2 h-4 w-4" />
