@@ -322,8 +322,8 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         // Clear custom endpoint fields if switching to Vertex AI
         payload.api_endpoint = undefined;
       } else if (isCustomEndpoint) {
-        // If using custom endpoint, clear Vertex AI specific fields and api_key
-        payload.api_key = values.api_key; // API key is required for custom endpoint
+        // If using custom endpoint, clear Vertex AI specific fields
+        // payload.api_key is handled by the custom validation above
         payload.project_id = undefined;
         payload.location_id = undefined;
         payload.json_key_content = undefined;
@@ -676,7 +676,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                     <TableHead>Apodo</TableHead>
                     <TableHead>Proveedor</TableHead>
                     <TableHead>Clave / Configuración</TableHead>
-                    {isSuperAdmin && <TableHead>Global</TableHead>} {/* NEW: Show Global column for Super Admins */}
+                    {isSuperAdmin && <TableHead>Global</TableHead>}
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -712,7 +712,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                             </div>
                           )}
                         </TableCell>
-                        {isSuperAdmin && ( // NEW: Show Global status for Super Admins
+                        {isSuperAdmin && (
                           <TableCell>
                             {key.is_global ? 'Sí' : 'No'}
                           </TableCell>
