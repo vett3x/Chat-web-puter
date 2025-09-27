@@ -127,6 +127,7 @@ export function DraggableConversationCard({
         .eq('conversation_id', conversation.id);
 
       if (messagesError) {
+        console.error('Supabase Error deleting messages:', messagesError);
         throw new Error(`Error al eliminar los mensajes del chat: ${messagesError.message}`);
       }
 
@@ -137,6 +138,7 @@ export function DraggableConversationCard({
         .eq('id', conversation.id);
 
       if (conversationError) {
+        console.error('Supabase Error deleting conversation:', conversationError);
         throw new Error(`Error al eliminar la conversación: ${conversationError.message}`);
       }
 

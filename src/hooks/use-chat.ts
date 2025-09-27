@@ -722,14 +722,28 @@ export function useChat({
     }
     setIsLoading(true);
     try {
-      const { error } = await supabase
+      // Step 1: Delete all messages associated with the conversation
+      const { error: messagesError } = await supabase
         .from('messages')
         .delete()
         .eq('conversation_id', conversationId);
 
-      if (error) {
-        throw new Error(error.message);
+      if (messagesError) {
+        console.error('Supabase Error clearing messages in useChat:', messagesError);
+        throw new Error(messagesError.message);
       }
+
+      // Step 2: Delete the conversation itself
+      const { error: conversationError } = await supabase
+        .from('conversations')
+        .delete()
+        .eq('id', conversationId);
+
+      if (conversationError) {
+        console.error('Supabase Error clearing conversation in useChat:', conversationError);
+        throw new Error(conversationError.message);
+      }
+
       setMessages([]);
       toast.success('Chat limpiado correctamente.');
     } catch (error: any) {
