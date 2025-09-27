@@ -251,11 +251,8 @@ export async function GET(req: NextRequest) {
     .select('id, provider, api_key, is_active, created_at, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint, is_global')
     .order('created_at', { ascending: false });
 
-  if (userRole === 'user') {
-    // Regular users only see their own non-global keys
-    query = query.eq('user_id', session.user.id).eq('is_global', false);
-  } else if (userRole === 'admin') {
-    // Admins see their own keys OR global keys
+  // All roles (user, admin, super_admin) should see their own keys OR global keys
+  if (userRole === 'user' || userRole === 'admin') {
     query = query.or(`user_id.eq.${session.user.id},is_global.eq.true`);
   }
   // If userRole is 'super_admin', no additional filter is applied, so they see all.
