@@ -50,33 +50,37 @@ export default function LoginPage() {
     checkStatus();
   }, []);
 
-  // Effect to initialize and persist kick info from URL to sessionStorage
+  // Effect to load kickInfo from sessionStorage on component mount
+  useEffect(() => {
+    const storedInfo = sessionStorage.getItem('kickInfo');
+    if (storedInfo) {
+      try {
+        const parsedInfo = JSON.parse(storedInfo);
+        if (parsedInfo.reason && parsedInfo.kickedAt) {
+          setKickInfo(parsedInfo);
+        }
+      } catch (e) {
+        console.error("Failed to parse kickInfo from sessionStorage on mount", e);
+        sessionStorage.removeItem('kickInfo');
+      }
+    }
+  }, []); // Empty dependency array for mount only
+
+  // Effect to update kickInfo if new URL params are present
   useEffect(() => {
     const errorParam = searchParams.get('error');
     const reasonParam = searchParams.get('reason');
     const kickedAtParam = searchParams.get('kicked_at');
 
     if (errorParam === 'account_kicked' && reasonParam && kickedAtParam) {
-      // Info is in the URL, save it to sessionStorage and state
       const info = { reason: reasonParam, kickedAt: kickedAtParam };
       sessionStorage.setItem('kickInfo', JSON.stringify(info));
       setKickInfo(info);
-    } else {
-      // Info not in URL, try to load from sessionStorage
-      const storedInfo = sessionStorage.getItem('kickInfo');
-      if (storedInfo) {
-        try {
-          const parsedInfo = JSON.parse(storedInfo);
-          if (parsedInfo.reason && parsedInfo.kickedAt) {
-            setKickInfo(parsedInfo);
-          }
-        } catch (e) {
-          console.error("Failed to parse kickInfo from sessionStorage", e);
-          sessionStorage.removeItem('kickInfo');
-        }
-      }
     }
-  }, [searchParams]);
+    // IMPORTANT: Do NOT set kickInfo to null here if URL params are missing.
+    // The timer effect is responsible for clearing kickInfo when it expires.
+    // If URL params are missing, we should rely on the kickInfo already in state (from sessionStorage or previous URL).
+  }, [searchParams]); // Dependency on searchParams
 
   // Effect for countdown timer, now based on state
   useEffect(() => {
@@ -92,12 +96,13 @@ export default function LoginPage() {
         } else {
           // Kick expired
           setTimeRemaining(null);
-          setKickInfo(null);
-          sessionStorage.removeItem('kickInfo');
+          setKickInfo(null); // <-- This clears kickInfo state
+          sessionStorage.removeItem('kickInfo'); // <-- This clears sessionStorage
           if (interval) clearInterval(interval);
           // Redirect to clear any lingering error params from the URL
-          if (searchParams.get('error')) {
-            window.location.href = '/login';
+          // Only redirect if there's an error param related to kick, otherwise it might cause infinite redirects
+          if (searchParams.get('error') === 'account_kicked') {
+            window.location.href = '/login'; // Force a full reload to clear URL params
           }
         }
       };
@@ -109,7 +114,7 @@ export default function LoginPage() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [kickInfo, searchParams]);
+  }, [kickInfo, searchParams]); // Dependency on kickInfo and searchParams
 
   const spanishVariables = {
     sign_in: { email_label: 'Correo electrónico', password_label: 'Contraseña', email_input_placeholder: 'Tu correo electrónico', password_input_placeholder: 'Tu contraseña', button_label: 'Iniciar sesión', social_auth_typography: 'O continuar con', link_text: '¿Ya tienes una cuenta? Inicia sesión', forgotten_password_text: '¿Olvidaste tu contraseña?', no_account_text: '¿No tienes una cuenta? Regístrate', },
