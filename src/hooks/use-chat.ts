@@ -329,10 +329,14 @@ export function useChat({
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      controller.abort();
-      toast.error('La IA tardó demasiado en responder. Por favor, inténtalo de nuevo.');
-    }, 30000); // 30 second timeout
+    let timeoutId: NodeJS.Timeout | undefined = undefined; // Initialize to undefined
+
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => {
+        controller.abort();
+        reject(new Error('La IA tardó demasiado en responder. Por favor, inténtalo de nuevo.'));
+      }, 30000); // 30 second timeout
+    });
 
     try {
       let systemPromptContent: string;
@@ -424,53 +428,75 @@ export function useChat({
       if (selectedModel.startsWith('puter:') || isCustomEndpoint) {
         let response;
         if (isCustomEndpoint) {
-          const apiResponse = await fetch('/api/ai/chat', {
+          const apiResponse = await Promise.race([
+            fetch('/api/ai/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                messages: finalMessagesForApi,
+                selectedKeyId: selectedModel.substring(9),
+                stream: false, // Request non-streaming for custom endpoint
+              }),
+              signal: controller.signal, // Pass the signal
+            }),
+            timeoutPromise // Race with timeout
+          ]);
+          // Handle the response from Promise.race carefully
+          if (apiResponse instanceof Response) {
+            response = await apiResponse.json();
+            if (!apiResponse.ok) throw new Error(response.message || 'Error en la API de IA.');
+          } else {
+            // This case should ideally not happen if timeoutPromise rejects
+            throw new Error('Respuesta inesperada del endpoint personalizado.');
+          }
+        } else {
+          const actualModelForPuter = selectedModel.substring(6);
+          // Wrap puter.ai.chat in Promise.race with timeout
+          response = await Promise.race([
+            window.puter.ai.chat(finalMessagesForApi, { model: actualModelForPuter }),
+            timeoutPromise // Race with timeout
+          ]);
+        }
+        if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
+        fullResponseText = response?.message?.content || 'Sin contenido.';
+      } else if (selectedModel.startsWith('user_key:')) {
+        const apiResponse = await Promise.race([
+          fetch('/api/ai/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               messages: finalMessagesForApi,
               selectedKeyId: selectedModel.substring(9),
-              stream: false, // Request non-streaming for custom endpoint
+              stream: true, // Request streaming for Gemini
             }),
             signal: controller.signal, // Pass the signal
-          });
-          response = await apiResponse.json();
-          if (!apiResponse.ok) throw new Error(response.message || 'Error en la API de IA.');
-        } else {
-          const actualModelForPuter = selectedModel.substring(6);
-          response = await window.puter.ai.chat(finalMessagesForApi, { model: actualModelForPuter });
-        }
-        if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
-        fullResponseText = response?.message?.content || 'Sin contenido.';
-      } else if (selectedModel.startsWith('user_key:')) {
-        const apiResponse = await fetch('/api/ai/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: finalMessagesForApi,
-            selectedKeyId: selectedModel.substring(9),
-            stream: true, // Request streaming for Gemini
           }),
-          signal: controller.signal, // Pass the signal
-        });
-        if (!apiResponse.ok || !apiResponse.body) {
-          const errorData = await apiResponse.json();
-          throw new Error(errorData.message || 'Error en la API de IA.');
-        }
-        const responseStream = apiResponse.body;
-        const reader = responseStream.getReader();
-        const decoder = new TextDecoder();
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          const chunk = decoder.decode(value, { stream: true });
-          fullResponseText += chunk;
-
-          // Only update messages during streaming if NOT a construction plan or error analysis request or correction plan
-          const isCurrentResponseStructured = fullResponseText.includes('### 1. Análisis del Requerimiento') || fullResponseText.includes('### 💡 Entendido!') || fullResponseText.includes('### 💡 Error Detectado');
-          if (!isAppChatModeBuild || !isCurrentResponseStructured) {
-            setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: parseAiResponseToRenderableParts(fullResponseText, isAppChatModeBuild), isTyping: false, isNew: true } : m));
+          timeoutPromise // Race with timeout
+        ]);
+        // Handle the response from Promise.race carefully
+        if (apiResponse instanceof Response) {
+          if (!apiResponse.ok || !apiResponse.body) {
+            const errorData = await apiResponse.json();
+            throw new Error(errorData.message || 'Error en la API de IA.');
           }
+          const responseStream = apiResponse.body;
+          const reader = responseStream.getReader();
+          const decoder = new TextDecoder();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            fullResponseText += chunk;
+
+            // Only update messages during streaming if NOT a construction plan or error analysis request or correction plan
+            const isCurrentResponseStructured = fullResponseText.includes('### 1. Análisis del Requerimiento') || fullResponseText.includes('### 💡 Entendido!') || fullResponseText.includes('### 💡 Error Detectado');
+            if (!isAppChatModeBuild || !isCurrentResponseStructured) {
+              setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: parseAiResponseToRenderableParts(fullResponseText, isAppChatModeBuild), isTyping: false, isNew: true } : m));
+            }
+          }
+        } else {
+          // This case should ideally not happen if timeoutPromise rejects
+          throw new Error('Respuesta inesperada del endpoint de streaming.');
         }
       } else {
         throw new Error('Modelo de IA no válido seleccionado.');
