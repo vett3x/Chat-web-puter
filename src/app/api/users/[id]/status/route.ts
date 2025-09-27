@@ -9,9 +9,10 @@ import { SUPERUSER_EMAILS } from '@/lib/constants';
 
 const updateStatusSchema = z.object({
   action: z.enum(['kick', 'ban', 'unban']),
+  reason: z.string().optional(), // Reason is optional for super admins
 });
 
-async function getIsSuperAdmin(): Promise<string | null> {
+async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null }> {
   const cookieStore = cookies() as any;
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,7 +24,7 @@ async function getIsSuperAdmin(): Promise<string | null> {
     }
   );
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return null;
+  if (!session) return { session: null, userRole: null };
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -31,13 +32,14 @@ async function getIsSuperAdmin(): Promise<string | null> {
     .eq('id', session.user.id)
     .single();
 
-  return profile?.role === 'super_admin' ? session.user.id : null;
+  const userRole = profile?.role as 'user' | 'admin' | 'super_admin' | null;
+  return { session, userRole };
 }
 
 export async function PUT(req: NextRequest, context: any) {
-  const currentUserId = await getIsSuperAdmin();
-  if (!currentUserId) {
-    return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden realizar esta acción.' }, { status: 403 });
+  const { session, userRole: currentUserRole } = await getSessionAndRole();
+  if (!session || (currentUserRole !== 'admin' && currentUserRole !== 'super_admin')) {
+    return NextResponse.json({ message: 'Acceso denegado. Se requiere rol de Admin o superior.' }, { status: 403 });
   }
 
   const userIdToUpdate = context.params.id;
@@ -45,7 +47,7 @@ export async function PUT(req: NextRequest, context: any) {
     return NextResponse.json({ message: 'ID de usuario no proporcionado.' }, { status: 400 });
   }
 
-  if (userIdToUpdate === currentUserId) {
+  if (userIdToUpdate === session.user.id) {
     return NextResponse.json({ message: 'No puedes modificar tu propio estado.' }, { status: 403 });
   }
 
@@ -67,43 +69,41 @@ export async function PUT(req: NextRequest, context: any) {
     if (targetProfile.role === 'super_admin') {
       return NextResponse.json({ message: 'No se puede modificar el estado de un Super Admin.' }, { status: 403 });
     }
+    if (currentUserRole === 'admin' && targetProfile.role === 'admin') {
+      return NextResponse.json({ message: 'Un Admin no puede modificar el estado de otro Admin.' }, { status: 403 });
+    }
 
     const body = await req.json();
-    const { action } = updateStatusSchema.parse(body);
+    const { action, reason } = updateStatusSchema.parse(body);
+
+    if (currentUserRole === 'admin' && (!reason || reason.trim() === '')) {
+      return NextResponse.json({ message: 'Se requiere una razón para realizar esta acción.' }, { status: 400 });
+    }
 
     let logDescription = '';
     let successMessage = '';
+    const actionText = { kick: 'expulsado', ban: 'baneado', unban: 'desbaneado' }[action];
+    const reasonText = reason ? ` Razón: ${reason}` : '';
 
     if (action === 'kick') {
       const { error } = await supabaseAdmin.auth.admin.signOut(userIdToUpdate);
       if (error) throw new Error(`Error al expulsar al usuario: ${error.message}`);
-      logDescription = `Usuario ${userIdToUpdate} expulsado.`;
-      successMessage = 'Usuario expulsado correctamente. Su sesión ha sido terminada.';
     } else if (action === 'ban') {
-      const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(userIdToUpdate, {
-        ban_duration: '876000h', // 100 years
-      });
+      const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(userIdToUpdate, { ban_duration: '876000h' });
       if (banError) throw new Error(`Error al banear al usuario en Auth: ${banError.message}`);
-      
       await supabaseAdmin.from('profiles').update({ status: 'banned' }).eq('id', userIdToUpdate);
       await supabaseAdmin.auth.admin.signOut(userIdToUpdate);
-      
-      logDescription = `Usuario ${userIdToUpdate} baneado.`;
-      successMessage = 'Usuario baneado y expulsado correctamente.';
     } else if (action === 'unban') {
-      const { error: unbanError } = await supabaseAdmin.auth.admin.updateUserById(userIdToUpdate, {
-        ban_duration: 'none',
-      });
+      const { error: unbanError } = await supabaseAdmin.auth.admin.updateUserById(userIdToUpdate, { ban_duration: 'none' });
       if (unbanError) throw new Error(`Error al desbanear al usuario en Auth: ${unbanError.message}`);
-      
       await supabaseAdmin.from('profiles').update({ status: 'active' }).eq('id', userIdToUpdate);
-      
-      logDescription = `Usuario ${userIdToUpdate} desbaneado.`;
-      successMessage = 'Usuario desbaneado correctamente.';
     }
 
+    logDescription = `Usuario ${userIdToUpdate} ${actionText} por ${session.user.email}.${reasonText}`;
+    successMessage = `Usuario ${actionText} correctamente.`;
+
     await supabaseAdmin.from('server_events_log').insert({
-      user_id: currentUserId,
+      user_id: session.user.id,
       event_type: `user_${action}`,
       description: logDescription,
     });

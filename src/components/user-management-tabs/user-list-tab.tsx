@@ -28,6 +28,7 @@ import { Separator } from '@/components/ui/separator';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { ReasonDialog } from './reason-dialog'; // Import the new dialog
 
 interface User {
   id: string;
@@ -56,6 +57,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'user' | 'admin' | 'super_admin'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'banned'>('all');
+  const [reasonDialogState, setReasonDialogState] = useState<{ isOpen: boolean; user: User | null; action: 'expulsar' | 'banear' | null }>({ isOpen: false, user: null, action: null });
 
   const fetchUsers = useCallback(async () => {
     setIsLoadingUsers(true);
@@ -101,13 +103,13 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
     setFilteredUsers(tempUsers);
   }, [allUsers, searchTerm, roleFilter, statusFilter]);
 
-  const handleUserStatusChange = async (userId: string, action: 'kick' | 'ban' | 'unban') => {
+  const handleUserStatusChange = async (userId: string, action: 'kick' | 'ban' | 'unban', reason?: string) => {
     setIsActionLoading(userId);
     try {
       const response = await fetch(`/api/users/${userId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, reason }),
         credentials: 'include',
       });
       const result = await response.json();
@@ -141,11 +143,16 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
     setIsDetailDialogOpen(true);
   };
 
+  const openReasonDialog = (user: User, action: 'expulsar' | 'banear') => {
+    setReasonDialogState({ isOpen: true, user, action });
+  };
+
   if (isSessionLoading) {
     return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
 
   const isCurrentUserSuperAdmin = currentUserRole === 'super_admin';
+  const isCurrentUserAdmin = currentUserRole === 'admin';
 
   const renderUserTable = (usersToRender: User[], title: string) => (
     <div className="mb-8">
@@ -161,7 +168,9 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
           <TableBody>
             {usersToRender.map((user) => {
               const isCurrentUser = user.id === currentUserId;
-              const canPerformAction = isCurrentUserSuperAdmin && user.role !== 'super_admin' && !isCurrentUser;
+              const canSuperAdminAct = isCurrentUserSuperAdmin && user.role !== 'super_admin' && !isCurrentUser;
+              const canAdminAct = isCurrentUserAdmin && user.role === 'user' && !isCurrentUser;
+              const canPerformModeration = canSuperAdminAct || canAdminAct;
 
               return (
                 <TableRow key={user.id} className={cn(user.status === 'banned' && 'bg-muted/50 opacity-60')}>
@@ -190,22 +199,26 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
                         <>
                           <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleOpenUserDetails(user)}><Eye className="h-4 w-4" /></Button>
                           <DropdownMenu>
-                            <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8" disabled={!canPerformAction}><Users className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                            <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8" disabled={!canPerformModeration}><Users className="h-4 w-4" /></Button></DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleUserStatusChange(user.id, 'kick')}><LogOut className="mr-2 h-4 w-4" /> Expulsar</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => isCurrentUserSuperAdmin ? handleUserStatusChange(user.id, 'kick') : openReasonDialog(user, 'expulsar')}><LogOut className="mr-2 h-4 w-4" /> Expulsar</DropdownMenuItem>
                               {user.status === 'banned' ? (
                                 <DropdownMenuItem onClick={() => handleUserStatusChange(user.id, 'unban')}><CheckCircle className="mr-2 h-4 w-4" /> Desbanear</DropdownMenuItem>
                               ) : (
-                                <DropdownMenuItem onClick={() => handleUserStatusChange(user.id, 'ban')} className="text-destructive focus:text-destructive"><Ban className="mr-2 h-4 w-4" /> Banear</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => isCurrentUserSuperAdmin ? handleUserStatusChange(user.id, 'ban') : openReasonDialog(user, 'banear')} className="text-destructive focus:text-destructive"><Ban className="mr-2 h-4 w-4" /> Banear</DropdownMenuItem>
                               )}
-                              <DropdownMenuSeparator />
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Eliminar</DropdownMenuItem></AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader><AlertDialogTitle>¿Seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará permanentemente al usuario "{user.first_name || user.email}".</AlertDialogDescription></AlertDialogHeader>
-                                  <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteUser(user.id)} className="bg-destructive">Eliminar</AlertDialogAction></AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
+                              {isCurrentUserSuperAdmin && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Eliminar</DropdownMenuItem></AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader><AlertDialogTitle>¿Seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará permanentemente al usuario "{user.first_name || user.email}".</AlertDialogDescription></AlertDialogHeader>
+                                      <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteUser(user.id)} className="bg-destructive">Eliminar</AlertDialogAction></AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </>
@@ -255,6 +268,19 @@ export const UserListTab = React.forwardRef<UserListTabRef, {}>(({}, ref) => {
         )}
       </CardContent>
       {selectedUser && <UserDetailDialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen} user={selectedUser} currentUserRole={currentUserRole} onRoleUpdated={fetchUsers} />}
+      {reasonDialogState.isOpen && reasonDialogState.user && (
+        <ReasonDialog
+          open={reasonDialogState.isOpen}
+          onOpenChange={(open) => setReasonDialogState({ ...reasonDialogState, isOpen: open })}
+          userName={reasonDialogState.user.first_name || reasonDialogState.user.email}
+          action={reasonDialogState.action!}
+          onSubmit={(reason) => {
+            if (reasonDialogState.user && reasonDialogState.action) {
+              handleUserStatusChange(reasonDialogState.user.id, reasonDialogState.action as 'kick' | 'ban', reason);
+            }
+          }}
+        />
+      )}
     </Card>
   );
 });
