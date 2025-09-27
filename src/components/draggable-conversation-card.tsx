@@ -100,8 +100,7 @@ export function DraggableConversationCard({
     const { error } = await supabase
       .from('conversations')
       .update({ title: editingTitle })
-      .eq('id', conversation.id)
-      .eq('user_id', userId);
+      .eq('id', conversation.id);
 
     if (error) {
       console.error('Error updating conversation title:', error);
@@ -122,8 +121,7 @@ export function DraggableConversationCard({
     const { error } = await supabase
       .from('conversations')
       .delete()
-      .eq('id', conversation.id)
-      .eq('user_id', userId);
+      .eq('id', conversation.id);
 
     if (error) {
       console.error('Error deleting conversation:', error);
