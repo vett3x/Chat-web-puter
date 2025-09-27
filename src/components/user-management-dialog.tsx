@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Users } from 'lucide-react';
 import { UserManagementTabs } from './UserManagementTabs'; // Updated import path
+import { useSession } from '@/components/session-context-provider'; // Import useSession
 
 interface UserManagementDialogProps {
   open: boolean;
@@ -20,6 +21,8 @@ interface UserManagementDialogProps {
 }
 
 export function UserManagementDialog({ open, onOpenChange }: UserManagementDialogProps) {
+  const { isUserTemporarilyDisabled } = useSession(); // Get the disabled state
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[95vw] p-6 h-[95vh] flex flex-col">
@@ -32,11 +35,11 @@ export function UserManagementDialog({ open, onOpenChange }: UserManagementDialo
           </DialogDescription>
         </DialogHeader>
         <div className="flex-1 py-4 overflow-hidden">
-          <UserManagementTabs />
+          <UserManagementTabs isUserTemporarilyDisabled={isUserTemporarilyDisabled} /> {/* Pass the prop */}
         </div>
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline">Cerrar</Button>
+            <Button variant="outline" disabled={isUserTemporarilyDisabled}>Cerrar</Button>
           </DialogClose>
         </DialogFooter>
       </DialogContent>

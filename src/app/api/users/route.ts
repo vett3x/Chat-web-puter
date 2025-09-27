@@ -140,10 +140,8 @@ export async function GET(req: NextRequest) {
       };
     }));
 
-    // NEW: Filter out Super Admins if the requesting user is a regular Admin
-    if (currentUserRole === 'admin') {
-      return NextResponse.json(formattedUsers.filter(user => user.role !== 'super_admin'), { status: 200 });
-    }
+    // NEW: No longer filter out Super Admins here. Admins will see them in the list.
+    // The restriction for viewing details will be handled on the client-side component.
 
     return NextResponse.json(formattedUsers, { status: 200 });
 

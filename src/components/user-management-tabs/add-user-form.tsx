@@ -40,9 +40,10 @@ type AddUserFormValues = z.infer<typeof addUserFormSchema>;
 
 interface AddUserFormProps {
   onUserAdded: () => void; // Callback to refresh user list
+  isUserTemporarilyDisabled: boolean; // Ensure this prop is declared
 }
 
-export function AddUserForm({ onUserAdded }: AddUserFormProps) {
+export function AddUserForm({ onUserAdded, isUserTemporarilyDisabled }: AddUserFormProps) {
   const [isAddingUser, setIsAddingUser] = useState(false);
 
   const form = useForm<AddUserFormValues>({
@@ -101,7 +102,7 @@ export function AddUserForm({ onUserAdded }: AddUserFormProps) {
                 <FormItem>
                   <FormLabel>Correo Electrónico</FormLabel>
                   <FormControl>
-                    <Input placeholder="usuario@ejemplo.com" {...field} disabled={isAddingUser} />
+                    <Input placeholder="usuario@ejemplo.com" {...field} disabled={isAddingUser || isUserTemporarilyDisabled} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -114,7 +115,7 @@ export function AddUserForm({ onUserAdded }: AddUserFormProps) {
                 <FormItem>
                   <FormLabel>Contraseña</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="••••••••" {...field} disabled={isAddingUser} />
+                    <Input type="password" placeholder="••••••••" {...field} disabled={isAddingUser || isUserTemporarilyDisabled} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -127,7 +128,7 @@ export function AddUserForm({ onUserAdded }: AddUserFormProps) {
                 <FormItem>
                   <FormLabel>Nombre (Opcional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="Nombre del usuario" {...field} disabled={isAddingUser} />
+                    <Input placeholder="Nombre del usuario" {...field} disabled={isAddingUser || isUserTemporarilyDisabled} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -140,7 +141,7 @@ export function AddUserForm({ onUserAdded }: AddUserFormProps) {
                 <FormItem>
                   <FormLabel>Apellido (Opcional)</FormLabel> {/* Corrected closing tag */}
                   <FormControl>
-                    <Input placeholder="Apellido del usuario" {...field} disabled={isAddingUser} />
+                    <Input placeholder="Apellido del usuario" {...field} disabled={isAddingUser || isUserTemporarilyDisabled} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -152,7 +153,7 @@ export function AddUserForm({ onUserAdded }: AddUserFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Rol</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isAddingUser}>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isAddingUser || isUserTemporarilyDisabled}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Seleccionar rol" />
@@ -167,7 +168,7 @@ export function AddUserForm({ onUserAdded }: AddUserFormProps) {
                 </FormItem>
               )}
             />
-            <Button type="submit" disabled={isAddingUser}>
+            <Button type="submit" disabled={isAddingUser || isUserTemporarilyDisabled}>
               {isAddingUser ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
