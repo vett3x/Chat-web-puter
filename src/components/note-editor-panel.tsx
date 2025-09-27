@@ -61,14 +61,23 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
   const { theme } = useTheme();
   const [note, setNote] = useState<Note | null>(null);
   const [title, setTitle] = useState('');
-  const [initialContent, setInitialContent] = useState<any>(null);
+  const [initialContent, setInitialContent] = useState<any>(null); // This is the content from DB, used for comparison
   const [isLoading, setIsLoading] = useState(true);
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [showAiHint, setShowAiHint] = useState(false);
   const [noteContentForChat, setNoteContentForChat] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('saved');
   const [isMounted, setIsMounted] = useState(false);
-  const [editorReady, setEditorReady] = useState(false); // NEW: State to track if BlockNote editor is ready
+  const [editorReady, setEditorReady] = useState(false);
+
+  // Refs para acceder a los valores más recientes de los estados dentro de useCallback
+  const latestTitleRef = useRef(title);
+  const latestNoteRef = useRef(note);
+  const latestSaveStatusRef = useRef(saveStatus);
+
+  useEffect(() => { latestTitleRef.current = title; }, [title]);
+  useEffect(() => { latestNoteRef.current = note; }, [note]);
+  useEffect(() => { latestSaveStatusRef.current = saveStatus; }, [saveStatus]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -76,49 +85,77 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
 
   const editor = useCreateBlockNote({
     dictionary: locales[userLanguage as keyof typeof locales] || locales.es,
-    onEditorReady: () => { // NEW: Callback when editor is fully ready
+    onEditorReady: () => {
       setEditorReady(true);
     }
   });
 
   const handleSave = useCallback(async () => {
-    if (!note || saveStatus === 'saving' || !editor || !editorReady) return; // Check editorReady
+    const currentNote = latestNoteRef.current;
+    const currentTitle = latestTitleRef.current;
+    const currentSaveStatus = latestSaveStatusRef.current;
+
+    if (!currentNote || currentSaveStatus === 'saving' || !editor || !editorReady) return;
 
     setSaveStatus('saving');
     const currentContent = editor.topLevelBlocks;
-    const { error } = await supabase.from('notes').update({ title, content: currentContent }).eq('id', note.id);
+    const { error } = await supabase.from('notes').update({ title: currentTitle, content: currentContent }).eq('id', currentNote.id);
 
     if (error) {
       toast.error('Error en el autoguardado.');
       setSaveStatus('idle');
     } else {
-      const updatedData = { title, content: currentContent, updated_at: new Date().toISOString() };
-      onNoteUpdated(note.id, updatedData);
+      const updatedData = { title: currentTitle, content: currentContent, updated_at: new Date().toISOString() };
+      onNoteUpdated(currentNote.id, updatedData);
       setNote(prev => prev ? { ...prev, ...updatedData } : null);
+      setInitialContent(currentContent); // Update initialContent to reflect saved state
       setSaveStatus('saved');
     }
-  }, [note, title, onNoteUpdated, editor, editorReady, saveStatus]); // Add editorReady to dependencies
+  }, [noteId, onNoteUpdated, setNote, setSaveStatus, editor, editorReady]); // Dependencias estables
 
+  // Efecto para autoguardado de contenido del editor
   useEffect(() => {
-    if (!editor || !editorReady) return; // Check editorReady
+    if (!editor || !editorReady || !note) return;
     let debounceTimeout: NodeJS.Timeout;
     const handleContentChange = () => {
-      setSaveStatus('idle');
+      if (latestSaveStatusRef.current !== 'saving') {
+        setSaveStatus('idle');
+      }
       clearTimeout(debounceTimeout);
       debounceTimeout = setTimeout(async () => {
-        const markdown = await editor.blocksToMarkdownLossy();
-        setNoteContentForChat(markdown);
-        handleSave();
+        const currentContent = editor.topLevelBlocks;
+        // Compara con el initialContent (último contenido guardado)
+        if (JSON.stringify(currentContent) !== JSON.stringify(initialContent)) {
+           handleSave();
+        } else {
+           setSaveStatus('saved'); // Si no hay cambios, vuelve a 'saved'
+        }
       }, 2000);
     };
     editor.onEditorContentChange(handleContentChange);
     return () => {
       clearTimeout(debounceTimeout);
     };
-  }, [editor, editorReady, handleSave]); // Add editorReady to dependencies
+  }, [editor, editorReady, handleSave, note, initialContent]); // Depende de initialContent para la comparación
+
+  // Efecto para autoguardado de título
+  useEffect(() => {
+    if (isLoading || !editorReady || !note) return;
+    // Solo guardar si el título del input es diferente al título de la nota guardada
+    if (title === note.title) return;
+
+    if (latestSaveStatusRef.current !== 'saving') {
+      setSaveStatus('idle');
+    }
+
+    const handler = setTimeout(() => {
+      handleSave();
+    }, 1000); // Debounce más corto para el título
+    return () => { clearTimeout(handler); };
+  }, [title, note?.title, isLoading, editorReady, handleSave, note]); // Depende de note.title para la comparación
 
   const fetchNote = useCallback(async () => {
-    if (!session?.user?.id || !noteId || !editor || !editorReady) return; // Check editorReady
+    if (!session?.user?.id || !noteId || !editor || !editorReady) return;
     setIsLoading(true);
     const { data, error } = await supabase.from('notes').select('id, title, content, updated_at, chat_history').eq('id', noteId).eq('user_id', session.user.id).single();
     if (error) {
@@ -129,23 +166,22 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
       setTitle(data.title);
       if (typeof data.content === 'string') {
         const blocks = await editor.tryParseMarkdownToBlocks(data.content);
-        setInitialContent(blocks);
+        setInitialContent(blocks); // Establecer initialContent aquí
       } else {
-        setInitialContent(data.content);
+        setInitialContent(data.content); // Establecer initialContent aquí
       }
     }
     setIsLoading(false);
-  }, [noteId, session?.user?.id, editor, editorReady]); // Add editorReady to dependencies
+  }, [noteId, session?.user?.id, editor, editorReady]);
 
   useEffect(() => {
-    // Only fetch note if editor is ready
     if (editorReady) {
       fetchNote();
     }
-  }, [fetchNote, editorReady]); // Trigger fetchNote when editorReady changes
+  }, [fetchNote, editorReady]);
 
   useEffect(() => {
-    if (initialContent && editor && editorReady) { // Only replace blocks if editor is ready
+    if (initialContent && editor && editorReady) {
       const loadContent = async () => {
         editor.replaceBlocks(editor.topLevelBlocks, initialContent);
         const markdown = await editor.blocksToMarkdownLossy();
@@ -153,7 +189,7 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
       };
       loadContent();
     }
-  }, [initialContent, editor, editorReady]); // Add editorReady to dependencies
+  }, [initialContent, editor, editorReady]);
 
   useEffect(() => {
     const hasSeenHint = localStorage.getItem('hasSeenNoteAiHint');
@@ -175,14 +211,6 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
     }
   }, [note]);
 
-  useEffect(() => {
-    if (isLoading || !note) return;
-    if (title === note.title) return;
-    setSaveStatus('idle');
-    const handler = setTimeout(() => { handleSave(); }, 2000);
-    return () => { clearTimeout(handler); };
-  }, [title, note, isLoading, handleSave]);
-
   if (isLoading || isLoadingApiKeys) {
     return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /><p className="ml-2 text-muted-foreground">Cargando nota y claves...</p></div>;
   }
@@ -198,11 +226,12 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
           <div className="flex items-center gap-1 text-xs text-muted-foreground w-24 justify-end">
             {saveStatus === 'saving' && <><Loader2 className="h-3 w-3 animate-spin" /><span>Guardando...</span></>}
             {saveStatus === 'saved' && <><Check className="h-3 w-3 text-green-500" /><span>Guardado</span></>}
+            {saveStatus === 'idle' && <span className="text-yellow-500">Sin guardar</span>}
           </div>
         </div>
       </div>
       <div className="flex-1 overflow-y-auto">
-        {isMounted && editor && editorReady ? ( // Render only when editor is fully ready
+        {isMounted && editor && editorReady ? (
           <BlockNoteView editor={editor} theme={theme === 'dark' ? customDarkTheme : 'light'} />
         ) : (
           <div className="flex items-center justify-center h-full">
