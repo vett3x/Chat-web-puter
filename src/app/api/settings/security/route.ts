@@ -8,7 +8,8 @@ import { createClient } from '@supabase/supabase-js';
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants';
 
 const updateSecuritySchema = z.object({
-  security_enabled: z.boolean(),
+  security_enabled: z.boolean().optional(),
+  maintenance_mode_enabled: z.boolean().optional(), // NEW: Add maintenance_mode_enabled
 });
 
 async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null; userPermissions: UserPermissions }> {
@@ -68,12 +69,15 @@ export async function GET(req: NextRequest) {
   try {
     const { data, error } = await supabaseAdmin
       .from('global_settings')
-      .select('security_enabled')
+      .select('security_enabled, maintenance_mode_enabled') // NEW: Select maintenance_mode_enabled
       .single();
 
     if (error) throw error;
 
-    return NextResponse.json({ security_enabled: data?.security_enabled ?? true });
+    return NextResponse.json({ 
+      security_enabled: data?.security_enabled ?? true,
+      maintenance_mode_enabled: data?.maintenance_mode_enabled ?? false, // NEW: Return maintenance_mode_enabled
+    });
   } catch (error: any) {
     console.error('[API /settings/security GET] Error fetching security setting:', error);
     return NextResponse.json({ message: error.message || 'Error al obtener la configuración de seguridad.' }, { status: 500 });
@@ -88,24 +92,48 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { security_enabled } = updateSecuritySchema.parse(body);
+    const parsedBody = updateSecuritySchema.parse(body);
+
+    const updateData: { security_enabled?: boolean; maintenance_mode_enabled?: boolean; updated_at: string } = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (parsedBody.security_enabled !== undefined) {
+      updateData.security_enabled = parsedBody.security_enabled;
+    }
+    if (parsedBody.maintenance_mode_enabled !== undefined) { // NEW: Handle maintenance_mode_enabled
+      updateData.maintenance_mode_enabled = parsedBody.maintenance_mode_enabled;
+    }
 
     const { data, error } = await supabaseAdmin
       .from('global_settings')
-      .update({ security_enabled, updated_at: new Date().toISOString() })
+      .update(updateData)
       .eq('id', '00000000-0000-0000-0000-000000000000') // Assuming a fixed ID for the single row, or fetch it
-      .select('security_enabled')
+      .select('security_enabled, maintenance_mode_enabled') // NEW: Select both fields
       .single();
 
     if (error) throw error;
 
-    await supabaseAdmin.from('server_events_log').insert({
-      user_id: session.user.id,
-      event_type: 'security_setting_updated',
-      description: `Sistema de seguridad de comandos ${security_enabled ? 'activado' : 'desactivado'} por Super Admin '${session.user.email}'.`,
-    });
+    if (parsedBody.security_enabled !== undefined) {
+      await supabaseAdmin.from('server_events_log').insert({
+        user_id: session.user.id,
+        event_type: 'security_setting_updated',
+        description: `Sistema de seguridad de comandos ${parsedBody.security_enabled ? 'activado' : 'desactivado'} por Super Admin '${session.user.email}'.`,
+      });
+    }
+    if (parsedBody.maintenance_mode_enabled !== undefined) { // NEW: Log maintenance mode changes
+      await supabaseAdmin.from('server_events_log').insert({
+        user_id: session.user.id,
+        event_type: 'maintenance_mode_updated',
+        description: `Modo Mantenimiento ${parsedBody.maintenance_mode_enabled ? 'activado' : 'desactivado'} por Super Admin '${session.user.email}'.`,
+      });
+    }
 
-    return NextResponse.json({ message: `Sistema de seguridad ${security_enabled ? 'activado' : 'desactivado'}.`, security_enabled: data.security_enabled });
+    return NextResponse.json({ 
+      message: `Configuración actualizada.`, 
+      security_enabled: data.security_enabled,
+      maintenance_mode_enabled: data.maintenance_mode_enabled, // NEW: Return updated maintenance_mode_enabled
+    });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ message: 'Error de validación', errors: error.errors }, { status: 400 });

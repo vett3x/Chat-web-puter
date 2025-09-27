@@ -10,7 +10,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
-import { Loader2, Shield, PlusCircle, Trash2, RefreshCw, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Loader2, Shield, PlusCircle, Trash2, RefreshCw, ToggleLeft, ToggleRight, Hammer } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -50,8 +50,10 @@ export function SecurityTab() {
   const [isSubmittingCommand, setIsSubmittingCommand] = useState(false);
 
   const [securityEnabled, setSecurityEnabled] = useState(true);
-  const [isLoadingSecuritySetting, setIsLoadingSecuritySetting] = useState(true);
+  const [maintenanceModeEnabled, setMaintenanceModeEnabled] = useState(false); // NEW: State for maintenance mode
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true); // Combined loading state for settings
   const [isTogglingSecurity, setIsTogglingSecurity] = useState(false);
+  const [isTogglingMaintenance, setIsTogglingMaintenance] = useState(false); // NEW: State for toggling maintenance
 
   const form = useForm<CommandFormValues>({
     resolver: zodResolver(commandSchema),
@@ -75,8 +77,8 @@ export function SecurityTab() {
     }
   }, []);
 
-  const fetchSecuritySetting = useCallback(async () => {
-    setIsLoadingSecuritySetting(true);
+  const fetchGlobalSettings = useCallback(async () => { // NEW: Combined fetch for global settings
+    setIsLoadingSettings(true);
     try {
       const response = await fetch('/api/settings/security');
       if (!response.ok) {
@@ -85,23 +87,24 @@ export function SecurityTab() {
       }
       const data = await response.json();
       setSecurityEnabled(data.security_enabled);
+      setMaintenanceModeEnabled(data.maintenance_mode_enabled); // NEW: Set maintenance mode state
     } catch (err: any) {
-      // Only show error if user is Super Admin, otherwise it's expected to be denied
       if (isSuperAdmin) {
         toast.error(err.message);
       }
       setSecurityEnabled(true); // Default to enabled on error or no access
+      setMaintenanceModeEnabled(false); // Default to disabled on error or no access
     } finally {
-      setIsLoadingSecuritySetting(false);
+      setIsLoadingSettings(false);
     }
   }, [isSuperAdmin]);
 
   useEffect(() => {
     if (isSuperAdmin) {
-      fetchSecuritySetting();
+      fetchGlobalSettings(); // Fetch all global settings
     }
     fetchCommands();
-  }, [fetchCommands, fetchSecuritySetting, isSuperAdmin]);
+  }, [fetchCommands, fetchGlobalSettings, isSuperAdmin]);
 
   const onSubmit = async (values: CommandFormValues) => {
     setIsSubmittingCommand(true);
@@ -154,6 +157,25 @@ export function SecurityTab() {
     }
   };
 
+  const handleToggleMaintenanceMode = async (checked: boolean) => { // NEW: Handler for maintenance mode
+    setIsTogglingMaintenance(true);
+    try {
+      const response = await fetch('/api/settings/security', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ maintenance_mode_enabled: checked }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message);
+      setMaintenanceModeEnabled(result.maintenance_mode_enabled);
+      toast.success(result.message);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsTogglingMaintenance(false);
+    }
+  };
+
   return (
     <div className="space-y-8 h-full overflow-y-auto p-1">
       {isSuperAdmin && (
@@ -164,26 +186,45 @@ export function SecurityTab() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoadingSecuritySetting ? (
+            {isLoadingSettings ? (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" /> Cargando configuración...
               </div>
             ) : (
-              <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                <div className="space-y-0.5">
-                  <Label htmlFor="security-toggle" className="text-base">
-                    Activar Sistema de Seguridad de Comandos
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Cuando está desactivado, la IA puede ejecutar cualquier comando en los contenedores. Úsalo con precaución y solo para diagnóstico.
-                  </p>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="security-toggle" className="text-base">
+                      Activar Sistema de Seguridad de Comandos
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Cuando está desactivado, la IA puede ejecutar cualquier comando en los contenedores. Úsalo con precaución y solo para diagnóstico.
+                    </p>
+                  </div>
+                  <Switch
+                    id="security-toggle"
+                    checked={securityEnabled}
+                    onCheckedChange={handleToggleSecurity}
+                    disabled={isTogglingSecurity}
+                  />
                 </div>
-                <Switch
-                  id="security-toggle"
-                  checked={securityEnabled}
-                  onCheckedChange={handleToggleSecurity}
-                  disabled={isTogglingSecurity}
-                />
+                {/* NEW: Maintenance Mode Toggle */}
+                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="maintenance-toggle" className="text-base">
+                      Activar Modo Mantenimiento
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Expulsa a todos los usuarios (excepto Super Admins) y muestra una página de mantenimiento.
+                    </p>
+                  </div>
+                  <Switch
+                    id="maintenance-toggle"
+                    checked={maintenanceModeEnabled}
+                    onCheckedChange={handleToggleMaintenanceMode}
+                    disabled={isTogglingMaintenance}
+                  />
+                </div>
               </div>
             )}
           </CardContent>

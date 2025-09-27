@@ -73,23 +73,42 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  const publicPaths = ['/login']; // Rutas accesibles sin autenticación
+  // NEW: Check for maintenance mode
+  const { data: globalSettings, error: settingsError } = await supabase
+    .from('global_settings')
+    .select('maintenance_mode_enabled')
+    .single();
 
+  const maintenanceModeEnabled = globalSettings?.maintenance_mode_enabled ?? false;
+  const isSuperAdmin = userRole === 'super_admin';
+
+  const publicPaths = ['/login', '/maintenance']; // Rutas accesibles sin autenticación o en mantenimiento
+
+  // If maintenance mode is enabled and user is not Super Admin, redirect to maintenance page
+  if (maintenanceModeEnabled && !isSuperAdmin && !publicPaths.includes(req.nextUrl.pathname)) {
+    // Invalidate session to ensure user is logged out and redirected
+    if (session) {
+      await supabase.auth.signOut();
+    }
+    const redirectUrl = req.nextUrl.clone();
+    redirectUrl.pathname = '/maintenance';
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  // If maintenance mode is NOT enabled, but user is on /maintenance page, redirect to home
+  if (!maintenanceModeEnabled && req.nextUrl.pathname === '/maintenance') {
+    const redirectUrl = req.nextUrl.clone();
+    redirectUrl.pathname = '/';
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  // Standard authentication check (after maintenance mode check)
   if (!session && !publicPaths.includes(req.nextUrl.pathname)) {
     const redirectUrl = req.nextUrl.clone();
     redirectUrl.pathname = '/login';
     redirectUrl.searchParams.set(`redirectedFrom`, req.nextUrl.pathname);
     return NextResponse.redirect(redirectUrl);
   }
-
-  // Example of role-based redirection (optional, can be expanded)
-  // If a 'user' tries to access an admin-only page, redirect them.
-  // For now, we'll rely on API handlers for fine-grained access control.
-  // if (userRole === 'user' && req.nextUrl.pathname.startsWith('/admin-only-page')) {
-  //   const redirectUrl = req.nextUrl.clone();
-  //   redirectUrl.pathname = '/'; // Redirect to home or a forbidden page
-  //   return NextResponse.redirect(redirectUrl);
-  // }
 
   // Store userRole and userPermissions in headers for access in API routes if needed,
   // though getSessionAndRole is called directly in API routes for robustness.
