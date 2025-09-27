@@ -3,12 +3,23 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Shield, RefreshCw, AlertCircle } from 'lucide-react';
+import { Loader2, Shield, RefreshCw, AlertCircle, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface ModerationLog {
   id: string;
@@ -20,12 +31,14 @@ interface ModerationLog {
 
 interface UserModerationHistoryTabProps {
   userId: string;
+  currentUserRole: 'user' | 'admin' | 'super_admin' | null;
 }
 
-export function UserModerationHistoryTab({ userId }: UserModerationHistoryTabProps) {
+export function UserModerationHistoryTab({ userId, currentUserRole }: UserModerationHistoryTabProps) {
   const [logs, setLogs] = useState<ModerationLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isSuperAdmin = currentUserRole === 'super_admin';
 
   const fetchModerationHistory = useCallback(async () => {
     setIsLoading(true);
@@ -53,15 +66,58 @@ export function UserModerationHistoryTab({ userId }: UserModerationHistoryTabPro
     }
   }, [userId, fetchModerationHistory]);
 
+  const handleClearHistory = async () => {
+    try {
+      const response = await fetch(`/api/users/${userId}/moderation-history`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || `HTTP error! status: ${response.status}`);
+      }
+      toast.success(result.message || 'Historial de moderación limpiado correctamente.');
+      fetchModerationHistory(); // Refresh the list
+    } catch (err: any) {
+      console.error('Error clearing moderation history:', err);
+      toast.error(err.message || 'Error al limpiar el historial de moderación.');
+    }
+  };
+
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="flex items-center gap-2">
           <Shield className="h-5 w-5" /> Historial de Moderación
         </CardTitle>
-        <Button variant="ghost" size="icon" onClick={fetchModerationHistory} disabled={isLoading} title="Refrescar">
-          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-        </Button>
+        <div className="flex items-center gap-2">
+          {isSuperAdmin && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" disabled={isLoading || logs.length === 0}>
+                  <Trash2 className="mr-2 h-4 w-4" /> Limpiar Historial
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Estás seguro de limpiar el historial de moderación?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta acción eliminará permanentemente todos los registros de moderación para este usuario. Esta acción no se puede deshacer.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleClearHistory} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Limpiar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+          <Button variant="ghost" size="icon" onClick={fetchModerationHistory} disabled={isLoading} title="Refrescar">
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="flex-1 overflow-hidden pt-0">
         {isLoading ? (

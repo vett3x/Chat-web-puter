@@ -211,7 +211,7 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
                   />
                 </TabsContent>
                 <TabsContent value="moderation" className="h-full">
-                  <UserModerationHistoryTab userId={user.id} />
+                  <UserModerationHistoryTab userId={user.id} currentUserRole={currentUserRole} />
                 </TabsContent>
               </ScrollArea>
             </div>

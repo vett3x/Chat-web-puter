@@ -92,3 +92,44 @@ export async function GET(req: NextRequest, context: any) {
     return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest, context: any) {
+  const { session, userRole } = await getSessionAndRole();
+  if (!session || userRole !== 'super_admin') {
+    return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden limpiar el historial de moderación.' }, { status: 403 });
+  }
+
+  const userIdToClear = context.params.id;
+  if (!userIdToClear) {
+    return NextResponse.json({ message: 'ID de usuario no proporcionado.' }, { status: 400 });
+  }
+
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  try {
+    const { error } = await supabaseAdmin
+      .from('moderation_logs')
+      .delete()
+      .eq('target_user_id', userIdToClear);
+
+    if (error) {
+      console.error(`Error clearing moderation history for user ${userIdToClear}:`, error);
+      throw new Error('Error al limpiar el historial de moderación.');
+    }
+
+    // Log the action
+    await supabaseAdmin.from('server_events_log').insert({
+      user_id: session.user.id,
+      event_type: 'moderation_history_cleared',
+      description: `Historial de moderación del usuario ${userIdToClear} limpiado por Super Admin '${session.user.email}'.`,
+    });
+
+    return NextResponse.json({ message: 'Historial de moderación limpiado correctamente.' });
+  } catch (error: any) {
+    console.error(`[API /moderation-history DELETE] Error:`, error);
+    return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
+  }
+}
