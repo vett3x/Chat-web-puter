@@ -172,7 +172,7 @@ export async function GET(req: NextRequest) {
 
   let query = supabaseAdmin
     .from('user_api_keys')
-    .select('id, provider, api_key, is_active, created_at, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint, is_global')
+    .select('id, provider, api_key, is_active, created_at, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint, is_global, user_id') // NEW: Select user_id
     .order('created_at', { ascending: false });
 
   // All roles (user, admin, super_admin) should see their own keys OR global keys
