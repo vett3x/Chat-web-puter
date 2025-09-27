@@ -83,6 +83,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
   });
 
   // Efecto para rellenar el formulario cuando editingKeyId se establece (modo edición)
+  // O para resetearlo al estado de "añadir nueva clave" cuando editingKeyId es null
   useEffect(() => {
     if (editingKeyId) {
       const keyToEdit = keys.find(k => k.id === editingKeyId);
@@ -107,23 +108,28 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
             handleRemoveJsonKeyFile();
         }
       }
-    }
-  }, [editingKeyId, keys, form, handleRemoveJsonKeyFile]);
-
-  // Efecto para cargar las claves y resetear el formulario cuando el diálogo se abre
-  useEffect(() => {
-    if (open) {
-      fetchKeys();
-      handleCancelEdit(); // Esto establecerá editingKeyId a null
-      form.reset({ // Resetear explícitamente el formulario al estado por defecto "añadir nueva clave"
+    } else {
+      // Si editingKeyId es null (e.g., después de handleCancelEdit o al abrir el diálogo)
+      // Resetear el formulario al estado por defecto "añadir nueva clave"
+      form.reset({
         provider: '', api_key: '', nickname: '', project_id: '', location_id: '',
         use_vertex_ai: false, model_name: '', json_key_file: undefined, json_key_content: undefined,
         api_endpoint: '', is_global: false,
       });
-      handleRemoveJsonKeyFile(); // Asegurarse de que el input de archivo esté limpio
-      setSearchQuery('');
+      handleRemoveJsonKeyFile(); // También limpiar el input de archivo
     }
-  }, [open, fetchKeys, handleCancelEdit, form, handleRemoveJsonKeyFile, setSearchQuery]);
+  }, [editingKeyId, keys, form, handleRemoveJsonKeyFile]); // Dependencias son correctas aquí.
+
+  // Efecto para cargar las claves y limpiar la búsqueda cuando el diálogo se abre
+  useEffect(() => {
+    if (open) {
+      fetchKeys();
+      setSearchQuery('');
+      // handleCancelEdit() se llama aquí para asegurar que editingKeyId sea null
+      // y así el useEffect anterior resetee el formulario al estado de "añadir nueva clave".
+      handleCancelEdit(); 
+    }
+  }, [open, fetchKeys, handleCancelEdit, setSearchQuery]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
