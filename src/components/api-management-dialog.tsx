@@ -16,11 +16,11 @@ import { Card } from '@/components/ui/card';
 import { KeyRound } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod'; // CORREGIDO: Sintaxis de importación de zod
+import * as z from 'zod';
 
 import { useApiKeysManagement } from '@/hooks/use-api-keys-management';
-import { ApiKeyForm } from '@/components/api-management/api-key-form'; // CORREGIDO: Eliminada extensión .tsx
-import { ApiKeyTable } from '@/components/api-management/api-key-table'; // CORREGIDO: Eliminada extensión .tsx
+import { ApiKeyForm } from '@/components/api-management/api-key-form';
+import { ApiKeyTable } from '@/components/api-management/api-key-table';
 
 const apiKeySchema = z.object({
   id: z.string().optional(),
@@ -82,7 +82,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
     },
   });
 
-  // Effect to reset form when editingKeyId changes
+  // Efecto para rellenar el formulario cuando editingKeyId se establece (modo edición)
   useEffect(() => {
     if (editingKeyId) {
       const keyToEdit = keys.find(k => k.id === editingKeyId);
@@ -101,24 +101,29 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
           api_endpoint: keyToEdit.api_endpoint || '',
           is_global: keyToEdit.is_global,
         });
+        // Limpiar el archivo JSON seleccionado al iniciar la edición de una clave
+        // a menos que sea una clave Vertex AI existente con contenido
+        if (!(keyToEdit.use_vertex_ai && keyToEdit.json_key_content)) {
+            handleRemoveJsonKeyFile();
+        }
       }
-    } else {
-      form.reset({
+    }
+  }, [editingKeyId, keys, form, handleRemoveJsonKeyFile]);
+
+  // Efecto para cargar las claves y resetear el formulario cuando el diálogo se abre
+  useEffect(() => {
+    if (open) {
+      fetchKeys();
+      handleCancelEdit(); // Esto establecerá editingKeyId a null
+      form.reset({ // Resetear explícitamente el formulario al estado por defecto "añadir nueva clave"
         provider: '', api_key: '', nickname: '', project_id: '', location_id: '',
         use_vertex_ai: false, model_name: '', json_key_file: undefined, json_key_content: undefined,
         api_endpoint: '', is_global: false,
       });
-    }
-  }, [editingKeyId, keys, form]);
-
-  // Effect to fetch keys when dialog opens
-  useEffect(() => {
-    if (open) {
-      fetchKeys();
-      handleCancelEdit(); // Ensure form is reset and not in editing mode
+      handleRemoveJsonKeyFile(); // Asegurarse de que el input de archivo esté limpio
       setSearchQuery('');
     }
-  }, [open, fetchKeys, handleCancelEdit, setSearchQuery]);
+  }, [open, fetchKeys, handleCancelEdit, form, handleRemoveJsonKeyFile, setSearchQuery]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
