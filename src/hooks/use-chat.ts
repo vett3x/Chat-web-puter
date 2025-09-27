@@ -545,22 +545,23 @@ export function useChat({
       setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, ...finalAssistantMessageData, id: savedData?.id || assistantMessageId, timestamp: savedData?.timestamp || new Date() } : m));
 
       // Execute files and commands *after* the message is saved and displayed
+      // IMPORTANT: Do NOT await these calls to prevent blocking the UI.
+      // They will run in the background and provide their own toast feedback.
       if (filesToWrite.length > 0) {
-        await onWriteFiles(filesToWrite);
+        onWriteFiles(filesToWrite); // Removed await
       }
       if (commandsToExecute.length > 0) {
-        await executeCommandsInContainer(commandsToExecute);
+        executeCommandsInContainer(commandsToExecute); // Removed await
       }
 
       // Update autoFixStatus based on AI's response
       setAutoFixStatus(prevStatus => {
-        if (prevStatus === 'fixing') {
-          return 'idle'; // Successfully applied the fix
-        }
         if (isErrorAnalysisRequest || isConstructionPlan || isCorrectionPlan) {
           return 'plan_ready'; // AI responded with a new plan/request
         }
-        return 'idle'; // Default for regular chat responses
+        // If it was 'fixing' and now AI has responded with code/commands, it's done with its part.
+        // Or if it was 'analyzing' and AI responded with a regular chat message.
+        return 'idle';
       });
 
     } catch (error: any) {
