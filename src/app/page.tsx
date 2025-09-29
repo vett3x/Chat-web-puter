@@ -84,7 +84,7 @@ export default function Home() {
     removeLocalItem,
   } = useSidebarData();
 
-  const { userApiKeys, isLoadingApiKeys } = useUserApiKeys();
+  const { userApiKeys, isLoadingApiKeys, refreshApiKeys } = useUserApiKeys(); // Get refreshApiKeys
 
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   const [selectedAppDetails, setSelectedAppDetails] = useState<UserApp | null>(null);
@@ -375,6 +375,7 @@ export default function Home() {
   const handleGlobalRefresh = useCallback(() => {
     console.log("[Home] Global refresh triggered.");
     refreshSidebarData();
+    refreshApiKeys(); // Refresh API keys on global refresh
 
     if (selectedItem) {
       if (selectedItem.type === 'note' && noteEditorRef.current) {
@@ -385,7 +386,16 @@ export default function Home() {
         chatInterfaceRef.current.refreshChatMessages();
       }
     }
-  }, [refreshSidebarData, selectedItem]);
+  }, [refreshSidebarData, refreshApiKeys, selectedItem]); // Added refreshApiKeys to dependencies
+
+  // NEW: Initial data fetch for sidebar and API keys when userId becomes available
+  useEffect(() => {
+    if (userId && !isLoadingData && !isLoadingApiKeys) {
+      refreshSidebarData();
+      refreshApiKeys();
+    }
+  }, [userId, isLoadingData, isLoadingApiKeys, refreshSidebarData, refreshApiKeys]);
+
 
   const handleOpenProfileSettings = () => setIsProfileSettingsOpen(true);
   const handleOpenAccountSettings = () => setIsAccountSettingsOpen(true);

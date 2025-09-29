@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'; // Import useRef
 import { toast } from 'sonner';
+import { useSession } from '@/components/session-context-provider'; // Import useSession
 
 export interface ApiKey {
   id: string;
@@ -20,11 +21,19 @@ export interface ApiKey {
 const POLLING_INTERVAL = 30000; // 30 segundos
 
 export function useUserApiKeys() {
+  const { session, isLoading: isSessionLoading } = useSession(); // Get session and loading state
+  const userId = session?.user?.id;
+
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref for debounce
 
   const fetchKeys = useCallback(async () => {
+    if (!userId) { // Only fetch if user is logged in
+      setKeys([]);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const response = await fetch('/api/ai-keys');
@@ -36,7 +45,7 @@ export function useUserApiKeys() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [userId]); // Depend on userId
 
   // Debounced version of fetchKeys
   const debouncedFetchKeys = useCallback(() => {
@@ -49,14 +58,21 @@ export function useUserApiKeys() {
   }, [fetchKeys]);
 
   useEffect(() => {
-    debouncedFetchKeys(); // Initial fetch
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') { // Only poll when tab is visible
-        debouncedFetchKeys();
-      }
-    }, POLLING_INTERVAL);
-    return () => clearInterval(interval);
-  }, [debouncedFetchKeys]);
+    // Only start polling if userId is available
+    if (userId) {
+      // Initial fetch is now handled by Home.tsx
+      const interval = setInterval(() => {
+        if (document.visibilityState === 'visible') { // Only poll when tab is visible
+          debouncedFetchKeys();
+        }
+      }, POLLING_INTERVAL);
+      return () => clearInterval(interval);
+    } else {
+      // Clear data and stop loading if no user
+      setKeys([]);
+      setIsLoading(false);
+    }
+  }, [userId, debouncedFetchKeys]); // Depend on userId
 
   return { userApiKeys: keys, isLoadingApiKeys: isLoading, refreshApiKeys: debouncedFetchKeys };
 }
