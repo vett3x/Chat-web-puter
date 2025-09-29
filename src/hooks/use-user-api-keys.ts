@@ -34,18 +34,62 @@ export function useUserApiKeys() {
       setIsLoading(false);
       return;
     }
-    setIsLoading(true);
+    // Don't set loading to true on background refreshes
+    // setIsLoading(true); 
     try {
       const response = await fetch('/api/ai-keys');
       const data = await response.json();
       if (!response.ok) throw new Error(data.message);
       setKeys(data);
+      // Cache the fetched keys
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`api_keys_${userId}`, JSON.stringify(data));
+      }
     } catch (error: any) {
-      toast.error(`Error al cargar las claves de API: ${error.message}`);
+      toast.error(`Error al refrescar las claves de API: ${error.message}`);
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Always set loading to false after fetch
     }
   }, [userId]); // Depend on userId
+
+  useEffect(() => {
+    if (isSessionLoading) {
+      return; // Wait until session is loaded
+    }
+
+    if (userId) {
+      // 1. Load from cache immediately
+      const cachedKeys = typeof window !== 'undefined' ? localStorage.getItem(`api_keys_${userId}`) : null;
+      if (cachedKeys) {
+        try {
+          setKeys(JSON.parse(cachedKeys));
+          setIsLoading(false); // We have data, so we are not "loading" anymore
+        } catch (e) {
+          console.error("Failed to parse cached API keys", e);
+          localStorage.removeItem(`api_keys_${userId}`);
+        }
+      } else {
+        setIsLoading(true); // No cache, so we are in a loading state
+      }
+
+      // 2. Fetch fresh data in the background
+      fetchKeys();
+
+    } else {
+      // No user, clear everything
+      setKeys([]);
+      setIsLoading(false);
+      if (typeof window !== 'undefined') {
+        // Attempt to clear any stray cache
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('api_keys_')) {
+            localStorage.removeItem(key);
+          }
+        });
+      }
+    }
+  }, [userId, isSessionLoading, fetchKeys]);
+
 
   // Debounced version of fetchKeys
   const debouncedFetchKeys = useCallback(() => {

@@ -112,17 +112,6 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
     );
   }
 
-  if (!isPuterReady || isLoadingApiKeys) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Cargando IA y claves...</p>
-        </div>
-      </div>
-    );
-  }
-
   if (!userId) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -132,6 +121,9 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
       </div>
     );
   }
+
+  // Show the UI immediately but disable input while keys/puter are loading
+  const isChatReady = isPuterReady && !isLoadingApiKeys;
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -151,7 +143,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
         />
         <AutoFixStatusComponent status={autoFixStatus} />
         <ChatInput
-          isLoading={isLoading}
+          isLoading={isLoading || !isChatReady} // Disable if AI is thinking OR if keys/puter are not ready
           selectedModel={selectedModel}
           onModelChange={handleModelChange}
           sendMessage={sendMessage}
