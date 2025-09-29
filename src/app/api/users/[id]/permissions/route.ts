@@ -147,6 +147,13 @@ export async function PUT(
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
+    // Fetch target user's email for better logging
+    const { data: targetUserData, error: targetUserError } = await supabaseAdmin.auth.admin.getUserById(userIdToUpdate);
+    if (targetUserError) {
+      console.warn(`Could not fetch target user email for logging: ${targetUserError.message}`);
+    }
+    const targetUserIdentifier = targetUserData?.user?.email || userIdToUpdate; // Fallback to UUID if email not found
+
     try {
       const body = await req.json();
       const { permissions: newPermissions } = updatePermissionsSchema.parse(body);
@@ -193,7 +200,7 @@ export async function PUT(
         await supabaseAdmin.from('server_events_log').insert({
           user_id: session.user.id,
           event_type: 'user_permissions_update_failed',
-          description: `Fallo al actualizar permisos del usuario ${userIdToUpdate}. Error: ${error.message}`,
+          description: `Fallo al actualizar permisos del usuario '${targetUserIdentifier}'. Error: ${error.message}`,
         });
         throw new Error(`Error al actualizar los permisos del usuario: ${error.message}`);
       }
@@ -201,7 +208,7 @@ export async function PUT(
       await supabaseAdmin.from('server_events_log').insert({
         user_id: session.user.id,
         event_type: 'user_permissions_updated',
-        description: `Permisos del usuario ${userIdToUpdate} actualizados por Super Admin '${session.user.email}'.`,
+        description: `Permisos del usuario '${targetUserIdentifier}' actualizados por Super Admin '${session.user.email}'.`,
       });
 
       return NextResponse.json({ message: 'Permisos de usuario actualizados correctamente.', user: data }, { status: 200 });

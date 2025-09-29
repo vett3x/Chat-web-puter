@@ -107,6 +107,13 @@ export async function PUT(
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
+    // Fetch target user's email for better logging
+    const { data: targetUserData, error: targetUserError } = await supabaseAdmin.auth.admin.getUserById(userIdToUpdate);
+    if (targetUserError) {
+      console.warn(`Could not fetch target user email for logging: ${targetUserError.message}`);
+    }
+    const targetUserIdentifier = targetUserData?.user?.email || userIdToUpdate; // Fallback to UUID if email not found
+
     try {
       const body = await req.json();
       const { role: newRole } = updateRoleSchema.parse(body);
@@ -146,7 +153,7 @@ export async function PUT(
         await supabaseAdmin.from('server_events_log').insert({
           user_id: session.user.id,
           event_type: 'user_role_update_failed',
-          description: `Fallo al actualizar el rol del usuario ${userIdToUpdate} a '${newRole}'. Error: ${error.message}`,
+          description: `Fallo al actualizar el rol del usuario '${targetUserIdentifier}' a '${newRole}'. Error: ${error.message}`,
         });
         throw new Error(`Error al actualizar el rol del usuario: ${error.message}`);
       }
@@ -154,7 +161,7 @@ export async function PUT(
       await supabaseAdmin.from('server_events_log').insert({
         user_id: session.user.id,
         event_type: 'user_role_updated',
-        description: `Rol del usuario ${userIdToUpdate} actualizado a '${newRole}' por Super Admin '${session.user.email}'.`,
+        description: `Rol del usuario '${targetUserIdentifier}' actualizado a '${newRole}' por Super Admin '${session.user.email}'.`,
       });
 
       return NextResponse.json({ message: 'Rol de usuario actualizado correctamente.', user: data }, { status: 200 });

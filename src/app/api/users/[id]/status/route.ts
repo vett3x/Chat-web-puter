@@ -89,6 +89,13 @@ export async function PUT(req: NextRequest, context: any) {
       return NextResponse.json({ message: 'Un Admin no puede modificar el estado de otro Admin.' }, { status: 403 });
     }
 
+    // Fetch target user's email for better logging
+    const { data: targetUserData, error: targetUserError } = await supabaseAdmin.auth.admin.getUserById(userIdToUpdate);
+    if (targetUserError) {
+      console.warn(`Could not fetch target user email for logging: ${targetUserError.message}`);
+    }
+    const targetUserIdentifier = targetUserData?.user?.email || userIdToUpdate; // Fallback to UUID if email not found
+
     const body = await req.json();
     const parsedBody = updateStatusSchema.parse(body);
 
@@ -104,7 +111,7 @@ export async function PUT(req: NextRequest, context: any) {
         user_metadata: { kicked_at: new Date().toISOString() },
       });
       if (error) throw new Error(`Error al expulsar al usuario: ${error.message}`);
-      logDescription = `Usuario ${userIdToUpdate} ${actionText} por ${session.user.email}. Razón: ${parsedBody.reason}`;
+      logDescription = `Usuario '${targetUserIdentifier}' ${actionText} por ${session.user.email}. Razón: ${parsedBody.reason}`;
     } else if (parsedBody.action === 'ban') {
       actionText = 'baneado';
       const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(userIdToUpdate, { 
@@ -113,13 +120,13 @@ export async function PUT(req: NextRequest, context: any) {
       });
       if (banError) throw new Error(`Error al banear al usuario en Auth: ${banError.message}`);
       await supabaseAdmin.from('profiles').update({ status: 'banned', kicked_at: null }).eq('id', userIdToUpdate); // Clear kicked_at on ban
-      logDescription = `Usuario ${userIdToUpdate} ${actionText} por ${session.user.email}. Razón: ${parsedBody.reason}`;
+      logDescription = `Usuario '${targetUserIdentifier}' ${actionText} por ${session.user.email}. Razón: ${parsedBody.reason}`;
     } else if (parsedBody.action === 'unban') {
       actionText = 'desbaneado';
       const { error: unbanError } = await supabaseAdmin.auth.admin.updateUserById(userIdToUpdate, { ban_duration: 'none' });
       if (unbanError) throw new Error(`Error al desbanear al usuario en Auth: ${unbanError.message}`);
       await supabaseAdmin.from('profiles').update({ status: 'active', kicked_at: null }).eq('id', userIdToUpdate);
-      logDescription = `Usuario ${userIdToUpdate} ${actionText} por ${session.user.email}. Razón: ${parsedBody.reason}`;
+      logDescription = `Usuario '${targetUserIdentifier}' ${actionText} por ${session.user.email}. Razón: ${parsedBody.reason}`;
     } else if (parsedBody.action === 'extend_kick') { // NEW: extend_kick logic
       if (currentUserRole !== 'super_admin') {
         return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden extender expulsiones.' }, { status: 403 });
@@ -137,7 +144,7 @@ export async function PUT(req: NextRequest, context: any) {
         user_metadata: { kicked_at: newKickedAt.toISOString() },
       });
       if (authUpdateError) throw new Error(`Error al extender la expulsión del usuario: ${authUpdateError.message}`);
-      logDescription = `Expulsión del usuario ${userIdToUpdate} extendida por ${parsedBody.extend_minutes} minutos por ${session.user.email}. Nueva fecha de fin: ${newKickedAt.toISOString()}. Razón: ${parsedBody.reason}`;
+      logDescription = `Expulsión del usuario '${targetUserIdentifier}' extendida por ${parsedBody.extend_minutes} minutos por ${session.user.email}. Nueva fecha de fin: ${newKickedAt.toISOString()}. Razón: ${parsedBody.reason}`;
     } else {
       return NextResponse.json({ message: 'Acción no válida.' }, { status: 400 });
     }
