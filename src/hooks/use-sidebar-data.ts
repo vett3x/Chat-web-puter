@@ -125,22 +125,20 @@ export function useSidebarData() {
   useEffect(() => {
     // Only start polling if userId is available
     if (userId) {
-      // Initial fetch is now handled by Home.tsx
       const interval = setInterval(() => {
         if (document.visibilityState === 'visible') { // Only poll when tab is visible
           debouncedFetchData();
         }
       }, POLLING_INTERVAL);
       return () => clearInterval(interval);
-    } else {
-      // Clear data and stop loading if no user
+    } else if (!isSessionLoading) {
       setApps([]);
       setConversations([]);
       setFolders([]);
       setNotes([]);
       setIsLoading(false);
     }
-  }, [userId, debouncedFetchData]); // Removed isSessionLoading from dependencies
+  }, [userId, isSessionLoading, debouncedFetchData]);
 
   const createConversation = async (onSuccess: (newConversation: Conversation) => void): Promise<string | null> => {
     if (!userId) {

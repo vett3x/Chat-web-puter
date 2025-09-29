@@ -60,19 +60,18 @@ export function useUserApiKeys() {
   useEffect(() => {
     // Only start polling if userId is available
     if (userId) {
-      // Initial fetch is now handled by Home.tsx
       const interval = setInterval(() => {
         if (document.visibilityState === 'visible') { // Only poll when tab is visible
           debouncedFetchKeys();
         }
       }, POLLING_INTERVAL);
       return () => clearInterval(interval);
-    } else {
+    } else if (!isSessionLoading) {
       // Clear data and stop loading if no user
       setKeys([]);
       setIsLoading(false);
     }
-  }, [userId, debouncedFetchKeys]); // Depend on userId
+  }, [userId, isSessionLoading, debouncedFetchKeys]); // Depend on userId
 
   return { userApiKeys: keys, isLoadingApiKeys: isLoading, refreshApiKeys: debouncedFetchKeys };
 }

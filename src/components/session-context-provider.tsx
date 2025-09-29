@@ -207,7 +207,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
     return () => {
       subscription.unsubscribe();
     };
-  }, [router, pathname, fetchUserProfileAndRole, supabase]); // Added supabase to dependencies
+  }, [router, pathname, fetchUserProfileAndRole, supabase]);
 
   useEffect(() => {
     const checkSessionAndGlobalStatus = async () => {
