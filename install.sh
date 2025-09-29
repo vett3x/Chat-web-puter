@@ -12,11 +12,11 @@
 #   - `git` y `curl` instalados (`sudo apt update && sudo apt install git curl`).
 #
 # Uso:
-#   1. Guarda este script como `install.sh`.
+#   1. Guarda este script como `install.sh` en la raíz de tu proyecto.
 #   2. Dale permisos de ejecución: `chmod +x install.sh`.
 #   3. Ejecútalo: `./install.sh`.
 #
-#   Para actualizaciones, simplemente ejecuta el script de nuevo.
+#   Para actualizaciones, simplemente ejecuta el script de nuevo desde la raíz del proyecto.
 #
 # Variables de Entorno Requeridas (deben estar disponibles en el entorno de ejecución):
 #   - NEXT_PUBLIC_SUPABASE_URL
@@ -30,8 +30,7 @@
 set -e # Salir inmediatamente si un comando falla.
 
 # --- Variables de Configuración ---
-REPO_URL="https://github.com/vett3x/Chat-web-puter.git"
-PROJECT_DIR="Chat-web-puter"
+# Ya no necesitamos REPO_URL ni PROJECT_DIR, asumimos que estamos en la raíz del proyecto.
 NEXT_APP_NAME="chat-app-next"
 WS_APP_NAME="chat-app-ws"
 NODE_MAJOR_VERSION=22
@@ -133,24 +132,15 @@ check_command "curl"
 # --- Paso 2: Instalar Node.js ---
 setup_nodejs
 
-# --- Paso 3: Clonar o Actualizar Repositorio ---
-IS_NEW_INSTALL=false
-if [ -d "$PROJECT_DIR" ]; then
-  echo "--- El directorio '$PROJECT_DIR' ya existe. Realizando actualización. ---"
-  # Navegar al directorio del proyecto para el pull
-  cd "$PROJECT_DIR"
-  echo "Navegando al directorio del proyecto: $(pwd)"
-  echo "Realizando git pull para obtener los últimos cambios..."
-  git pull origin main
-else
-  echo "--- El directorio '$PROJECT_DIR' no existe. Realizando nueva instalación. ---"
-  echo "--- Paso 3: Clonando el repositorio desde GitHub... ---"
-  git clone "$REPO_URL"
-  # Navegar al directorio del proyecto después de clonar
-  cd "$PROJECT_DIR"
-  echo "Navegando al directorio del proyecto: $(pwd)"
-  IS_NEW_INSTALL=true
+# --- Paso 3: Actualizar Repositorio (asumiendo que ya estamos en el directorio del proyecto) ---
+echo "--- Paso 3: Actualizando el repositorio (git pull)... ---"
+# Asegurarse de que estamos en un repositorio git
+if [ ! -d ".git" ]; then
+  echo "Error: No es un repositorio Git. Por favor, clona el repositorio primero o ejecuta este script desde la raíz del proyecto."
+  exit 1
 fi
+git pull origin main
+echo "Repositorio actualizado correctamente."
 
 # --- Paso 4: Configuración de Variables de Entorno ---
 # Siempre crear o sobrescribir .env.local para asegurar que las últimas variables se usen
