@@ -1,12 +1,13 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/integrations/supabase/client';
 import { Session } from '@supabase/supabase-js';
 import { Loader2 } from 'lucide-react';
 import { SUPERUSER_EMAILS, PERMISSION_KEYS } from '@/lib/constants';
 import { toast } from 'sonner';
+import { addMinutes } from 'date-fns'; // Import addMinutes
 
 type UserRole = 'user' | 'admin' | 'super_admin';
 type UserStatus = 'active' | 'banned' | 'kicked';
@@ -36,10 +37,9 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const router = useRouter();
   const pathname = usePathname();
 
-  // DERIVED STATE: This is the fix. isUserTemporarilyDisabled is now derived directly from userStatus.
   const isUserTemporarilyDisabled = userStatus === 'banned' || userStatus === 'kicked';
 
-  const fetchUserProfileAndRole = async (currentSession: Session | null) => {
+  const fetchUserProfileAndRole = useCallback(async (currentSession: Session | null) => {
     if (currentSession?.user?.id) {
       const { data: profile, error } = await supabase
         .from('profiles')
@@ -73,7 +73,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         for (const key of Object.values(PERMISSION_KEYS)) {
           determinedPermissions[key] = true;
         }
-        determinedStatus = 'active';
+        determinedStatus = 'active'; // Super Admins are always active
       } else if (!profile) {
         determinedPermissions = {
           can_create_server: false,
@@ -83,14 +83,15 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         };
       }
       
+      // Client-side check for expired kick status
       if (determinedStatus === 'kicked' && determinedKickedAt) {
-        const kickedTime = new Date(determinedKickedAt).getTime();
-        const fifteenMinutesAgo = Date.now() - (15 * 60 * 1000);
-        if (kickedTime < fifteenMinutesAgo) {
-          console.log(`[SessionContext] User ${currentSession.user.id} was kicked, but 15 minutes have passed. Auto-unkicking.`);
-          await supabase.from('profiles').update({ status: 'active', kicked_at: null }).eq('id', currentSession.user.id);
-          // This part requires an admin client, so we'll rely on the server-side cron/middleware to handle it.
-          // For the client, we can optimistically set the status to active.
+        const kickedTime = new Date(determinedKickedAt);
+        const unkickTime = addMinutes(kickedTime, 15); // Assuming 15 minutes default kick duration
+        const now = new Date();
+
+        if (now >= unkickTime) {
+          console.log(`[SessionContext] User ${currentSession.user.id} was kicked, but 15 minutes have passed. Auto-unkicking locally.`);
+          // Optimistically update local state. Middleware/cron will handle DB update.
           determinedStatus = 'active';
           determinedKickedAt = null;
           toast.info("Tu expulsión ha expirado. Puedes volver a usar la aplicación.");
@@ -110,7 +111,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       setUserLanguage('es');
       setUserStatus(null);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
@@ -154,67 +155,123 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     return () => {
       subscription.unsubscribe();
     };
-  }, [router, pathname]);
+  }, [router, pathname, fetchUserProfileAndRole]);
 
   useEffect(() => {
     const checkSessionAndGlobalStatus = async () => {
-      if (!session) return;
+      if (!session || !session.user.id) return;
 
       console.log(`[SessionContext] Real-time status check for user ${session.user.id}. Current role: ${userRole}, status: ${userStatus}`);
 
-      // REMOVED: The aggressive supabase.auth.refreshSession() call.
-      // The Supabase client handles this automatically.
+      // Fetch global settings
+      try {
+        const response = await fetch('/api/settings/public-status');
+        if (!response.ok) {
+          console.warn('Could not fetch public status for real-time check.');
+          return;
+        }
+        const statusData = await response.json();
+        const { usersDisabled, adminsDisabled } = statusData;
 
-      if (userRole !== 'super_admin') {
-        try {
-          const response = await fetch('/api/settings/public-status');
-          if (!response.ok) {
-            console.warn('Could not fetch public status for real-time check.');
-            return;
-          }
-          const statusData = await response.json();
-          const { usersDisabled, adminsDisabled } = statusData;
+        // Fetch user's current profile status from DB
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('status, kicked_at')
+          .eq('id', session.user.id)
+          .single();
 
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('status, kicked_at')
-            .eq('id', session.user.id)
-            .single();
-
-          if (profileError || !profile) {
-            console.error("[SessionContext] Error re-fetching user profile status:", profileError);
-            setUserStatus('active'); 
-          } else {
-            let currentStatus = profile.status as UserStatus;
-            if (profile.status === 'kicked' && profile.kicked_at) {
-              const kickedTime = new Date(profile.kicked_at).getTime();
-              const fifteenMinutesAgo = Date.now() - (15 * 60 * 1000);
-              if (kickedTime < fifteenMinutesAgo) {
-                currentStatus = 'active';
-              }
+        if (profileError || !profile) {
+          console.error("[SessionContext] Error re-fetching user profile status:", profileError);
+          // If profile not found, assume active for now, but log out if global settings disable their role
+          if (userRole !== 'super_admin') {
+            if (usersDisabled && userRole === 'user') {
+              console.log(`[SessionContext] Real-time check: User ${session.user.id} (role: user) is disabled globally. Signing out.`);
+              await supabase.auth.signOut();
+              toast.error("El acceso para cuentas de Usuario ha sido desactivado. Se ha cerrado tu sesión.");
+              router.push('/login?error=account_type_disabled');
+              return;
+            } else if (adminsDisabled && userRole === 'admin') {
+              console.log(`[SessionContext] Real-time check: User ${session.user.id} (role: admin) is disabled globally. Signing out.`);
+              await supabase.auth.signOut();
+              toast.error("El acceso para cuentas de Admin ha sido desactivado. Se ha cerrado tu sesión.");
+              router.push('/login?error=account_type_disabled');
+              return;
             }
-            setUserStatus(currentStatus);
           }
+          return; // Exit if profile not found and no global disable
+        }
 
+        const dbStatus = profile.status as UserStatus;
+        const dbKickedAt = profile.kicked_at;
+
+        // Handle global role disable (only for non-super_admin)
+        if (userRole !== 'super_admin') {
           if (usersDisabled && userRole === 'user') {
-            console.log(`[SessionContext] Real-time check: User ${session.user.id} (role: user) is disabled. Signing out.`);
+            console.log(`[SessionContext] Real-time check: User ${session.user.id} (role: user) is disabled globally. Signing out.`);
             await supabase.auth.signOut();
             toast.error("El acceso para cuentas de Usuario ha sido desactivado. Se ha cerrado tu sesión.");
+            router.push('/login?error=account_type_disabled');
+            return;
           } else if (adminsDisabled && userRole === 'admin') {
-            console.log(`[SessionContext] Real-time check: User ${session.user.id} (role: admin) is disabled. Signing out.`);
+            console.log(`[SessionContext] Real-time check: User ${session.user.id} (role: admin) is disabled globally. Signing out.`);
             await supabase.auth.signOut();
             toast.error("El acceso para cuentas de Admin ha sido desactivado. Se ha cerrado tu sesión.");
+            router.push('/login?error=account_type_disabled');
+            return;
           }
-        } catch (error) {
-          console.error("Error checking global status in real-time:", error);
         }
+
+        // Handle individual user status changes (banned/kicked)
+        if (dbStatus === 'banned' && userStatus !== 'banned') {
+          console.log(`[SessionContext] Real-time check: User ${session.user.id} is now banned. Signing out.`);
+          await supabase.auth.signOut();
+          toast.error("Tu cuenta ha sido baneada. Se ha cerrado tu sesión.");
+          router.push('/login?error=account_banned');
+          return;
+        }
+
+        if (dbStatus === 'kicked' && userStatus !== 'kicked') {
+          const kickedTime = dbKickedAt ? new Date(dbKickedAt).getTime() : 0;
+          const fifteenMinutesAgo = Date.now() - (15 * 60 * 1000);
+          if (kickedTime > fifteenMinutesAgo) { // Still actively kicked
+            console.log(`[SessionContext] Real-time check: User ${session.user.id} is now kicked. Signing out.`);
+            await supabase.auth.signOut();
+            toast.warning("Has sido expulsado del sistema. Se ha cerrado tu sesión.");
+            router.push(`/login?error=account_kicked&kicked_at=${dbKickedAt}`);
+            return;
+          } else {
+            // If DB says kicked but time has expired, update DB to active
+            console.log(`[SessionContext] Real-time check: User ${session.user.id} was kicked, but 15 minutes have passed. Auto-unkicking in DB.`);
+            await supabase.from('profiles').update({ status: 'active', kicked_at: null }).eq('id', session.user.id);
+            // For client-side, optimistically update local state
+            setUserStatus('active');
+            toast.info("Tu expulsión ha expirado. Puedes volver a usar la aplicación.");
+          }
+        }
+        
+        // If status is active in DB but local state was banned/kicked, update local state
+        if (dbStatus === 'active' && (userStatus === 'banned' || userStatus === 'kicked')) {
+            console.log(`[SessionContext] Real-time check: User ${session.user.id} is now active in DB. Updating local state.`);
+            setUserStatus('active');
+            toast.info("Tu cuenta ha sido reactivada.");
+        }
+
+        // If there's any discrepancy in status or kicked_at, re-fetch full profile to synchronize all state
+        if (dbStatus !== userStatus || (dbKickedAt && dbKickedAt !== profile.kicked_at) || (!dbKickedAt && profile.kicked_at)) {
+            console.log(`[SessionContext] Real-time check: Profile data discrepancy detected. Re-fetching full profile for user ${session.user.id}.`);
+            await fetchUserProfileAndRole(session);
+        }
+
+      } catch (error) {
+        console.error("Error checking global status in real-time:", error);
       }
     };
 
-    const intervalId = setInterval(checkSessionAndGlobalStatus, 3000);
+    // Set interval for 10 seconds
+    const intervalId = setInterval(checkSessionAndGlobalStatus, 10000);
 
     return () => clearInterval(intervalId);
-  }, [session, userRole, router, userStatus]);
+  }, [session, userRole, userStatus, router, fetchUserProfileAndRole]);
 
   if (isLoading) {
     return (
