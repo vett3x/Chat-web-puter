@@ -94,11 +94,12 @@ export async function middleware(req: NextRequest) {
     }
 
     if (shouldBeKicked && !publicPaths.includes(req.nextUrl.pathname)) {
-      console.log(`[Middleware] User ${session.user.id} (Role: ${userRole}, Status: ${userStatus}) should be kicked. Redirecting to /login with error: ${kickReason}`);
+      console.log(`[Middleware] User ${session.user.id} (Role: ${userRole}, Status: ${userStatus}) should be kicked.`);
       await supabase.auth.signOut();
-      const redirectUrl = req.nextUrl.clone();
-      redirectUrl.pathname = '/login';
-      redirectUrl.searchParams.set('error', kickReason);
+      
+      const finalRedirectUrl = new URL('/login', req.nextUrl.origin); // Create absolute URL
+      finalRedirectUrl.searchParams.set('error', kickReason);
+      
       // Fetch the reason from moderation_logs if it's a specific kick/ban
       if (kickReason === 'account_kicked' || kickReason === 'account_banned') {
         const { data: moderationLog } = await supabase
@@ -110,13 +111,14 @@ export async function middleware(req: NextRequest) {
           .limit(1)
           .single();
         if (moderationLog?.reason) {
-          redirectUrl.searchParams.set('reason', moderationLog.reason);
+          finalRedirectUrl.searchParams.set('reason', moderationLog.reason);
         }
         if (kickedAt) {
-          redirectUrl.searchParams.set('kicked_at', kickedAt);
+          finalRedirectUrl.searchParams.set('kicked_at', kickedAt);
         }
       }
-      return NextResponse.redirect(redirectUrl);
+      console.log(`[Middleware] Final redirecting to: ${finalRedirectUrl.toString()}`);
+      return NextResponse.redirect(finalRedirectUrl);
     }
   }
 
