@@ -52,12 +52,37 @@ export async function provisionApp(data: AppProvisioningData) {
   let serverIdForLog: string | null = null; // Initialize to null
 
   try {
-    // FASE 1: Configuración del Entorno
+    // FASE 1: Configuración del Entorno y Verificación de Cuotas
     await supabaseAdmin.from('server_events_log').insert({
       user_id: userId,
       event_type: 'app_provisioning_started',
       description: `Iniciando aprovisionamiento para la aplicación '${appName}' (ID: ${appId}).`,
     });
+
+    // --- QUOTA ENFORCEMENT ---
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('max_containers, cpu_limit, memory_limit_mb, role')
+      .eq('id', userId)
+      .single();
+
+    if (profileError || !profile) {
+      throw new Error('No se pudo verificar la cuota del usuario.');
+    }
+
+    const { count: appCount, error: countError } = await supabaseAdmin
+      .from('user_apps')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    if (countError) {
+      throw new Error('No se pudo contar las aplicaciones existentes del usuario.');
+    }
+
+    if (profile.role !== 'super_admin' && appCount !== null && appCount >= profile.max_containers) {
+      throw new Error(`Has alcanzado tu límite de ${profile.max_containers} contenedores/aplicaciones.`);
+    }
+    // --- END QUOTA ENFORCEMENT ---
 
     const { data: serverData, error: serverError } = await supabaseAdmin.from('user_servers').select('id, ip_address, ssh_port, ssh_username, ssh_password, name').eq('status', 'ready').limit(1).single();
     if (serverError || !serverData) {
@@ -72,15 +97,17 @@ export async function provisionApp(data: AppProvisioningData) {
     const hostPort = generateRandomPort();
     containerName = `app-${appName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${appId.substring(0, 8)}`;
     
-    // --- CAPA 3: FORTALECIMIENTO DEL CONTENEDOR ---
+    // --- CAPA 3: FORTALECIMIENTO DEL CONTENEDOR Y APLICACIÓN DE CUOTAS ---
     const securityFlags = [
-      '--read-only', // Make container root filesystem read-only
-      '--tmpfs /tmp', // Provide a writable temporary directory
-      '--cap-drop=ALL', // Drop all Linux capabilities
-      '--security-opt no-new-privileges', // Prevent privilege escalation
+      '--read-only',
+      '--tmpfs /tmp',
+      '--cap-drop=ALL',
+      '--security-opt no-new-privileges',
     ].join(' ');
 
-    const runCommand = `docker run -d --name ${containerName} -p ${hostPort}:${containerPort} ${securityFlags} -v ${containerName}-app-data:/app --entrypoint tail node:lts-bookworm -f /dev/null`;
+    const quotaFlags = profile.role !== 'super_admin' ? `--cpus="${profile.cpu_limit}" --memory="${profile.memory_limit_mb}m"` : '';
+
+    const runCommand = `docker run -d --name ${containerName} -p ${hostPort}:${containerPort} ${securityFlags} ${quotaFlags} -v ${containerName}-app-data:/app --entrypoint tail node:lts-bookworm -f /dev/null`;
     
     await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Ejecutando comando Docker para crear contenedor: ${runCommand}\n`);
     const { stdout: newContainerId, stderr: runStderr, code: runCode } = await executeSshCommand(server, runCommand);

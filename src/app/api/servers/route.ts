@@ -150,6 +150,31 @@ export async function POST(req: NextRequest) {
   );
 
   try {
+    // --- QUOTA ENFORCEMENT ---
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('max_servers')
+      .eq('id', session.user.id)
+      .single();
+
+    if (profileError || !profile) {
+      throw new Error('No se pudo verificar la cuota del usuario.');
+    }
+
+    const { count: serverCount, error: countError } = await supabaseAdmin
+      .from('user_servers')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', session.user.id);
+
+    if (countError) {
+      throw new Error('No se pudo contar los servidores existentes del usuario.');
+    }
+
+    if (userRole !== 'super_admin' && serverCount !== null && serverCount >= profile.max_servers) {
+      return NextResponse.json({ message: `Has alcanzado tu límite de ${profile.max_servers} servidores.` }, { status: 403 });
+    }
+    // --- END QUOTA ENFORCEMENT ---
+
     const body = await req.json();
     const newServerData = serverSchema.parse(body);
 
