@@ -144,7 +144,7 @@ export function UpdateManagerDialog({ open, onOpenChange }: UpdateManagerDialogP
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" disabled={isUpdating}>
                   {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GitPullRequest className="mr-2 h-4 w-4" />}
-                  Activar Actualización
+                  Actualizar
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
@@ -157,7 +157,7 @@ export function UpdateManagerDialog({ open, onOpenChange }: UpdateManagerDialogP
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
                   <AlertDialogAction onClick={handleActivateUpdate} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                    Sí, activar
+                    Sí, actualizar
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
