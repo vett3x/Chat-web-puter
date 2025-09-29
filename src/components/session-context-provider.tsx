@@ -183,7 +183,24 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
 
       console.log(`[SessionContext] Real-time status check for user ${session.user.id}. Current role: ${userRole}, status: ${userStatus}`);
 
-      try { // Wrap the entire logic in a try-catch
+      try {
+        // NEW: Proactively refresh Supabase session
+        const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) {
+          console.warn("[SessionContext] Error refreshing Supabase session:", refreshError);
+          // If refresh fails, it means the session is likely invalid, force sign out.
+          await supabase.auth.signOut();
+          router.push('/login');
+          return;
+        }
+        // If session was refreshed, update local state and re-fetch profile to ensure consistency
+        if (refreshedSession && refreshedSession.user.id !== session.user.id) {
+            setSession(refreshedSession);
+            await fetchUserProfileAndRole(refreshedSession);
+            console.log("[SessionContext] Supabase session refreshed and profile re-fetched.");
+        }
+
+
         // Fetch global settings
         const response = await fetch('/api/settings/public-status');
         if (!response.ok) {
