@@ -39,7 +39,7 @@ interface ProfileDropdownProps {
 export function ProfileDropdown({ onOpenProfileSettings, onOpenAccountSettings, onOpenServerManagement, onOpenUserManagement, onOpenUpdateManager, onOpenApiManagement }: ProfileDropdownProps) {
   const { session, userRole, userStatus } = useSession();
   const router = useRouter();
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useTheme(); // Get resolvedTheme
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -92,6 +92,7 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAccountSettings, 
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
   const isSuperAdmin = userRole === 'super_admin';
   const isBannedOrKicked = userStatus === 'banned' || userStatus === 'kicked';
+  const isDarkMode = resolvedTheme === 'dark'; // Use resolvedTheme for actual display
 
   return (
     <DropdownMenu>
@@ -151,12 +152,12 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAccountSettings, 
           onSelect={(e: Event) => e.preventDefault()}
         >
           <div className="flex items-center">
-            {isMounted && theme === 'dark' ? <Moon className="mr-2 h-4 w-4" /> : <Sun className="mr-2 h-4 w-4" />}
+            {isMounted && isDarkMode ? <Moon className="mr-2 h-4 w-4" /> : <Sun className="mr-2 h-4 w-4" />}
             <span>Modo Oscuro</span>
           </div>
           {isMounted && (
             <Switch
-              checked={theme === 'dark'}
+              checked={isDarkMode} // Use isDarkMode (resolvedTheme) here
               onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
               onClick={(e) => e.stopPropagation()}
             />
