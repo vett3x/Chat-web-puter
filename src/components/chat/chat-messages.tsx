@@ -2,13 +2,11 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Bot, User, Loader2, Clipboard, RefreshCw, Upload, Trash2, LayoutDashboard, ClipboardList, Database, Users, BrainCircuit, PenSquare, Lightbulb, Bug } from 'lucide-react';
-import { MessageContent } from '@/components/message-content';
+import { Bot, User, Loader2, RefreshCw, LayoutDashboard, ClipboardList, Database, Users, BrainCircuit, PenSquare, Lightbulb, Bug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getModelLabel } from '@/lib/ai-models';
 import { useUserApiKeys } from '@/hooks/use-user-api-keys';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,10 +18,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ConstructionPlan } from './construction-plan';
 import { Message } from '@/hooks/use-general-chat'; // Corrected import path for Message
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { RenderablePart } from '@/lib/utils'; // Import RenderablePart
+import { ChatMessageItem } from './chat-message-item'; // NEW: Import the memoized component
 
 interface ChatMessagesProps {
   messages: Message[];
@@ -100,21 +97,6 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
     }
   }, [handleScroll]);
 
-  const handleCopy = (content: Message['content']) => {
-    let textToCopy = '';
-    if (typeof content === 'string') {
-      textToCopy = content;
-    } else if (Array.isArray(content)) {
-      textToCopy = content.map(part => (part.type === 'text' ? part.text : '')).join('\n');
-    }
-    navigator.clipboard.writeText(textToCopy);
-    toast.success('Copiado al portapapeles.');
-  };
-
-  const handleRequestChanges = () => {
-    toast.info("Plan rechazado. Por favor, escribe tus cambios en el chat para que la IA genere un nuevo plan.");
-  };
-
   const appSuggestions = [
     { icon: <LayoutDashboard className="h-5 w-5 text-blue-400" />, title: "Crear la página de inicio", description: "Diseña el layout principal de la aplicación.", prompt: "Crea la página de inicio con una barra de navegación, un área de contenido principal y un pie de página." },
     { icon: <ClipboardList className="h-5 w-5 text-orange-400" />, title: "Añadir un formulario", description: "Implementa un formulario de contacto o registro.", prompt: "Añade un formulario de contacto con campos para nombre, email y mensaje." },
@@ -171,80 +153,21 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
             }
 
             const isLastMessage = index === displayedMessages.length - 1;
-            const hasFiles = Array.isArray(message.content) && message.content.some((part: RenderablePart) => part.type === 'code' && part.filename);
 
             return (
-              <div
+              <ChatMessageItem
                 key={message.id}
-                className={`flex flex-col gap-1 ${message.role === 'user' ? 'items-end' : 'items-start'}`}
-              >
-                <div className={`group relative flex gap-3 max-w-[80%] ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                  <div className="flex-shrink-0">
-                    {message.role === 'user' ? (
-                      <Avatar className="w-8 h-8 shadow-avatar-user">
-                        {userAvatarUrl && userAvatarUrl !== '' ? (
-                          <AvatarImage src={userAvatarUrl} alt="User Avatar" />
-                        ) : (
-                          <AvatarFallback className="bg-primary text-primary-foreground">
-                            <User className="h-4 w-4" />
-                          </AvatarFallback>
-                        )}
-                      </Avatar>
-                    ) : (
-                      <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center shadow-avatar-ai">
-                        <Bot className="h-4 w-4" />
-                      </div>
-                    )}
-                  </div>
-                  <div className={`rounded-lg p-3 ${message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                    {message.isTyping ? (
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="text-sm">Pensando...</span>
-                      </div>
-                    ) : (
-                      <MessageContent
-                        content={message.content}
-                        isNew={isLastMessage && !message.isAnimated}
-                        aiResponseSpeed={aiResponseSpeed}
-                        isAppChat={isAppChat}
-                        isConstructionPlan={message.isConstructionPlan}
-                        planApproved={message.planApproved}
-                        onApprovePlan={onApprovePlan}
-                        onRequestChanges={handleRequestChanges}
-                        messageId={message.id}
-                        onAnimationComplete={() => {}}
-                        isErrorAnalysisRequest={message.isErrorAnalysisRequest}
-                        isCorrectionPlan={message.isCorrectionPlan}
-                        correctionApproved={message.correctionApproved}
-                        isLoading={isLoading}
-                      />
-                    )}
-                  </div>
-                  {message.role === 'assistant' && !message.isTyping && !message.isConstructionPlan && (
-                    <div className="absolute top-1/2 -translate-y-1/2 left-full ml-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopy(message.content)} title="Copiar">
-                        <Clipboard className="h-3.5 w-3.5" />
-                      </Button>
-                      {hasFiles && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onReapplyFiles(message)} disabled={isLoading} title="Reaplicar archivos">
-                          <Upload className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                      {isLastMessage && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onRegenerate} disabled={isLoading} title="Regenerar">
-                          <RefreshCw className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
-                {message.role === 'assistant' && !message.isTyping && message.model && (
-                  <p className="text-xs text-muted-foreground px-12">
-                    ✓ Generado con {getModelLabel(message.model, userApiKeys)}
-                  </p>
-                )}
-              </div>
+                message={message}
+                isLastMessage={isLastMessage}
+                userAvatarUrl={userAvatarUrl}
+                aiResponseSpeed={aiResponseSpeed}
+                onRegenerate={onRegenerate}
+                onReapplyFiles={onReapplyFiles}
+                onApprovePlan={onApprovePlan}
+                isAppChat={isAppChat}
+                isLoading={isLoading}
+                userApiKeys={userApiKeys}
+              />
             );
           })
         )}

@@ -6,6 +6,13 @@ import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants';
 
+// NEW: Add sanitization function
+function sanitizeCommandDetails(command: string | null): string | null {
+  if (!command) return null;
+  // Replace sshpass -p 'password' with a generic placeholder
+  return command.replace(/sshpass -p '[^']+' ssh/, "sshpass -p '[PASSWORD_HIDDEN]' ssh");
+}
+
 // Helper function to get the session and user role
 async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null; userPermissions: UserPermissions }> {
   const cookieStore = cookies() as any;
@@ -116,7 +123,13 @@ export async function GET(
       throw new Error('Error al cargar el historial de eventos del contenedor.');
     }
 
-    return NextResponse.json(events, { status: 200 });
+    // Sanitize the command_details field before sending
+    const sanitizedEvents = events.map(event => ({
+      ...event,
+      command_details: sanitizeCommandDetails(event.command_details),
+    }));
+
+    return NextResponse.json(sanitizedEvents, { status: 200 });
 
   } catch (error: any) {
     console.error(`Unhandled error in GET /api/.../history:`, error);
