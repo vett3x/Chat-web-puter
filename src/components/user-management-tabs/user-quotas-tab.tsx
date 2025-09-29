@@ -5,16 +5,18 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader2, Save, Server, Dock, Globe, AlertCircle } from 'lucide-react';
+import { Loader2, Save, Server, Dock, Globe, AlertCircle, Cpu, MemoryStick } from 'lucide-react';
 import { toast } from 'sonner';
 
 const quotasFormSchema = z.object({
   max_servers: z.coerce.number().int().min(0, 'El valor no puede ser negativo.'),
   max_containers: z.coerce.number().int().min(0, 'El valor no puede ser negativo.'),
   max_tunnels: z.coerce.number().int().min(0, 'El valor no puede ser negativo.'),
+  cpu_limit: z.coerce.number().min(0.1, 'El mínimo es 0.1').max(16, 'El máximo es 16'),
+  memory_limit_mb: z.coerce.number().int().min(128, 'El mínimo es 128 MB.'),
 });
 
 type QuotasFormValues = z.infer<typeof quotasFormSchema>;
@@ -23,6 +25,8 @@ interface UserQuotas {
   max_servers: number;
   max_containers: number;
   max_tunnels: number;
+  cpu_limit: number;
+  memory_limit_mb: number;
 }
 
 interface UserQuotasTabProps {
@@ -46,6 +50,8 @@ export function UserQuotasTab({ userId, userName, currentUserRole, targetUserRol
       max_servers: 0,
       max_containers: 0,
       max_tunnels: 0,
+      cpu_limit: 1.0,
+      memory_limit_mb: 1024,
     },
   });
 
@@ -131,6 +137,22 @@ export function UserQuotasTab({ userId, userName, currentUserRole, targetUserRol
               <FormItem>
                 <FormLabel className="flex items-center gap-2"><Globe className="h-4 w-4" /> Máximo de Túneles</FormLabel>
                 <FormControl><Input type="number" {...field} disabled={!canEdit || isSaving} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="cpu_limit" render={({ field }) => (
+              <FormItem>
+                <FormLabel className="flex items-center gap-2"><Cpu className="h-4 w-4" /> Límite de CPU (Cores)</FormLabel>
+                <FormControl><Input type="number" step="0.1" {...field} disabled={!canEdit || isSaving} /></FormControl>
+                <FormDescription>Número de cores de CPU asignados a cada contenedor (ej: 0.5, 1, 2).</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="memory_limit_mb" render={({ field }) => (
+              <FormItem>
+                <FormLabel className="flex items-center gap-2"><MemoryStick className="h-4 w-4" /> Límite de Memoria (MB)</FormLabel>
+                <FormControl><Input type="number" {...field} disabled={!canEdit || isSaving} /></FormControl>
+                <FormDescription>Cantidad máxima de memoria RAM en MB asignada a cada contenedor (ej: 512, 1024).</FormDescription>
                 <FormMessage />
               </FormItem>
             )} />

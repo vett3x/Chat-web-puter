@@ -11,6 +11,8 @@ const updateQuotasSchema = z.object({
   max_servers: z.number().int().min(0),
   max_containers: z.number().int().min(0),
   max_tunnels: z.number().int().min(0),
+  cpu_limit: z.coerce.number().min(0.1).max(16),
+  memory_limit_mb: z.coerce.number().int().min(128),
 });
 
 async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null }> {
@@ -56,7 +58,7 @@ export async function GET(req: NextRequest, context: any) {
   try {
     const { data, error } = await supabaseAdmin
       .from('profiles')
-      .select('max_servers, max_containers, max_tunnels')
+      .select('max_servers, max_containers, max_tunnels, cpu_limit, memory_limit_mb')
       .eq('id', userIdToFetch)
       .single();
 
