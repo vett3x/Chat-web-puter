@@ -27,18 +27,19 @@ NEXT_APP_NAME="chat-app-next"
 WS_APP_NAME="chat-app-ws"
 NODE_MAJOR_VERSION=22
 
+# Variables de entorno para .env.local (¡NO COMPARTIR ESTAS CLAVES PÚBLICAMENTE!)
+SUPABASE_URL="https://juxrggowingqlchwfuct.supabase.co"
+SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1eHJnZ293aW5ncWxjaHdmdWN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgxNDY4OTYsImV4cCI6MjA3MzcyMjg5Nn0.Bf05aFnLW_YCAZdCZC2Kgqtf7is9WcORfDagC2Nq0ec"
+SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1eHJnZ293aW5ncWxjaHdmdWN0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImiYXQiOjE3NTgxNDY4OTYsImV4cCI6MjA3MzcyMjg5Nn0.IMgQlqNaEh9RmCAyaQqNLnOJJxEvL3B1zA03m4pCIW4"
+ENCRYPTION_KEY="a8f2e7d1c9b0e6a5f4d3c2b1a0e9d8c7b6a5f4d3c2b1a0e9d8c7b6a5f4d3c2b1"
+WEBSOCKET_PORT=3001
+
 # --- Funciones de Ayuda ---
 function check_command() {
   if ! command -v $1 &> /dev/null; then
     echo "Error: El comando '$1' no se encuentra. Por favor, instálalo."
     exit 1
   fi
-}
-
-function setup_dependencies() {
-    echo "--- Instalando dependencias del sistema (git, curl, sshpass)... ---"
-    sudo apt-get update
-    sudo apt-get install -y git curl sshpass
 }
 
 function setup_nodejs() {
@@ -49,25 +50,23 @@ function setup_nodejs() {
       echo "Node.js v${NODE_MAJOR_VERSION} ya está instalado. Omitiendo."
       return
     else
-      echo "Se encontró una versión diferente de Node.js (v${CURRENT_NODE_VERSION}). Se procederá a instalar la v${NODE_MAJOR_VERSION}."
+      echo "Se encontró una versión diferente de Node.js (v${CURRENT_NODE_VERSION}). Se recomienda usar la v${NODE_MAJOR_VERSION}."
+      read -p "¿Deseas continuar con la versión actual o instalar la v${NODE_MAJOR_VERSION}? (c/i): " choice
+      if [ "$choice" == "c" ]; then
+        echo "Continuando con la versión actual de Node.js."
+        return
+      fi
     fi
   fi
 
   echo "Instalando Node.js v${NODE_MAJOR_VERSION} usando NodeSource..."
-  # Instalar dependencias para añadir repositorios
   sudo apt-get update
-  sudo apt-get install -y ca-certificates
-
-  # Añadir la clave GPG de NodeSource
+  sudo apt-get install -y ca-certificates curl gnupg
   sudo mkdir -p /etc/apt/keyrings
   curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-
-  # Añadir el repositorio de NodeSource
   echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR_VERSION.x nodistro main" | sudo tee /etc/apt/sources.list.d/nodesource.list
-
-  # Instalar Node.js
   sudo apt-get update
-  sudo apt-get install nodejs -y
+  sudo apt-get install nodejs sshpass -y
   echo "Node.js v${NODE_MAJOR_VERSION} instalado correctamente."
   node -v
   npm -v
@@ -80,53 +79,81 @@ function setup_pm2() {
   fi
 }
 
-# --- Inicio del Script ---
-echo ">>> Iniciando el despliegue de la aplicación..."
+function setup_crontab() {
+  echo "--- Configurando tareas CRON para la gestión del ciclo de vida de la aplicación ---"
+  # Obtener la IP pública del servidor
+  SERVER_IP=$(curl -s ifconfig.me)
+  if [ -z "$SERVER_IP" ]; then
+    echo "Advertencia: No se pudo obtener la IP del servidor. Usando 'localhost'."
+    SERVER_IP="localhost"
+  fi
 
-# --- Paso 1: Instalar Dependencias del Sistema ---
-setup_dependencies
+  CRON_JOB="*/5 * * * * curl -s http://${SERVER_IP}:${WEBSOCKET_PORT}/api/cron/manage-app-lifecycle > /dev/null 2>&1"
+  
+  # Comprobar si la tarea CRON ya existe
+  if ! sudo crontab -l | grep -Fq "$CRON_JOB"; then
+    echo "Añadiendo tarea CRON: $CRON_JOB"
+    (sudo crontab -l 2>/dev/null; echo "$CRON_JOB") | sudo crontab -
+    echo "Tarea CRON añadida correctamente."
+  else
+    echo "La tarea CRON ya existe. Omitiendo."
+  fi
+}
 
-# --- Paso 2: Instalar Node.js v22 ---
-setup_nodejs
-
-# --- Paso 3: Clonar el Repositorio ---
-if [ -d "$PROJECT_DIR" ]; then
-  echo "--- El directorio '$PROJECT_DIR' ya existe. Omitiendo clonación. ---"
-else
-  echo "--- Paso 3: Clonando el repositorio desde GitHub... ---"
-  git clone "$REPO_URL"
-fi
-
-cd "$PROJECT_DIR"
-echo "Navegando al directorio del proyecto: $(pwd)"
-
-# --- Paso 4: Configuración de Variables de Entorno ---
-echo ""
-echo "--- Paso 4: ACCIÓN REQUERIDA - Configuración del entorno ---"
-echo "Necesitas crear un archivo '.env.local' con las claves de Supabase."
-echo "Copia y pega el siguiente contenido en un nuevo archivo llamado '.env.local':"
-echo ""
-echo "----------------------------------------------------------------"
-cat << EOF
+function create_env_file() {
+  echo "--- Creando archivo .env.local ---"
+  cat << EOF > .env.local
 # Supabase
-NEXT_PUBLIC_SUPABASE_URL="https://juxrggowingqlchwfuct.supabase.co"
-NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1eHJnZ293aW5ncWxjaHdmdWN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgxNDY4OTYsImV4cCI6MjA3MzcyMjg5Nn0.Bf05aFnLW_YCAZdCZC2Kgqtf7is9WcORdDagC2Nq0ec"
+NEXT_PUBLIC_SUPABASE_URL="${SUPABASE_URL}"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY}"
+SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY}"
 
-# La clave de servicio es un secreto y debe manejarse con cuidado.
-# Asegúrate de que este archivo .env.local no se suba a tu repositorio.
-SUPABASE_SERVICE_ROLE_KEY="tu_supabase_service_role_key_aqui"
+# Clave de cifrado para secretos (¡NO CAMBIAR DESPUÉS DE LA PRIMERA INSTALACIÓN!)
+ENCRYPTION_KEY="${ENCRYPTION_KEY}"
 
 # Puerto para el servidor de WebSockets
-WEBSOCKET_PORT=3001
+WEBSOCKET_PORT=${WEBSOCKET_PORT}
 EOF
-echo "----------------------------------------------------------------"
-echo ""
-echo "IMPORTANTE: Reemplaza 'tu_supabase_service_role_key_aqui' con tu clave real de Supabase."
-read -p "Una vez que hayas creado y guardado el archivo '.env.local', presiona [Enter] para continuar..."
+  echo "Archivo .env.local creado con éxito."
+}
 
-if [ ! -f ".env.local" ]; then
-    echo "Error: El archivo .env.local no fue encontrado. Abortando."
-    exit 1
+# --- Inicio del Script Principal ---
+echo ">>> Iniciando el despliegue de la aplicación..."
+
+# --- Paso 1: Verificar Prerrequisitos ---
+echo "--- Paso 1: Verificando prerrequisitos (git, curl)... ---"
+check_command "git"
+check_command "curl"
+
+# --- Paso 2: Instalar Node.js ---
+setup_nodejs
+
+# --- Paso 3: Clonar o Actualizar Repositorio ---
+IS_NEW_INSTALL=false
+if [ -d "$PROJECT_DIR" ]; then
+  echo "--- El directorio '$PROJECT_DIR' ya existe. Realizando actualización. ---"
+  cd "$PROJECT_DIR"
+  echo "Navegando al directorio del proyecto: $(pwd)"
+  echo "Realizando git pull para obtener los últimos cambios..."
+  git pull origin main
+else
+  echo "--- El directorio '$PROJECT_DIR' no existe. Realizando nueva instalación. ---"
+  echo "--- Paso 3: Clonando el repositorio desde GitHub... ---"
+  git clone "$REPO_URL"
+  cd "$PROJECT_DIR"
+  echo "Navegando al directorio del proyecto: $(pwd)"
+  IS_NEW_INSTALL=true
+fi
+
+# --- Paso 4: Configuración de Variables de Entorno ---
+if [ "$IS_NEW_INSTALL" = true ]; then
+  create_env_file
+else
+  echo "--- El archivo .env.local ya debería existir. Omitiendo creación. ---"
+  if [ ! -f ".env.local" ]; then
+    echo "Advertencia: .env.local no encontrado en una actualización. Creando uno nuevo."
+    create_env_file
+  fi
 fi
 
 # --- Paso 5: Instalar Dependencias ---
@@ -157,6 +184,9 @@ pm2 start "ts-node" --name "$WS_APP_NAME" -- server/websocket.ts
 # Guardar la lista de procesos de PM2 para que se reinicien con el servidor
 pm2 save
 echo "Lista de procesos de PM2 guardada para el reinicio automático del servidor."
+
+# --- Paso 8: Configurar Tareas CRON ---
+setup_crontab
 
 # --- Fin del Script ---
 echo ""
