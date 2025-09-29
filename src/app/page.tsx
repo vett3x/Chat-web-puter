@@ -138,6 +138,24 @@ export default function Home() {
     };
   }, [selectedAppDetails, refreshSidebarData]);
 
+  // NEW: Effect to handle tab visibility changes
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log("[Home] Tab became visible. Refreshing data...");
+        refreshSidebarData(); // Refresh all sidebar data
+        // NoteEditorPanel's internal fetchNote will be triggered by its noteId dependency
+        // when refreshSidebarData causes a re-render.
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [refreshSidebarData]); // Dependencies for visibility change
+
   const handleSelectItem = useCallback(async (id: string | null, type: SelectedItem['type'] | null) => {
     setActiveFile(null);
     setRightPanelView('preview');
@@ -337,7 +355,7 @@ export default function Home() {
   };
 
   return (
-    <div className="h-screen bg-background flex relative"> {/* Added relative for overlay positioning */}
+    <div className="h-screen bg-background flex relative">
       {isUserTemporarilyDisabled && (
         <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-4 pointer-events-auto">
           <ShieldAlert className="h-16 w-16 text-destructive mx-auto mb-4" />
