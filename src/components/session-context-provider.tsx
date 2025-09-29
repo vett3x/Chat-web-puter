@@ -59,92 +59,92 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
   }, [onGlobalRefresh]);
 
   const fetchUserProfileAndRole = useCallback(async (currentSession: Session | null) => {
-    if (currentSession?.user?.id) {
-      try {
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('role, permissions, avatar_url, language, status, kicked_at')
-          .eq('id', currentSession.user.id)
-          .single();
-
-        let determinedRole: UserRole | null = null;
-        let determinedPermissions: UserPermissions = {};
-        let determinedAvatarUrl: string | null = null;
-        let determinedLanguage: string | null = 'es';
-        let determinedStatus: UserStatus = 'active';
-        let determinedKickedAt: string | null = null;
-
-        if (error) {
-          console.error('[SessionContext] Error fetching user profile:', error);
-          determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
-          determinedPermissions = {}; 
-          determinedAvatarUrl = null;
-          determinedLanguage = 'es';
-          determinedStatus = 'active'; 
-          determinedKickedAt = null;
-        } else if (profile) {
-          determinedRole = profile.role as UserRole;
-          determinedPermissions = profile.permissions || {};
-          determinedAvatarUrl = profile.avatar_url;
-          determinedLanguage = profile.language || 'es';
-          determinedStatus = profile.status as UserStatus;
-          determinedKickedAt = profile.kicked_at;
-        } else {
-          determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
-          determinedPermissions = {
-            can_create_server: false,
-            can_manage_docker_containers: false,
-            can_manage_cloudflare_domains: false,
-            can_manage_cloudflare_tunnels: false,
-          };
-          determinedAvatarUrl = null;
-          determinedLanguage = 'es';
-          determinedStatus = 'active';
-          determinedKickedAt = null;
-        }
-        
-        if (determinedStatus === 'kicked' && determinedKickedAt) {
-          const kickedTime = new Date(determinedKickedAt);
-          const unkickTime = addMinutes(kickedTime, 15); 
-          const now = new Date();
-
-          if (now >= unkickTime) {
-            console.log(`[SessionContext] User ${currentSession.user.id} was kicked, but 15 minutes have passed. Auto-unkicking locally.`);
-            determinedStatus = 'active';
-            determinedKickedAt = null;
-            toast.info("Tu expulsión ha expirado. Puedes volver a usar la aplicación.");
-          }
-        }
-
-        // Only update state if values have actually changed
-        if (userRole !== determinedRole) setUserRole(determinedRole);
-        if (JSON.stringify(userPermissions) !== JSON.stringify(determinedPermissions)) setUserPermissions(determinedPermissions);
-        if (userAvatarUrl !== determinedAvatarUrl) setUserAvatarUrl(determinedAvatarUrl);
-        if (userLanguage !== determinedLanguage) setUserLanguage(determinedLanguage);
-        if (userStatus !== determinedStatus) setUserStatus(determinedStatus);
-        
-        // NEW: Update lastKnownProfileStatus here
-        setLastKnownProfileStatus({
-          status: determinedStatus,
-          kicked_at: determinedKickedAt,
-        });
-
-      } catch (fetchError: any) {
-        console.error('[SessionContext] Critical error during profile fetch:', fetchError);
-        setUserRole(SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user');
-        setUserPermissions({}); 
-        setUserAvatarUrl(null);
-        setUserLanguage('es');
-        setUserStatus('active');
-      }
-    } else {
+    if (!currentSession?.user?.id) {
       setUserRole(null);
       setUserPermissions({});
       setUserAvatarUrl(null);
       setUserLanguage('es');
       setUserStatus(null);
-      // NEW: Clear lastKnownProfileStatus when no session
       setLastKnownProfileStatus(null);
+      return;
+    }
+
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('role, permissions, avatar_url, language, status, kicked_at')
+        .eq('id', currentSession.user.id)
+        .single();
+
+      let determinedRole: UserRole | null = null;
+      let determinedPermissions: UserPermissions = {};
+      let determinedAvatarUrl: string | null = null;
+      let determinedLanguage: string | null = 'es';
+      let determinedStatus: UserStatus = 'active';
+      let determinedKickedAt: string | null = null;
+
+      if (error) {
+        console.error('[SessionContext] Error fetching user profile:', error);
+        determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
+        determinedPermissions = {}; 
+        determinedAvatarUrl = null;
+        determinedLanguage = 'es';
+        determinedStatus = 'active'; 
+        determinedKickedAt = null;
+      } else if (profile) {
+        determinedRole = profile.role as UserRole;
+        determinedPermissions = profile.permissions || {};
+        determinedAvatarUrl = profile.avatar_url;
+        determinedLanguage = profile.language || 'es';
+        determinedStatus = profile.status as UserStatus;
+        determinedKickedAt = profile.kicked_at;
+      } else {
+        determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
+        determinedPermissions = {
+          can_create_server: false,
+          can_manage_docker_containers: false,
+          can_manage_cloudflare_domains: false,
+          can_manage_cloudflare_tunnels: false,
+        };
+        determinedAvatarUrl = null;
+        determinedLanguage = 'es';
+        determinedStatus = 'active';
+        determinedKickedAt = null;
+      }
+      
+      if (determinedStatus === 'kicked' && determinedKickedAt) {
+        const kickedTime = new Date(determinedKickedAt);
+        const unkickTime = addMinutes(kickedTime, 15); 
+        const now = new Date();
+
+        if (now >= unkickTime) {
+          console.log(`[SessionContext] User ${currentSession.user.id} was kicked, but 15 minutes have passed. Auto-unkicking locally.`);
+          determinedStatus = 'active';
+          determinedKickedAt = null;
+          toast.info("Tu expulsión ha expirado. Puedes volver a usar la aplicación.");
+        }
+      }
+
+      // Only update state if values have actually changed
+      if (userRole !== determinedRole) setUserRole(determinedRole);
+      if (JSON.stringify(userPermissions) !== JSON.stringify(determinedPermissions)) setUserPermissions(determinedPermissions);
+      if (userAvatarUrl !== determinedAvatarUrl) setUserAvatarUrl(determinedAvatarUrl);
+      if (userLanguage !== determinedLanguage) setUserLanguage(determinedLanguage);
+      if (userStatus !== determinedStatus) setUserStatus(determinedStatus);
+      
+      // NEW: Update lastKnownProfileStatus here
+      setLastKnownProfileStatus({
+        status: determinedStatus,
+        kicked_at: determinedKickedAt,
+      });
+
+    } catch (fetchError: any) {
+      console.error('[SessionContext] Critical error during profile fetch:', fetchError);
+      setUserRole(SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user');
+      setUserPermissions({}); 
+      setUserAvatarUrl(null);
+      setUserLanguage('es');
+      setUserStatus('active');
     }
   }, [userRole, userPermissions, userAvatarUrl, userLanguage, userStatus]); // Added all state dependencies
 

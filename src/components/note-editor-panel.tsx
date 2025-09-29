@@ -6,7 +6,7 @@ import { useSession } from '@/components/session-context-provider';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Save, Loader2, Wand2, X, Check } from 'lucide-react';
+import { Save, Loader2, Wand2, X, Check } from 'lucide-react'; // Import KeyRound
 import { NoteAiChat } from './note-ai-chat'; // Corrected import path for NoteAiChat component
 import { ChatMessage } from '@/hooks/use-note-assistant-chat'; // ChatMessage is still from the hook
 import { ApiKey } from '@/hooks/use-user-api-keys';
@@ -132,7 +132,11 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
     setIsLoading(false);
   }, [noteId, session?.user?.id, editor]);
 
-  useEffect(() => { fetchNote(); }, [fetchNote]);
+  useEffect(() => { 
+    if (noteId && session?.user?.id) {
+      fetchNote(); 
+    }
+  }, [noteId, session?.user?.id, fetchNote]); // Only refetch when noteId or userId changes
 
   useEffect(() => {
     if (initialContent && editor) {
@@ -166,8 +170,7 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
   }, [note]);
 
   useEffect(() => {
-    if (isLoading || !note) return;
-    if (title === note.title) return;
+    if (isLoading || !note || title === note.title) return; // Only run if not loading, note exists, and title has changed
     setSaveStatus('idle');
     const handler = setTimeout(() => { handleSave(); }, 2000);
     return () => { clearTimeout(handler); };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ApiKey } from '@/hooks/use-user-api-keys';
@@ -114,6 +114,7 @@ export function useNoteAssistantChat({
   const [isLoading, setIsLoading] = useState(false);
   const [isPuterReady, setIsPuterReady] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>(''); // Initialize as empty string
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref for debounce
 
   const defaultWelcomeMessage: ChatMessage = { role: 'assistant', content: 'Hola, soy tu asistente. Pregúntame cualquier cosa sobre esta nota.' };
 

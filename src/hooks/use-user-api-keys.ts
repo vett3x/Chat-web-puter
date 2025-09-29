@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react'; // Import useRef
 import { toast } from 'sonner';
 
 export interface ApiKey {
@@ -17,9 +17,12 @@ export interface ApiKey {
   is_global: boolean; // NEW: Add is_global
 }
 
+const POLLING_INTERVAL = 30000; // 30 segundos
+
 export function useUserApiKeys() {
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref for debounce
 
   const fetchKeys = useCallback(async () => {
     setIsLoading(true);
@@ -35,9 +38,25 @@ export function useUserApiKeys() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchKeys();
+  // Debounced version of fetchKeys
+  const debouncedFetchKeys = useCallback(() => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    debounceTimeoutRef.current = setTimeout(() => {
+      fetchKeys();
+    }, 300); // 300ms debounce
   }, [fetchKeys]);
 
-  return { userApiKeys: keys, isLoadingApiKeys: isLoading, refreshApiKeys: fetchKeys };
+  useEffect(() => {
+    debouncedFetchKeys(); // Initial fetch
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') { // Only poll when tab is visible
+        debouncedFetchKeys();
+      }
+    }, POLLING_INTERVAL);
+    return () => clearInterval(interval);
+  }, [debouncedFetchKeys]);
+
+  return { userApiKeys: keys, isLoadingApiKeys: isLoading, refreshApiKeys: debouncedFetchKeys };
 }

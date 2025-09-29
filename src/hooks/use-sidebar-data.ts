@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react'; // Import useRef
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/components/session-context-provider';
 import { toast } from 'sonner';
@@ -50,6 +50,7 @@ export function useSidebarData() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [notes, setNotes] = useState<Note[]>([]); // New state for notes
   const [isLoading, setIsLoading] = useState(true);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref for debounce
 
   const fetchData = useCallback(async () => {
     if (!userId) {
@@ -111,12 +112,22 @@ export function useSidebarData() {
     }
   }, [userId]);
 
+  // Debounced version of fetchData
+  const debouncedFetchData = useCallback(() => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    debounceTimeoutRef.current = setTimeout(() => {
+      fetchData();
+    }, 300); // 300ms debounce
+  }, [fetchData]);
+
   useEffect(() => {
     if (userId) {
-      fetchData(); // Initial fetch
+      debouncedFetchData(); // Initial fetch
       const interval = setInterval(() => {
         if (document.visibilityState === 'visible') { // Only poll when tab is visible
-          fetchData();
+          debouncedFetchData();
         }
       }, POLLING_INTERVAL);
       return () => clearInterval(interval);
@@ -127,7 +138,7 @@ export function useSidebarData() {
       setNotes([]);
       setIsLoading(false);
     }
-  }, [userId, isSessionLoading, fetchData]);
+  }, [userId, isSessionLoading, debouncedFetchData]);
 
   const createConversation = async (onSuccess: (newConversation: Conversation) => void): Promise<string | null> => {
     if (!userId) {
@@ -250,7 +261,7 @@ export function useSidebarData() {
     folders,
     notes,
     isLoading,
-    fetchData,
+    fetchData: debouncedFetchData, // Expose debounced version
     createConversation,
     createFolder,
     createNote,

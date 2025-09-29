@@ -140,6 +140,7 @@ export function useDeepAICoderChat({
   const [selectedModel, setSelectedModel] = useState<string>(''); // Initialize as empty string
   const [autoFixStatus, setAutoFixStatus] = useState<AutoFixStatus>('idle');
   const autoFixAttempts = useRef(0);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref for debounce
 
   useEffect(() => {
     const checkPuter = () => {
@@ -206,26 +207,31 @@ export function useDeepAICoderChat({
   }, []);
 
   const loadConversationData = useCallback(async () => {
-    if (conversationId && userId) {
-      setIsLoading(true);
-      setMessages([]); // Clear messages immediately when conversationId changes
-      
-      const details = await getConversationDetails(conversationId);
-      
-      if (details?.model && (details.model.startsWith('puter:') || details.model.startsWith('user_key:'))) {
-        setSelectedModel(details.model);
-      } else {
-        // If conversation has no model, use the determined default model
-        setSelectedModel(determineDefaultModel(userApiKeys));
-      }
-
-      const fetchedMsgs = await getMessagesFromDB(conversationId);
-      setMessages(fetchedMsgs); // Always set messages from DB
-      setIsLoading(false);
-    } else {
-      setMessages([]);
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
     }
-  }, [conversationId, userId, getMessagesFromDB, getConversationDetails, userApiKeys]); // Removed isSendingFirstMessage from dependencies
+    debounceTimeoutRef.current = setTimeout(async () => {
+      if (conversationId && userId) {
+        setIsLoading(true);
+        setMessages([]); // Clear messages immediately when conversationId changes
+        
+        const details = await getConversationDetails(conversationId);
+        
+        if (details?.model && (details.model.startsWith('puter:') || details.model.startsWith('user_key:'))) {
+          setSelectedModel(details.model);
+        } else {
+          // If conversation has no model, use the determined default model
+          setSelectedModel(determineDefaultModel(userApiKeys));
+        }
+
+        const fetchedMsgs = await getMessagesFromDB(conversationId);
+        setMessages(fetchedMsgs); // Always set messages from DB
+        setIsLoading(false);
+      } else {
+        setMessages([]);
+      }
+    }, 100); // Debounce for 100ms
+  }, [conversationId, userId, getMessagesFromDB, getConversationDetails, userApiKeys]);
 
   useEffect(() => {
     loadConversationData();
