@@ -30,13 +30,13 @@ interface Profile {
 interface ProfileDropdownProps {
   onOpenProfileSettings: () => void;
   onOpenAccountSettings: () => void;
-  onOpenServerManagement: () => void;
+  onOpenAdminPanel: () => void; // Renamed from onOpenServerManagement
   onOpenUserManagement: () => void;
   onOpenUpdateManager: () => void;
   onOpenApiManagement: () => void; // NEW: Add onOpenApiManagement prop
 }
 
-export function ProfileDropdown({ onOpenProfileSettings, onOpenAccountSettings, onOpenServerManagement, onOpenUserManagement, onOpenUpdateManager, onOpenApiManagement }: ProfileDropdownProps) {
+export function ProfileDropdown({ onOpenProfileSettings, onOpenAccountSettings, onOpenAdminPanel, onOpenUserManagement, onOpenUpdateManager, onOpenApiManagement }: ProfileDropdownProps) {
   const { session, userRole, userStatus } = useSession();
   const router = useRouter();
   const { theme, setTheme, resolvedTheme } = useTheme(); // Get resolvedTheme
@@ -177,10 +177,10 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAccountSettings, 
           </div>
         </DropdownMenuItem>
         {isAdmin && (
-          <DropdownMenuItem onClick={onOpenServerManagement} className="flex items-center cursor-pointer">
+          <DropdownMenuItem onClick={onOpenAdminPanel} className="flex items-center cursor-pointer">
             <div className="flex items-center">
               <Server className="mr-2 h-4 w-4" />
-              <span>Gestión de Servidores</span>
+              <span>Panel de Administración</span>
             </div>
           </DropdownMenuItem>
         )}

@@ -16,8 +16,8 @@ interface SidebarHeaderProps {
   isCreatingFolder: boolean;
   isCreatingNote: boolean;
   onOpenProfileSettings: () => void;
-  onOpenAccountSettings: () => void; // Renamed from onOpenAppSettings
-  onOpenServerManagement: () => void;
+  onOpenAccountSettings: () => void;
+  onOpenAdminPanel: () => void; // Renamed from onOpenServerManagement
   onOpenUserManagement: () => void;
   onOpenDeepAiCoder: () => void;
   onOpenUpdateManager: () => void;
@@ -33,8 +33,8 @@ export function SidebarHeader({
   isCreatingFolder,
   isCreatingNote,
   onOpenProfileSettings,
-  onOpenAccountSettings, // Renamed from onOpenAppSettings
-  onOpenServerManagement,
+  onOpenAccountSettings,
+  onOpenAdminPanel, // Renamed from onOpenServerManagement
   onOpenUserManagement,
   onOpenDeepAiCoder,
   onOpenUpdateManager,
@@ -114,7 +114,7 @@ export function SidebarHeader({
         <ProfileDropdown
           onOpenProfileSettings={onOpenProfileSettings}
           onOpenAccountSettings={onOpenAccountSettings}
-          onOpenServerManagement={onOpenServerManagement}
+          onOpenAdminPanel={onOpenAdminPanel} // Renamed from onOpenServerManagement
           onOpenUserManagement={onOpenUserManagement}
           onOpenUpdateManager={onOpenUpdateManager}
           onOpenApiManagement={onOpenApiManagement}
@@ -187,9 +187,9 @@ export function SidebarHeader({
             <Button
               variant="outline"
               size="icon"
-              onClick={onOpenServerManagement}
+              onClick={onOpenAdminPanel} // Renamed from onOpenServerManagement
               className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7"
-              title="Gestión de Servidores"
+              title="Panel de Administración"
             >
               <Server className="h-3.5 w-3.5" />
             </Button>

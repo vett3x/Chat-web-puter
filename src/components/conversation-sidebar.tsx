@@ -52,7 +52,7 @@ interface ConversationSidebarProps {
   onFileSelect: (path: string) => void;
   onOpenProfileSettings: () => void;
   onOpenAccountSettings: () => void;
-  onOpenServerManagement: () => void;
+  onOpenAdminPanel: () => void;
   onOpenUserManagement: () => void;
   onOpenDeepAiCoder: () => void;
   onOpenUpdateManager: () => void;
@@ -69,7 +69,7 @@ export const ConversationSidebar = React.memo(({
   onFileSelect,
   onOpenProfileSettings,
   onOpenAccountSettings,
-  onOpenServerManagement,
+  onOpenAdminPanel,
   onOpenUserManagement,
   onOpenDeepAiCoder,
   onOpenUpdateManager,
@@ -200,7 +200,7 @@ export const ConversationSidebar = React.memo(({
         isCreatingNote={isCreatingNote}
         onOpenProfileSettings={onOpenProfileSettings}
         onOpenAccountSettings={onOpenAccountSettings}
-        onOpenServerManagement={onOpenServerManagement}
+        onOpenAdminPanel={onOpenAdminPanel}
         onOpenUserManagement={onOpenUserManagement}
         onOpenDeepAiCoder={onOpenDeepAiCoder}
         onOpenUpdateManager={onOpenUpdateManager}

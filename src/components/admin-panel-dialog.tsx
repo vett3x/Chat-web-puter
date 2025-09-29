@@ -12,28 +12,27 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Server } from 'lucide-react';
-import { ServerManagementTabs } from './server-management-tabs'; // Import the new tabs component
+import { AdminPanelTabs } from './admin-panel-tabs'; // Import the new tabs component
 
-interface ServerManagementDialogProps {
+interface AdminPanelDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function ServerManagementDialog({ open, onOpenChange }: ServerManagementDialogProps) {
+export function AdminPanelDialog({ open, onOpenChange }: AdminPanelDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[95vw] p-6 h-[95vh] flex flex-col"> {/* Increased max-width to 95vw */}
+      <DialogContent className="sm:max-w-[95vw] p-6 h-[95vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Server className="h-6 w-6" /> Gestión de Servidores
+            <Server className="h-6 w-6" /> Panel de Administración
           </DialogTitle>
           <DialogDescription>
-            Aquí puedes añadir y gestionar los servidores que utilizará DeepAI Coder para desplegar entornos de desarrollo.
-            Recuerda que las credenciales SSH se enviarán a tu backend de orquestación para su gestión segura.
+            Gestiona servidores, contenedores, seguridad y visualiza el estado general del sistema.
           </DialogDescription>
         </DialogHeader>
         <div className="flex-1 py-4 overflow-hidden">
-          <ServerManagementTabs />
+          <AdminPanelTabs />
         </div>
         <DialogFooter>
           <DialogClose asChild>

@@ -9,7 +9,7 @@ import { CodeEditorPanel } from "@/components/code-editor-panel";
 import { NoteEditorPanel, NoteEditorPanelRef } from "@/components/note-editor-panel";
 import { ProfileSettingsDialog } from "@/components/profile-settings-dialog";
 import { AccountSettingsDialog } from "@/components/account-settings-dialog";
-import { ServerManagementDialog } from "@/components/server-management-dialog";
+import { AdminPanelDialog } from "@/components/admin-panel-dialog"; // Renamed import
 import { UserManagementDialog } from "@/components/user-management-dialog";
 import { DeepAiCoderDialog } from "@/components/deep-ai-coder-dialog";
 import { RetryUploadDialog } from "@/components/retry-upload-dialog";
@@ -74,7 +74,7 @@ function HomePageContent() {
   
   const [isProfileSettingsOpen, setIsProfileSettingsOpen] = useState(false);
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
-  const [isServerManagementOpen, setIsServerManagementOpen] = useState(false);
+  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false); // Renamed state
   const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
   const [isDeepAiCoderOpen, setIsDeepAiCoderOpen] = useState(false);
   const [isUpdateManagerOpen, setIsUpdateManagerOpen] = useState(false);
@@ -317,7 +317,7 @@ function HomePageContent() {
 
   const handleOpenProfileSettings = () => setIsProfileSettingsOpen(true);
   const handleOpenAccountSettings = () => setIsAccountSettingsOpen(true);
-  const handleOpenServerManagement = () => setIsServerManagementOpen(true);
+  const handleOpenAdminPanel = () => setIsAdminPanelOpen(true); // Renamed handler
   const handleOpenUserManagement = () => setIsUserManagementOpen(true);
   const handleOpenDeepAiCoder = () => setIsDeepAiCoderOpen(true);
   const handleOpenUpdateManager = () => setIsUpdateManagerOpen(true);
@@ -378,7 +378,7 @@ function HomePageContent() {
           onFileSelect={handleFileSelect}
           onOpenProfileSettings={handleOpenProfileSettings}
           onOpenAccountSettings={handleOpenAccountSettings}
-          onOpenServerManagement={handleOpenServerManagement}
+          onOpenAdminPanel={handleOpenAdminPanel}
           onOpenUserManagement={handleOpenUserManagement}
           onOpenDeepAiCoder={handleOpenDeepAiCoder}
           onOpenUpdateManager={handleOpenUpdateManager}
@@ -452,7 +452,7 @@ function HomePageContent() {
         isLoadingApiKeys={isLoadingApiKeys}
         currentUserRole={userRole}
       />
-      {isAdmin && <ServerManagementDialog open={isServerManagementOpen} onOpenChange={setIsServerManagementOpen} />}
+      {isAdmin && <AdminPanelDialog open={isAdminPanelOpen} onOpenChange={setIsAdminPanelOpen} />}
       {isAdmin && <UserManagementDialog open={isUserManagementOpen} onOpenChange={setIsUserManagementOpen} />}
       <ApiManagementDialog open={isApiManagementOpen} onOpenChange={setIsApiManagementOpen} />
       {isAdmin && <AlertsDialog open={isAlertsOpen} onOpenChange={setIsAlertsOpen} />}
