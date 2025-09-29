@@ -11,15 +11,11 @@ import fs from 'fs/promises';
 import path from 'path';
 
 const provisionSchema = z.object({
-  // SSH Details
-  ssh_host: z.string().min(1, 'El host SSH es requerido.'),
+  ssh_host: z.string().ip({ message: 'Debe ser una IP válida.' }),
   ssh_port: z.coerce.number().int().min(1).default(22),
   ssh_user: z.string().min(1, 'El usuario SSH es requerido.'),
   ssh_password: z.string().min(1, 'La contraseña SSH es requerida.'),
-  // DB Config Details
-  nickname: z.string().min(1, 'El apodo es requerido.'),
-  db_name: z.string().min(1).default('postgres'),
-  db_user: z.string().min(1).default('postgres'),
+  nickname: z.string().min(1, 'El apodo para esta conexión es requerido.'),
   db_password: z.string().min(6, 'La contraseña de la BD debe tener al menos 6 caracteres.'),
 });
 
@@ -47,6 +43,8 @@ export async function POST(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
+  let configId: string | null = null;
+
   try {
     const body = await req.json();
     const { ssh_host, ssh_port, ssh_user, ssh_password, ...dbConfig } = provisionSchema.parse(body);
@@ -58,44 +56,61 @@ export async function POST(req: NextRequest) {
       ssh_password: ssh_password,
     };
 
-    // 1. Read the script content from the project
+    // 1. Create the record in the database with 'provisioning' status
+    const encryptedPassword = encrypt(dbConfig.db_password);
+    const { data: newConfig, error: insertError } = await supabaseAdmin
+      .from('database_config')
+      .insert({
+        nickname: dbConfig.nickname,
+        is_active: false,
+        db_host: ssh_host,
+        db_port: 5432,
+        db_name: 'postgres',
+        db_user: 'postgres',
+        db_password: encryptedPassword,
+        status: 'provisioning',
+      })
+      .select('id')
+      .single();
+
+    if (insertError) throw insertError;
+    configId = newConfig.id;
+
+    // 2. Read the script content from the project
     const scriptPath = path.join(process.cwd(), 'install_postgres.sh');
     const scriptContent = await fs.readFile(scriptPath, 'utf-8');
     const remoteScriptPath = '/tmp/install_postgres.sh';
 
-    // 2. Upload the script to the target server
+    // 3. Upload the script to the target server using scp
     await writeRemoteFile(sshDetails, remoteScriptPath, scriptContent);
 
-    // 3. Make the script executable
+    // 4. Verify file existence
+    const { code: fileCheckCode, stderr: fileCheckStderr } = await executeSshCommand(sshDetails, `test -f ${remoteScriptPath}`);
+    if (fileCheckCode !== 0) throw new Error(`Verificación fallida: El script no se subió correctamente. ${fileCheckStderr}`);
+
+    // 5. Make the script executable
     await executeSshCommand(sshDetails, `chmod +x ${remoteScriptPath}`);
 
-    // 4. Run the script with the DB password as an argument
+    // 6. Verify execute permissions
+    const { code: permCheckCode, stderr: permCheckStderr } = await executeSshCommand(sshDetails, `test -x ${remoteScriptPath}`);
+    if (permCheckCode !== 0) throw new Error(`Verificación fallida: No se pudieron establecer los permisos de ejecución. ${permCheckStderr}`);
+
+    // 7. Run the script
     const { stdout, stderr, code } = await executeSshCommand(sshDetails, `sudo ${remoteScriptPath} '${dbConfig.db_password}'`);
     if (code !== 0) {
       throw new Error(`Error durante el aprovisionamiento: ${stderr}`);
     }
 
-    // 5. If successful, save the configuration to our database
-    const encryptedPassword = encrypt(dbConfig.db_password);
-    const { error: insertError } = await supabaseAdmin
-      .from('database_config')
-      .insert({
-        nickname: dbConfig.nickname,
-        is_active: false, // Never set as active by default on provision
-        db_host: ssh_host,
-        db_port: 5432, // Standard PostgreSQL port
-        db_name: dbConfig.db_name,
-        db_user: dbConfig.db_user,
-        db_password: encryptedPassword,
-      });
-
-    if (insertError) {
-      throw new Error(`El servidor fue aprovisionado, pero falló al guardar la configuración: ${insertError.message}`);
-    }
+    // 8. If successful, update status to 'ready'
+    await supabaseAdmin.from('database_config').update({ status: 'ready' }).eq('id', configId);
 
     return NextResponse.json({ message: 'Servidor PostgreSQL aprovisionado y configurado exitosamente.', output: stdout });
 
   } catch (error: any) {
+    if (configId) {
+      // If any step fails, mark the config as 'failed'
+      await supabaseAdmin.from('database_config').update({ status: 'failed' }).eq('id', configId);
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json({ message: 'Error de validación', errors: error.errors }, { status: 400 });
     }

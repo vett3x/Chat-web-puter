@@ -9,10 +9,11 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
-import { Loader2, Save, Database, TestTube2, PlusCircle, Trash2, Edit, CheckCircle2, Terminal } from 'lucide-react';
+import { Loader2, Save, Database, TestTube2, PlusCircle, Trash2, Edit, CheckCircle2, Terminal, AlertCircle, RefreshCw } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 
 // Schema for connecting to an existing DB
 const configSchema = z.object({
@@ -41,6 +42,7 @@ type ProvisionFormValues = z.infer<typeof provisionSchema>;
 
 interface DbConfig extends ConfigFormValues {
   created_at: string;
+  status: 'provisioning' | 'ready' | 'failed';
 }
 
 export function DatabaseConfigTab() {
@@ -50,7 +52,6 @@ export function DatabaseConfigTab() {
   const [isTestingId, setIsTestingId] = useState<string | null>(null);
   const [editingConfig, setEditingConfig] = useState<DbConfig | null>(null);
   const [isProvisioning, setIsProvisioning] = useState(false);
-  const [provisioningServer, setProvisioningServer] = useState<{ nickname: string; ssh_host: string } | null>(null);
 
   const configForm = useForm<ConfigFormValues>({
     resolver: zodResolver(configSchema),
@@ -118,7 +119,6 @@ export function DatabaseConfigTab() {
 
   const onProvisionSubmit = async (values: ProvisionFormValues) => {
     setIsProvisioning(true);
-    setProvisioningServer({ nickname: values.nickname, ssh_host: values.ssh_host });
     const toastId = toast.loading('Aprovisionando servidor PostgreSQL...');
     try {
       const response = await fetch('/api/admin/database-config/provision', {
@@ -130,12 +130,11 @@ export function DatabaseConfigTab() {
       if (!response.ok) throw new Error(result.message);
       toast.success(result.message, { id: toastId });
       provisionForm.reset();
-      fetchConfigs();
     } catch (err: any) {
       toast.error(`Error: ${err.message}`, { id: toastId });
     } finally {
       setIsProvisioning(false);
-      setProvisioningServer(null);
+      fetchConfigs(); // Always refresh after provisioning attempt
     }
   };
 
@@ -226,36 +225,28 @@ export function DatabaseConfigTab() {
         <CardContent>
           {isLoading ? <div className="flex items-center justify-center py-4"><Loader2 className="h-6 w-6 animate-spin" /></div> : (
             <Table>
-              <TableHeader><TableRow><TableHead>Apodo</TableHead><TableHead>Host</TableHead><TableHead>Usuario</TableHead><TableHead>Activo</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Apodo</TableHead><TableHead>Host</TableHead><TableHead>Estado</TableHead><TableHead>Activo</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
               <TableBody>
-                {provisioningServer && (
-                  <TableRow className="bg-muted/50 opacity-70">
-                    <TableCell className="font-medium">{provisioningServer.nickname}</TableCell>
-                    <TableCell>{provisioningServer.ssh_host}:5432</TableCell>
-                    <TableCell>postgres</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>Aprovisionando...</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button variant="outline" size="sm" disabled><TestTube2 className="h-4 w-4" /></Button>
-                      <Button variant="outline" size="sm" disabled><Edit className="h-4 w-4" /></Button>
-                      <Button variant="destructive" size="sm" disabled><Trash2 className="h-4 w-4" /></Button>
-                    </TableCell>
-                  </TableRow>
-                )}
                 {configs.map((config) => (
                   <TableRow key={config.id}>
                     <TableCell className="font-medium">{config.nickname}</TableCell>
                     <TableCell>{config.db_host}:{config.db_port}</TableCell>
-                    <TableCell>{config.db_user}</TableCell>
+                    <TableCell>
+                      {config.status === 'ready' && <Badge>Listo</Badge>}
+                      {config.status === 'provisioning' && <Badge variant="outline" className="flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Aprovisionando</Badge>}
+                      {config.status === 'failed' && <Badge variant="destructive" className="flex items-center gap-1"><AlertCircle className="h-3 w-3" /> Falló</Badge>}
+                    </TableCell>
                     <TableCell>{config.is_active ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : null}</TableCell>
                     <TableCell className="text-right space-x-2">
-                      <Button variant="outline" size="sm" onClick={() => handleTestConnection(config.id!)} disabled={!!isTestingId}>{isTestingId === config.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <TestTube2 className="h-4 w-4" />}</Button>
-                      <Button variant="outline" size="sm" onClick={() => handleEdit(config)} disabled={!!isSubmitting}><Edit className="h-4 w-4" /></Button>
-                      {!config.is_active && <Button variant="outline" size="sm" onClick={() => handleSetActive(config.id!)} disabled={!!isSubmitting}>Activar</Button>}
+                      {config.status === 'failed' ? (
+                        <Button variant="secondary" size="sm" onClick={() => { /* Logic to re-trigger provision */ }} disabled={isProvisioning}><RefreshCw className="h-4 w-4 mr-2" /> Reinstalar</Button>
+                      ) : (
+                        <>
+                          <Button variant="outline" size="sm" onClick={() => handleTestConnection(config.id!)} disabled={!!isTestingId || config.status !== 'ready'}>{isTestingId === config.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <TestTube2 className="h-4 w-4" />}</Button>
+                          <Button variant="outline" size="sm" onClick={() => handleEdit(config)} disabled={!!isSubmitting || config.status !== 'ready'}><Edit className="h-4 w-4" /></Button>
+                          {!config.is_active && <Button variant="outline" size="sm" onClick={() => handleSetActive(config.id!)} disabled={!!isSubmitting || config.status !== 'ready'}>Activar</Button>}
+                        </>
+                      )}
                       <Button variant="destructive" size="sm" onClick={() => handleDelete(config.id!)} disabled={!!isSubmitting}><Trash2 className="h-4 w-4" /></Button>
                     </TableCell>
                   </TableRow>

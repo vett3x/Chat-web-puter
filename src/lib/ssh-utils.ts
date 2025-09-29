@@ -2,7 +2,8 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
-import { randomBytes } from 'crypto';
+import os from 'os';
+import crypto from 'crypto';
 
 const execAsync = promisify(exec);
 
@@ -67,10 +68,9 @@ export async function transferDirectoryScp(
   }
 }
 
-
 /**
- * Writes content to a file on the remote server by piping base64 encoded content
- * directly over SSH, avoiding local temp files and scp.
+ * Writes content to a file on the remote server by creating a temporary local file
+ * and transferring it via scp.
  * @param serverDetails Details for connecting to the SSH server.
  * @param remoteFilePath The path to the file on the remote server.
  * @param content The content to write to the file.
@@ -80,23 +80,21 @@ export async function writeRemoteFile(
   remoteFilePath: string,
   content: string
 ): Promise<void> {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'dyad-scp-'));
+  const localFilePath = path.join(tempDir, path.basename(remoteFilePath));
+
   try {
-    // 1. Base64 encode the content to ensure safe transfer of all characters
-    const encodedContent = Buffer.from(content).toString('base64');
-
-    // 2. Construct a command to decode and write the file on the remote server
-    //    - `echo '${encodedContent}'`: Prints the base64 string.
-    //    - `| base64 -d`: Pipes the string to the base64 command to decode it.
-    //    - `> '${remoteFilePath}'`: Redirects the decoded output to the target file.
-    const command = `echo '${encodedContent}' | base64 -d > '${remoteFilePath}'`;
-
-    // 3. Execute the command via SSH
-    const { stderr, code } = await executeSshCommand(serverDetails, command);
-
-    if (code !== 0) {
-      throw new Error(`Failed to write remote file. Exit code: ${code}. Stderr: ${stderr}`);
-    }
+    await fs.writeFile(localFilePath, content);
+    const scpCommand = `sshpass -p '${serverDetails.ssh_password}' scp ${SSH_OPTIONS} -P ${serverDetails.ssh_port || 22} '${localFilePath}' ${serverDetails.ssh_username}@${serverDetails.ip_address}:'${remoteFilePath}'`;
+    await execAsync(scpCommand);
   } catch (error: any) {
-    throw new Error(`Failed to write remote file '${remoteFilePath}': ${error.message}`);
+    // The error from execAsync will have code and stderr on failure
+    if (error.code) {
+      throw new Error(`scp failed with code ${error.code}: ${error.stderr}`);
+    }
+    // Handle other errors like fs.writeFile
+    throw new Error(`Failed to write remote file via scp: ${error.message}`);
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
   }
 }
