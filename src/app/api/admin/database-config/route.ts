@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
   try {
     const { data, error } = await supabaseAdmin
       .from('database_config')
-      .select('id, nickname, is_active, db_host, db_port, db_name, db_user, created_at, status') // Exclude password, include status
+      .select('id, nickname, is_active, db_host, db_port, db_name, db_user, created_at, status, provisioning_log') // Include provisioning_log
       .order('created_at', { ascending: true });
 
     if (error) throw error;

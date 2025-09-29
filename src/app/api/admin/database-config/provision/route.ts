@@ -69,6 +69,7 @@ export async function POST(req: NextRequest) {
         db_user: 'postgres',
         db_password: encryptedPassword,
         status: 'provisioning',
+        provisioning_log: 'Iniciando aprovisionamiento...',
       })
       .select('id')
       .single();
@@ -84,32 +85,27 @@ export async function POST(req: NextRequest) {
     // 3. Upload the script to the target server using scp
     await writeRemoteFile(sshDetails, remoteScriptPath, scriptContent);
 
-    // 4. Verify file existence
-    const { code: fileCheckCode, stderr: fileCheckStderr } = await executeSshCommand(sshDetails, `test -f ${remoteScriptPath}`);
-    if (fileCheckCode !== 0) throw new Error(`Verificación fallida: El script no se subió correctamente. ${fileCheckStderr}`);
-
-    // 5. Make the script executable
+    // 4. Make the script executable
     await executeSshCommand(sshDetails, `chmod +x ${remoteScriptPath}`);
 
-    // 6. Verify execute permissions
-    const { code: permCheckCode, stderr: permCheckStderr } = await executeSshCommand(sshDetails, `test -x ${remoteScriptPath}`);
-    if (permCheckCode !== 0) throw new Error(`Verificación fallida: No se pudieron establecer los permisos de ejecución. ${permCheckStderr}`);
-
-    // 7. Run the script
+    // 5. Run the script
     const { stdout, stderr, code } = await executeSshCommand(sshDetails, `sudo ${remoteScriptPath} '${dbConfig.db_password}'`);
+    
+    const logOutput = `--- STDOUT ---\n${stdout}\n\n--- STDERR ---\n${stderr}`;
+
     if (code !== 0) {
-      throw new Error(`Error durante el aprovisionamiento: ${stderr}`);
+      throw new Error(`Error durante el aprovisionamiento (código de salida: ${code}).\n\n${logOutput}`);
     }
 
-    // 8. If successful, update status to 'ready'
-    await supabaseAdmin.from('database_config').update({ status: 'ready' }).eq('id', configId);
+    // 6. If successful, update status to 'ready' and save log
+    await supabaseAdmin.from('database_config').update({ status: 'ready', provisioning_log: logOutput }).eq('id', configId);
 
     return NextResponse.json({ message: 'Servidor PostgreSQL aprovisionado y configurado exitosamente.', output: stdout });
 
   } catch (error: any) {
     if (configId) {
-      // If any step fails, mark the config as 'failed'
-      await supabaseAdmin.from('database_config').update({ status: 'failed' }).eq('id', configId);
+      // If any step fails, mark the config as 'failed' and save the log
+      await supabaseAdmin.from('database_config').update({ status: 'failed', provisioning_log: error.message }).eq('id', configId);
     }
     if (error instanceof z.ZodError) {
       return NextResponse.json({ message: 'Error de validación', errors: error.errors }, { status: 400 });

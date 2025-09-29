@@ -9,11 +9,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
-import { Loader2, Save, Database, TestTube2, PlusCircle, Trash2, Edit, CheckCircle2, Terminal, AlertCircle, RefreshCw } from 'lucide-react';
+import { Loader2, Save, Database, TestTube2, PlusCircle, Trash2, Edit, CheckCircle2, Terminal, AlertCircle, RefreshCw, ScrollText } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 // Schema for connecting to an existing DB
 const configSchema = z.object({
@@ -43,6 +46,7 @@ type ProvisionFormValues = z.infer<typeof provisionSchema>;
 interface DbConfig extends ConfigFormValues {
   created_at: string;
   status: 'provisioning' | 'ready' | 'failed';
+  provisioning_log?: string | null;
 }
 
 export function DatabaseConfigTab() {
@@ -52,6 +56,7 @@ export function DatabaseConfigTab() {
   const [isTestingId, setIsTestingId] = useState<string | null>(null);
   const [editingConfig, setEditingConfig] = useState<DbConfig | null>(null);
   const [isProvisioning, setIsProvisioning] = useState(false);
+  const [viewingLogConfig, setViewingLogConfig] = useState<DbConfig | null>(null);
 
   const configForm = useForm<ConfigFormValues>({
     resolver: zodResolver(configSchema),
@@ -151,7 +156,7 @@ export function DatabaseConfigTab() {
       if (!response.ok) throw new Error(result.message);
       toast.success(result.message, { id: toastId });
     } catch (err: any) {
-      toast.error(err.message, { id: toastId });
+      toast.error(err.message, { id: toastId, duration: 10000 });
     } finally {
       setIsTestingId(null);
     }
@@ -187,6 +192,19 @@ export function DatabaseConfigTab() {
       toast.error(`Error al activar: ${err.message}`);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleReinstall = async (id: string) => {
+    const toastId = toast.loading('Iniciando reinstalación...');
+    try {
+      const response = await fetch(`/api/admin/database-config/${id}/reprovision`, { method: 'POST' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message);
+      toast.success(result.message, { id: toastId });
+      fetchConfigs();
+    } catch (err: any) {
+      toast.error(`Error: ${err.message}`, { id: toastId });
     }
   };
 
@@ -238,11 +256,14 @@ export function DatabaseConfigTab() {
                     </TableCell>
                     <TableCell>{config.is_active ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : null}</TableCell>
                     <TableCell className="text-right space-x-2">
+                      {(config.status === 'provisioning' || config.status === 'failed') && (
+                        <Button variant="secondary" size="sm" onClick={() => setViewingLogConfig(config)}><ScrollText className="h-4 w-4" /></Button>
+                      )}
                       {config.status === 'failed' ? (
-                        <Button variant="secondary" size="sm" onClick={() => { /* Logic to re-trigger provision */ }} disabled={isProvisioning}><RefreshCw className="h-4 w-4 mr-2" /> Reinstalar</Button>
+                        <Button variant="secondary" size="sm" onClick={() => handleReinstall(config.id!)} disabled={isProvisioning}><RefreshCw className="h-4 w-4" /></Button>
                       ) : (
                         <>
-                          <Button variant="outline" size="sm" onClick={() => handleTestConnection(config.id!)} disabled={!!isTestingId || config.status !== 'ready'}>{isTestingId === config.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <TestTube2 className="h-4 w-4" />}</Button>
+                          <Button variant="outline" size="sm" onClick={() => handleTestConnection(config.id!)} disabled={!!isTestingId || config.status !== 'ready'}><TestTube2 className="h-4 w-4" /></Button>
                           <Button variant="outline" size="sm" onClick={() => handleEdit(config)} disabled={!!isSubmitting || config.status !== 'ready'}><Edit className="h-4 w-4" /></Button>
                           {!config.is_active && <Button variant="outline" size="sm" onClick={() => handleSetActive(config.id!)} disabled={!!isSubmitting || config.status !== 'ready'}>Activar</Button>}
                         </>
@@ -266,7 +287,6 @@ export function DatabaseConfigTab() {
         <CardContent>
           <Form {...configForm}>
             <form onSubmit={configForm.handleSubmit(onConfigSubmit)} className="space-y-4">
-              {/* Form fields for adding an existing connection... */}
               <FormField control={configForm.control} name="nickname" render={({ field }) => (<FormItem><FormLabel>Apodo</FormLabel><FormControl><Input placeholder="Servidor Principal (EU)" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={configForm.control} name="db_host" render={({ field }) => (<FormItem><FormLabel>Host / IP</FormLabel><FormControl><Input placeholder="192.168.1.10" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={configForm.control} name="db_port" render={({ field }) => (<FormItem><FormLabel>Puerto</FormLabel><FormControl><Input type="number" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
@@ -285,6 +305,24 @@ export function DatabaseConfigTab() {
           </Form>
         </CardContent>
       </Card>
+
+      {/* Log Viewer Dialog */}
+      <Dialog open={!!viewingLogConfig} onOpenChange={(open) => !open && setViewingLogConfig(null)}>
+        <DialogContent className="sm:max-w-[80vw] h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Log de Aprovisionamiento: {viewingLogConfig?.nickname}</DialogTitle>
+            <DialogDescription>Mostrando la salida del script de instalación.</DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto rounded-md bg-[#1E1E1E]">
+            <SyntaxHighlighter language="bash" style={vscDarkPlus} customStyle={{ margin: 0, height: '100%', background: 'transparent' }} codeTagProps={{ style: { fontFamily: 'var(--font-geist-mono)' } }} wrapLines={true} wrapLongLines={true}>
+              {viewingLogConfig?.provisioning_log || 'No hay logs disponibles.'}
+            </SyntaxHighlighter>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cerrar</Button></DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
