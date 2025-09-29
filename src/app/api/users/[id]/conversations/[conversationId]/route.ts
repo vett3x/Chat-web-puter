@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
-import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
+import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants';
 
 // Helper function to get the session and user role
 async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null; userPermissions: UserPermissions }> {
@@ -71,79 +71,15 @@ async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | '
   return { session, userRole, userPermissions };
 }
 
-export async function GET(
-  req: NextRequest,
-  context: any // Usamos 'any' para resolver el error de compilación de TypeScript
-) {
-  const userIdToFetch = context.params.id;
-
-  if (!userIdToFetch) {
-    return NextResponse.json({ message: 'ID de usuario no proporcionado.' }, { status: 400 });
-  }
-
-  const { session, userRole } = await getSessionAndRole();
-  if (!session || !userRole) {
-    return NextResponse.json({ message: 'Acceso denegado. No autenticado.' }, { status: 401 });
-  }
-  // Allow Admins and Super Admins to view other users' conversations
-  if (userRole !== 'admin' && userRole !== 'super_admin') {
-    return NextResponse.json({ message: 'Acceso denegado. Se requiere rol de Admin o Super Admin.' }, { status: 403 });
-  }
-
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    console.error('SUPABASE_SERVICE_ROLE_KEY is not set in environment variables.');
-    return NextResponse.json({ message: 'Error de configuración del servidor.' }, { status: 500 });
-  }
-
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
-  try {
-    const { data: conversations, error } = await supabaseAdmin
-      .from('conversations')
-      .select(`
-        id,
-        title,
-        model,
-        created_at,
-        folders (
-          name
-        )
-      `)
-      .eq('user_id', userIdToFetch)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error(`Error fetching conversations for user ${userIdToFetch}:`, error);
-      throw new Error('Error al cargar las conversaciones del usuario.');
-    }
-
-    const formattedConversations = conversations.map(conv => ({
-      id: conv.id,
-      title: conv.title,
-      model: conv.model,
-      created_at: conv.created_at,
-      folder_name: (conv.folders as any)?.name || 'General',
-    }));
-
-    return NextResponse.json(formattedConversations, { status: 200 });
-
-  } catch (error: any) {
-    console.error(`Unhandled error in GET /api/users/${userIdToFetch}/conversations:`, error);
-    return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
-  }
-}
-
 export async function DELETE(
   req: NextRequest,
   context: any
 ) {
-  const userIdToDeleteConversations = context.params.id;
+  const userId = context.params.id;
+  const conversationId = context.params.conversationId;
 
-  if (!userIdToDeleteConversations) {
-    return NextResponse.json({ message: 'ID de usuario no proporcionado.' }, { status: 400 });
+  if (!userId || !conversationId) {
+    return NextResponse.json({ message: 'ID de usuario o conversación no proporcionado.' }, { status: 400 });
   }
 
   const { session, userRole } = await getSessionAndRole();
@@ -162,39 +98,52 @@ export async function DELETE(
   );
 
   try {
-    // Delete all messages associated with the user's conversations
+    // First, verify the conversation belongs to the user
+    const { data: conversation, error: fetchConvError } = await supabaseAdmin
+      .from('conversations')
+      .select('id, title')
+      .eq('id', conversationId)
+      .eq('user_id', userId)
+      .single();
+
+    if (fetchConvError || !conversation) {
+      console.error(`Error fetching conversation ${conversationId} for user ${userId}:`, fetchConvError);
+      return NextResponse.json({ message: 'Conversación no encontrada o no pertenece a este usuario.' }, { status: 404 });
+    }
+
+    // Delete all messages associated with the conversation
     const { error: messagesError } = await supabaseAdmin
       .from('messages')
       .delete()
-      .eq('user_id', userIdToDeleteConversations);
+      .eq('conversation_id', conversationId);
 
     if (messagesError) {
-      console.error(`Error deleting messages for user ${userIdToDeleteConversations}:`, messagesError);
-      throw new Error('Error al eliminar los mensajes del usuario.');
+      console.error(`Error deleting messages for conversation ${conversationId}:`, messagesError);
+      throw new Error('Error al eliminar los mensajes de la conversación.');
     }
 
-    // Delete all conversations for the user
-    const { error: conversationsError } = await supabaseAdmin
+    // Delete the conversation itself
+    const { error: conversationError } = await supabaseAdmin
       .from('conversations')
       .delete()
-      .eq('user_id', userIdToDeleteConversations);
+      .eq('id', conversationId);
 
-    if (conversationsError) {
-      console.error(`Error deleting conversations for user ${userIdToDeleteConversations}:`, conversationsError);
-      throw new Error('Error al eliminar las conversaciones del usuario.');
+    if (conversationError) {
+      console.error(`Error deleting conversation ${conversationId}:`, conversationError);
+      throw new Error('Error al eliminar la conversación.');
     }
 
     // Log the action
     await supabaseAdmin.from('server_events_log').insert({
       user_id: session.user.id,
-      event_type: 'user_conversations_deleted_all',
-      description: `Todas las conversaciones del usuario ${userIdToDeleteConversations} eliminadas por ${session.user.email}.`,
+      event_type: 'user_conversation_deleted_single',
+      description: `Conversación '${conversation.title}' (ID: ${conversationId}) del usuario ${userId} eliminada por ${session.user.email}.`,
     });
 
-    return NextResponse.json({ message: 'Todas las conversaciones eliminadas correctamente.' }, { status: 200 });
+    return NextResponse.json({ message: 'Conversación eliminada correctamente.' }, { status: 200 });
 
   } catch (error: any) {
-    console.error(`Unhandled error in DELETE /api/users/${userIdToDeleteConversations}/conversations:`, error);
+    console.error(`Unhandled error in DELETE /api/users/${userId}/conversations/${conversationId}:`, error);
     return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
   }
 }
