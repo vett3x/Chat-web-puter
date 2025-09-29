@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useImperativeHandle } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Users, Trash2, RefreshCw, AlertCircle, Eye, Search, Crown, Shield, Bot, LogOut, Ban, CheckCircle, UserCog } from 'lucide-react';
+import { Loader2, Users, Trash2, RefreshCw, AlertCircle, Eye, Search, Crown, Shield, Bot, LogOut, Ban, CheckCircle, UserCog, Server, Dock, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSession } from '@/components/session-context-provider';
 import { SUPERUSER_EMAILS } from '@/lib/constants';
@@ -46,7 +46,10 @@ interface User {
   avatar_url: string | null;
   role: 'user' | 'admin' | 'super_admin';
   status: 'active' | 'banned' | 'kicked';
-  kicked_at: string | null; // NEW: Add kicked_at
+  kicked_at: string | null;
+  max_servers: number;
+  max_containers: number;
+  max_tunnels: number;
 }
 
 export interface UserListTabRef {
@@ -220,7 +223,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
         <p className="text-muted-foreground text-sm">No hay usuarios en esta categoría.</p>
       ) : (
         <Table>
-          <TableHeader><TableRow><TableHead>Usuario</TableHead><TableHead>Email</TableHead><TableHead>Rol</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Usuario</TableHead><TableHead>Email</TableHead><TableHead>Rol</TableHead><TableHead>Cuotas</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
           <TableBody>
             {usersToRender.map((user) => {
               const isCurrentUser = user.id === currentUserId;
@@ -249,6 +252,22 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
                         </Badge>
                       )}
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center gap-3 text-xs">
+                            <span className="flex items-center gap-1"><Server className="h-3 w-3" /> {user.max_servers}</span>
+                            <span className="flex items-center gap-1"><Dock className="h-3 w-3" /> {user.max_containers}</span>
+                            <span className="flex items-center gap-1"><Globe className="h-3 w-3" /> {user.max_tunnels}</span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Límites (Servidores / Contenedores / Túneles)</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2"> {/* Use flex to keep badge and text inline */}

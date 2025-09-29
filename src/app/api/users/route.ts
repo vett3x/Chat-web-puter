@@ -76,7 +76,10 @@ interface SupabaseProfile {
   avatar_url: string | null;
   role: 'user' | 'admin' | 'super_admin';
   status: 'active' | 'banned' | 'kicked';
-  kicked_at: string | null; // NEW: Add kicked_at
+  kicked_at: string | null;
+  max_servers: number;
+  max_containers: number;
+  max_tunnels: number;
 }
 
 export async function GET(req: NextRequest) {
@@ -103,7 +106,7 @@ export async function GET(req: NextRequest) {
     // 1. Fetch all profiles
     const { data: profiles, error: profilesError } = await supabaseAdmin
       .from('profiles')
-      .select(`id, first_name, last_name, avatar_url, role, status, kicked_at`); // Select role, status, and kicked_at
+      .select(`id, first_name, last_name, avatar_url, role, status, kicked_at, max_servers, max_containers, max_tunnels`);
 
     if (profilesError) {
       console.error('Supabase query error fetching profiles in GET /api/users:', profilesError);
@@ -125,6 +128,9 @@ export async function GET(req: NextRequest) {
           role: profile.role,
           status: profile.status,
           kicked_at: profile.kicked_at,
+          max_servers: profile.max_servers,
+          max_containers: profile.max_containers,
+          max_tunnels: profile.max_tunnels,
         };
       }
 
@@ -137,11 +143,11 @@ export async function GET(req: NextRequest) {
         role: profile.role,
         status: profile.status,
         kicked_at: profile.kicked_at,
+        max_servers: profile.max_servers,
+        max_containers: profile.max_containers,
+        max_tunnels: profile.max_tunnels,
       };
     }));
-
-    // NEW: No longer filter out Super Admins here. Admins will see them in the list.
-    // The restriction for viewing details will be handled on the client-side component.
 
     return NextResponse.json(formattedUsers, { status: 200 });
 
