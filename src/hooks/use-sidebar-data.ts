@@ -39,6 +39,8 @@ interface Note {
   updated_at: string;
 }
 
+const POLLING_INTERVAL = 30000; // 30 segundos
+
 export function useSidebarData() {
   const { session, isLoading: isSessionLoading } = useSession();
   const userId = session?.user?.id;
@@ -75,14 +77,14 @@ export function useSidebarData() {
 
       if (appError) {
         console.error('Error fetching apps:', appError);
-        toast.error('Error al cargar los proyectos.');
+        // toast.error('Error al cargar los proyectos.'); // Avoid spamming toasts on background errors
       } else {
         setApps(appData || []);
       }
 
       if (convError) {
         console.error('Error fetching conversations:', convError);
-        toast.error('Error al cargar las conversaciones.');
+        // toast.error('Error al cargar las conversaciones.');
       } else {
         const appConversationIds = new Set((appData || []).map(app => app.conversation_id));
         setConversations((convData || []).filter(conv => !appConversationIds.has(conv.id)));
@@ -90,20 +92,20 @@ export function useSidebarData() {
 
       if (folderError) {
         console.error('Error fetching folders:', folderError);
-        toast.error('Error al cargar las carpetas.');
+        // toast.error('Error al cargar las carpetas.');
       } else {
         setFolders(folderData || []);
       }
 
       if (noteError) {
         console.error('Error fetching notes:', noteError);
-        toast.error('Error al cargar las notas.');
+        // toast.error('Error al cargar las notas.');
       } else {
         setNotes(noteData || []);
       }
     } catch (error) {
       console.error("A critical error occurred while fetching sidebar data:", error);
-      toast.error("Ocurrió un error crítico al recargar la barra lateral.");
+      // toast.error("Ocurrió un error crítico al recargar la barra lateral."); // Avoid spamming toasts
     } finally {
       setIsLoading(false);
     }
@@ -111,7 +113,13 @@ export function useSidebarData() {
 
   useEffect(() => {
     if (userId) {
-      fetchData();
+      fetchData(); // Initial fetch
+      const interval = setInterval(() => {
+        if (document.visibilityState === 'visible') { // Only poll when tab is visible
+          fetchData();
+        }
+      }, POLLING_INTERVAL);
+      return () => clearInterval(interval);
     } else if (!isSessionLoading) {
       setApps([]);
       setConversations([]);

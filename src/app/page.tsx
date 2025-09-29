@@ -138,23 +138,23 @@ export default function Home() {
     };
   }, [selectedAppDetails, refreshSidebarData]);
 
-  // NEW: Effect to handle tab visibility changes
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        console.log("[Home] Tab became visible. Refreshing data...");
-        refreshSidebarData(); // Refresh all sidebar data
-        // NoteEditorPanel's internal fetchNote will be triggered by its noteId dependency
-        // when refreshSidebarData causes a re-render.
-      }
-    };
+  // NEW: Effect to handle tab visibility changes - REMOVED, now handled by useSidebarData polling
+  // useEffect(() => {
+  //   const handleVisibilityChange = () => {
+  //     if (document.visibilityState === 'visible') {
+  //       console.log("[Home] Tab became visible. Refreshing data...");
+  //       refreshSidebarData(); // Refresh all sidebar data
+  //       // NoteEditorPanel's internal fetchNote will be triggered by its noteId dependency
+  //       // when refreshSidebarData causes a re-render.
+  //     }
+  //   };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+  //   document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [refreshSidebarData]); // Dependencies for visibility change
+  //   return () => {
+  //     document.removeEventListener('visibilitychange', handleVisibilityChange);
+  //   };
+  // }, [refreshSidebarData]);
 
   const handleSelectItem = useCallback(async (id: string | null, type: SelectedItem['type'] | null) => {
     setActiveFile(null);
