@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useSession, SessionContextProvider } from "@/components/session-context-provider";
 import { ConversationSidebar } from "@/components/conversation-sidebar";
 import { ChatInterface, ChatInterfaceRef } from "@/components/chat-interface";
@@ -59,6 +59,11 @@ interface RetryState {
 }
 
 const HEALTH_CHECK_INTERVAL = 15000; // 15 segundos
+
+// Memoized components
+const MemoizedConversationSidebar = React.memo(ConversationSidebar);
+const MemoizedChatInterface = React.memo(ChatInterface);
+const MemoizedNoteEditorPanel = React.memo(NoteEditorPanel);
 
 export default function Home() {
   const { session, isLoading: isSessionLoading, userRole, userLanguage, isUserTemporarilyDisabled } = useSession();
@@ -158,10 +163,13 @@ export default function Home() {
       }
     };
 
-    if (!isLoadingData) {
+    // Trigger refresh when global refresh is called from SessionContextProvider
+    // This useEffect now only runs when `onGlobalRefresh` is explicitly triggered.
+    // The `isLoadingData` dependency is removed to prevent redundant refreshes.
+    if (!isLoadingData) { // Still check isLoadingData to ensure data is loaded initially
       refreshActiveContent();
     }
-  }, [isLoadingData, selectedItem]);
+  }, [selectedItem, isLoadingData]); // Keep isLoadingData to ensure initial load
 
   useEffect(() => {
     let healthCheckInterval: NodeJS.Timeout;
@@ -453,7 +461,7 @@ export default function Home() {
         )}
 
         <div className="w-[320px] flex-shrink-0">
-          <ConversationSidebar
+          <MemoizedConversationSidebar
             apps={apps}
             conversations={conversations}
             folders={folders}
@@ -494,7 +502,7 @@ export default function Home() {
             />
           )}
           {selectedItem?.type === 'note' ? (
-            <NoteEditorPanel
+            <MemoizedNoteEditorPanel
               ref={noteEditorRef}
               noteId={selectedItem.id}
               onNoteUpdated={(id, data) => updateLocalItem(id, 'note', data)}
@@ -505,7 +513,7 @@ export default function Home() {
           ) : (
             <ResizablePanelGroup direction="horizontal" className="flex-1">
               <ResizablePanel defaultSize={50} minSize={30}>
-                <ChatInterface
+                <MemoizedChatInterface
                   ref={chatInterfaceRef}
                   key={selectedItem?.conversationId || 'no-conversation'}
                   userId={userId}

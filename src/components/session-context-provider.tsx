@@ -116,11 +116,13 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
           }
         }
 
-        setUserRole(determinedRole);
-        setUserPermissions(determinedPermissions);
-        setUserAvatarUrl(determinedAvatarUrl);
-        setUserLanguage(determinedLanguage);
-        setUserStatus(determinedStatus);
+        // Only update state if values have actually changed
+        if (userRole !== determinedRole) setUserRole(determinedRole);
+        if (JSON.stringify(userPermissions) !== JSON.stringify(determinedPermissions)) setUserPermissions(determinedPermissions);
+        if (userAvatarUrl !== determinedAvatarUrl) setUserAvatarUrl(determinedAvatarUrl);
+        if (userLanguage !== determinedLanguage) setUserLanguage(determinedLanguage);
+        if (userStatus !== determinedStatus) setUserStatus(determinedStatus);
+        
         // NEW: Update lastKnownProfileStatus here
         setLastKnownProfileStatus({
           status: determinedStatus,
@@ -144,7 +146,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
       // NEW: Clear lastKnownProfileStatus when no session
       setLastKnownProfileStatus(null);
     }
-  }, []);
+  }, [userRole, userPermissions, userAvatarUrl, userLanguage, userStatus]); // Added all state dependencies
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
@@ -214,6 +216,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
       console.log(`[SessionContext] Real-time status check for user ${session.user.id}. Current role: ${userRole}, status: ${userStatus}`);
 
       try {
+        // Refresh Supabase session token
         const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
         if (refreshError) {
           console.warn("[SessionContext] Error refreshing Supabase session:", refreshError);
@@ -221,6 +224,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
           router.push('/login');
           return;
         }
+        // If session user ID changed (e.g., user switched accounts), re-fetch profile
         if (refreshedSession && refreshedSession.user.id !== session.user.id) {
             setSession(refreshedSession);
             await fetchUserProfileAndRole(refreshedSession);
@@ -242,6 +246,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
           .single();
 
         if (profileError || !profile) {
+          // If profile not found, but user is not super_admin, check global disables
           if (userRole !== 'super_admin') {
             if (usersDisabled && userRole === 'user') {
               console.log(`[SessionContext] Real-time check: User ${session.user.id} (role: user) is disabled globally. Signing out.`);
@@ -359,7 +364,20 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
     };
 
     const intervalId = setInterval(checkSessionAndGlobalStatus, 10000);
-    return () => clearInterval(intervalId);
+    
+    // NEW: Add visibilitychange listener
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log("[SessionContext] Tab became visible. Triggering immediate status check.");
+        checkSessionAndGlobalStatus();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [session, userRole, userStatus, router, fetchUserProfileAndRole, pathname, triggerGlobalRefresh, lastKnownGlobalSettings, lastKnownProfileStatus]);
 
   if (isLoading) {
