@@ -286,7 +286,8 @@ export function useGeneralChat({
     });
 
     try {
-      const systemPromptContent = "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante.";
+      // Removed the hardcoded system prompt about code block formatting
+      const systemPromptContent = ""; 
 
       const messagesForApi = history.map(msg => ({
         role: msg.role,
