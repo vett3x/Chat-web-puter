@@ -22,11 +22,12 @@ interface SessionContextType {
   userLanguage: string | null;
   userStatus: UserStatus | null;
   isUserTemporarilyDisabled: boolean;
+  triggerGlobalRefresh: () => void; // NEW: Expose a function to trigger global refresh
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
-export const SessionContextProvider = ({ children }: { children: React.ReactNode }) => {
+export const SessionContextProvider = ({ children, onGlobalRefresh }: { children: React.ReactNode; onGlobalRefresh?: () => void }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
@@ -38,6 +39,13 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const pathname = usePathname();
 
   const isUserTemporarilyDisabled = userStatus === 'banned' || userStatus === 'kicked';
+
+  const triggerGlobalRefresh = useCallback(() => {
+    if (onGlobalRefresh) {
+      console.log("[SessionContext] Triggering global refresh via callback.");
+      onGlobalRefresh();
+    }
+  }, [onGlobalRefresh]);
 
   const fetchUserProfileAndRole = useCallback(async (currentSession: Session | null) => {
     if (currentSession?.user?.id) {
@@ -273,6 +281,12 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
             console.log(`[SessionContext] Real-time check: Profile data discrepancy detected. Re-fetching full profile for user ${session.user.id}.`);
             await fetchUserProfileAndRole(session);
         }
+
+        // NEW: If all checks pass and user is active, trigger a global refresh
+        if (session && userRole && userStatus === 'active') {
+          triggerGlobalRefresh();
+        }
+
       } catch (error) {
         console.error("[SessionContext] Unhandled error in checkSessionAndGlobalStatus interval:", error);
         // Do not redirect or change session state here, just log.
@@ -284,7 +298,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     const intervalId = setInterval(checkSessionAndGlobalStatus, 10000);
 
     return () => clearInterval(intervalId);
-  }, [session, userRole, userStatus, router, fetchUserProfileAndRole, pathname]);
+  }, [session, userRole, userStatus, router, fetchUserProfileAndRole, pathname, triggerGlobalRefresh]);
 
   if (isLoading) {
     return (
@@ -296,7 +310,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   }
   
   return (
-    <SessionContext.Provider value={{ session, isLoading, userRole, userPermissions, userAvatarUrl, userLanguage, userStatus, isUserTemporarilyDisabled }}>
+    <SessionContext.Provider value={{ session, isLoading, userRole, userPermissions, userAvatarUrl, userLanguage, userStatus, isUserTemporarilyDisabled, triggerGlobalRefresh }}>
       {children}
     </SessionContext.Provider>
   );

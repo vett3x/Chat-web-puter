@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useSession } from "@/components/session-context-provider";
+import { useSession, SessionContextProvider } from "@/components/session-context-provider"; // Import SessionContextProvider
 import { ConversationSidebar } from "@/components/conversation-sidebar";
 import { ChatInterface, ChatInterfaceRef } from "@/components/chat-interface"; // Import ChatInterfaceRef
 import { AppBrowserPanel } from "@/components/app-browser-panel";
@@ -139,28 +139,10 @@ export default function Home() {
     };
   }, [selectedAppDetails, refreshSidebarData]);
 
-  // NEW: Effect to handle tab visibility changes - REMOVED, now handled by useSidebarData polling
-  // useEffect(() => {
-  //   const handleVisibilityChange = () => {
-  //     if (document.visibilityState === 'visible') {
-  //       console.log("[Home] Tab became visible. Refreshing data...");
-  //       refreshSidebarData(); // Refresh all sidebar data
-  //       // NoteEditorPanel's internal fetchNote will be triggered by its noteId dependency
-  //       // when refreshSidebarData causes a re-render.
-  //     }
-  //   };
-
-  //   document.addEventListener('visibilitychange', handleVisibilityChange);
-
-  //   return () => {
-  //     document.removeEventListener('visibilitychange', handleVisibilityChange);
-  //   };
-  // }, [refreshSidebarData]);
-
   // NEW: Effect to refresh active content after sidebar data refresh
   useEffect(() => {
     const refreshActiveContent = async () => {
-      // This effect runs whenever refreshSidebarData is called (e.g., by polling)
+      // This effect runs whenever `isLoadingData` (from useSidebarData) changes from true to false.
       // We need to ensure the selected item's content is also refreshed.
       if (selectedItem) {
         if (selectedItem.type === 'note' && noteEditorRef.current) {
@@ -173,9 +155,6 @@ export default function Home() {
       }
     };
 
-    // We need to call refreshActiveContent *after* refreshSidebarData has completed its fetch.
-    // Since refreshSidebarData is a callback, we can't directly put this in its `finally` block.
-    // A simple way is to trigger this effect whenever `isLoadingData` (from useSidebarData) changes from true to false.
     if (!isLoadingData) {
       refreshActiveContent();
     }
@@ -339,6 +318,23 @@ export default function Home() {
     }
   };
 
+  // NEW: Global refresh handler
+  const handleGlobalRefresh = useCallback(() => {
+    console.log("[Home] Global refresh triggered.");
+    refreshSidebarData(); // Refresh all sidebar data
+
+    // Also refresh active content if any is selected
+    if (selectedItem) {
+      if (selectedItem.type === 'note' && noteEditorRef.current) {
+        console.log("[Home] Refreshing active note content via global refresh.");
+        noteEditorRef.current.refreshNoteContent();
+      } else if ((selectedItem.type === 'conversation' || selectedItem.type === 'app') && chatInterfaceRef.current) {
+        console.log("[Home] Refreshing active chat messages via global refresh.");
+        chatInterfaceRef.current.refreshChatMessages();
+      }
+    }
+  }, [refreshSidebarData, selectedItem]);
+
   const handleOpenProfileSettings = () => setIsProfileSettingsOpen(true);
   const handleOpenAccountSettings = () => setIsAccountSettingsOpen(true);
   const handleOpenServerManagement = () => setIsServerManagementOpen(true);
@@ -380,127 +376,129 @@ export default function Home() {
   };
 
   return (
-    <div className="h-screen bg-background flex relative">
-      {isUserTemporarilyDisabled && (
-        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-4 pointer-events-auto">
-          <ShieldAlert className="h-16 w-16 text-destructive mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-destructive">Acceso Restringido</h2>
-          <p className="text-muted-foreground mt-2">
-            Tu cuenta ha sido temporalmente deshabilitada o expulsada.
-            Por favor, contacta al soporte para más información.
-          </p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Se ha cerrado tu sesión. Recarga la página o intenta iniciar sesión de nuevo.
-          </p>
+    <SessionContextProvider onGlobalRefresh={handleGlobalRefresh}> {/* Pass handleGlobalRefresh here */}
+      <div className="h-screen bg-background flex relative">
+        {isUserTemporarilyDisabled && (
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-4 pointer-events-auto">
+            <ShieldAlert className="h-16 w-16 text-destructive mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-destructive">Acceso Restringido</h2>
+            <p className="text-muted-foreground mt-2">
+              Tu cuenta ha sido temporalmente deshabilitada o expulsada.
+              Por favor, contacta al soporte para más información.
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Se ha cerrado tu sesión. Recarga la página o intenta iniciar sesión de nuevo.
+            </p>
+          </div>
+        )}
+
+        <div className="w-[320px] flex-shrink-0">
+          <ConversationSidebar
+            apps={apps}
+            conversations={conversations}
+            folders={folders}
+            notes={notes}
+            isLoading={isLoadingData}
+            selectedItem={selectedItem}
+            onSelectItem={handleSelectItem}
+            onFileSelect={handleFileSelect}
+            onOpenProfileSettings={handleOpenProfileSettings}
+            onOpenAccountSettings={handleOpenAccountSettings}
+            onOpenServerManagement={handleOpenServerManagement}
+            onOpenUserManagement={handleOpenUserManagement}
+            onOpenDeepAiCoder={handleOpenDeepAiCoder}
+            onOpenUpdateManager={handleOpenUpdateManager}
+            onOpenApiManagement={handleOpenApiManagement}
+            onOpenAlerts={handleOpenAlerts}
+            refreshData={refreshSidebarData}
+            createConversation={createConversation as any}
+            createFolder={createFolder}
+            createNote={createNote as any}
+            moveItem={moveItem}
+            onDeleteApp={handleDeleteApp}
+            isDeletingAppId={isDeletingAppId}
+            fileTreeRefreshKey={fileTreeRefreshKey}
+            updateLocalItem={updateLocalItem}
+            removeLocalItem={removeLocalItem}
+          />
         </div>
-      )}
+        <div className="flex-1 min-w-0 flex flex-col">
+          {selectedItem?.type === 'app' && selectedAppDetails && (
+            <AppVersionsBar
+              appId={selectedAppDetails.id}
+              onRevertToVersion={handleRevertToVersion}
+              isReverting={isRevertingApp}
+              autoFixStatus={chatInterfaceRef.current?.autoFixStatus || 'idle'}
+              onTriggerFixBuildError={handleTriggerFixBuildError}
+              onTriggerReportWebError={handleTriggerReportWebError}
+            />
+          )}
+          {selectedItem?.type === 'note' ? (
+            <NoteEditorPanel
+              ref={noteEditorRef} // Assign ref here
+              noteId={selectedItem.id}
+              onNoteUpdated={(id, data) => updateLocalItem(id, 'note', data)}
+              userApiKeys={userApiKeys}
+              isLoadingApiKeys={isLoadingApiKeys}
+              userLanguage={userLanguage || 'es'}
+            />
+          ) : (
+            <ResizablePanelGroup direction="horizontal" className="flex-1">
+              <ResizablePanel defaultSize={50} minSize={30}>
+                <ChatInterface
+                  ref={chatInterfaceRef}
+                  key={selectedItem?.conversationId || 'no-conversation'}
+                  userId={userId}
+                  conversationId={selectedItem?.conversationId || null}
+                  onNewConversationCreated={handleNewConversationCreated}
+                  onConversationTitleUpdate={(id, newTitle) => {}}
+                  aiResponseSpeed={aiResponseSpeed}
+                  isAppProvisioning={isAppProvisioning}
+                  isAppDeleting={isAppDeleting}
+                  appPrompt={appPrompt}
+                  appId={appId}
+                  onWriteFiles={writeFilesToApp}
+                  isAppChat={selectedItem?.type === 'app'}
+                  onSidebarDataRefresh={refreshSidebarData}
+                  userApiKeys={userApiKeys}
+                  isLoadingApiKeys={isLoadingApiKeys}
+                />
+              </ResizablePanel>
+              {selectedItem?.type === 'app' && (
+                <>
+                  <ResizableHandle withHandle />
+                  <ResizablePanel defaultSize={50} minSize={30}>
+                    {renderRightPanelContent()}
+                  </ResizablePanel>
+                </>
+              )}
+            </ResizablePanelGroup>
+          )}
+        </div>
 
-      <div className="w-[320px] flex-shrink-0">
-        <ConversationSidebar
-          apps={apps}
-          conversations={conversations}
-          folders={folders}
-          notes={notes}
-          isLoading={isLoadingData}
-          selectedItem={selectedItem}
-          onSelectItem={handleSelectItem}
-          onFileSelect={handleFileSelect}
-          onOpenProfileSettings={handleOpenProfileSettings}
-          onOpenAccountSettings={handleOpenAccountSettings}
-          onOpenServerManagement={handleOpenServerManagement}
-          onOpenUserManagement={handleOpenUserManagement}
-          onOpenDeepAiCoder={handleOpenDeepAiCoder}
-          onOpenUpdateManager={handleOpenUpdateManager}
-          onOpenApiManagement={handleOpenApiManagement}
-          onOpenAlerts={handleOpenAlerts}
-          refreshData={refreshSidebarData}
-          createConversation={createConversation as any}
-          createFolder={createFolder}
-          createNote={createNote as any}
-          moveItem={moveItem}
-          onDeleteApp={handleDeleteApp}
-          isDeletingAppId={isDeletingAppId}
-          fileTreeRefreshKey={fileTreeRefreshKey}
-          updateLocalItem={updateLocalItem}
-          removeLocalItem={removeLocalItem}
+        <ProfileSettingsDialog open={isProfileSettingsOpen} onOpenChange={setIsProfileSettingsOpen} />
+        <AccountSettingsDialog
+          open={isAccountSettingsOpen}
+          onOpenChange={setIsAccountSettingsOpen}
+          aiResponseSpeed={aiResponseSpeed}
+          onAiResponseSpeedChange={handleAiResponseSpeedChange}
+          userApiKeys={userApiKeys}
+          isLoadingApiKeys={isLoadingApiKeys}
+          currentUserRole={userRole}
         />
+        {isAdmin && <ServerManagementDialog open={isServerManagementOpen} onOpenChange={setIsServerManagementOpen} />}
+        {isAdmin && <UserManagementDialog open={isUserManagementOpen} onOpenChange={setIsUserManagementOpen} />}
+        <ApiManagementDialog open={isApiManagementOpen} onOpenChange={setIsApiManagementOpen} />
+        {isAdmin && <AlertsDialog open={isAlertsOpen} onOpenChange={setIsAlertsOpen} />}
+        <DeepAiCoderDialog open={isDeepAiCoderOpen} onOpenChange={setIsDeepAiCoderOpen} onAppCreated={handleAppCreated} />
+        <RetryUploadDialog
+          open={retryState.isOpen}
+          onOpenChange={(open) => setRetryState({ ...retryState, isOpen: open })}
+          onRetry={handleRetryUpload}
+          fileCount={retryState.files?.length || 0}
+        />
+        {userRole === 'super_admin' && <UpdateManagerDialog open={isUpdateManagerOpen} onOpenChange={setIsUpdateManagerOpen} />}
       </div>
-      <div className="flex-1 min-w-0 flex flex-col">
-        {selectedItem?.type === 'app' && selectedAppDetails && (
-          <AppVersionsBar
-            appId={selectedAppDetails.id}
-            onRevertToVersion={handleRevertToVersion}
-            isReverting={isRevertingApp}
-            autoFixStatus={chatInterfaceRef.current?.autoFixStatus || 'idle'}
-            onTriggerFixBuildError={handleTriggerFixBuildError}
-            onTriggerReportWebError={handleTriggerReportWebError}
-          />
-        )}
-        {selectedItem?.type === 'note' ? (
-          <NoteEditorPanel
-            ref={noteEditorRef} // Assign ref here
-            noteId={selectedItem.id}
-            onNoteUpdated={(id, data) => updateLocalItem(id, 'note', data)}
-            userApiKeys={userApiKeys}
-            isLoadingApiKeys={isLoadingApiKeys}
-            userLanguage={userLanguage || 'es'}
-          />
-        ) : (
-          <ResizablePanelGroup direction="horizontal" className="flex-1">
-            <ResizablePanel defaultSize={50} minSize={30}>
-              <ChatInterface
-                ref={chatInterfaceRef}
-                key={selectedItem?.conversationId || 'no-conversation'}
-                userId={userId}
-                conversationId={selectedItem?.conversationId || null}
-                onNewConversationCreated={handleNewConversationCreated}
-                onConversationTitleUpdate={(id, newTitle) => {}}
-                aiResponseSpeed={aiResponseSpeed}
-                isAppProvisioning={isAppProvisioning}
-                isAppDeleting={isAppDeleting}
-                appPrompt={appPrompt}
-                appId={appId}
-                onWriteFiles={writeFilesToApp}
-                isAppChat={selectedItem?.type === 'app'}
-                onSidebarDataRefresh={refreshSidebarData}
-                userApiKeys={userApiKeys}
-                isLoadingApiKeys={isLoadingApiKeys}
-              />
-            </ResizablePanel>
-            {selectedItem?.type === 'app' && (
-              <>
-                <ResizableHandle withHandle />
-                <ResizablePanel defaultSize={50} minSize={30}>
-                  {renderRightPanelContent()}
-                </ResizablePanel>
-              </>
-            )}
-          </ResizablePanelGroup>
-        )}
-      </div>
-
-      <ProfileSettingsDialog open={isProfileSettingsOpen} onOpenChange={setIsProfileSettingsOpen} />
-      <AccountSettingsDialog
-        open={isAccountSettingsOpen}
-        onOpenChange={setIsAccountSettingsOpen}
-        aiResponseSpeed={aiResponseSpeed}
-        onAiResponseSpeedChange={handleAiResponseSpeedChange}
-        userApiKeys={userApiKeys}
-        isLoadingApiKeys={isLoadingApiKeys}
-        currentUserRole={userRole}
-      />
-      {isAdmin && <ServerManagementDialog open={isServerManagementOpen} onOpenChange={setIsServerManagementOpen} />}
-      {isAdmin && <UserManagementDialog open={isUserManagementOpen} onOpenChange={setIsUserManagementOpen} />}
-      <ApiManagementDialog open={isApiManagementOpen} onOpenChange={setIsApiManagementOpen} />
-      {isAdmin && <AlertsDialog open={isAlertsOpen} onOpenChange={setIsAlertsOpen} />}
-      <DeepAiCoderDialog open={isDeepAiCoderOpen} onOpenChange={setIsDeepAiCoderOpen} onAppCreated={handleAppCreated} />
-      <RetryUploadDialog
-        open={retryState.isOpen}
-        onOpenChange={(open) => setRetryState({ ...retryState, isOpen: open })}
-        onRetry={handleRetryUpload}
-        fileCount={retryState.files?.length || 0}
-      />
-      {userRole === 'super_admin' && <UpdateManagerDialog open={isUpdateManagerOpen} onOpenChange={setIsUpdateManagerOpen} />}
-    </div>
+    </SessionContextProvider>
   );
 }
