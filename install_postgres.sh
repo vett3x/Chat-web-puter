@@ -2,13 +2,22 @@
 set -e # Exit immediately if a command exits with a non-zero status.
 
 # --- Configuration ---
-# Check if a password is provided
+# Check if a password file path is provided
 if [ -z "$1" ]; then
-  echo "Usage: $0 <postgres_admin_and_app_user_password>"
+  echo "Usage: $0 <path_to_password_file>"
   exit 1
 fi
 
-DB_PASSWORD=$1
+PASS_FILE=$1
+if [ ! -f "$PASS_FILE" ]; then
+    echo "ERROR: Password file not found at $PASS_FILE"
+    exit 1
+fi
+
+# Read the password from the file and then immediately delete the file
+DB_PASSWORD=$(cat "$PASS_FILE")
+rm -f "$PASS_FILE"
+
 APP_DB_USER="app_user"
 APP_DB_NAME="app_db"
 
@@ -29,13 +38,11 @@ if [ -z "$PG_CONF" ] || [ -z "$PG_HBA" ]; then
 fi
 
 echo "--- Configuring postgresql.conf to listen on all addresses ---"
-# Use grep to check if the setting is already correct to avoid duplicate entries
 if ! grep -q "^listen_addresses = '\\*'" "$PG_CONF"; then
     sed -i "s/.*listen_addresses.*/listen_addresses = '*'/" "$PG_CONF"
 fi
 
 echo "--- Configuring pg_hba.conf for remote password authentication ---"
-# Check if the rule already exists before adding it
 if ! grep -q "host    all             all             0.0.0.0/0               md5" "$PG_HBA"; then
     echo "host    all             all             0.0.0.0/0               md5" >> "$PG_HBA"
 fi
@@ -60,7 +67,6 @@ sudo -u postgres psql -v ON_ERROR_STOP=1 <<-EOSQL
     \$\$;
 
     -- Create a dedicated database for the application if it doesn't exist
-    -- Note: We connect to 'postgres' db to check existence of 'app_db'
     SELECT 'CREATE DATABASE $APP_DB_NAME'
     WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$APP_DB_NAME')\gexec
 

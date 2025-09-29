@@ -9,6 +9,7 @@ import { encrypt } from '@/lib/encryption';
 import { executeSshCommand, writeRemoteFile } from '@/lib/ssh-utils';
 import fs from 'fs/promises';
 import path from 'path';
+import crypto from 'crypto';
 
 const provisionSchema = z.object({
   ssh_host: z.string().ip({ message: 'Debe ser una IP válida.' }),
@@ -44,19 +45,20 @@ export async function POST(req: NextRequest) {
   );
 
   let configId: string | null = null;
+  const remotePassFilePath = `/tmp/${crypto.randomBytes(16).toString('hex')}.pass`;
+  let sshDetails: any = null;
 
   try {
     const body = await req.json();
     const { ssh_host, ssh_port, ssh_user, ssh_password, ...dbConfig } = provisionSchema.parse(body);
 
-    const sshDetails = {
+    sshDetails = {
       ip_address: ssh_host,
       ssh_port: ssh_port,
       ssh_username: ssh_user,
       ssh_password: ssh_password,
     };
 
-    // 1. Create the record in the database with 'provisioning' status
     const encryptedPassword = encrypt(dbConfig.db_password);
     const { data: newConfig, error: insertError } = await supabaseAdmin
       .from('database_config')
@@ -65,8 +67,8 @@ export async function POST(req: NextRequest) {
         is_active: false,
         db_host: ssh_host,
         db_port: 5432,
-        db_name: 'app_db', // Use the dedicated app database name
-        db_user: 'app_user', // Use the dedicated app user
+        db_name: 'app_db',
+        db_user: 'app_user',
         db_password: encryptedPassword,
         status: 'provisioning',
         provisioning_log: 'Iniciando aprovisionamiento...',
@@ -77,19 +79,15 @@ export async function POST(req: NextRequest) {
     if (insertError) throw insertError;
     configId = newConfig.id;
 
-    // 2. Read the script content from the project
     const scriptPath = path.join(process.cwd(), 'install_postgres.sh');
     const scriptContent = await fs.readFile(scriptPath, 'utf-8');
     const remoteScriptPath = '/tmp/install_postgres.sh';
 
-    // 3. Upload the script to the target server using scp
+    await writeRemoteFile(sshDetails, remotePassFilePath, dbConfig.db_password);
     await writeRemoteFile(sshDetails, remoteScriptPath, scriptContent);
-
-    // 4. Make the script executable
     await executeSshCommand(sshDetails, `chmod +x ${remoteScriptPath}`);
 
-    // 5. Run the script
-    const { stdout, stderr, code } = await executeSshCommand(sshDetails, `sudo ${remoteScriptPath} '${dbConfig.db_password}'`);
+    const { stdout, stderr, code } = await executeSshCommand(sshDetails, `sudo ${remoteScriptPath} ${remotePassFilePath}`);
     
     const logOutput = `--- STDOUT ---\n${stdout}\n\n--- STDERR ---\n${stderr}`;
 
@@ -97,14 +95,12 @@ export async function POST(req: NextRequest) {
       throw new Error(`Error durante el aprovisionamiento (código de salida: ${code}).\n\n${logOutput}`);
     }
 
-    // 6. If successful, update status to 'ready' and save log
     await supabaseAdmin.from('database_config').update({ status: 'ready', provisioning_log: logOutput }).eq('id', configId);
 
     return NextResponse.json({ message: 'Servidor PostgreSQL aprovisionado y configurado exitosamente.', output: stdout });
 
   } catch (error: any) {
     if (configId) {
-      // If any step fails, mark the config as 'failed' and save the log
       await supabaseAdmin.from('database_config').update({ status: 'failed', provisioning_log: error.message }).eq('id', configId);
     }
     if (error instanceof z.ZodError) {
@@ -112,5 +108,10 @@ export async function POST(req: NextRequest) {
     }
     console.error('[API DB Provision] Error:', error);
     return NextResponse.json({ message: error.message }, { status: 500 });
+  } finally {
+    if (sshDetails) {
+      // Clean up the remote script file, the password file is deleted by the script itself
+      await executeSshCommand(sshDetails, `rm -f /tmp/install_postgres.sh`).catch(e => console.warn("Failed to cleanup remote script file"));
+    }
   }
 }
