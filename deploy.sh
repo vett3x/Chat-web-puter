@@ -81,12 +81,18 @@ function setup_pm2() {
 
 function setup_crontab() {
   echo "--- Configurando tareas CRON para la gestión del ciclo de vida de la aplicación ---"
-  # Usar localhost para la tarea CRON
-  CRON_JOB="*/5 * * * * curl -s http://localhost:${WEBSOCKET_PORT}/api/cron/manage-app-lifecycle > /dev/null 2>&1"
+  # Definir la URL del endpoint de CRON
+  CRON_URL_PATTERN="/api/cron/manage-app-lifecycle"
+  CRON_JOB="*/5 * * * * curl -s http://localhost:${WEBSOCKET_PORT}${CRON_URL_PATTERN} > /dev/null 2>&1"
   
-  # Comprobar si la tarea CRON ya existe
+  # Eliminar cualquier tarea CRON existente que apunte a este endpoint
+  echo "Eliminando tareas CRON antiguas para ${CRON_URL_PATTERN} (si existen)..."
+  (sudo crontab -l 2>/dev/null | grep -v "${CRON_URL_PATTERN}") | sudo crontab - || true
+  echo "Tareas CRON antiguas eliminadas."
+
+  # Comprobar si la tarea CRON ya existe (después de la limpieza)
   if ! sudo crontab -l | grep -Fq "$CRON_JOB"; then
-    echo "Añadiendo tarea CRON: $CRON_JOB"
+    echo "Añadiendo nueva tarea CRON: $CRON_JOB"
     (sudo crontab -l 2>/dev/null; echo "$CRON_JOB") | sudo crontab -
     echo "Tarea CRON añadida correctamente."
   else
