@@ -69,12 +69,17 @@ export async function POST(req: NextRequest) {
 
     await pgClient.connect();
 
-    // Test permissions by creating and dropping a temporary schema
-    const testSchemaName = `dyad_connection_test_${Date.now()}`;
-    await pgClient.query(`CREATE SCHEMA ${testSchemaName};`);
-    await pgClient.query(`DROP SCHEMA ${testSchemaName};`);
+    // Test permissions by creating, inserting into, and dropping a temporary table
+    const testTableName = `dyad_connection_test_${Date.now()}`;
+    await pgClient.query(`CREATE TABLE ${testTableName} (id INT);`);
+    await pgClient.query(`INSERT INTO ${testTableName} (id) VALUES (1);`);
+    const { rowCount } = await pgClient.query(`SELECT * FROM ${testTableName};`);
+    if (rowCount !== 1) {
+      throw new Error('La verificación de inserción y selección falló.');
+    }
+    await pgClient.query(`DROP TABLE ${testTableName};`);
 
-    return NextResponse.json({ message: 'Conexión exitosa y permisos de administrador verificados.' });
+    return NextResponse.json({ message: 'Conexión exitosa y permisos de usuario de aplicación verificados.' });
 
   } catch (error: any) {
     console.error('[DB Test Connection] Error:', error);
@@ -86,8 +91,8 @@ export async function POST(req: NextRequest) {
       errorMessage = `La base de datos '${pgClient.database}' no existe.`;
     } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
       errorMessage = `No se pudo conectar al host '${pgClient.host}'. Revisa el host y el puerto.`;
-    } else if (error.message.includes('permission denied to create schema')) {
-        errorMessage = 'Conexión exitosa, pero el usuario no tiene permisos de administrador para crear esquemas.';
+    } else if (error.message.includes('permission denied')) {
+        errorMessage = `Conexión exitosa, pero el usuario '${pgClient.user}' no tiene los permisos necesarios en la base de datos '${pgClient.database}'.`;
     } else {
       errorMessage = error.message;
     }
