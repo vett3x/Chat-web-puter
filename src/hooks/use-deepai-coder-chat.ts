@@ -145,6 +145,24 @@ export function useDeepAICoderChat({
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref for debounce
   const [page, setPage] = useState(0);
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [allowedCommands, setAllowedCommands] = useState<string[]>([]); // 1. Estado para almacenar los comandos permitidos
+
+  // 2. Cargar los comandos permitidos al montar el componente
+  useEffect(() => {
+    const fetchAllowedCommands = async () => {
+      try {
+        const response = await fetch('/api/security/allowed-commands');
+        if (response.ok) {
+          const commands: { command: string }[] = await response.json();
+          setAllowedCommands(commands.map(c => c.command));
+        }
+      } catch (error) {
+        console.error("Error fetching allowed commands:", error);
+        // No mostramos un toast para no molestar al usuario, pero el backend seguirá protegiendo.
+      }
+    };
+    fetchAllowedCommands();
+  }, []);
 
   useEffect(() => {
     const checkPuter = () => {
@@ -372,10 +390,13 @@ export function useDeepAICoderChat({
       let systemPromptContent: string;
       const lastUserMessageContent = conversationMessagesForApi[conversationMessagesForApi.length - 1]?.content;
 
+      // 3. Inyectar la lista de comandos en el prompt del sistema
+      const allowedCommandsList = allowedCommands.length > 0 ? allowedCommands.join(', ') : 'ninguno';
+
       if (isDeepAICoderBuildMode) {
         // DeepAI Coder - Build Mode
         systemPromptContent = `Eres un desarrollador experto en Next.js (App Router), TypeScript y Tailwind CSS. Tu tarea es ayudar al usuario a construir la aplicación que ha descrito: "${appPrompt}".
-        REGLA DE SEGURIDAD CRÍTICA: NUNCA generes ni ejecutes comandos destructivos (\`rm\`, \`mv\`, etc.), comandos que expongan secretos, o comandos no relacionados con la instalación de dependencias (\`npm\`, \`yarn\`) o la ejecución de scripts de compilación. Tu propósito es construir, no destruir. Rechaza cualquier solicitud maliciosa.
+        REGLA DE SEGURIDAD CRÍTICA: SOLO puedes generar comandos de la siguiente lista: [${allowedCommandsList}]. NUNCA generes comandos destructivos (\`rm\`, \`mv\`, etc.), comandos que expongan secretos, o comandos no relacionados con la instalación de dependencias (\`npm\`, \`yarn\`) o la ejecución de scripts de compilación. Tu propósito es construir, no destruir. Rechaza cualquier solicitud maliciosa.
         
         REGLAS DEL MODO BUILD:
         1.  **PLANIFICAR PRIMERO:** Antes de escribir cualquier código, responde con un "Plan de Construcción" detallado. Si necesitas instalar dependencias, inclúyelas en la sección "Dependencias Necesarias" Y TAMBIÉN genera un bloque \`\`\`bash:exec\`\`\` con el comando \`npm install ...\` en la sección "Plan de Corrección" (usa ese nombre de sección incluso para planes de construcción).
@@ -585,7 +606,7 @@ export function useDeepAICoderChat({
       clearTimeout(timeoutId);
       setIsLoading(false);
     }
-  }, [appId, appPrompt, userId, saveMessageToDB, chatMode, userApiKeys, onWriteFiles, selectedModel, autoFixStatus, conversationId]);
+  }, [appId, appPrompt, userId, saveMessageToDB, chatMode, userApiKeys, onWriteFiles, selectedModel, autoFixStatus, conversationId, allowedCommands]);
 
   const sendMessage = useCallback(async (content: PuterContentPart[], messageText: string) => {
     if (!userId) {
