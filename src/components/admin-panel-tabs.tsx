@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Server, Dock, History, Cloud, Shield, LayoutDashboard } from 'lucide-react';
+import { Server, Dock, History, Cloud, Shield, LayoutDashboard, Database } from 'lucide-react'; // Import Database icon
 import { ServerListTab } from './server-tabs/server-list-tab';
 import { UsageHistoryTab } from './server-tabs/usage-history-tab';
 import { CloudflareTunnelTab } from './server-tabs/cloudflare-tunnel-tab';
@@ -11,7 +11,8 @@ import { AllDockerContainersTab } from './server-tabs/all-docker-containers-tab'
 import { SecurityTab } from './server-tabs/security-tab';
 import { useSession } from '@/components/session-context-provider';
 import { cn } from '@/lib/utils';
-import { AdminDashboardTab } from './admin/admin-dashboard'; // Import the new dashboard tab
+import { AdminDashboardTab } from './admin/admin-dashboard';
+import { DatabaseConfigTab } from './admin/database-config-tab'; // Import the new tab component
 
 export function AdminPanelTabs() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -20,7 +21,7 @@ export function AdminPanelTabs() {
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col">
-      <TabsList className={cn("grid w-full", isSuperAdmin ? "grid-cols-6" : "grid-cols-4")}>
+      <TabsList className={cn("grid w-full", isSuperAdmin ? "grid-cols-7" : "grid-cols-4")}>
         {isSuperAdmin && (
           <TabsTrigger value="dashboard" className="flex items-center gap-2">
             <LayoutDashboard className="h-4 w-4" /> Panel
@@ -38,6 +39,11 @@ export function AdminPanelTabs() {
         <TabsTrigger value="cloudflare" className="flex items-center gap-2">
           <Cloud className="h-4 w-4" /> Cloudflare
         </TabsTrigger>
+        {isSuperAdmin && (
+          <TabsTrigger value="database" className="flex items-center gap-2">
+            <Database className="h-4 w-4" /> Base de Datos
+          </TabsTrigger>
+        )}
         {isSuperAdmin && (
           <TabsTrigger value="security" className="flex items-center gap-2">
             <Shield className="h-4 w-4" /> Seguridad
@@ -63,6 +69,11 @@ export function AdminPanelTabs() {
           <TabsContent value="cloudflare" className="h-full">
             <CloudflareTunnelTab />
           </TabsContent>
+          {isSuperAdmin && (
+            <TabsContent value="database" className="h-full">
+              <DatabaseConfigTab />
+            </TabsContent>
+          )}
           {isSuperAdmin && (
             <TabsContent value="security" className="h-full">
               <SecurityTab />
