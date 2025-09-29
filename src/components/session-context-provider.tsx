@@ -38,6 +38,17 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
   const router = useRouter();
   const pathname = usePathname();
 
+  // NEW: State to track last known global settings and user profile status
+  const [lastKnownGlobalSettings, setLastKnownGlobalSettings] = useState<{
+    maintenance_mode_enabled: boolean;
+    users_disabled: boolean;
+    admins_disabled: boolean;
+  } | null>(null);
+  const [lastKnownProfileStatus, setLastKnownProfileStatus] = useState<{
+    status: UserStatus;
+    kicked_at: string | null;
+  } | null>(null);
+
   const isUserTemporarilyDisabled = userStatus === 'banned' || userStatus === 'kicked';
 
   const triggerGlobalRefresh = useCallback(() => {
@@ -65,9 +76,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
 
         if (error) {
           console.error('[SessionContext] Error fetching user profile:', error);
-          // Fallback role based on email if profile fetch fails
           determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
-          // Explicitly set default/empty values for other states on error
           determinedPermissions = {}; 
           determinedAvatarUrl = null;
           determinedLanguage = 'es';
@@ -80,7 +89,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
           determinedLanguage = profile.language || 'es';
           determinedStatus = profile.status as UserStatus;
           determinedKickedAt = profile.kicked_at;
-        } else { // No profile found, but no error (shouldn't happen often with RLS)
+        } else {
           determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
           determinedPermissions = {
             can_create_server: false,
@@ -94,7 +103,6 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
           determinedKickedAt = null;
         }
         
-        // Client-side check for expired kick status (moved outside the initial error block)
         if (determinedStatus === 'kicked' && determinedKickedAt) {
           const kickedTime = new Date(determinedKickedAt);
           const unkickTime = addMinutes(kickedTime, 15); 
@@ -113,16 +121,19 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
         setUserAvatarUrl(determinedAvatarUrl);
         setUserLanguage(determinedLanguage);
         setUserStatus(determinedStatus);
+        // NEW: Update lastKnownProfileStatus here
+        setLastKnownProfileStatus({
+          status: determinedStatus,
+          kicked_at: determinedKickedAt,
+        });
 
-      } catch (fetchError: any) { // Catch any network/Supabase errors during profile fetch
+      } catch (fetchError: any) {
         console.error('[SessionContext] Critical error during profile fetch:', fetchError);
-        // Ensure all states are reset to defaults on critical fetch error
-        setUserRole(SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user'); // Best guess role
+        setUserRole(SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user');
         setUserPermissions({}); 
         setUserAvatarUrl(null);
         setUserLanguage('es');
         setUserStatus('active');
-        // Do not redirect here, let the main auth state change listener handle it if session is truly invalid.
       }
     } else {
       setUserRole(null);
@@ -130,6 +141,8 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
       setUserAvatarUrl(null);
       setUserLanguage('es');
       setUserStatus(null);
+      // NEW: Clear lastKnownProfileStatus when no session
+      setLastKnownProfileStatus(null);
     }
   }, []);
 
@@ -159,6 +172,23 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
       await fetchUserProfileAndRole(initialSession);
       setIsLoading(false);
 
+      // NEW: Fetch initial global settings here
+      try {
+        const response = await fetch('/api/settings/public-status');
+        if (response.ok) {
+          const statusData = await response.json();
+          setLastKnownGlobalSettings({
+            maintenance_mode_enabled: statusData.maintenanceModeEnabled,
+            users_disabled: statusData.usersDisabled,
+            admins_disabled: statusData.adminsDisabled,
+          });
+        } else {
+          console.warn('Could not fetch initial public status.');
+        }
+      } catch (error) {
+        console.error('Error fetching initial public status:', error);
+      }
+
       if (!initialSession && pathname !== '/login') {
         console.log('[SessionContext] Initial: No session, redirecting to /login.');
         router.push('/login');
@@ -184,33 +214,27 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
       console.log(`[SessionContext] Real-time status check for user ${session.user.id}. Current role: ${userRole}, status: ${userStatus}`);
 
       try {
-        // NEW: Proactively refresh Supabase session
         const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
         if (refreshError) {
           console.warn("[SessionContext] Error refreshing Supabase session:", refreshError);
-          // If refresh fails, it means the session is likely invalid, force sign out.
           await supabase.auth.signOut();
           router.push('/login');
           return;
         }
-        // If session was refreshed, update local state and re-fetch profile to ensure consistency
         if (refreshedSession && refreshedSession.user.id !== session.user.id) {
             setSession(refreshedSession);
             await fetchUserProfileAndRole(refreshedSession);
             console.log("[SessionContext] Supabase session refreshed and profile re-fetched.");
         }
 
-
-        // Fetch global settings
         const response = await fetch('/api/settings/public-status');
         if (!response.ok) {
           console.warn('Could not fetch public status for real-time check.');
           return;
         }
         const statusData = await response.json();
-        const { usersDisabled, adminsDisabled } = statusData;
+        const { maintenanceModeEnabled, usersDisabled, adminsDisabled } = statusData;
 
-        // Fetch user's current profile status from DB
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('status, kicked_at')
@@ -218,8 +242,6 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
           .single();
 
         if (profileError || !profile) {
-          console.error("[SessionContext] Error re-fetching user profile status:", profileError);
-          // If profile not found, assume active for now, but log out if global settings disable their role
           if (userRole !== 'super_admin') {
             if (usersDisabled && userRole === 'user') {
               console.log(`[SessionContext] Real-time check: User ${session.user.id} (role: user) is disabled globally. Signing out.`);
@@ -235,13 +257,48 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
               return;
             }
           }
-          return; // Exit if profile not found and no global disable
+          return;
         }
 
         const dbStatus = profile.status as UserStatus;
         const dbKickedAt = profile.kicked_at;
 
-        // Handle global role disable (only for non-super_admin)
+        // NEW: Check for changes before triggering global refresh
+        let shouldTriggerGlobalRefresh = false;
+
+        // Check for global settings changes
+        if (lastKnownGlobalSettings && (
+          lastKnownGlobalSettings.maintenance_mode_enabled !== maintenanceModeEnabled ||
+          lastKnownGlobalSettings.users_disabled !== usersDisabled ||
+          lastKnownGlobalSettings.admins_disabled !== adminsDisabled
+        )) {
+          console.log("[SessionContext] Global settings changed.");
+          shouldTriggerGlobalRefresh = true;
+        }
+        // Check for profile status changes
+        if (lastKnownProfileStatus && (
+          lastKnownProfileStatus.status !== dbStatus ||
+          lastKnownProfileStatus.kicked_at !== dbKickedAt
+        )) {
+          console.log("[SessionContext] User profile status changed.");
+          shouldTriggerGlobalRefresh = true;
+        }
+
+        // Update last known states
+        setLastKnownGlobalSettings({
+          maintenance_mode_enabled: maintenanceModeEnabled,
+          users_disabled: usersDisabled,
+          admins_disabled: adminsDisabled,
+        });
+        setLastKnownProfileStatus({
+          status: dbStatus,
+          kicked_at: dbKickedAt,
+        });
+
+        // ... (existing global role disable, banned/kicked logic)
+        // This logic should still run to enforce immediate redirects/sign-outs.
+        // The `shouldTriggerGlobalRefresh` is for UI updates *after* these critical actions.
+
         if (userRole !== 'super_admin') {
           if (usersDisabled && userRole === 'user') {
             console.log(`[SessionContext] Real-time check: User ${session.user.id} (role: user) is disabled globally. Signing out.`);
@@ -258,7 +315,6 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
           }
         }
 
-        // Handle individual user status changes (banned/kicked)
         if (dbStatus === 'banned' && userStatus !== 'banned') {
           console.log(`[SessionContext] Real-time check: User ${session.user.id} is now banned. Signing out.`);
           await supabase.auth.signOut();
@@ -270,52 +326,41 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
         if (dbStatus === 'kicked' && userStatus !== 'kicked') {
           const kickedTime = dbKickedAt ? new Date(dbKickedAt).getTime() : 0;
           const fifteenMinutesAgo = Date.now() - (15 * 60 * 1000);
-          if (kickedTime > fifteenMinutesAgo) { // Still actively kicked
+          if (kickedTime > fifteenMinutesAgo) {
             console.log(`[SessionContext] Real-time check: User ${session.user.id} is now kicked. Signing out.`);
             await supabase.auth.signOut();
             toast.warning("Has sido expulsado del sistema. Se ha cerrado tu sesión.");
             router.push(`/login?error=account_kicked&kicked_at=${dbKickedAt}`);
             return;
           } else {
-            // If DB says kicked but time has expired, update DB to active
             console.log(`[SessionContext] Real-time check: User ${session.user.id} was kicked, but 15 minutes have passed. Auto-unkicking in DB.`);
             await supabase.from('profiles').update({ status: 'active', kicked_at: null }).eq('id', session.user.id);
-            // For client-side, optimistically update local state
             setUserStatus('active');
             toast.info("Tu expulsión ha expirado. Tu cuenta ha sido reactivada.");
+            shouldTriggerGlobalRefresh = true; // Trigger refresh after auto-unkick
           }
         }
         
-        // If status is active in DB but local state was banned/kicked, update local state
         if (dbStatus === 'active' && (userStatus === 'banned' || userStatus === 'kicked')) {
             console.log(`[SessionContext] Real-time check: User ${session.user.id} is now active in DB. Updating local state.`);
             setUserStatus('active');
             toast.info("Tu cuenta ha sido reactivada.");
+            shouldTriggerGlobalRefresh = true; // Trigger refresh after reactivation
         }
 
-        // If there's any discrepancy in status or kicked_at, re-fetch full profile to synchronize all state
-        if (dbStatus !== userStatus || (dbKickedAt && dbKickedAt !== profile.kicked_at) || (!dbKickedAt && profile.kicked_at)) {
-            console.log(`[SessionContext] Real-time check: Profile data discrepancy detected. Re-fetching full profile for user ${session.user.id}.`);
-            await fetchUserProfileAndRole(session);
-        }
-
-        // NEW: If all checks pass and user is active, trigger a global refresh
-        if (session && userRole && userStatus === 'active') {
+        if (shouldTriggerGlobalRefresh) {
+          console.log("[SessionContext] Triggering global refresh due to detected changes.");
           triggerGlobalRefresh();
         }
 
       } catch (error) {
         console.error("[SessionContext] Unhandled error in checkSessionAndGlobalStatus interval:", error);
-        // Do not redirect or change session state here, just log.
-        // The main auth state change listener will handle definitive sign-outs.
       }
     };
 
-    // Set interval for 10 seconds
     const intervalId = setInterval(checkSessionAndGlobalStatus, 10000);
-
     return () => clearInterval(intervalId);
-  }, [session, userRole, userStatus, router, fetchUserProfileAndRole, pathname, triggerGlobalRefresh]);
+  }, [session, userRole, userStatus, router, fetchUserProfileAndRole, pathname, triggerGlobalRefresh, lastKnownGlobalSettings, lastKnownProfileStatus]);
 
   if (isLoading) {
     return (
