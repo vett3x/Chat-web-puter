@@ -1,62 +1,72 @@
 #!/bin/bash
 set -e # Exit immediately if a command exits with a non-zero status.
 
+# --- Configuration ---
 # Check if a password is provided
 if [ -z "$1" ]; then
-  echo "Usage: $0 <postgres_password>"
+  echo "Usage: $0 <postgres_admin_and_app_user_password>"
   exit 1
 fi
 
 DB_PASSWORD=$1
+APP_DB_USER="app_user"
+APP_DB_NAME="app_db"
 
 echo "--- Starting PostgreSQL Installation and Configuration ---"
 
-# Update package lists
+# --- Installation ---
 apt-get update -y
-
-# Install PostgreSQL and its client
 apt-get install -y postgresql postgresql-client
-
 echo "--- PostgreSQL Installed ---"
 
-# Find the main postgresql.conf file path
+# --- Configuration for Remote Access ---
 PG_CONF=$(find /etc/postgresql -name "postgresql.conf" | head -n 1)
-if [ -z "$PG_CONF" ]; then
-    echo "ERROR: postgresql.conf not found!"
-    exit 1
-fi
-echo "Found postgresql.conf at $PG_CONF"
-
-# Find the main pg_hba.conf file path
 PG_HBA=$(find /etc/postgresql -name "pg_hba.conf" | head -n 1)
-if [ -z "$PG_HBA" ]; then
-    echo "ERROR: pg_hba.conf not found!"
+
+if [ -z "$PG_CONF" ] || [ -z "$PG_HBA" ]; then
+    echo "ERROR: PostgreSQL configuration files not found!"
     exit 1
 fi
-echo "Found pg_hba.conf at $PG_HBA"
 
-# Configure PostgreSQL to listen on all addresses
 echo "--- Configuring postgresql.conf to listen on all addresses ---"
-sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" "$PG_CONF"
-# Also uncomment if it's commented out without a value
-sed -i "s/listen_addresses = 'localhost'/listen_addresses = '*'/" "$PG_CONF"
+# Use grep to check if the setting is already correct to avoid duplicate entries
+if ! grep -q "^listen_addresses = '\\*'" "$PG_CONF"; then
+    sed -i "s/.*listen_addresses.*/listen_addresses = '*'/" "$PG_CONF"
+fi
 
-# Allow password authentication for all IPv4 remote connections
-echo "--- Configuring pg_hba.conf for remote access ---"
-# This line allows any user from any IP to connect to any database with a password.
-# For better security, you might want to restrict the IP range.
-echo "host    all             all             0.0.0.0/0               md5" >> "$PG_HBA"
+echo "--- Configuring pg_hba.conf for remote password authentication ---"
+# Check if the rule already exists before adding it
+if ! grep -q "host    all             all             0.0.0.0/0               md5" "$PG_HBA"; then
+    echo "host    all             all             0.0.0.0/0               md5" >> "$PG_HBA"
+fi
 
-# Restart PostgreSQL to apply changes
-echo "--- Restarting PostgreSQL service ---"
+echo "--- Restarting PostgreSQL service to apply changes ---"
 systemctl restart postgresql
+sleep 5 # Wait for the service to be ready
 
-# Wait a moment for the service to restart
-sleep 5
+# --- Database and User Setup (Idempotent) ---
+echo "--- Setting up dedicated database and user ---"
+sudo -u postgres psql -v ON_ERROR_STOP=1 <<-EOSQL
+    -- Set password for the default superuser
+    ALTER USER postgres WITH PASSWORD '$DB_PASSWORD';
 
-# Change the password for the postgres user
-echo "--- Setting password for 'postgres' user ---"
-sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD '$DB_PASSWORD';"
+    -- Create a dedicated user for the application if it doesn't exist
+    DO \$\$
+    BEGIN
+       IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$APP_DB_USER') THEN
+          CREATE ROLE $APP_DB_USER WITH LOGIN PASSWORD '$DB_PASSWORD';
+       END IF;
+    END
+    \$\$;
+
+    -- Create a dedicated database for the application if it doesn't exist
+    -- Note: We connect to 'postgres' db to check existence of 'app_db'
+    SELECT 'CREATE DATABASE $APP_DB_NAME'
+    WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$APP_DB_NAME')\gexec
+
+    -- Grant all privileges on the new database to the new user
+    GRANT ALL PRIVILEGES ON DATABASE $APP_DB_NAME TO $APP_DB_USER;
+EOSQL
 
 echo "--- PostgreSQL Provisioning Complete ---"
-echo "Server is ready to accept remote connections."
+echo "Server is ready. Connect using user '$APP_DB_USER' on database '$APP_DB_NAME'."
