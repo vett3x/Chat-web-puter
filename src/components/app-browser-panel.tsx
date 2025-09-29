@@ -10,12 +10,14 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { AppProvisioningStatusPanel } from './app-provisioning-status-panel'; // New import
 
 interface AppBrowserPanelProps {
   appId: string | null;
   appUrl: string | null;
   appStatus: string | null;
   isAppDeleting?: boolean;
+  onRefreshAppDetails: () => void; // New prop
 }
 
 interface ServerEvent {
@@ -132,7 +134,7 @@ function SystemLogsPanel({ appId }: { appId: string }) {
 export const AppBrowserPanel = forwardRef<
   { refresh: () => void },
   AppBrowserPanelProps
->(({ appId, appUrl, appStatus, isAppDeleting = false }, ref) => {
+>(({ appId, appUrl, appStatus, isAppDeleting = false, onRefreshAppDetails }, ref) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isRestarting, setIsRestarting] = useState(false);
 
@@ -173,15 +175,8 @@ export const AppBrowserPanel = forwardRef<
       );
     }
 
-    if (appStatus === 'provisioning') {
-      return (
-        <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-4">
-          <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-          <h3 className="text-lg font-semibold">Aprovisionando Entorno</h3>
-          <p>Creando contenedor, configurando dominio y desplegando la base de Next.js...</p>
-          <p className="text-sm mt-2">(Esto puede tardar unos minutos)</p>
-        </div>
-      );
+    if (appStatus === 'provisioning' && appId) {
+      return <AppProvisioningStatusPanel appId={appId} onProvisioningComplete={onRefreshAppDetails} />;
     }
 
     if (appUrl && appStatus === 'ready') {

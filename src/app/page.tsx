@@ -190,6 +190,17 @@ function HomePageContent() {
     }
   }, [userId]);
 
+  const refreshAppDetails = useCallback(async () => {
+    if (selectedItem?.type === 'app' && selectedItem.id && userId) {
+      const { data, error } = await supabase.from('user_apps').select('*').eq('id', selectedItem.id).eq('user_id', userId).single();
+      if (error) {
+        toast.error('Error al refrescar los detalles de la aplicación.');
+      } else {
+        setSelectedAppDetails(data);
+      }
+    }
+  }, [selectedItem, userId]);
+
   const handleFileSelect = async (path: string) => {
     if (!selectedItem || selectedItem.type !== 'app') return;
     setIsFileLoading(true);
@@ -333,7 +344,7 @@ function HomePageContent() {
     if (rightPanelView === 'editor' && activeFile && selectedItem?.type === 'app') {
       return <CodeEditorPanel appId={selectedItem.id} file={activeFile} onClose={() => { setActiveFile(null); setRightPanelView('preview'); }} onSwitchToPreview={() => setRightPanelView('preview')} />;
     }
-    return <AppBrowserPanel ref={appBrowserRef} appId={selectedAppDetails?.id || null} appUrl={selectedAppDetails?.url || null} appStatus={selectedAppDetails?.status || null} />;
+    return <AppBrowserPanel ref={appBrowserRef} appId={selectedAppDetails?.id || null} appUrl={selectedAppDetails?.url || null} appStatus={selectedAppDetails?.status || null} onRefreshAppDetails={refreshAppDetails} />;
   };
 
   return (
