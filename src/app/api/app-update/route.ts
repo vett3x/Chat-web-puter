@@ -119,12 +119,15 @@ export async function POST(req: NextRequest) {
       const projectRoot = process.cwd();
       const installScriptPath = path.join(projectRoot, 'install.sh');
 
-      // Ensure the install.sh script exists and is executable
+      // Ensure the install.sh script exists
       try {
-        await fs.access(installScriptPath, fs.constants.X_OK);
+        await fs.access(installScriptPath, fs.constants.F_OK);
       } catch (err) {
-        throw new Error(`El script 'install.sh' no existe o no tiene permisos de ejecución en ${installScriptPath}.`);
+        throw new Error(`El script 'install.sh' no existe en ${installScriptPath}.`);
       }
+
+      // Add execute permissions to install.sh
+      await execAsync(`chmod +x ${installScriptPath}`);
 
       let output = '';
       output += `--- Ejecutando el script de instalación/actualización: ${installScriptPath} ---\n`;
