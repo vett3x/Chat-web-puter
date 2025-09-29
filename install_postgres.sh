@@ -1,63 +1,62 @@
 #!/bin/bash
-#
-# Script GENERALIZADO para instalar y configurar PostgreSQL en Ubuntu Server
-# para permitir conexiones remotas seguras.
-# Acepta la contraseña de la base de datos como el primer argumento.
-#
+set -e # Exit immediately if a command exits with a non-zero status.
 
-# --- NO EDITAR DEBAJO DE ESTA LÍNEA ---
-
-# Salir inmediatamente si un comando falla
-set -e
-
-# Validar que se haya proporcionado una contraseña
+# Check if a password is provided
 if [ -z "$1" ]; then
-    echo "ERROR: No se proporcionó una contraseña para la base de datos como argumento."
-    echo "Uso: sudo ./install_postgres.sh 'su-contraseña-segura'"
-    exit 1
+  echo "Usage: $0 <postgres_password>"
+  exit 1
 fi
 
-DB_PASSWORD="$1"
-ALLOWED_NETWORK="0.0.0.0/0" # Permitir desde cualquier IP para máxima flexibilidad
+DB_PASSWORD=$1
 
-echo "--- [Paso 1/7] Actualizando paquetes del sistema... ---"
-export DEBIAN_FRONTEND=noninteractive
-sudo apt-get update -y > /dev/null
-sudo apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade > /dev/null
-echo "Sistema actualizado."
+echo "--- Starting PostgreSQL Installation and Configuration ---"
 
-echo "--- [Paso 2/7] Instalando PostgreSQL... ---"
-sudo apt-get install postgresql postgresql-contrib -y > /dev/null
-echo "PostgreSQL instalado."
+# Update package lists
+apt-get update -y
 
-echo "--- [Paso 3/7] Localizando archivos de configuración... ---"
-PG_CONF=$(find /etc/postgresql -name "postgresql.conf" -print -quit)
-PG_HBA_CONF=$(find /etc/postgresql -name "pg_hba.conf" -print -quit)
+# Install PostgreSQL and its client
+apt-get install -y postgresql postgresql-client
 
-if [ -z "$PG_CONF" ] || [ -z "$PG_HBA_CONF" ]; then
-    echo "ERROR: No se pudieron encontrar los archivos de configuración de PostgreSQL."
+echo "--- PostgreSQL Installed ---"
+
+# Find the main postgresql.conf file path
+PG_CONF=$(find /etc/postgresql -name "postgresql.conf" | head -n 1)
+if [ -z "$PG_CONF" ]; then
+    echo "ERROR: postgresql.conf not found!"
     exit 1
 fi
-echo "postgresql.conf encontrado en: $PG_CONF"
-echo "pg_hba.conf encontrado en: $PG_HBA_CONF"
+echo "Found postgresql.conf at $PG_CONF"
 
-echo "--- [Paso 4/7] Configurando 'postgresql.conf' para conexiones remotas... ---"
-sudo sed -i "s/^#*listen_addresses = .*/listen_addresses = '*'/" "$PG_CONF"
-sudo sed -i "s/^#*password_encryption = .*/password_encryption = 'scram-sha-256'/" "$PG_CONF"
-echo "'postgresql.conf' configurado."
+# Find the main pg_hba.conf file path
+PG_HBA=$(find /etc/postgresql -name "pg_hba.conf" | head -n 1)
+if [ -z "$PG_HBA" ]; then
+    echo "ERROR: pg_hba.conf not found!"
+    exit 1
+fi
+echo "Found pg_hba.conf at $PG_HBA"
 
-echo "--- [Paso 5/7] Configurando 'pg_hba.conf' para permitir acceso desde la red... ---"
-echo "# Regla añadida por el script de Dyad para permitir conexiones remotas seguras" | sudo tee -a "$PG_HBA_CONF" > /dev/null
-echo "host    all             all             $ALLOWED_NETWORK          scram-sha-256" | sudo tee -a "$PG_HBA_CONF" > /dev/null
-echo "'pg_hba.conf' configurado."
+# Configure PostgreSQL to listen on all addresses
+echo "--- Configuring postgresql.conf to listen on all addresses ---"
+sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" "$PG_CONF"
+# Also uncomment if it's commented out without a value
+sed -i "s/listen_addresses = 'localhost'/listen_addresses = '*'/" "$PG_CONF"
 
-echo "--- [Paso 6/7] Reiniciando el servicio de PostgreSQL... ---"
-sudo systemctl restart postgresql
-echo "Servicio reiniciado."
+# Allow password authentication for all IPv4 remote connections
+echo "--- Configuring pg_hba.conf for remote access ---"
+# This line allows any user from any IP to connect to any database with a password.
+# For better security, you might want to restrict the IP range.
+echo "host    all             all             0.0.0.0/0               md5" >> "$PG_HBA"
 
-echo "--- [Paso 7/7] Estableciendo la contraseña para el usuario 'postgres'... ---"
+# Restart PostgreSQL to apply changes
+echo "--- Restarting PostgreSQL service ---"
+systemctl restart postgresql
+
+# Wait a moment for the service to restart
+sleep 5
+
+# Change the password for the postgres user
+echo "--- Setting password for 'postgres' user ---"
 sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD '$DB_PASSWORD';"
-echo "Contraseña establecida."
 
-echo ""
-echo "✅ ¡LISTO! Instalación y configuración completadas."
+echo "--- PostgreSQL Provisioning Complete ---"
+echo "Server is ready to accept remote connections."
