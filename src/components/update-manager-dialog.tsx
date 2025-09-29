@@ -46,6 +46,7 @@ export function UpdateManagerDialog({ open, onOpenChange }: UpdateManagerDialogP
   const [isLoading, setIsLoading] = useState(false);
   const [logOutput, setLogOutput] = useState<string>(''); // Initialize as empty string
   const [updateInfo, setUpdateInfo] = useState<UpdateCheckResponse | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false); // New state for update process
 
   const handleCheckForUpdates = async () => {
     setIsLoading(true);
@@ -69,9 +70,9 @@ export function UpdateManagerDialog({ open, onOpenChange }: UpdateManagerDialogP
     }
   };
 
-  const handleForceUpdate = async () => {
-    setIsLoading(true);
-    setLogOutput('Iniciando actualización forzada...');
+  const handleActivateUpdate = async () => {
+    setIsUpdating(true); // Set updating state
+    setLogOutput('Iniciando actualización...');
     try {
       const response = await fetch('/api/app-update?action=force', { method: 'POST' });
       const result = await response.json();
@@ -84,7 +85,7 @@ export function UpdateManagerDialog({ open, onOpenChange }: UpdateManagerDialogP
       toast.error('Error durante la actualización.');
       setLogOutput(`Error: ${error.message}`);
     } finally {
-      setIsLoading(false);
+      setIsUpdating(false); // Reset updating state
     }
   };
 
@@ -135,27 +136,28 @@ export function UpdateManagerDialog({ open, onOpenChange }: UpdateManagerDialogP
             </div>
           )}
           <div className="flex gap-2">
-            <Button onClick={handleCheckForUpdates} disabled={isLoading}>
+            <Button onClick={handleCheckForUpdates} disabled={isLoading || isUpdating}>
               {isLoading && !updateInfo && !logOutput ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
               Comprobar Actualizaciones
             </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="destructive" disabled={isLoading}> {/* Removed !updateInfo?.updateAvailable */}
-                  <GitPullRequest className="mr-2 h-4 w-4" /> Forzar Actualización
+                <Button variant="destructive" disabled={isUpdating}>
+                  {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GitPullRequest className="mr-2 h-4 w-4" />}
+                  Activar Actualización
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>¿Estás seguro de forzar la actualización?</AlertDialogTitle>
+                  <AlertDialogTitle>¿Estás seguro de activar la actualización?</AlertDialogTitle>
                   <AlertDialogDescription>
                     Esta acción descargará los últimos cambios del repositorio, instalará las dependencias y reconstruirá la aplicación. El servidor se reiniciará y puede que no esté disponible durante unos momentos.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleForceUpdate} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                    Sí, actualizar
+                  <AlertDialogAction onClick={handleActivateUpdate} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Sí, activar
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
