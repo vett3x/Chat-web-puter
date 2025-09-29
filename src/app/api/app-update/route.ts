@@ -117,23 +117,23 @@ export async function POST(req: NextRequest) {
   if (action === 'force') {
     try {
       const projectRoot = process.cwd();
-      const installScriptPath = path.join(projectRoot, 'install.sh');
+      const updateScriptPath = path.join(projectRoot, 'update.sh'); // Changed to update.sh
 
-      // Ensure the install.sh script exists
+      // Ensure the update.sh script exists
       try {
-        await fs.access(installScriptPath, fs.constants.F_OK);
+        await fs.access(updateScriptPath, fs.constants.F_OK);
       } catch (err) {
-        throw new Error(`El script 'install.sh' no existe en ${installScriptPath}.`);
+        throw new Error(`El script 'update.sh' no existe en ${updateScriptPath}.`);
       }
 
-      // Add execute permissions to install.sh
-      await execAsync(`chmod +x ${installScriptPath}`);
+      // Add execute permissions to update.sh
+      await execAsync(`chmod +x ${updateScriptPath}`);
 
       let output = '';
-      output += `--- Ejecutando el script de instalación/actualización: ${installScriptPath} ---\n`;
+      output += `--- Ejecutando el script de actualización: ${updateScriptPath} ---\n`;
 
-      // Execute install.sh with environment variables
-      const { stdout, stderr } = await execAsync(`bash ${installScriptPath}`, {
+      // Execute update.sh with environment variables
+      const { stdout, stderr } = await execAsync(`bash ${updateScriptPath}`, {
         cwd: projectRoot, // Ensure the script runs from the project root
         env: {
           ...process.env, // Pass all existing environment variables
@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
       if (stderr) {
         output += `\nSTDERR: ${stderr}`;
       }
-      output += '\n--- Script de instalación/actualización completado. ---';
+      output += '\n--- Script de actualización completado. ---';
 
       return NextResponse.json({ output });
     } catch (error: any) {

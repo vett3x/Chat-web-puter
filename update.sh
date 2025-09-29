@@ -1,28 +1,27 @@
 #!/bin/bash
 
 # ==============================================================================
-# Script de Instalación/Actualización para la Aplicación de Chat con IA
+# Script de Actualización para la Aplicación de Chat con IA
 # ==============================================================================
 #
-# Este script automatiza la instalación y configuración de la aplicación
+# Este script automatiza la actualización de la aplicación
 # en un servidor Linux (probado en Ubuntu 22.04).
 #
 # Prerrequisitos:
 #   - Acceso `sudo` en el servidor.
 #   - `git` y `curl` instalados (`sudo apt update && sudo apt install git curl`).
+#   - Node.js y npm instalados.
+#   - PM2 instalado globalmente.
+#   - El archivo `.env.local` debe existir en la raíz del proyecto con las variables de entorno necesarias.
 #
 # Uso:
-#   1. Guarda este script como `install.sh` en la raíz de tu proyecto.
-#   2. Dale permisos de ejecución: `chmod +x install.sh`.
-#   3. Ejecútalo: `./install.sh`.
+#   1. Guarda este script como `update.sh` en la raíz de tu proyecto.
+#   2. Dale permisos de ejecución: `chmod +x update.sh`.
+#   3. Ejecútalo: `./update.sh`.
 #
-#   Para actualizaciones, simplemente ejecuta el script de nuevo desde la raíz del proyecto.
+#   Este script asume que ya estás en la raíz del proyecto.
 #
-# Variables de Entorno Requeridas (deben estar disponibles en el entorno de ejecución):
-#   - NEXT_PUBLIC_SUPABASE_URL
-#   - NEXT_PUBLIC_SUPABASE_ANON_KEY
-#   - SUPABASE_SERVICE_ROLE_KEY
-#   - ENCRYPTION_KEY
+# Variables de Entorno Requeridas (deben estar disponibles en el entorno de ejecución o en .env.local):
 #   - WEBSOCKET_PORT (por defecto 3001 si no se especifica)
 #
 # ==============================================================================
@@ -30,10 +29,9 @@
 set -e # Salir inmediatamente si un comando falla.
 
 # --- Variables de Configuración ---
-# Ya no necesitamos REPO_URL ni PROJECT_DIR, asumimos que estamos en la raíz del proyecto.
 NEXT_APP_NAME="chat-app-next"
 WS_APP_NAME="chat-app-ws"
-NODE_MAJOR_VERSION=22
+NODE_MAJOR_VERSION=22 # Se mantiene para la verificación de Node.js, aunque no se instala aquí.
 
 # --- Funciones de Ayuda ---
 function check_command() {
@@ -43,34 +41,21 @@ function check_command() {
   fi
 }
 
-function setup_nodejs() {
+function setup_nodejs_check() {
   echo "--- Comprobando la instalación de Node.js v${NODE_MAJOR_VERSION} ---"
   if command -v node &> /dev/null; then
     CURRENT_NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
     if [ "$CURRENT_NODE_VERSION" == "$NODE_MAJOR_VERSION" ]; then
-      echo "Node.js v${NODE_MAJOR_VERSION} ya está instalado. Omitiendo."
+      echo "Node.js v${NODE_MAJOR_VERSION} ya está instalado. Correcto."
       return
     else
-      echo "Se encontró una versión diferente de Node.js (v${CURRENT_NODE_VERSION}). Se recomienda usar la v${NODE_MAJOR_VERSION}."
-      read -p "¿Deseas continuar con la versión actual o instalar la v${NODE_MAJOR_VERSION}? (c/i): " choice
-      if [ "$choice" == "c" ]; then
-        echo "Continuando con la versión actual de Node.js."
-        return
-      fi
+      echo "Advertencia: Se encontró una versión diferente de Node.js (v${CURRENT_NODE_VERSION}). Se recomienda usar la v${NODE_MAJOR_VERSION}."
+      echo "Por favor, instala Node.js v${NODE_MAJOR_VERSION} manualmente si experimentas problemas."
     fi
+  else
+    echo "Error: Node.js no se encuentra. Por favor, instálalo manualmente (v${NODE_MAJOR_VERSION} recomendada)."
+    exit 1
   fi
-
-  echo "Instalando Node.js v${NODE_MAJOR_VERSION} usando NodeSource..."
-  sudo apt-get update
-  sudo apt-get install -y ca-certificates curl gnupg
-  sudo mkdir -p /etc/apt/keyrings
-  curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-  echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR_VERSION.x nodistro main" | sudo tee /etc/apt/sources.list.d/nodesource.list
-  sudo apt-get update
-  sudo apt-get install nodejs sshpass -y
-  echo "Node.js v${NODE_MAJOR_VERSION} instalado correctamente."
-  node -v
-  npm -v
 }
 
 function setup_pm2() {
@@ -103,59 +88,44 @@ function setup_crontab() {
   fi
 }
 
-function create_env_file() {
-  echo "--- Creando archivo .env.local ---"
-  # Usar variables de entorno pasadas al script, con valores por defecto si no están definidas
-  cat << EOF > .env.local
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL}"
-NEXT_PUBLIC_SUPABASE_ANON_KEY="${NEXT_PUBLIC_SUPABASE_ANON_KEY}"
-SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY}"
-
-# Clave de cifrado para secretos (¡NO CAMBIAR DESPUÉS DE LA PRIMERA INSTALACIÓN!)
-ENCRYPTION_KEY="${ENCRYPTION_KEY}"
-
-# Puerto para el servidor de WebSockets
-WEBSOCKET_PORT=${WEBSOCKET_PORT:-3001}
-EOF
-  echo "Archivo .env.local creado con éxito."
-}
-
 # --- Inicio del Script Principal ---
-echo ">>> Iniciando el despliegue/actualización de la aplicación..."
+echo ">>> Iniciando la actualización de la aplicación..."
 
 # --- Paso 1: Verificar Prerrequisitos ---
-echo "--- Paso 1: Verificando prerrequisitos (git, curl)... ---"
+echo "--- Paso 1: Verificando prerrequisitos (git, curl, Node.js, npm)... ---"
 check_command "git"
 check_command "curl"
+setup_nodejs_check # Verifica Node.js y npm
 
-# --- Paso 2: Instalar Node.js ---
-setup_nodejs
-
-# --- Paso 3: Actualizar Repositorio (asumiendo que ya estamos en el directorio del proyecto) ---
-echo "--- Paso 3: Actualizando el repositorio (git pull)... ---"
+# --- Paso 2: Actualizar Repositorio (asumiendo que ya estamos en el directorio del proyecto) ---
+echo "--- Paso 2: Actualizando el repositorio (git pull)... ---"
 # Asegurarse de que estamos en un repositorio git
 if [ ! -d ".git" ]; then
-  echo "Error: No es un repositorio Git. Por favor, clona el repositorio primero o ejecuta este script desde la raíz del proyecto."
+  echo "Error: No es un repositorio Git. Por favor, ejecuta este script desde la raíz del proyecto."
   exit 1
 fi
 git pull origin main
 echo "Repositorio actualizado correctamente."
 
-# --- Paso 4: Configuración de Variables de Entorno ---
-# Siempre crear o sobrescribir .env.local para asegurar que las últimas variables se usen
-create_env_file
+# --- Paso 3: Verificar archivo .env.local ---
+echo "--- Paso 3: Verificando archivo .env.local ---"
+if [ ! -f ".env.local" ]; then
+  echo "Error: El archivo .env.local no se encuentra en la raíz del proyecto."
+  echo "Por favor, créalo con las variables de entorno necesarias antes de ejecutar la actualización."
+  exit 1
+fi
+echo "Archivo .env.local encontrado."
 
-# --- Paso 5: Instalar Dependencias ---
-echo "--- Paso 5: Instalando dependencias con npm... ---"
+# --- Paso 4: Instalar Dependencias ---
+echo "--- Paso 4: Instalando dependencias con npm... ---"
 npm install
 
-# --- Paso 6: Construir la Aplicación Next.js ---
-echo "--- Paso 6: Construyendo la aplicación Next.js para producción... ---"
+# --- Paso 5: Construir la Aplicación Next.js ---
+echo "--- Paso 5: Construyendo la aplicación Next.js para producción... ---"
 npm run build
 
-# --- Paso 7: Configurar y Usar PM2 ---
-echo "--- Paso 7: Configurando y arrancando la aplicación con PM2... ---"
+# --- Paso 6: Configurar y Usar PM2 ---
+echo "--- Paso 6: Configurando y arrancando la aplicación con PM2... ---"
 setup_pm2
 
 # Detener procesos antiguos si existen para un reinicio limpio
@@ -175,12 +145,12 @@ pm2 start "ts-node" --name "$WS_APP_NAME" -- server/websocket.ts
 pm2 save
 echo "Lista de procesos de PM2 guardada para el reinicio automático del servidor."
 
-# --- Paso 8: Configurar Tareas CRON ---
+# --- Paso 7: Configurar Tareas CRON ---
 setup_crontab
 
 # --- Fin del Script ---
 echo ""
-echo ">>> ¡Despliegue/Actualización completado!"
+echo ">>> ¡Actualización completada!"
 echo ""
 echo "Tu aplicación ahora está corriendo bajo PM2."
 echo "Puedes ver el estado de los procesos con el comando: pm2 list"
