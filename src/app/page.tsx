@@ -3,10 +3,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession } from "@/components/session-context-provider";
 import { ConversationSidebar } from "@/components/conversation-sidebar";
-import { ChatInterface } from "@/components/chat-interface";
+import { ChatInterface, ChatInterfaceRef } from "@/components/chat-interface"; // Import ChatInterfaceRef
 import { AppBrowserPanel } from "@/components/app-browser-panel";
 import { CodeEditorPanel } from "@/components/code-editor-panel";
-import { NoteEditorPanel } from "@/components/note-editor-panel";
+import { NoteEditorPanel, NoteEditorPanelRef } from "@/components/note-editor-panel"; // Import NoteEditorPanelRef
 import { ProfileSettingsDialog } from "@/components/profile-settings-dialog";
 import { AccountSettingsDialog } from "@/components/account-settings-dialog";
 import { ServerManagementDialog } from "@/components/server-management-dialog";
@@ -106,7 +106,8 @@ export default function Home() {
   const appBrowserRef = useRef<{ refresh: () => void }>(null);
   const [fileTreeRefreshKey, setFileTreeRefreshKey] = useState(0);
 
-  const chatInterfaceRef = useRef<any>(null);
+  const chatInterfaceRef = useRef<ChatInterfaceRef>(null); // Use ChatInterfaceRef
+  const noteEditorRef = useRef<NoteEditorPanelRef>(null); // Use NoteEditorPanelRef
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -155,6 +156,30 @@ export default function Home() {
   //     document.removeEventListener('visibilitychange', handleVisibilityChange);
   //   };
   // }, [refreshSidebarData]);
+
+  // NEW: Effect to refresh active content after sidebar data refresh
+  useEffect(() => {
+    const refreshActiveContent = async () => {
+      // This effect runs whenever refreshSidebarData is called (e.g., by polling)
+      // We need to ensure the selected item's content is also refreshed.
+      if (selectedItem) {
+        if (selectedItem.type === 'note' && noteEditorRef.current) {
+          console.log("[Home] Refreshing active note content...");
+          noteEditorRef.current.refreshNoteContent();
+        } else if ((selectedItem.type === 'conversation' || selectedItem.type === 'app') && chatInterfaceRef.current) {
+          console.log("[Home] Refreshing active chat messages...");
+          chatInterfaceRef.current.refreshChatMessages();
+        }
+      }
+    };
+
+    // We need to call refreshActiveContent *after* refreshSidebarData has completed its fetch.
+    // Since refreshSidebarData is a callback, we can't directly put this in its `finally` block.
+    // A simple way is to trigger this effect whenever `isLoadingData` (from useSidebarData) changes from true to false.
+    if (!isLoadingData) {
+      refreshActiveContent();
+    }
+  }, [isLoadingData, selectedItem]); // Depend on isLoadingData and selectedItem
 
   const handleSelectItem = useCallback(async (id: string | null, type: SelectedItem['type'] | null) => {
     setActiveFile(null);
@@ -413,6 +438,7 @@ export default function Home() {
         )}
         {selectedItem?.type === 'note' ? (
           <NoteEditorPanel
+            ref={noteEditorRef} // Assign ref here
             noteId={selectedItem.id}
             onNoteUpdated={(id, data) => updateLocalItem(id, 'note', data)}
             userApiKeys={userApiKeys}

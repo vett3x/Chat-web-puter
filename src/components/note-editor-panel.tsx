@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useImperativeHandle, forwardRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/components/session-context-provider';
 import { toast } from 'sonner';
@@ -56,7 +56,11 @@ interface NoteEditorPanelProps {
   userLanguage: string; // New prop for user language
 }
 
-export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingApiKeys, userLanguage }: NoteEditorPanelProps) {
+export interface NoteEditorPanelRef {
+  refreshNoteContent: () => void;
+}
+
+export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelProps>(({ noteId, onNoteUpdated, userApiKeys, isLoadingApiKeys, userLanguage }, ref) => {
   const { session } = useSession();
   const { theme, resolvedTheme } = useTheme(); // Get resolvedTheme
   const [note, setNote] = useState<Note | null>(null);
@@ -169,6 +173,11 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
     return () => { clearTimeout(handler); };
   }, [title, note, isLoading, handleSave]);
 
+  // Expose refreshNoteContent via ref
+  useImperativeHandle(ref, () => ({
+    refreshNoteContent: fetchNote,
+  }));
+
   if (isLoading || isLoadingApiKeys) {
     return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /><p className="ml-2 text-muted-foreground">Cargando nota y claves...</p></div>;
   }
@@ -204,4 +213,6 @@ export function NoteEditorPanel({ noteId, onNoteUpdated, userApiKeys, isLoadingA
       />
     </div>
   );
-}
+});
+
+NoteEditorPanel.displayName = 'NoteEditorPanel';

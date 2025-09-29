@@ -194,30 +194,31 @@ export function useGeneralChat({
     }));
   }, []);
 
-  useEffect(() => {
-    const loadConversationData = async () => {
-      if (conversationId && userId) {
-        setIsLoading(true);
-        setMessages([]); // Clear messages immediately when conversationId changes
-        
-        const details = await getConversationDetails(conversationId);
-        
-        if (details?.model && (details.model.startsWith('puter:') || details.model.startsWith('user_key:'))) {
-          setSelectedModel(details.model);
-        } else {
-          // If conversation has no model, use the determined default model
-          setSelectedModel(determineDefaultModel(userApiKeys));
-        }
-
-        const fetchedMsgs = await getMessagesFromDB(conversationId);
-        setMessages(fetchedMsgs); // Always set messages from DB
-        setIsLoading(false);
+  const loadConversationData = useCallback(async () => {
+    if (conversationId && userId) {
+      setIsLoading(true);
+      setMessages([]); // Clear messages immediately when conversationId changes
+      
+      const details = await getConversationDetails(conversationId);
+      
+      if (details?.model && (details.model.startsWith('puter:') || details.model.startsWith('user_key:'))) {
+        setSelectedModel(details.model);
       } else {
-        setMessages([]);
+        // If conversation has no model, use the determined default model
+        setSelectedModel(determineDefaultModel(userApiKeys));
       }
-    };
-    loadConversationData();
+
+      const fetchedMsgs = await getMessagesFromDB(conversationId);
+      setMessages(fetchedMsgs); // Always set messages from DB
+      setIsLoading(false);
+    } else {
+      setMessages([]);
+    }
   }, [conversationId, userId, getMessagesFromDB, getConversationDetails, userApiKeys]); // Removed isSendingFirstMessage from dependencies
+
+  useEffect(() => {
+    loadConversationData();
+  }, [loadConversationData]);
 
   const createNewConversationInDB = async () => {
     if (!userId) return null;
@@ -530,5 +531,6 @@ export function useGeneralChat({
     autoFixStatus: 'idle' as AutoFixStatus, // Always idle for general chat
     triggerFixBuildError,
     triggerReportWebError,
+    loadConversationData, // NEW: Expose loadConversationData
   };
 }

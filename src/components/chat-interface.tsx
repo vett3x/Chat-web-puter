@@ -31,6 +31,7 @@ export interface ChatInterfaceRef {
   autoFixStatus: AutoFixStatus;
   triggerFixBuildError: () => void;
   triggerReportWebError: () => void;
+  refreshChatMessages: () => void; // NEW: Expose refreshChatMessages
 }
 
 export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
@@ -66,6 +67,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
     autoFixStatus,
     triggerFixBuildError,
     triggerReportWebError,
+    loadConversationData, // NEW: Get loadConversationData from useChat
   } = useChat({
     userId,
     conversationId,
@@ -87,6 +89,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
     autoFixStatus,
     triggerFixBuildError,
     triggerReportWebError,
+    refreshChatMessages: loadConversationData, // NEW: Expose loadConversationData as refreshChatMessages
   }));
 
   if (isAppProvisioning) {
