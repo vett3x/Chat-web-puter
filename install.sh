@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-# Script de Despliegue para la Aplicación de Chat con IA
+# Script de Instalación/Actualización para la Aplicación de Chat con IA
 # ==============================================================================
 #
 # Este script automatiza la instalación y configuración de la aplicación
@@ -12,9 +12,18 @@
 #   - `git` y `curl` instalados (`sudo apt update && sudo apt install git curl`).
 #
 # Uso:
-#   1. Guarda este script como `deploy.sh`.
-#   2. Dale permisos de ejecución: `chmod +x deploy.sh`.
-#   3. Ejecútalo: `./deploy.sh`.
+#   1. Guarda este script como `install.sh`.
+#   2. Dale permisos de ejecución: `chmod +x install.sh`.
+#   3. Ejecútalo: `./install.sh`.
+#
+#   Para actualizaciones, simplemente ejecuta el script de nuevo.
+#
+# Variables de Entorno Requeridas (deben estar disponibles en el entorno de ejecución):
+#   - NEXT_PUBLIC_SUPABASE_URL
+#   - NEXT_PUBLIC_SUPABASE_ANON_KEY
+#   - SUPABASE_SERVICE_ROLE_KEY
+#   - ENCRYPTION_KEY
+#   - WEBSOCKET_PORT (por defecto 3001 si no se especifica)
 #
 # ==============================================================================
 
@@ -27,16 +36,9 @@ NEXT_APP_NAME="chat-app-next"
 WS_APP_NAME="chat-app-ws"
 NODE_MAJOR_VERSION=22
 
-# Variables de entorno para .env.local (¡NO COMPARTIR ESTAS CLAVES PÚBLICAMENTE!)
-SUPABASE_URL="https://juxrggowingqlchwfuct.supabase.co"
-SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1eHJnZ293aW5ncWxjaHdmdWN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgxNDY4OTYsImV4cCI6MjA3MzcyMjg5Nn0.Bf05aFnLW_YCAZdCZC2Kgqtf7is9WcORfDagC2Nq0ec"
-SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1eHJnZ293aW5ncWxjaHdmdWN0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImiYXQiOjE3NTgxNDY4OTYsImV4cCI6MjA3MzcyMjg5Nn0.IMgQlqNaEh9RmCAyaQqNLnOJJxEvL3B1zA03m4pCIW4"
-ENCRYPTION_KEY="a8f2e7d1c9b0e6a5f4d3c2b1a0e9d8c7b6a5f4d3c2b1a0e9d8c7b6a5f4d3c2b1"
-WEBSOCKET_PORT=3001
-
 # --- Funciones de Ayuda ---
 function check_command() {
-  if ! command -v $1 &> /dev/null; then
+  if ! command -v "$1" &> /dev/null; then
     echo "Error: El comando '$1' no se encuentra. Por favor, instálalo."
     exit 1
   fi
@@ -83,7 +85,9 @@ function setup_crontab() {
   echo "--- Configurando tareas CRON para la gestión del ciclo de vida de la aplicación ---"
   # Definir la URL del endpoint de CRON
   CRON_URL_PATTERN="/api/cron/manage-app-lifecycle"
-  CRON_JOB="*/5 * * * * curl -s http://localhost:${WEBSOCKET_PORT}${CRON_URL_PATTERN} > /dev/null 2>&1"
+  # Usar WEBSOCKET_PORT del entorno, con un valor por defecto si no está definido
+  LOCAL_WEBSOCKET_PORT=${WEBSOCKET_PORT:-3001}
+  CRON_JOB="*/5 * * * * curl -s http://localhost:${LOCAL_WEBSOCKET_PORT}${CRON_URL_PATTERN} > /dev/null 2>&1"
   
   # Eliminar cualquier tarea CRON existente que apunte a este endpoint
   echo "Eliminando tareas CRON antiguas para ${CRON_URL_PATTERN} (si existen)..."
@@ -102,23 +106,24 @@ function setup_crontab() {
 
 function create_env_file() {
   echo "--- Creando archivo .env.local ---"
+  # Usar variables de entorno pasadas al script, con valores por defecto si no están definidas
   cat << EOF > .env.local
 # Supabase
-NEXT_PUBLIC_SUPABASE_URL="${SUPABASE_URL}"
-NEXT_PUBLIC_SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY}"
+NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL}"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="${NEXT_PUBLIC_SUPABASE_ANON_KEY}"
 SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY}"
 
 # Clave de cifrado para secretos (¡NO CAMBIAR DESPUÉS DE LA PRIMERA INSTALACIÓN!)
 ENCRYPTION_KEY="${ENCRYPTION_KEY}"
 
 # Puerto para el servidor de WebSockets
-WEBSOCKET_PORT=${WEBSOCKET_PORT}
+WEBSOCKET_PORT=${WEBSOCKET_PORT:-3001}
 EOF
   echo "Archivo .env.local creado con éxito."
 }
 
 # --- Inicio del Script Principal ---
-echo ">>> Iniciando el despliegue de la aplicación..."
+echo ">>> Iniciando el despliegue/actualización de la aplicación..."
 
 # --- Paso 1: Verificar Prerrequisitos ---
 echo "--- Paso 1: Verificando prerrequisitos (git, curl)... ---"
@@ -132,6 +137,7 @@ setup_nodejs
 IS_NEW_INSTALL=false
 if [ -d "$PROJECT_DIR" ]; then
   echo "--- El directorio '$PROJECT_DIR' ya existe. Realizando actualización. ---"
+  # Navegar al directorio del proyecto para el pull
   cd "$PROJECT_DIR"
   echo "Navegando al directorio del proyecto: $(pwd)"
   echo "Realizando git pull para obtener los últimos cambios..."
@@ -140,21 +146,15 @@ else
   echo "--- El directorio '$PROJECT_DIR' no existe. Realizando nueva instalación. ---"
   echo "--- Paso 3: Clonando el repositorio desde GitHub... ---"
   git clone "$REPO_URL"
+  # Navegar al directorio del proyecto después de clonar
   cd "$PROJECT_DIR"
   echo "Navegando al directorio del proyecto: $(pwd)"
   IS_NEW_INSTALL=true
 fi
 
 # --- Paso 4: Configuración de Variables de Entorno ---
-if [ "$IS_NEW_INSTALL" = true ]; then
-  create_env_file
-else
-  echo "--- El archivo .env.local ya debería existir. Omitiendo creación. ---"
-  if [ ! -f ".env.local" ]; then
-    echo "Advertencia: .env.local no encontrado en una actualización. Creando uno nuevo."
-    create_env_file
-  fi
-fi
+# Siempre crear o sobrescribir .env.local para asegurar que las últimas variables se usen
+create_env_file
 
 # --- Paso 5: Instalar Dependencias ---
 echo "--- Paso 5: Instalando dependencias con npm... ---"
@@ -190,7 +190,7 @@ setup_crontab
 
 # --- Fin del Script ---
 echo ""
-echo ">>> ¡Despliegue completado!"
+echo ">>> ¡Despliegue/Actualización completado!"
 echo ""
 echo "Tu aplicación ahora está corriendo bajo PM2."
 echo "Puedes ver el estado de los procesos con el comando: pm2 list"

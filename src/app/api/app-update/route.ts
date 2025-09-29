@@ -116,28 +116,38 @@ export async function POST(req: NextRequest) {
 
   if (action === 'force') {
     try {
+      const projectRoot = process.cwd();
+      const installScriptPath = path.join(projectRoot, 'install.sh');
+
+      // Ensure the install.sh script exists and is executable
+      try {
+        await fs.access(installScriptPath, fs.constants.X_OK);
+      } catch (err) {
+        throw new Error(`El script 'install.sh' no existe o no tiene permisos de ejecución en ${installScriptPath}.`);
+      }
+
       let output = '';
-      
-      output += '--- Forzando la limpieza de cambios locales (git reset --hard HEAD) ---\n';
-      const { stdout: resetOut, stderr: resetErr } = await execAsync('git reset --hard HEAD');
-      output += resetOut + (resetErr ? `\nSTDERR: ${resetErr}` : '') + '\n';
+      output += `--- Ejecutando el script de instalación/actualización: ${installScriptPath} ---\n`;
 
-      output += '--- Ejecutando git pull origin main ---\n';
-      const { stdout: pullOut, stderr: pullErr } = await execAsync('git pull origin main');
-      output += pullOut.replace(/\[dyad\].*\n/g, '') + (pullErr ? `\nSTDERR: ${pullErr}` : '') + '\n'; // Filter Dyad commits
+      // Execute install.sh with environment variables
+      const { stdout, stderr } = await execAsync(`bash ${installScriptPath}`, {
+        cwd: projectRoot, // Ensure the script runs from the project root
+        env: {
+          ...process.env, // Pass all existing environment variables
+          // Explicitly pass Supabase and other keys from process.env
+          NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+          SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+          ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
+          WEBSOCKET_PORT: process.env.WEBSOCKET_PORT,
+        },
+      });
 
-      output += '\n--- Ejecutando npm install ---\n';
-      const { stdout: installOut, stderr: installErr } = await execAsync('npm install');
-      output += installOut + (installErr ? `\nSTDERR: ${installErr}` : '') + '\n';
-
-      output += '\n--- Ejecutando npm run build ---\n';
-      const { stdout: buildOut, stderr: buildErr } = await execAsync('npm run build');
-      output += buildOut + (buildErr ? `\nSTDERR: ${buildErr}` : '') + '\n';
-
-      output += '\n--- Actualización completada. El servidor debería reiniciarse automáticamente. ---';
-
-      // NOTE: We cannot restart the server from here as it would kill this API process.
-      // The process manager (like PM2, Docker, etc.) should be configured to watch for changes in the .next directory and restart automatically.
+      output += stdout;
+      if (stderr) {
+        output += `\nSTDERR: ${stderr}`;
+      }
+      output += '\n--- Script de instalación/actualización completado. ---';
 
       return NextResponse.json({ output });
     } catch (error: any) {
