@@ -52,6 +52,8 @@ export interface Message {
 
 export type AutoFixStatus = 'idle' | 'analyzing' | 'plan_ready' | 'fixing' | 'failed';
 
+const MESSAGES_PER_PAGE = 30;
+
 // Function to determine the default model based on user preferences and available keys
 const determineDefaultModel = (userApiKeys: ApiKey[]): string => {
   if (typeof window !== 'undefined') {
@@ -141,6 +143,8 @@ export function useDeepAICoderChat({
   const [autoFixStatus, setAutoFixStatus] = useState<AutoFixStatus>('idle');
   const autoFixAttempts = useRef(0);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref for debounce
+  const [page, setPage] = useState(0);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
 
   useEffect(() => {
     const checkPuter = () => {
@@ -180,14 +184,17 @@ export function useDeepAICoderChat({
     return data;
   }, []);
 
-  const getMessagesFromDB = useCallback(async (convId: string) => {
-    const { data, error } = await supabase.from('messages').select('id, content, role, model, created_at, conversation_id, type, plan_approved, is_correction_plan, correction_approved').eq('conversation_id', convId).order('created_at', { ascending: true });
+  const getMessagesFromDB = useCallback(async (convId: string, pageToLoad: number) => {
+    const from = pageToLoad * MESSAGES_PER_PAGE;
+    const to = from + MESSAGES_PER_PAGE - 1;
+
+    const { data, error } = await supabase.from('messages').select('id, content, role, model, created_at, conversation_id, type, plan_approved, is_correction_plan, correction_approved').eq('conversation_id', convId).order('created_at', { ascending: false }).range(from, to);
     if (error) {
       console.error('Error fetching messages:', error);
       toast.error('Error al cargar los mensajes.');
       return [];
     }
-    return data.map((msg) => ({
+    return data.reverse().map((msg) => ({
       id: msg.id,
       conversation_id: msg.conversation_id,
       content: msg.content as Message['content'],
@@ -214,6 +221,8 @@ export function useDeepAICoderChat({
       if (conversationId && userId) {
         setIsLoading(true);
         setMessages([]); // Clear messages immediately when conversationId changes
+        setPage(0);
+        setHasMoreMessages(true);
         
         const details = await getConversationDetails(conversationId);
         
@@ -224,14 +233,32 @@ export function useDeepAICoderChat({
           setSelectedModel(determineDefaultModel(userApiKeys));
         }
 
-        const fetchedMsgs = await getMessagesFromDB(conversationId);
+        const fetchedMsgs = await getMessagesFromDB(conversationId, 0);
         setMessages(fetchedMsgs); // Always set messages from DB
+        if (fetchedMsgs.length < MESSAGES_PER_PAGE) {
+          setHasMoreMessages(false);
+        }
         setIsLoading(false);
       } else {
         setMessages([]);
       }
     }, 100); // Debounce for 100ms
   }, [conversationId, userId, getMessagesFromDB, getConversationDetails, userApiKeys]);
+
+  const loadMoreMessages = useCallback(async () => {
+    if (!conversationId || !hasMoreMessages || isLoading) return;
+
+    const nextPage = page + 1;
+    const olderMessages = await getMessagesFromDB(conversationId, nextPage);
+
+    if (olderMessages.length > 0) {
+      setMessages(prev => [...olderMessages, ...prev]);
+      setPage(nextPage);
+    }
+    if (olderMessages.length < MESSAGES_PER_PAGE) {
+      setHasMoreMessages(false);
+    }
+  }, [conversationId, hasMoreMessages, isLoading, page, getMessagesFromDB]);
 
   useEffect(() => {
     loadConversationData();
@@ -893,5 +920,7 @@ export function useDeepAICoderChat({
     triggerFixBuildError,
     triggerReportWebError,
     loadConversationData, // NEW: Expose loadConversationData
+    loadMoreMessages,
+    hasMoreMessages,
   };
 }

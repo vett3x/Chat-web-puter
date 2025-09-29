@@ -68,6 +68,8 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
     triggerFixBuildError,
     triggerReportWebError,
     loadConversationData, // NEW: Get loadConversationData from useChat
+    loadMoreMessages,
+    hasMoreMessages,
   } = useChat({
     userId,
     conversationId,
@@ -140,6 +142,8 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
           onApprovePlan={approvePlan}
           isAppChat={isAppChat}
           onSuggestionClick={(prompt: string) => sendMessage([{ type: 'text', text: prompt }], prompt)}
+          loadMoreMessages={loadMoreMessages}
+          hasMoreMessages={hasMoreMessages}
         />
         <AutoFixStatusComponent status={autoFixStatus} />
         <ChatInput

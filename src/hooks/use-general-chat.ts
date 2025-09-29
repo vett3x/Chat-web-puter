@@ -51,6 +51,8 @@ export interface Message {
 
 export type AutoFixStatus = 'idle' | 'analyzing' | 'plan_ready' | 'fixing' | 'failed';
 
+const MESSAGES_PER_PAGE = 30;
+
 // Function to determine the default model based on user preferences and available keys
 const determineDefaultModel = (userApiKeys: ApiKey[]): string => {
   if (typeof window !== 'undefined') {
@@ -130,6 +132,8 @@ export function useGeneralChat({
   const [isSendingFirstMessage, setIsSendingFirstMessage] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>(''); // Initialize as empty string
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref for debounce
+  const [page, setPage] = useState(0);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
 
   useEffect(() => {
     const checkPuter = () => {
@@ -169,14 +173,25 @@ export function useGeneralChat({
     return data;
   }, []);
 
-  const getMessagesFromDB = useCallback(async (convId: string) => {
-    const { data, error } = await supabase.from('messages').select('id, content, role, model, created_at, conversation_id, type, plan_approved, is_correction_plan, correction_approved').eq('conversation_id', convId).order('created_at', { ascending: true });
+  const getMessagesFromDB = useCallback(async (convId: string, pageToLoad: number) => {
+    const from = pageToLoad * MESSAGES_PER_PAGE;
+    const to = from + MESSAGES_PER_PAGE - 1;
+
+    const { data, error } = await supabase
+      .from('messages')
+      .select('id, content, role, model, created_at, conversation_id, type, plan_approved, is_correction_plan, correction_approved')
+      .eq('conversation_id', convId)
+      .order('created_at', { ascending: false }) // Fetch newest first
+      .range(from, to);
+
     if (error) {
       console.error('Error fetching messages:', error);
       toast.error('Error al cargar los mensajes.');
       return [];
     }
-    return data.map((msg) => ({
+
+    // Reverse the data to have oldest first for rendering
+    return data.reverse().map((msg) => ({
       id: msg.id,
       conversation_id: msg.conversation_id,
       content: msg.content as Message['content'],
@@ -202,25 +217,44 @@ export function useGeneralChat({
     debounceTimeoutRef.current = setTimeout(async () => {
       if (conversationId && userId) {
         setIsLoading(true);
-        setMessages([]); // Clear messages immediately when conversationId changes
+        setMessages([]);
+        setPage(0);
+        setHasMoreMessages(true);
         
         const details = await getConversationDetails(conversationId);
         
         if (details?.model && (details.model.startsWith('puter:') || details.model.startsWith('user_key:'))) {
           setSelectedModel(details.model);
         } else {
-          // If conversation has no model, use the determined default model
           setSelectedModel(determineDefaultModel(userApiKeys));
         }
 
-        const fetchedMsgs = await getMessagesFromDB(conversationId);
-        setMessages(fetchedMsgs); // Always set messages from DB
+        const fetchedMsgs = await getMessagesFromDB(conversationId, 0);
+        setMessages(fetchedMsgs);
+        if (fetchedMsgs.length < MESSAGES_PER_PAGE) {
+          setHasMoreMessages(false);
+        }
         setIsLoading(false);
       } else {
         setMessages([]);
       }
-    }, 100); // Debounce for 100ms
+    }, 100);
   }, [conversationId, userId, getMessagesFromDB, getConversationDetails, userApiKeys]);
+
+  const loadMoreMessages = useCallback(async () => {
+    if (!conversationId || !hasMoreMessages || isLoading) return;
+
+    const nextPage = page + 1;
+    const olderMessages = await getMessagesFromDB(conversationId, nextPage);
+
+    if (olderMessages.length > 0) {
+      setMessages(prev => [...olderMessages, ...prev]);
+      setPage(nextPage);
+    }
+    if (olderMessages.length < MESSAGES_PER_PAGE) {
+      setHasMoreMessages(false);
+    }
+  }, [conversationId, hasMoreMessages, isLoading, page, getMessagesFromDB]);
 
   useEffect(() => {
     loadConversationData();
@@ -293,7 +327,6 @@ export function useGeneralChat({
     });
 
     try {
-      // Removed the hardcoded system prompt about code block formatting
       const systemPromptContent = ""; 
 
       const messagesForApi = history.map(msg => ({
@@ -509,7 +542,6 @@ export function useGeneralChat({
     }
   }, [conversationId, userId]);
 
-  // These are not applicable to general chat, so provide no-op functions
   const approvePlan = useCallback(async (messageId: string) => {
     toast.info("Esta acción no está disponible en el chat general.");
   }, []);
@@ -534,9 +566,11 @@ export function useGeneralChat({
     reapplyFilesFromMessage,
     clearChat,
     approvePlan,
-    autoFixStatus: 'idle' as AutoFixStatus, // Always idle for general chat
+    autoFixStatus: 'idle' as AutoFixStatus,
     triggerFixBuildError,
     triggerReportWebError,
-    loadConversationData, // NEW: Expose loadConversationData
+    loadConversationData,
+    loadMoreMessages,
+    hasMoreMessages,
   };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Bot, User, Loader2, Clipboard, RefreshCw, Upload, Trash2, LayoutDashboard, ClipboardList, Database, Users, BrainCircuit, PenSquare, Lightbulb, Bug } from 'lucide-react';
 import { MessageContent } from '@/components/message-content';
@@ -37,6 +37,8 @@ interface ChatMessagesProps {
   onApprovePlan: (messageId: string) => void;
   isAppChat?: boolean;
   onSuggestionClick: (prompt: string) => void;
+  loadMoreMessages: () => void;
+  hasMoreMessages: boolean;
 }
 
 const SuggestionCard = ({ icon, title, description, onClick }: { icon: React.ReactNode, title: string, description: string, onClick: () => void }) => (
@@ -51,18 +53,52 @@ const SuggestionCard = ({ icon, title, description, onClick }: { icon: React.Rea
   </Card>
 );
 
-export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerate, onReapplyFiles, appPrompt, userAvatarUrl, onClearChat, onApprovePlan, isAppChat, onSuggestionClick }: ChatMessagesProps) {
+export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerate, onReapplyFiles, appPrompt, userAvatarUrl, onClearChat, onApprovePlan, isAppChat, onSuggestionClick, loadMoreMessages, hasMoreMessages }: ChatMessagesProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
   const { userApiKeys } = useUserApiKeys();
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [shouldScrollToBottom, setShouldScrollToBottom] = useState(true);
 
   useEffect(() => {
-    if (scrollAreaRef.current) {
-      const scrollElement = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollElement) {
-        scrollElement.scrollTop = scrollElement.scrollHeight;
-      }
+    if (shouldScrollToBottom && viewportRef.current) {
+      viewportRef.current.scrollTop = viewportRef.current.scrollHeight;
+      setShouldScrollToBottom(false);
     }
-  }, [messages, isLoading]);
+  }, [messages, isLoading, shouldScrollToBottom]);
+
+  useEffect(() => {
+    // When a new message is added by the user or AI, we want to scroll to the bottom.
+    if (messages.length > 0 && messages[messages.length - 1].isNew) {
+      setShouldScrollToBottom(true);
+    }
+  }, [messages]);
+
+  const handleScroll = useCallback(async (e: Event) => {
+    const target = e.currentTarget as HTMLDivElement;
+    const { scrollTop } = target;
+    if (scrollTop === 0 && hasMoreMessages && !isLoadingMore) {
+      setIsLoadingMore(true);
+      const currentScrollHeight = target.scrollHeight;
+      await loadMoreMessages();
+      // After loading, adjust scroll to keep the view stable
+      if (viewportRef.current) {
+        viewportRef.current.scrollTop = viewportRef.current.scrollHeight - currentScrollHeight;
+      }
+      setIsLoadingMore(false);
+    }
+  }, [hasMoreMessages, isLoadingMore, loadMoreMessages]);
+
+  useEffect(() => {
+    const viewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    if (viewport) {
+      viewportRef.current = viewport as HTMLDivElement;
+      viewport.addEventListener('scroll', handleScroll);
+      return () => {
+        viewport.removeEventListener('scroll', handleScroll);
+      };
+    }
+  }, [handleScroll]);
 
   const handleCopy = (content: Message['content']) => {
     let textToCopy = '';
@@ -94,11 +130,16 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
   ];
 
   const suggestions = isAppChat ? appSuggestions : generalSuggestions;
-  const displayedMessages = messages.slice(-30); // Show only the last 30 messages
+  const displayedMessages = messages;
 
   return (
     <ScrollArea className="h-full" ref={scrollAreaRef}>
       <div className="p-4 space-y-4 pb-48">
+        {isLoadingMore && (
+          <div className="flex justify-center py-2">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        )}
         {messages.length === 0 && !isLoading ? (
           <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground py-8 max-w-2xl mx-auto">
             <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -121,7 +162,6 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
           </div>
         ) : (
           displayedMessages.map((message: Message, index: number) => {
-            // Skip rendering the hidden internal user messages
             if (typeof message.content === 'string' && 
                 (message.content.endsWith('[USER_APPROVED_PLAN]') || 
                  message.content.endsWith('[USER_REQUESTED_BUILD_FIX]') || 
@@ -130,7 +170,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
               return null;
             }
 
-            const isLastMessage = index === displayedMessages.length - 1 && messages.length === displayedMessages.length;
+            const isLastMessage = index === displayedMessages.length - 1;
             const hasFiles = Array.isArray(message.content) && message.content.some((part: RenderablePart) => part.type === 'code' && part.filename);
 
             return (
@@ -165,26 +205,19 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
                     ) : (
                       <MessageContent
                         content={message.content}
-                        isNew={isLastMessage && !message.isAnimated} // Only pass isNew if it's the last message and not yet animated
+                        isNew={isLastMessage && !message.isAnimated}
                         aiResponseSpeed={aiResponseSpeed}
                         isAppChat={isAppChat}
-                        isConstructionPlan={message.isConstructionPlan} // Pass isConstructionPlan
-                        planApproved={message.planApproved} // Pass planApproved
-                        onApprovePlan={onApprovePlan} // Pass onApprovePlan
-                        onRequestChanges={handleRequestChanges} // Pass onRequestChanges
-                        messageId={message.id} // Pass messageId
-                        onAnimationComplete={() => {
-                          // Mark message as animated once its content animation is complete
-                          if (isLastMessage && !message.isAnimated) {
-                            // This will trigger a re-render, but isAnimated will prevent re-animation
-                            // For now, we only update the local state. Persistence to DB can be added later if needed.
-                            // setMessages(prev => prev.map(m => m.id === message.id ? { ...m, isAnimated: true } : m));
-                          }
-                        }}
-                        isErrorAnalysisRequest={message.isErrorAnalysisRequest} // Pass isErrorAnalysisRequest
+                        isConstructionPlan={message.isConstructionPlan}
+                        planApproved={message.planApproved}
+                        onApprovePlan={onApprovePlan}
+                        onRequestChanges={handleRequestChanges}
+                        messageId={message.id}
+                        onAnimationComplete={() => {}}
+                        isErrorAnalysisRequest={message.isErrorAnalysisRequest}
                         isCorrectionPlan={message.isCorrectionPlan}
                         correctionApproved={message.correctionApproved}
-                        isLoading={isLoading} // Pass isLoading
+                        isLoading={isLoading}
                       />
                     )}
                   </div>
