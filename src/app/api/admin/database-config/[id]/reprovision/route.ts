@@ -4,10 +4,16 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
-import { decrypt } from '@/lib/encryption';
+import { z } from 'zod';
+import { encrypt } from '@/lib/encryption';
 import { executeSshCommand, writeRemoteFile } from '@/lib/ssh-utils';
 import fs from 'fs/promises';
 import path from 'path';
+
+const reprovisionSchema = z.object({
+  ssh_password: z.string().min(1, 'La contraseña SSH es requerida.'),
+  db_password: z.string().min(6, 'La contraseña de la BD debe tener al menos 6 caracteres.'),
+});
 
 async function getIsSuperAdmin(): Promise<boolean> {
   const cookieStore = cookies() as any;
@@ -49,21 +55,45 @@ export async function POST(req: NextRequest, context: any) {
       throw new Error('Configuración de base de datos no encontrada.');
     }
 
+    const body = await req.json();
+    const { ssh_password, db_password } = reprovisionSchema.parse(body);
+
     await supabaseAdmin.from('database_config').update({ status: 'provisioning', provisioning_log: 'Iniciando reinstalación...' }).eq('id', configId);
 
     const sshDetails = {
       ip_address: config.db_host,
-      ssh_port: 22, // Assuming default, as it's not stored
+      ssh_port: 22, // Assuming default
       ssh_username: 'root', // Assuming default
-      ssh_password: '', // This needs to be provided somehow, or use key-based auth
+      ssh_password: ssh_password,
     };
+
+    const scriptPath = path.join(process.cwd(), 'install_postgres.sh');
+    const scriptContent = await fs.readFile(scriptPath, 'utf-8');
+    const remoteScriptPath = '/tmp/install_postgres.sh';
+
+    await writeRemoteFile(sshDetails, remoteScriptPath, scriptContent);
+    await executeSshCommand(sshDetails, `chmod +x ${remoteScriptPath}`);
+    const { stdout, stderr, code } = await executeSshCommand(sshDetails, `sudo ${remoteScriptPath} '${db_password}'`);
     
-    // This is a limitation: we don't store the SSH password.
-    // For now, we'll assume the user needs to re-enter it or we can't reprovision.
-    // Let's throw a clear error for now.
-    return NextResponse.json({ message: 'La reinstalación automática no está soportada actualmente por razones de seguridad (no se almacenan las contraseñas SSH). Por favor, elimina y vuelve a aprovisionar la configuración.' }, { status: 501 });
+    const logOutput = `--- REPROVISION STDOUT ---\n${stdout}\n\n--- REPROVISION STDERR ---\n${stderr}`;
+
+    if (code !== 0) {
+      throw new Error(`Error durante la reinstalación (código de salida: ${code}).\n\n${logOutput}`);
+    }
+
+    const encryptedPassword = encrypt(db_password);
+    await supabaseAdmin.from('database_config').update({ 
+      status: 'ready', 
+      provisioning_log: logOutput,
+      db_password: encryptedPassword
+    }).eq('id', configId);
+
+    return NextResponse.json({ message: 'Servidor PostgreSQL reinstalado y configurado exitosamente.', output: stdout });
 
   } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ message: 'Error de validación', errors: error.errors }, { status: 400 });
+    }
     await supabaseAdmin.from('database_config').update({ status: 'failed', provisioning_log: `Error durante la reinstalación: ${error.message}` }).eq('id', configId);
     console.error(`[API DB Reprovision] Error for config ${configId}:`, error);
     return NextResponse.json({ message: error.message }, { status: 500 });

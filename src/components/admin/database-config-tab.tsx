@@ -40,8 +40,14 @@ const provisionSchema = z.object({
   db_password: z.string().min(6, 'La contraseña de la BD debe tener al menos 6 caracteres.'),
 });
 
+const reprovisionSchema = z.object({
+  ssh_password: z.string().min(1, 'La contraseña SSH es requerida.'),
+  db_password: z.string().min(6, 'La contraseña de la BD debe tener al menos 6 caracteres.'),
+});
+
 type ConfigFormValues = z.infer<typeof configSchema>;
 type ProvisionFormValues = z.infer<typeof provisionSchema>;
+type ReprovisionFormValues = z.infer<typeof reprovisionSchema>;
 
 interface DbConfig extends ConfigFormValues {
   created_at: string;
@@ -57,6 +63,7 @@ export function DatabaseConfigTab() {
   const [editingConfig, setEditingConfig] = useState<DbConfig | null>(null);
   const [isProvisioning, setIsProvisioning] = useState(false);
   const [viewingLogConfig, setViewingLogConfig] = useState<DbConfig | null>(null);
+  const [reprovisioningConfig, setReprovisioningConfig] = useState<DbConfig | null>(null);
 
   const configForm = useForm<ConfigFormValues>({
     resolver: zodResolver(configSchema),
@@ -66,6 +73,11 @@ export function DatabaseConfigTab() {
   const provisionForm = useForm<ProvisionFormValues>({
     resolver: zodResolver(provisionSchema),
     defaultValues: { ssh_host: '', ssh_port: 22, ssh_user: 'root', ssh_password: '', nickname: '', db_password: '' },
+  });
+
+  const reprovisionForm = useForm<ReprovisionFormValues>({
+    resolver: zodResolver(reprovisionSchema),
+    defaultValues: { ssh_password: '', db_password: '' },
   });
 
   const fetchConfigs = useCallback(async () => {
@@ -195,16 +207,26 @@ export function DatabaseConfigTab() {
     }
   };
 
-  const handleReinstall = async (id: string) => {
-    const toastId = toast.loading('Iniciando reinstalación...');
+  const handleReprovisionSubmit = async (values: ReprovisionFormValues) => {
+    if (!reprovisioningConfig) return;
+    setIsProvisioning(true);
+    const toastId = toast.loading('Reinstalando servidor PostgreSQL...');
     try {
-      const response = await fetch(`/api/admin/database-config/${id}/reprovision`, { method: 'POST' });
+      const response = await fetch(`/api/admin/database-config/${reprovisioningConfig.id}/reprovision`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message);
       toast.success(result.message, { id: toastId });
-      fetchConfigs();
+      setReprovisioningConfig(null);
+      reprovisionForm.reset();
     } catch (err: any) {
       toast.error(`Error: ${err.message}`, { id: toastId });
+    } finally {
+      setIsProvisioning(false);
+      fetchConfigs();
     }
   };
 
@@ -269,7 +291,7 @@ export function DatabaseConfigTab() {
                         <Button variant="secondary" size="sm" onClick={() => setViewingLogConfig(config)}><ScrollText className="h-4 w-4" /></Button>
                       )}
                       {config.status === 'failed' ? (
-                        <Button variant="secondary" size="sm" onClick={() => handleReinstall(config.id!)} disabled={isProvisioning}><RefreshCw className="h-4 w-4" /></Button>
+                        <Button variant="secondary" size="sm" onClick={() => setReprovisioningConfig(config)} disabled={isProvisioning}><RefreshCw className="h-4 w-4" /></Button>
                       ) : (
                         <>
                           <Button variant="outline" size="sm" onClick={() => handleTestConnection(config.id!)} disabled={!!isTestingId || config.status !== 'ready'}><TestTube2 className="h-4 w-4" /></Button>
@@ -330,6 +352,31 @@ export function DatabaseConfigTab() {
           <DialogFooter>
             <DialogClose asChild><Button variant="outline">Cerrar</Button></DialogClose>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reprovision Dialog */}
+      <Dialog open={!!reprovisioningConfig} onOpenChange={(open) => !open && setReprovisioningConfig(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reinstalar Servidor PostgreSQL</DialogTitle>
+            <DialogDescription>
+              Reinstalando en {reprovisioningConfig?.db_host}. Por favor, proporciona las credenciales necesarias.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...reprovisionForm}>
+            <form onSubmit={reprovisionForm.handleSubmit(handleReprovisionSubmit)} className="space-y-4 py-4">
+              <FormField control={reprovisionForm.control} name="ssh_password" render={({ field }) => (<FormItem><FormLabel>Contraseña SSH del Servidor</FormLabel><FormControl><Input type="password" {...field} disabled={isProvisioning} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={reprovisionForm.control} name="db_password" render={({ field }) => (<FormItem><FormLabel>Nueva Contraseña para PostgreSQL</FormLabel><FormControl><Input type="password" {...field} disabled={isProvisioning} /></FormControl><FormMessage /></FormItem>)} />
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setReprovisioningConfig(null)} disabled={isProvisioning}>Cancelar</Button>
+                <Button type="submit" disabled={isProvisioning}>
+                  {isProvisioning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                  Reinstalar
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </div>
