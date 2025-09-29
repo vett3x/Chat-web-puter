@@ -7,6 +7,7 @@ import { useSession } from '@/components/session-context-provider';
 import { ApiKey } from '@/hooks/use-user-api-keys';
 import { ChatMode } from '@/components/chat/chat-input';
 import { parseAiResponseToRenderableParts, RenderablePart } from '@/lib/utils';
+import { AI_PROVIDERS } from '@/lib/ai-models'; // Import AI_PROVIDERS
 
 // Define unified part types
 interface TextPart { type: 'text'; text: string; }
@@ -51,7 +52,35 @@ export interface Message {
 
 export type AutoFixStatus = 'idle' | 'analyzing' | 'plan_ready' | 'fixing' | 'failed';
 
-const DEFAULT_AI_MODEL_FALLBACK = 'puter:claude-sonnet-4';
+// Function to determine the default model based on user preferences and available keys
+const determineDefaultModel = (userApiKeys: ApiKey[]): string => {
+  if (typeof window !== 'undefined') {
+    const storedDefaultModel = localStorage.getItem('default_ai_model');
+    if (storedDefaultModel && (userApiKeys.some(key => `user_key:${key.id}` === storedDefaultModel) || AI_PROVIDERS.some(p => p.models.some(m => `puter:${m.value}` === storedDefaultModel)))) {
+      return storedDefaultModel;
+    }
+  }
+
+  // Prioritize global keys
+  const globalKey = userApiKeys.find(key => key.is_global);
+  if (globalKey) {
+    return `user_key:${globalKey.id}`;
+  }
+
+  // Then prioritize Claude models
+  const claudeModel = AI_PROVIDERS.find(p => p.value === 'anthropic_claude')?.models[0];
+  if (claudeModel) {
+    return `puter:${claudeModel.value}`;
+  }
+
+  // Fallback to any available user key
+  if (userApiKeys.length > 0) {
+    return `user_key:${userApiKeys[0].id}`;
+  }
+
+  // Final fallback if no keys or Puter models are available
+  return 'puter:claude-sonnet-4'; // A safe default if nothing else works
+};
 
 interface UseDeepAICoderChatProps {
   userId: string | undefined;
@@ -108,12 +137,7 @@ export function useDeepAICoderChat({
   const [isLoading, setIsLoading] = useState(false);
   const [isPuterReady, setIsPuterReady] = useState(false);
   const [isSendingFirstMessage, setIsSendingFirstMessage] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FALLBACK;
-    }
-    return DEFAULT_AI_MODEL_FALLBACK;
-  });
+  const [selectedModel, setSelectedModel] = useState<string>(''); // Initialize as empty string
   const [autoFixStatus, setAutoFixStatus] = useState<AutoFixStatus>('idle');
   const autoFixAttempts = useRef(0);
 
@@ -137,37 +161,10 @@ export function useDeepAICoderChat({
   useEffect(() => {
     if (isLoadingApiKeys) return;
 
-    const storedModel = localStorage.getItem('selected_ai_model');
-    let currentModelIsValid = false;
-
-    if (storedModel) {
-      if (storedModel.startsWith('user_key:')) {
-        const keyId = storedModel.substring(9);
-        if (userApiKeys.some(key => key.id === keyId)) {
-          currentModelIsValid = true;
-        }
-      } else if (storedModel.startsWith('puter:')) {
-        currentModelIsValid = true;
-      }
-    }
-
-    if (!currentModelIsValid) {
-      let newDefaultModel = DEFAULT_AI_MODEL_FALLBACK;
-      const geminiFlashKey = userApiKeys.find(key => 
-        key.provider === 'google_gemini' && 
-        (key.model_name === 'gemini-2.5-flash' || key.model_name === 'gemini-2.5-pro')
-      );
-
-      if (geminiFlashKey) {
-        newDefaultModel = `user_key:${geminiFlashKey.id}`;
-      }
-      
-      setSelectedModel(newDefaultModel);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('selected_ai_model', newDefaultModel);
-      }
-    } else {
-      setSelectedModel(storedModel || DEFAULT_AI_MODEL_FALLBACK);
+    const newDefaultModel = determineDefaultModel(userApiKeys);
+    setSelectedModel(newDefaultModel);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('selected_ai_model', newDefaultModel);
     }
   }, [isLoadingApiKeys, userApiKeys]);
 
@@ -219,8 +216,8 @@ export function useDeepAICoderChat({
         if (details?.model && (details.model.startsWith('puter:') || details.model.startsWith('user_key:'))) {
           setSelectedModel(details.model);
         } else {
-          const lastUsedModel = localStorage.getItem('selected_ai_model') || DEFAULT_AI_MODEL_FALLBACK;
-          setSelectedModel(lastUsedModel);
+          // If conversation has no model, use the determined default model
+          setSelectedModel(determineDefaultModel(userApiKeys));
         }
 
         const fetchedMsgs = await getMessagesFromDB(conversationId);
@@ -231,7 +228,7 @@ export function useDeepAICoderChat({
       }
     };
     loadConversationData();
-  }, [conversationId, userId, getMessagesFromDB, getConversationDetails]); // Removed isSendingFirstMessage from dependencies
+  }, [conversationId, userId, getMessagesFromDB, getConversationDetails, userApiKeys]); // Removed isSendingFirstMessage from dependencies
 
   const createNewConversationInDB = async () => {
     if (!userId) return null;

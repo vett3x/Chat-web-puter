@@ -39,7 +39,35 @@ export interface ChatMessage {
   isAnimated?: boolean; // Añadido para consistencia con el tipo Message
 }
 
-const DEFAULT_AI_MODEL_FALLBACK = 'puter:claude-sonnet-4';
+// Function to determine the default model based on user preferences and available keys
+const determineDefaultModel = (userApiKeys: ApiKey[]): string => {
+  if (typeof window !== 'undefined') {
+    const storedDefaultModel = localStorage.getItem('default_ai_model');
+    if (storedDefaultModel && (userApiKeys.some(key => `user_key:${key.id}` === storedDefaultModel) || AI_PROVIDERS.some(p => p.models.some(m => `puter:${m.value}` === storedDefaultModel)))) {
+      return storedDefaultModel;
+    }
+  }
+
+  // Prioritize global keys
+  const globalKey = userApiKeys.find(key => key.is_global);
+  if (globalKey) {
+    return `user_key:${globalKey.id}`;
+  }
+
+  // Then prioritize Claude models
+  const claudeModel = AI_PROVIDERS.find(p => p.value === 'anthropic_claude')?.models[0];
+  if (claudeModel) {
+    return `puter:${claudeModel.value}`;
+  }
+
+  // Fallback to any available user key
+  if (userApiKeys.length > 0) {
+    return `user_key:${userApiKeys[0].id}`;
+  }
+
+  // Final fallback if no keys or Puter models are available
+  return 'puter:claude-sonnet-4'; // A safe default if nothing else works
+};
 
 interface UseNoteAssistantChatProps {
   noteTitle: string;
@@ -85,7 +113,7 @@ export function useNoteAssistantChat({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isPuterReady, setIsPuterReady] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_AI_MODEL_FALLBACK);
+  const [selectedModel, setSelectedModel] = useState<string>(''); // Initialize as empty string
 
   const defaultWelcomeMessage: ChatMessage = { role: 'assistant', content: 'Hola, soy tu asistente. Pregúntame cualquier cosa sobre esta nota.' };
 
@@ -109,37 +137,10 @@ export function useNoteAssistantChat({
   useEffect(() => {
     if (isLoadingApiKeys) return;
 
-    const storedModel = localStorage.getItem('selected_ai_model_note_chat');
-    let currentModelIsValid = false;
-
-    if (storedModel) {
-      if (storedModel.startsWith('user_key:')) {
-        const keyId = storedModel.substring(9);
-        if (userApiKeys.some(key => key.id === keyId)) {
-          currentModelIsValid = true;
-        }
-      } else if (storedModel.startsWith('puter:')) {
-        currentModelIsValid = true;
-      }
-    }
-
-    if (!currentModelIsValid) {
-      let newDefaultModel = DEFAULT_AI_MODEL_FALLBACK;
-      const geminiFlashKey = userApiKeys.find(key => 
-        key.provider === 'google_gemini' && 
-        (key.model_name === 'gemini-2.5-flash' || key.model_name === 'gemini-2.5-pro')
-      );
-
-      if (geminiFlashKey) {
-        newDefaultModel = `user_key:${geminiFlashKey.id}`;
-      }
-      
-      setSelectedModel(newDefaultModel);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('selected_ai_model_note_chat', newDefaultModel);
-      }
-    } else {
-      setSelectedModel(storedModel || DEFAULT_AI_MODEL_FALLBACK);
+    const newDefaultModel = determineDefaultModel(userApiKeys);
+    setSelectedModel(newDefaultModel);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('selected_ai_model_note_chat', newDefaultModel);
     }
   }, [isLoadingApiKeys, userApiKeys]);
 

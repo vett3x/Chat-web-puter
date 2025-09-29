@@ -8,7 +8,7 @@ import { AppBrowserPanel } from "@/components/app-browser-panel";
 import { CodeEditorPanel } from "@/components/code-editor-panel";
 import { NoteEditorPanel } from "@/components/note-editor-panel";
 import { ProfileSettingsDialog } from "@/components/profile-settings-dialog";
-import { AppSettingsDialog } from "@/components/app-settings-dialog";
+import { AccountSettingsDialog } from "@/components/account-settings-dialog";
 import { ServerManagementDialog } from "@/components/server-management-dialog";
 import { UserManagementDialog } from "@/components/user-management-dialog";
 import { DeepAiCoderDialog } from "@/components/deep-ai-coder-dialog";
@@ -82,7 +82,7 @@ export default function Home() {
   const [selectedAppDetails, setSelectedAppDetails] = useState<UserApp | null>(null);
   
   const [isProfileSettingsOpen, setIsProfileSettingsOpen] = useState(false);
-  const [isAppSettingsOpen, setIsAppSettingsOpen] = useState(false);
+  const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
   const [isServerManagementOpen, setIsServerManagementOpen] = useState(false);
   const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
   const [isDeepAiCoderOpen, setIsDeepAiCoderOpen] = useState(false);
@@ -297,7 +297,7 @@ export default function Home() {
   };
 
   const handleOpenProfileSettings = () => setIsProfileSettingsOpen(true);
-  const handleOpenAppSettings = () => setIsAppSettingsOpen(true);
+  const handleOpenAccountSettings = () => setIsAccountSettingsOpen(true);
   const handleOpenServerManagement = () => setIsServerManagementOpen(true);
   const handleOpenUserManagement = () => setIsUserManagementOpen(true);
   const handleOpenDeepAiCoder = () => setIsDeepAiCoderOpen(true);
@@ -363,7 +363,7 @@ export default function Home() {
           onSelectItem={handleSelectItem}
           onFileSelect={handleFileSelect}
           onOpenProfileSettings={handleOpenProfileSettings}
-          onOpenAppSettings={handleOpenAppSettings}
+          onOpenAccountSettings={handleOpenAccountSettings}
           onOpenServerManagement={handleOpenServerManagement}
           onOpenUserManagement={handleOpenUserManagement}
           onOpenDeepAiCoder={handleOpenDeepAiCoder}
@@ -436,11 +436,14 @@ export default function Home() {
       </div>
 
       <ProfileSettingsDialog open={isProfileSettingsOpen} onOpenChange={setIsProfileSettingsOpen} />
-      <AppSettingsDialog
-        open={isAppSettingsOpen}
-        onOpenChange={setIsAppSettingsOpen}
+      <AccountSettingsDialog
+        open={isAccountSettingsOpen}
+        onOpenChange={setIsAccountSettingsOpen}
         aiResponseSpeed={aiResponseSpeed}
         onAiResponseSpeedChange={handleAiResponseSpeedChange}
+        userApiKeys={userApiKeys}
+        isLoadingApiKeys={isLoadingApiKeys}
+        currentUserRole={userRole}
       />
       {isAdmin && <ServerManagementDialog open={isServerManagementOpen} onOpenChange={setIsServerManagementOpen} />}
       {isAdmin && <UserManagementDialog open={isUserManagementOpen} onOpenChange={setIsUserManagementOpen} />}

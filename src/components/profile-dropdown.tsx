@@ -29,14 +29,14 @@ interface Profile {
 
 interface ProfileDropdownProps {
   onOpenProfileSettings: () => void;
-  onOpenAppSettings: () => void;
+  onOpenAccountSettings: () => void;
   onOpenServerManagement: () => void;
   onOpenUserManagement: () => void;
   onOpenUpdateManager: () => void;
   onOpenApiManagement: () => void; // NEW: Add onOpenApiManagement prop
 }
 
-export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOpenServerManagement, onOpenUserManagement, onOpenUpdateManager, onOpenApiManagement }: ProfileDropdownProps) {
+export function ProfileDropdown({ onOpenProfileSettings, onOpenAccountSettings, onOpenServerManagement, onOpenUserManagement, onOpenUpdateManager, onOpenApiManagement }: ProfileDropdownProps) {
   const { session, userRole, userStatus } = useSession();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -162,10 +162,10 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
             />
           )}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={onOpenAppSettings} className="flex items-center cursor-pointer">
+        <DropdownMenuItem onClick={onOpenAccountSettings} className="flex items-center cursor-pointer">
           <div className="flex items-center">
             <Settings className="mr-2 h-4 w-4" />
-            <span>Configuración</span>
+            <span>Configuración de Cuenta</span>
           </div>
         </DropdownMenuItem>
         {/* Always show API Management in dropdown */}

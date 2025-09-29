@@ -16,7 +16,7 @@ interface SidebarHeaderProps {
   isCreatingFolder: boolean;
   isCreatingNote: boolean;
   onOpenProfileSettings: () => void;
-  onOpenAppSettings: () => void;
+  onOpenAccountSettings: () => void; // Renamed from onOpenAppSettings
   onOpenServerManagement: () => void;
   onOpenUserManagement: () => void;
   onOpenDeepAiCoder: () => void;
@@ -33,7 +33,7 @@ export function SidebarHeader({
   isCreatingFolder,
   isCreatingNote,
   onOpenProfileSettings,
-  onOpenAppSettings,
+  onOpenAccountSettings, // Renamed from onOpenAppSettings
   onOpenServerManagement,
   onOpenUserManagement,
   onOpenDeepAiCoder,
@@ -113,7 +113,7 @@ export function SidebarHeader({
       <div className="mb-4">
         <ProfileDropdown
           onOpenProfileSettings={onOpenProfileSettings}
-          onOpenAppSettings={onOpenAppSettings}
+          onOpenAccountSettings={onOpenAccountSettings}
           onOpenServerManagement={onOpenServerManagement}
           onOpenUserManagement={onOpenUserManagement}
           onOpenUpdateManager={onOpenUpdateManager}

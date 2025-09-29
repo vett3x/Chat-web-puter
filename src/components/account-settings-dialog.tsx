@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader2, Save, KeyRound, Trash2, Gauge } from 'lucide-react';
+import { Loader2, Save, KeyRound, Trash2, Gauge, BrainCircuit } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -42,6 +42,9 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AI_PROVIDERS, getModelLabel } from '@/lib/ai-models';
+import { ApiKey } from '@/hooks/use-user-api-keys';
 
 // Schemas para los formularios
 const changePasswordSchema = z.object({
@@ -50,23 +53,36 @@ const changePasswordSchema = z.object({
 
 type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 
-interface AppSettingsDialogProps {
+const defaultModelSchema = z.object({
+  default_ai_model: z.string().min(1, { message: 'Debes seleccionar un modelo por defecto.' }),
+});
+
+type DefaultModelFormValues = z.infer<typeof defaultModelSchema>;
+
+interface AccountSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   aiResponseSpeed: 'slow' | 'normal' | 'fast';
   onAiResponseSpeedChange: (speed: 'slow' | 'normal' | 'fast') => void;
+  userApiKeys: ApiKey[];
+  isLoadingApiKeys: boolean;
+  currentUserRole: 'user' | 'admin' | 'super_admin' | null;
 }
 
-export function AppSettingsDialog({
+export function AccountSettingsDialog({
   open,
   onOpenChange,
   aiResponseSpeed,
   onAiResponseSpeedChange,
-}: AppSettingsDialogProps) {
+  userApiKeys,
+  isLoadingApiKeys,
+  currentUserRole,
+}: AccountSettingsDialogProps) {
   const { session, isLoading: isSessionLoading } = useSession();
   const router = useRouter();
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [isSavingDefaultModel, setIsSavingDefaultModel] = useState(false);
 
   const passwordForm = useForm<ChangePasswordFormValues>({
     resolver: zodResolver(changePasswordSchema),
@@ -74,6 +90,78 @@ export function AppSettingsDialog({
       new_password: '',
     },
   });
+
+  const defaultModelForm = useForm<DefaultModelFormValues>({
+    resolver: zodResolver(defaultModelSchema),
+    defaultValues: {
+      default_ai_model: '',
+    },
+  });
+
+  // Determine available models for the dropdown
+  const availableModels = React.useMemo(() => {
+    const models: { value: string; label: string; isGlobal?: boolean }[] = [];
+
+    // Add Puter.js models
+    AI_PROVIDERS.filter(p => p.source === 'puter').forEach(provider => {
+      provider.models.forEach(model => {
+        models.push({ value: `puter:${model.value}`, label: `${provider.company}: ${model.label}` });
+      });
+    });
+
+    // Add user API keys
+    userApiKeys.forEach(key => {
+      let label = '';
+      if (key.provider === 'custom_endpoint') {
+        label = key.nickname || `Endpoint Personalizado (${key.id.substring(0, 8)}...)`;
+      } else if (key.nickname) {
+        label = key.nickname;
+      } else {
+        const providerName = AI_PROVIDERS.find(p => p.value === key.provider)?.company || key.provider;
+        const modelLabel = key.model_name ? getModelLabel(key.model_name, userApiKeys) : 'Modelo no seleccionado';
+        if (key.use_vertex_ai) {
+          label = `${providerName} (Vertex AI): ${modelLabel}`;
+        } else {
+          label = `${providerName}: ${modelLabel}`;
+        }
+      }
+      if (key.is_global) {
+        label += ' (Global)';
+      }
+      models.push({ value: `user_key:${key.id}`, label, isGlobal: key.is_global });
+    });
+
+    return models;
+  }, [userApiKeys]);
+
+  // Determine initial default model value
+  useEffect(() => {
+    if (!isLoadingApiKeys && availableModels.length > 0) {
+      const storedDefaultModel = typeof window !== 'undefined' ? localStorage.getItem('default_ai_model') : null;
+      let initialDefault = '';
+
+      if (storedDefaultModel && availableModels.some(m => m.value === storedDefaultModel)) {
+        initialDefault = storedDefaultModel;
+      } else {
+        // Prioritize global keys
+        const globalKey = availableModels.find(m => m.isGlobal);
+        if (globalKey) {
+          initialDefault = globalKey.value;
+        } else {
+          // Then prioritize Claude models
+          const claudeModel = availableModels.find(m => m.value.startsWith('puter:claude'));
+          if (claudeModel) {
+            initialDefault = claudeModel.value;
+          } else if (availableModels.length > 0) {
+            // Fallback to the first available model
+            initialDefault = availableModels[0].value;
+          }
+        }
+      }
+      defaultModelForm.reset({ default_ai_model: initialDefault });
+    }
+  }, [isLoadingApiKeys, availableModels, defaultModelForm]);
+
 
   useEffect(() => {
     if (open && !isSessionLoading && !session) {
@@ -120,6 +208,22 @@ export function AppSettingsDialog({
     }
   };
 
+  const handleSaveDefaultModel = async (values: DefaultModelFormValues) => {
+    setIsSavingDefaultModel(true);
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('default_ai_model', values.default_ai_model);
+      }
+      toast.success('Modelo de IA por defecto guardado.');
+      onOpenChange(false);
+    } catch (error: any) {
+      console.error('Error saving default AI model:', error.message);
+      toast.error(`Error al guardar el modelo por defecto: ${error.message}`);
+    } finally {
+      setIsSavingDefaultModel(false);
+    }
+  };
+
   if (isSessionLoading || !session) {
     return null;
   }
@@ -128,8 +232,8 @@ export function AppSettingsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] p-6">
         <DialogHeader>
-          <DialogTitle>Configuración de la Aplicación</DialogTitle>
-          <DialogDescription>Gestiona las opciones generales de tu aplicación.</DialogDescription>
+          <DialogTitle>Configuración de Cuenta</DialogTitle>
+          <DialogDescription>Gestiona las opciones generales de tu cuenta y preferencias de IA.</DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-6">
           {/* Change Password Section */}
@@ -172,6 +276,47 @@ export function AppSettingsDialog({
               <div className="flex items-center space-x-2"><RadioGroupItem value="normal" id="speed-normal" /><Label htmlFor="speed-normal">Normal</Label></div>
               <div className="flex items-center space-x-2"><RadioGroupItem value="fast" id="speed-fast" /><Label htmlFor="speed-fast">Rápida</Label></div>
             </RadioGroup>
+          </div>
+
+          <Separator />
+
+          {/* Default AI Model Section */}
+          <div>
+            <h3 className="text-lg font-semibold flex items-center gap-2 mb-3">
+              <BrainCircuit className="h-5 w-5 text-muted-foreground" /> Modelo de IA por Defecto
+            </h3>
+            <Form {...defaultModelForm}>
+              <form onSubmit={defaultModelForm.handleSubmit(handleSaveDefaultModel)} className="space-y-4">
+                <FormField
+                  control={defaultModelForm.control}
+                  name="default_ai_model"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Seleccionar Modelo</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSavingDefaultModel || isLoadingApiKeys || availableModels.length === 0}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona un modelo de IA por defecto" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {availableModels.map((model) => (
+                            <SelectItem key={model.value} value={model.value}>
+                              {model.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" disabled={isSavingDefaultModel || isLoadingApiKeys || availableModels.length === 0}>
+                  {isSavingDefaultModel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  Guardar Modelo por Defecto
+                </Button>
+              </form>
+            </Form>
           </div>
 
           <Separator />

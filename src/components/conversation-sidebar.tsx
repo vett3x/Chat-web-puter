@@ -55,7 +55,7 @@ interface ConversationSidebarProps {
   onSelectItem: (id: string | null, type: SelectedItem['type'] | null) => void;
   onFileSelect: (path: string) => void;
   onOpenProfileSettings: () => void;
-  onOpenAppSettings: () => void;
+  onOpenAccountSettings: () => void; // Renamed from onOpenAppSettings
   onOpenServerManagement: () => void;
   onOpenUserManagement: () => void;
   onOpenDeepAiCoder: () => void;
@@ -84,7 +84,7 @@ export function ConversationSidebar({
   onSelectItem,
   onFileSelect,
   onOpenProfileSettings,
-  onOpenAppSettings,
+  onOpenAccountSettings, // Renamed from onOpenAppSettings
   onOpenServerManagement,
   onOpenUserManagement,
   onOpenDeepAiCoder,
@@ -207,7 +207,7 @@ export function ConversationSidebar({
         isCreatingFolder={isCreatingFolder}
         isCreatingNote={isCreatingNote}
         onOpenProfileSettings={onOpenProfileSettings}
-        onOpenAppSettings={onOpenAppSettings}
+        onOpenAccountSettings={onOpenAccountSettings} // Renamed from onOpenAppSettings
         onOpenServerManagement={onOpenServerManagement}
         onOpenUserManagement={onOpenUserManagement}
         onOpenDeepAiCoder={onOpenDeepAiCoder}
