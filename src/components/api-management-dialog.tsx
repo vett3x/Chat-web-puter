@@ -42,6 +42,63 @@ const apiKeySchema = z.object({
   json_key_content: z.string().optional(), // Added for payload
   api_endpoint: z.string().trim().url({ message: 'URL de endpoint inválida.' }).optional().or(z.literal('')), // Changed: Allow empty string for optional api_endpoint
   is_global: z.boolean().optional(), // NEW: Add is_global to schema
+}).superRefine((data, ctx) => {
+  if (data.provider === 'google_gemini') {
+    if (data.use_vertex_ai) {
+      if (!data.model_name || data.model_name === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Debes seleccionar un modelo para usar Vertex AI.',
+          path: ['model_name'],
+        });
+      }
+      if (!data.project_id) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Project ID es requerido para usar Vertex AI.',
+          path: ['project_id'],
+        });
+      }
+      if (!data.location_id) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Location ID es requerido para usar Vertex AI.',
+          path: ['location_id'],
+        });
+      }
+    } else { // Public API
+      if (!data.model_name || data.model_name === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Debes seleccionar un modelo para la API pública de Gemini.',
+          path: ['model_name'],
+        });
+      }
+      // API key validation for adding new keys is now handled in the frontend onSubmit.
+    }
+  } else if (data.provider === 'custom_endpoint') { // New validation for custom_endpoint
+    if (!data.api_endpoint || data.api_endpoint === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El link del endpoint es requerido para un endpoint personalizado.',
+        path: ['api_endpoint'],
+      });
+    }
+    if (!data.model_name || data.model_name === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El ID del modelo es requerido para un endpoint personalizado.',
+        path: ['model_name'],
+      });
+    }
+    if (!data.nickname || data.nickname === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El apodo es obligatorio para un endpoint personalizado.',
+        path: ['nickname'],
+      });
+    }
+  }
 });
 
 type ApiKeyFormValues = z.infer<typeof apiKeySchema>;
@@ -332,6 +389,11 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
   };
 
   const filteredKeys = keys.filter(key => {
+    // Only show global keys to Super Admins in this dialog
+    if (key.is_global && !isSuperAdmin) {
+      return false;
+    }
+    
     const lowerCaseQuery = searchQuery.toLowerCase();
     const providerLabel = providerOptions.find(p => p.value === key.provider)?.label || key.provider;
     
@@ -646,7 +708,6 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                     <TableRow><TableCell colSpan={isSuperAdmin ? 5 : 4} className="text-center text-muted-foreground">No hay claves que coincidan con la búsqueda.</TableCell></TableRow>
                   ) : (
                     filteredKeys
-                      // REMOVED: .filter(key => isSuperAdmin || !key.is_global) // This line was preventing non-admins from seeing global keys
                       .map(key => {
                         // Determine if the current user can edit/delete this key
                         const canManageKey = isSuperAdmin || (!key.is_global && key.user_id === currentUserId);
