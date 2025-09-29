@@ -9,11 +9,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
-import { Loader2, Save, Database, TestTube2, PlusCircle, Trash2, Edit, CheckCircle2 } from 'lucide-react';
+import { Loader2, Save, Database, TestTube2, PlusCircle, Trash2, Edit, CheckCircle2, Terminal } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 
+// Schema for connecting to an existing DB
 const configSchema = z.object({
   id: z.string().uuid().optional(),
   nickname: z.string().min(1, 'El apodo es requerido.'),
@@ -25,7 +26,18 @@ const configSchema = z.object({
   db_password: z.string().optional(),
 });
 
+// Schema for provisioning a new DB server
+const provisionSchema = z.object({
+  ssh_host: z.string().ip({ message: 'Debe ser una IP válida.' }),
+  ssh_port: z.coerce.number().int().min(1),
+  ssh_user: z.string().min(1, 'El usuario SSH es requerido.'),
+  ssh_password: z.string().min(1, 'La contraseña SSH es requerida.'),
+  nickname: z.string().min(1, 'El apodo para esta conexión es requerido.'),
+  db_password: z.string().min(6, 'La contraseña de la BD debe tener al menos 6 caracteres.'),
+});
+
 type ConfigFormValues = z.infer<typeof configSchema>;
+type ProvisionFormValues = z.infer<typeof provisionSchema>;
 
 interface DbConfig extends ConfigFormValues {
   created_at: string;
@@ -37,18 +49,16 @@ export function DatabaseConfigTab() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isTestingId, setIsTestingId] = useState<string | null>(null);
   const [editingConfig, setEditingConfig] = useState<DbConfig | null>(null);
+  const [isProvisioning, setIsProvisioning] = useState(false);
 
-  const form = useForm<ConfigFormValues>({
+  const configForm = useForm<ConfigFormValues>({
     resolver: zodResolver(configSchema),
-    defaultValues: {
-      nickname: '',
-      is_active: false,
-      db_host: '',
-      db_port: 5432,
-      db_name: 'postgres',
-      db_user: 'postgres',
-      db_password: '',
-    },
+    defaultValues: { nickname: '', is_active: false, db_host: '', db_port: 5432, db_name: 'postgres', db_user: 'postgres', db_password: '' },
+  });
+
+  const provisionForm = useForm<ProvisionFormValues>({
+    resolver: zodResolver(provisionSchema),
+    defaultValues: { ssh_host: '', ssh_port: 22, ssh_user: 'root', ssh_password: '', nickname: '', db_password: '' },
   });
 
   const fetchConfigs = useCallback(async () => {
@@ -70,30 +80,21 @@ export function DatabaseConfigTab() {
 
   const handleEdit = (config: DbConfig) => {
     setEditingConfig(config);
-    form.reset({ ...config, db_password: '' });
+    configForm.reset({ ...config, db_password: '' });
   };
 
   const handleCancelEdit = () => {
     setEditingConfig(null);
-    form.reset({
-      nickname: '',
-      is_active: false,
-      db_host: '',
-      db_port: 5432,
-      db_name: 'postgres',
-      db_user: 'postgres',
-      db_password: '',
-    });
+    configForm.reset({ nickname: '', is_active: false, db_host: '', db_port: 5432, db_name: 'postgres', db_user: 'postgres', db_password: '' });
   };
 
-  const onSubmit = async (values: ConfigFormValues) => {
+  const onConfigSubmit = async (values: ConfigFormValues) => {
     if (editingConfig && !values.db_password) {
       delete values.db_password;
     } else if (!editingConfig && !values.db_password) {
-      form.setError('db_password', { message: 'La contraseña es requerida.' });
+      configForm.setError('db_password', { message: 'La contraseña es requerida.' });
       return;
     }
-
     setIsSubmitting(true);
     try {
       const method = editingConfig ? 'PUT' : 'POST';
@@ -111,6 +112,27 @@ export function DatabaseConfigTab() {
       toast.error(`Error al guardar: ${err.message}`);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const onProvisionSubmit = async (values: ProvisionFormValues) => {
+    setIsProvisioning(true);
+    const toastId = toast.loading('Aprovisionando servidor PostgreSQL...');
+    try {
+      const response = await fetch('/api/admin/database-config/provision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message);
+      toast.success(result.message, { id: toastId });
+      provisionForm.reset();
+      fetchConfigs();
+    } catch (err: any) {
+      toast.error(`Error: ${err.message}`, { id: toastId });
+    } finally {
+      setIsProvisioning(false);
     }
   };
 
@@ -148,7 +170,6 @@ export function DatabaseConfigTab() {
   const handleSetActive = async (id: string) => {
     const configToActivate = configs.find(c => c.id === id);
     if (!configToActivate) return;
-
     setIsSubmitting(true);
     try {
       const response = await fetch('/api/admin/database-config', {
@@ -171,33 +192,32 @@ export function DatabaseConfigTab() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Database className="h-6 w-6" /> {editingConfig ? 'Editar' : 'Añadir'} Configuración de Base de Datos</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Terminal className="h-6 w-6" /> Aprovisionar Nuevo Servidor PostgreSQL</CardTitle>
           <CardDescription>
-            {editingConfig ? `Editando la configuración para '${editingConfig.nickname}'.` : 'Añade un nuevo servidor PostgreSQL al pool de bases de datos.'}
+            Instala y configura PostgreSQL en un servidor Ubuntu limpio a través de SSH.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField control={form.control} name="nickname" render={({ field }) => (<FormItem><FormLabel>Apodo</FormLabel><FormControl><Input placeholder="Servidor Principal (EU)" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="db_host" render={({ field }) => (<FormItem><FormLabel>Host / IP</FormLabel><FormControl><Input placeholder="192.168.1.10" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="db_port" render={({ field }) => (<FormItem><FormLabel>Puerto</FormLabel><FormControl><Input type="number" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="db_name" render={({ field }) => (<FormItem><FormLabel>Nombre de la Base de Datos</FormLabel><FormControl><Input {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="db_user" render={({ field }) => (<FormItem><FormLabel>Usuario Administrador</FormLabel><FormControl><Input {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="db_password" render={({ field }) => (<FormItem><FormLabel>Contraseña de Administrador</FormLabel><FormControl><Input type="password" placeholder={editingConfig ? "Dejar en blanco para no cambiar" : "••••••••"} {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="is_active" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm"><div className="space-y-0.5"><FormLabel>Activar para nuevos proyectos</FormLabel><FormDescription>Si se activa, esta base de datos se usará para todos los nuevos proyectos de DeepAI Coder.</FormDescription></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSubmitting} /></FormControl></FormItem>)} />
-              <div className="flex gap-2">
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingConfig ? <Save className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />)}
-                  {editingConfig ? 'Guardar Cambios' : 'Añadir Servidor'}
-                </Button>
-                {editingConfig && <Button type="button" variant="outline" onClick={handleCancelEdit} disabled={isSubmitting}>Cancelar</Button>}
+          <Form {...provisionForm}>
+            <form onSubmit={provisionForm.handleSubmit(onProvisionSubmit)} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField control={provisionForm.control} name="ssh_host" render={({ field }) => (<FormItem><FormLabel>IP del Servidor (CT)</FormLabel><FormControl><Input placeholder="10.10.10.210" {...field} disabled={isProvisioning} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={provisionForm.control} name="ssh_user" render={({ field }) => (<FormItem><FormLabel>Usuario SSH</FormLabel><FormControl><Input {...field} disabled={isProvisioning} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={provisionForm.control} name="ssh_password" render={({ field }) => (<FormItem><FormLabel>Contraseña SSH</FormLabel><FormControl><Input type="password" {...field} disabled={isProvisioning} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={provisionForm.control} name="nickname" render={({ field }) => (<FormItem><FormLabel>Apodo para esta Conexión</FormLabel><FormControl><Input placeholder="Mi Nuevo Servidor DB" {...field} disabled={isProvisioning} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={provisionForm.control} name="db_password" render={({ field }) => (<FormItem><FormLabel>Nueva Contraseña para PostgreSQL</FormLabel><FormControl><Input type="password" {...field} disabled={isProvisioning} /></FormControl><FormMessage /></FormItem>)} />
               </div>
+              <Button type="submit" disabled={isProvisioning}>
+                {isProvisioning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                Aprovisionar e Instalar
+              </Button>
             </form>
           </Form>
         </CardContent>
       </Card>
+
       <Separator />
+
       <Card>
         <CardHeader><CardTitle>Servidores de Base de Datos Configurados</CardTitle></CardHeader>
         <CardContent>
@@ -222,6 +242,35 @@ export function DatabaseConfigTab() {
               </TableBody>
             </Table>
           )}
+        </CardContent>
+      </Card>
+
+      <Separator />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Database className="h-6 w-6" /> {editingConfig ? 'Editar Conexión Existente' : 'Añadir Conexión a Base de Datos Existente'}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Form {...configForm}>
+            <form onSubmit={configForm.handleSubmit(onConfigSubmit)} className="space-y-4">
+              {/* Form fields for adding an existing connection... */}
+              <FormField control={configForm.control} name="nickname" render={({ field }) => (<FormItem><FormLabel>Apodo</FormLabel><FormControl><Input placeholder="Servidor Principal (EU)" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={configForm.control} name="db_host" render={({ field }) => (<FormItem><FormLabel>Host / IP</FormLabel><FormControl><Input placeholder="192.168.1.10" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={configForm.control} name="db_port" render={({ field }) => (<FormItem><FormLabel>Puerto</FormLabel><FormControl><Input type="number" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={configForm.control} name="db_name" render={({ field }) => (<FormItem><FormLabel>Nombre de la Base de Datos</FormLabel><FormControl><Input {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={configForm.control} name="db_user" render={({ field }) => (<FormItem><FormLabel>Usuario Administrador</FormLabel><FormControl><Input {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={configForm.control} name="db_password" render={({ field }) => (<FormItem><FormLabel>Contraseña de Administrador</FormLabel><FormControl><Input type="password" placeholder={editingConfig ? "Dejar en blanco para no cambiar" : "••••••••"} {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={configForm.control} name="is_active" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm"><div className="space-y-0.5"><FormLabel>Activar para nuevos proyectos</FormLabel></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSubmitting} /></FormControl></FormItem>)} />
+              <div className="flex gap-2">
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingConfig ? <Save className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />)}
+                  {editingConfig ? 'Guardar Cambios' : 'Añadir Conexión'}
+                </Button>
+                {editingConfig && <Button type="button" variant="outline" onClick={handleCancelEdit} disabled={isSubmitting}>Cancelar</Button>}
+              </div>
+            </form>
+          </Form>
         </CardContent>
       </Card>
     </div>
