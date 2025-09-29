@@ -25,17 +25,17 @@ const customDarkTheme: Theme = {
   colors: {
     ...darkDefaultTheme.colors,
     editor: {
-      background: "hsl(var(--background))",
-      text: "hsl(var(--foreground))",
+      background: "hsl(220 10% 7%)", // Directly use dark background HSL
+      text: "hsl(0 0% 98%)", // Directly use dark foreground HSL
     },
-    sideMenu: "hsl(var(--foreground))",
+    sideMenu: "hsl(0 0% 98%)", // Assuming sideMenu should be foreground color
     tooltip: {
-        background: "hsl(var(--muted))",
-        text: "hsl(var(--muted-foreground))",
+        background: "hsl(220 10% 10%)", // Assuming muted background
+        text: "hsl(220 10% 60%)", // Assuming muted foreground
     },
     menu: {
-        background: "hsl(var(--card))",
-        text: "hsl(var(--card-foreground))",
+        background: "hsl(220 10% 7%)", // Assuming card background
+        text: "hsl(0 0% 98%)", // Assuming card foreground
     },
   },
 };
