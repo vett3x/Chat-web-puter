@@ -9,7 +9,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
-import { Loader2, Save, Database } from 'lucide-react';
+import { Loader2, Save, Database, TestTube2 } from 'lucide-react';
 
 const configSchema = z.object({
   db_host: z.string().min(1, 'El host es requerido.'),
@@ -24,6 +24,7 @@ type ConfigFormValues = z.infer<typeof configSchema>;
 export function DatabaseConfigTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
 
   const form = useForm<ConfigFormValues>({
     resolver: zodResolver(configSchema),
@@ -81,6 +82,21 @@ export function DatabaseConfigTab() {
     }
   };
 
+  const handleTestConnection = async () => {
+    setIsTesting(true);
+    const toastId = toast.loading('Probando conexión...');
+    try {
+      const response = await fetch('/api/admin/database-config/test', { method: 'POST' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message);
+      toast.success(result.message, { id: toastId });
+    } catch (err: any) {
+      toast.error(err.message, { id: toastId });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
@@ -97,15 +113,21 @@ export function DatabaseConfigTab() {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField control={form.control} name="db_host" render={({ field }) => (<FormItem><FormLabel>Host / IP</FormLabel><FormControl><Input placeholder="192.168.1.10" {...field} disabled={isSaving} /></FormControl><FormMessage /></FormItem>)} />
-            <FormField control={form.control} name="db_port" render={({ field }) => (<FormItem><FormLabel>Puerto</FormLabel><FormControl><Input type="number" {...field} disabled={isSaving} /></FormControl><FormMessage /></FormItem>)} />
-            <FormField control={form.control} name="db_name" render={({ field }) => (<FormItem><FormLabel>Nombre de la Base de Datos</FormLabel><FormControl><Input {...field} disabled={isSaving} /></FormControl><FormMessage /></FormItem>)} />
-            <FormField control={form.control} name="db_user" render={({ field }) => (<FormItem><FormLabel>Usuario Administrador</FormLabel><FormControl><Input {...field} disabled={isSaving} /></FormControl><FormMessage /></FormItem>)} />
-            <FormField control={form.control} name="db_password" render={({ field }) => (<FormItem><FormLabel>Contraseña de Administrador</FormLabel><FormControl><Input type="password" placeholder="••••••••" {...field} disabled={isSaving} /></FormControl><FormMessage /></FormItem>)} />
-            <Button type="submit" disabled={isSaving}>
-              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              Guardar Configuración
-            </Button>
+            <FormField control={form.control} name="db_host" render={({ field }) => (<FormItem><FormLabel>Host / IP</FormLabel><FormControl><Input placeholder="192.168.1.10" {...field} disabled={isSaving || isTesting} /></FormControl><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="db_port" render={({ field }) => (<FormItem><FormLabel>Puerto</FormLabel><FormControl><Input type="number" {...field} disabled={isSaving || isTesting} /></FormControl><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="db_name" render={({ field }) => (<FormItem><FormLabel>Nombre de la Base de Datos</FormLabel><FormControl><Input {...field} disabled={isSaving || isTesting} /></FormControl><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="db_user" render={({ field }) => (<FormItem><FormLabel>Usuario Administrador</FormLabel><FormControl><Input {...field} disabled={isSaving || isTesting} /></FormControl><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="db_password" render={({ field }) => (<FormItem><FormLabel>Contraseña de Administrador</FormLabel><FormControl><Input type="password" placeholder="••••••••" {...field} disabled={isSaving || isTesting} /></FormControl><FormMessage /></FormItem>)} />
+            <div className="flex gap-2">
+              <Button type="submit" disabled={isSaving || isTesting}>
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Guardar Configuración
+              </Button>
+              <Button type="button" variant="outline" onClick={handleTestConnection} disabled={isSaving || isTesting}>
+                {isTesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TestTube2 className="mr-2 h-4 w-4" />}
+                Probar Conexión
+              </Button>
+            </div>
           </form>
         </Form>
       </CardContent>
