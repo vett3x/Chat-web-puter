@@ -18,15 +18,15 @@ interface DashboardData {
     maintenance_mode_enabled: boolean;
     users_disabled: boolean;
     admins_disabled: boolean;
-  } | null; // Allow systemStatus to be null
+  } | null;
   kpis: {
     totalUsers: number;
     activeServers: number;
     runningContainers: number;
     activeTunnels: number;
   };
-  criticalAlerts: { id: string; created_at: string; event_type: string; description: string }[];
-  errorTickets: { id: string; created_at: string; user_id: string; profiles: { first_name: string | null; last_name: string | null } | null }[];
+  criticalAlerts: { id: string; created_at: string; event_type: string; description: string }[] | null;
+  errorTickets: { id: string; created_at: string; user_id: string; profiles: { first_name: string | null; last_name: string | null } | null }[] | null;
   resourceUsage: {
     avgCpuPercent: number;
     totalMemoryUsedMiB: number;
@@ -94,13 +94,14 @@ export function AdminDashboardTab() {
     return <div className="text-center text-destructive">No se pudieron cargar los datos del panel de control.</div>;
   }
 
-  // Provide default values for systemStatus to prevent crash if it's null
   const systemStatus = data.systemStatus || {
     security_enabled: true,
     maintenance_mode_enabled: false,
     users_disabled: false,
     admins_disabled: false,
   };
+  const criticalAlerts = data.criticalAlerts || [];
+  const errorTickets = data.errorTickets || [];
 
   return (
     <div className="space-y-6 p-1">
@@ -133,16 +134,16 @@ export function AdminDashboardTab() {
         <Card>
           <CardHeader><CardTitle className="flex items-center gap-2"><ShieldAlert className="text-destructive" /> Alertas Críticas Recientes</CardTitle></CardHeader>
           <CardContent>
-            {data.criticalAlerts.length === 0 ? <p className="text-sm text-muted-foreground">No hay alertas críticas.</p> : (
-              <ul className="space-y-2">{data.criticalAlerts.map(alert => (<li key={alert.id} className="text-xs"><span className="font-semibold">{alert.event_type}:</span> {alert.description.substring(0, 80)}...</li>))}</ul>
+            {criticalAlerts.length === 0 ? <p className="text-sm text-muted-foreground">No hay alertas críticas.</p> : (
+              <ul className="space-y-2">{criticalAlerts.map(alert => (<li key={alert.id} className="text-xs"><span className="font-semibold">{alert.event_type}:</span> {alert.description.substring(0, 80)}...</li>))}</ul>
             )}
           </CardContent>
         </Card>
         <Card>
           <CardHeader><CardTitle className="flex items-center gap-2"><Ticket className="text-blue-500" /> Nuevos Tickets de Error de IA</CardTitle></CardHeader>
           <CardContent>
-            {data.errorTickets.length === 0 ? <p className="text-sm text-muted-foreground">No hay tickets nuevos.</p> : (
-              <ul className="space-y-2">{data.errorTickets.map(ticket => (<li key={ticket.id} className="text-xs">Usuario: {ticket.profiles?.first_name || 'N/A'} - {formatDistanceToNow(new Date(ticket.created_at), { addSuffix: true, locale: es })}</li>))}</ul>
+            {errorTickets.length === 0 ? <p className="text-sm text-muted-foreground">No hay tickets nuevos.</p> : (
+              <ul className="space-y-2">{errorTickets.map(ticket => (<li key={ticket.id} className="text-xs">Usuario: {ticket.profiles?.first_name || 'N/A'} - {formatDistanceToNow(new Date(ticket.created_at), { addSuffix: true, locale: es })}</li>))}</ul>
             )}
           </CardContent>
         </Card>
