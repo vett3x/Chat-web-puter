@@ -44,13 +44,19 @@ export async function POST(req: NextRequest) {
   const pgClient = new PgClient();
 
   try {
+    const { id } = await req.json();
+    if (!id) {
+      throw new Error('ID de configuración no proporcionado para la prueba.');
+    }
+
     const { data: config, error: fetchError } = await supabaseAdmin
       .from('database_config')
       .select('*')
+      .eq('id', id)
       .single();
 
     if (fetchError || !config) {
-      throw new Error('No se encontró la configuración de la base de datos. Por favor, guárdala primero.');
+      throw new Error('No se encontró la configuración de la base de datos para probar.');
     }
 
     const decryptedPassword = decrypt(config.db_password);
