@@ -5,6 +5,7 @@ import Script from "next/script";
 import { SessionContextProvider } from "@/components/session-context-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
+import { SuppressWarnings } from "@/components/suppress-warnings"; // Importar el nuevo componente
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,6 +32,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <SuppressWarnings /> {/* Añadir el componente aquí */}
         <Script 
           src="https://js.puter.com/v2/" 
           strategy="beforeInteractive"
