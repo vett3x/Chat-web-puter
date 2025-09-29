@@ -41,69 +41,81 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
   const fetchUserProfileAndRole = useCallback(async (currentSession: Session | null) => {
     if (currentSession?.user?.id) {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('role, permissions, avatar_url, language, status, kicked_at')
-        .eq('id', currentSession.user.id)
-        .single();
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('role, permissions, avatar_url, language, status, kicked_at')
+          .eq('id', currentSession.user.id)
+          .single();
 
-      let determinedRole: UserRole | null = null;
-      let determinedPermissions: UserPermissions = {};
-      let determinedAvatarUrl: string | null = null;
-      let determinedLanguage: string | null = 'es';
-      let determinedStatus: UserStatus = 'active';
-      let determinedKickedAt: string | null = null;
+        let determinedRole: UserRole | null = null;
+        let determinedPermissions: UserPermissions = {};
+        let determinedAvatarUrl: string | null = null;
+        let determinedLanguage: string | null = 'es';
+        let determinedStatus: UserStatus = 'active';
+        let determinedKickedAt: string | null = null;
 
-      if (error) {
-        console.error('[SessionContext] Error fetching user profile:', error);
-        determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
-      } else if (profile) {
-        determinedRole = profile.role as UserRole;
-        determinedPermissions = profile.permissions || {};
-        determinedAvatarUrl = profile.avatar_url;
-        determinedLanguage = profile.language || 'es';
-        determinedStatus = profile.status as UserStatus;
-        determinedKickedAt = profile.kicked_at;
-      } else {
-        determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
-      }
-
-      if (determinedRole === 'super_admin') {
-        determinedPermissions = {};
-        for (const key of Object.values(PERMISSION_KEYS)) {
-          determinedPermissions[key] = true;
-        }
-        determinedStatus = 'active'; // Super Admins are always active
-      } else if (!profile) {
-        determinedPermissions = {
-          can_create_server: false,
-          can_manage_docker_containers: false,
-          can_manage_cloudflare_domains: false,
-          can_manage_cloudflare_tunnels: false,
-        };
-      }
-      
-      // Client-side check for expired kick status
-      if (determinedStatus === 'kicked' && determinedKickedAt) {
-        const kickedTime = new Date(determinedKickedAt);
-        const unkickTime = addMinutes(kickedTime, 15); // Assuming 15 minutes default kick duration
-        const now = new Date();
-
-        if (now >= unkickTime) {
-          console.log(`[SessionContext] User ${currentSession.user.id} was kicked, but 15 minutes have passed. Auto-unkicking locally.`);
-          // Optimistically update local state. Middleware/cron will handle DB update.
+        if (error) {
+          console.error('[SessionContext] Error fetching user profile:', error);
+          // Fallback role based on email if profile fetch fails
+          determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
+          // Explicitly set default/empty values for other states on error
+          determinedPermissions = {}; 
+          determinedAvatarUrl = null;
+          determinedLanguage = 'es';
+          determinedStatus = 'active'; 
+          determinedKickedAt = null;
+        } else if (profile) {
+          determinedRole = profile.role as UserRole;
+          determinedPermissions = profile.permissions || {};
+          determinedAvatarUrl = profile.avatar_url;
+          determinedLanguage = profile.language || 'es';
+          determinedStatus = profile.status as UserStatus;
+          determinedKickedAt = profile.kicked_at;
+        } else { // No profile found, but no error (shouldn't happen often with RLS)
+          determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
+          determinedPermissions = {
+            can_create_server: false,
+            can_manage_docker_containers: false,
+            can_manage_cloudflare_domains: false,
+            can_manage_cloudflare_tunnels: false,
+          };
+          determinedAvatarUrl = null;
+          determinedLanguage = 'es';
           determinedStatus = 'active';
           determinedKickedAt = null;
-          toast.info("Tu expulsión ha expirado. Puedes volver a usar la aplicación.");
         }
+        
+        // Client-side check for expired kick status (moved outside the initial error block)
+        if (determinedStatus === 'kicked' && determinedKickedAt) {
+          const kickedTime = new Date(determinedKickedAt);
+          const unkickTime = addMinutes(kickedTime, 15); 
+          const now = new Date();
+
+          if (now >= unkickTime) {
+            console.log(`[SessionContext] User ${currentSession.user.id} was kicked, but 15 minutes have passed. Auto-unkicking locally.`);
+            determinedStatus = 'active';
+            determinedKickedAt = null;
+            toast.info("Tu expulsión ha expirado. Puedes volver a usar la aplicación.");
+          }
+        }
+
+        setUserRole(determinedRole);
+        setUserPermissions(determinedPermissions);
+        setUserAvatarUrl(determinedAvatarUrl);
+        setUserLanguage(determinedLanguage);
+        setUserStatus(determinedStatus);
+
+      } catch (fetchError: any) { // Catch any network/Supabase errors during profile fetch
+        console.error('[SessionContext] Critical error during profile fetch:', fetchError);
+        // Ensure all states are reset to defaults on critical fetch error
+        setUserRole(SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user'); // Best guess role
+        setUserPermissions({}); 
+        setUserAvatarUrl(null);
+        setUserLanguage('es');
+        setUserStatus('active');
+        // Do not redirect here, let the main auth state change listener handle it if session is truly invalid.
       }
-
-      setUserRole(determinedRole);
-      setUserPermissions(determinedPermissions);
-      setUserAvatarUrl(determinedAvatarUrl);
-      setUserLanguage(determinedLanguage);
-      setUserStatus(determinedStatus);
-
     } else {
       setUserRole(null);
       setUserPermissions({});
@@ -163,8 +175,8 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
       console.log(`[SessionContext] Real-time status check for user ${session.user.id}. Current role: ${userRole}, status: ${userStatus}`);
 
-      // Fetch global settings
-      try {
+      try { // Wrap the entire logic in a try-catch
+        // Fetch global settings
         const response = await fetch('/api/settings/public-status');
         if (!response.ok) {
           console.warn('Could not fetch public status for real-time check.');
@@ -245,7 +257,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
             await supabase.from('profiles').update({ status: 'active', kicked_at: null }).eq('id', session.user.id);
             // For client-side, optimistically update local state
             setUserStatus('active');
-            toast.info("Tu expulsión ha expirado. Puedes volver a usar la aplicación.");
+            toast.info("Tu expulsión ha expirado. Tu cuenta ha sido reactivada.");
           }
         }
         
@@ -261,9 +273,10 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
             console.log(`[SessionContext] Real-time check: Profile data discrepancy detected. Re-fetching full profile for user ${session.user.id}.`);
             await fetchUserProfileAndRole(session);
         }
-
       } catch (error) {
-        console.error("Error checking global status in real-time:", error);
+        console.error("[SessionContext] Unhandled error in checkSessionAndGlobalStatus interval:", error);
+        // Do not redirect or change session state here, just log.
+        // The main auth state change listener will handle definitive sign-outs.
       }
     };
 
@@ -271,7 +284,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     const intervalId = setInterval(checkSessionAndGlobalStatus, 10000);
 
     return () => clearInterval(intervalId);
-  }, [session, userRole, userStatus, router, fetchUserProfileAndRole]);
+  }, [session, userRole, userStatus, router, fetchUserProfileAndRole, pathname]);
 
   if (isLoading) {
     return (
