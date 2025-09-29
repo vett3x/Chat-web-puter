@@ -312,6 +312,11 @@ export default function Home() {
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
   const isAppDeleting = selectedItem?.type === 'app' && selectedItem.id === isDeletingAppId;
 
+  // Define these variables from selectedAppDetails
+  const appId = selectedAppDetails?.id || undefined;
+  const appPrompt = selectedAppDetails?.prompt || undefined;
+  const isAppProvisioning = selectedAppDetails?.status === 'provisioning';
+
   const renderRightPanelContent = () => {
     if (isAppDeleting) {
       return (
@@ -407,10 +412,10 @@ export default function Home() {
                 onNewConversationCreated={handleNewConversationCreated}
                 onConversationTitleUpdate={(id, newTitle) => {}}
                 aiResponseSpeed={aiResponseSpeed}
-                isAppProvisioning={selectedAppDetails?.status === 'provisioning'}
+                isAppProvisioning={isAppProvisioning}
                 isAppDeleting={isAppDeleting}
-                appPrompt={selectedAppDetails?.prompt}
-                appId={selectedAppDetails?.id}
+                appPrompt={appPrompt}
+                appId={appId}
                 onWriteFiles={writeFilesToApp}
                 isAppChat={selectedItem?.type === 'app'}
                 onSidebarDataRefresh={refreshSidebarData}
@@ -439,7 +444,7 @@ export default function Home() {
       />
       {isAdmin && <ServerManagementDialog open={isServerManagementOpen} onOpenChange={setIsServerManagementOpen} />}
       {isAdmin && <UserManagementDialog open={isUserManagementOpen} onOpenChange={setIsUserManagementOpen} />}
-      {isAdmin && <ApiManagementDialog open={isApiManagementOpen} onOpenChange={setIsApiManagementOpen} />}
+      <ApiManagementDialog open={isApiManagementOpen} onOpenChange={setIsApiManagementOpen} />
       {isAdmin && <AlertsDialog open={isAlertsOpen} onOpenChange={setIsAlertsOpen} />}
       <DeepAiCoderDialog open={isDeepAiCoderOpen} onOpenChange={setIsDeepAiCoderOpen} onAppCreated={handleAppCreated} />
       <RetryUploadDialog
