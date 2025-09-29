@@ -11,7 +11,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { User, Server, Cloud, History, MessageSquare, HardDrive, Save, Loader2, ShieldCheck, KeyRound, Shield, LogOut, Clock } from 'lucide-react'; // Import Clock icon
+import { User, Server, Cloud, History, MessageSquare, HardDrive, Save, Loader2, ShieldCheck, KeyRound, Shield, LogOut, Clock, BarChart } from 'lucide-react'; // Import BarChart
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { UserServersTab } from './user-servers-tab';
@@ -21,7 +21,8 @@ import { UserResourcesTab } from './user-resources-tab';
 import { UserActivityTab } from './user-activity-tab';
 import { UserPermissionsTab } from './user-permissions-tab';
 import { UserAccountTab } from './user-account-tab';
-import { UserModerationHistoryTab } from './user-moderation-history-tab'; // Import the new tab
+import { UserModerationHistoryTab } from './user-moderation-history-tab';
+import { UserQuotasTab } from './user-quotas-tab'; // Import the new tab
 import {
   Select,
   SelectContent,
@@ -34,9 +35,9 @@ import { toast } from 'sonner';
 import { useSession } from '@/components/session-context-provider';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { format, addMinutes, intervalToDuration, formatDuration } from 'date-fns'; // Import addMinutes, intervalToDuration, formatDuration
+import { format, addMinutes, intervalToDuration, formatDuration } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Input } from '@/components/ui/input'; // Import Input for extend kick
+import { Input } from '@/components/ui/input';
 
 type UserRole = 'user' | 'admin' | 'super_admin';
 type UserStatus = 'active' | 'banned' | 'kicked';
@@ -62,21 +63,20 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
   const [activeTab, setActiveTab] = useState('servers');
   const [selectedRole, setSelectedRole] = useState<UserRole>(user.role);
   const [isUpdatingRole, setIsUpdatingRole] = useState(false);
-  const [extendMinutes, setExtendMinutes] = useState<number>(15); // State for extending kick
-  const [isExtendingKick, setIsExtendingKick] = useState(false); // State for loading during kick extension
-  const [timeRemaining, setTimeRemaining] = useState<string | null>(null); // NEW: State for remaining kick time
+  const [extendMinutes, setExtendMinutes] = useState<number>(15);
+  const [isExtendingKick, setIsExtendingKick] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log("[UserDetailDialog] User prop:", user); // Debug log
+    console.log("[UserDetailDialog] User prop:", user);
     setSelectedRole(user.role);
-  }, [user.role, user]); // Added user to dependency array
+  }, [user.role, user]);
 
-  // NEW: Effect to update time remaining
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     if (user.status === 'kicked' && user.kicked_at) {
       const kickTime = new Date(user.kicked_at);
-      const unkickTime = addMinutes(kickTime, 15); // Assuming 15 minutes default kick duration
+      const unkickTime = addMinutes(kickTime, 15);
 
       const updateRemainingTime = () => {
         const now = new Date();
@@ -87,7 +87,7 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
         } else {
           setTimeRemaining(null);
           if (interval) clearInterval(interval);
-          onRoleUpdated(); // Refresh user list to reflect unkick
+          onRoleUpdated();
         }
       };
 
@@ -167,8 +167,7 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
       const result = await response.json();
       if (!response.ok) throw new Error(result.message);
       toast.success(result.message);
-      onRoleUpdated(); // Refresh user data to show new kicked_at
-      // No need to close dialog, user might want to extend again
+      onRoleUpdated();
     } catch (err: any) {
       toast.error(`Error al extender la expulsión: ${err.message}`);
     } finally {
@@ -219,7 +218,7 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
               <div className="flex items-center gap-2">
                 <LogOut className="h-5 w-5" />
                 <span>Este usuario fue expulsado el {format(new Date(user.kicked_at), 'dd/MM/yyyy HH:mm', { locale: es })}.</span>
-                <span className="font-semibold">Tiempo restante: {timeRemaining || 'Calculando...'}</span> {/* Always show, for debugging */}
+                <span className="font-semibold">Tiempo restante: {timeRemaining || 'Calculando...'}</span>
               </div>
               {isCurrentUserSuperAdmin && (
                 <div className="flex items-center gap-2 mt-2">
@@ -251,77 +250,34 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
           )}
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-8">
-              <TabsTrigger value="servers" className="flex items-center gap-2">
-                <Server className="h-4 w-4" /> Servidores
-              </TabsTrigger>
-              <TabsTrigger value="cloudflare" className="flex items-center gap-2">
-                <Cloud className="h-4 w-4" /> Cloudflare
-              </TabsTrigger>
-              <TabsTrigger value="conversations" className="flex items-center gap-2">
-                <MessageSquare className="h-4 w-4" /> Conversaciones
-              </TabsTrigger>
-              <TabsTrigger value="resources" className="flex items-center gap-2">
-                <HardDrive className="h-4 w-4" /> Recursos
-              </TabsTrigger>
-              <TabsTrigger value="activity" className="flex items-center gap-2">
-                <History className="h-4 w-4" /> Actividad
-              </TabsTrigger>
-              <TabsTrigger value="permissions" className="flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4" /> Permisos
-              </TabsTrigger>
-              <TabsTrigger value="account" className="flex items-center gap-2">
-                <KeyRound className="h-4 w-4" /> Cuenta
-              </TabsTrigger>
-              <TabsTrigger value="moderation" className="flex items-center gap-2">
-                <Shield className="h-4 w-4" /> Moderación
-              </TabsTrigger>
+            <TabsList className="grid w-full grid-cols-9">
+              <TabsTrigger value="servers" className="flex items-center gap-2"><Server className="h-4 w-4" /> Servidores</TabsTrigger>
+              <TabsTrigger value="cloudflare" className="flex items-center gap-2"><Cloud className="h-4 w-4" /> Cloudflare</TabsTrigger>
+              <TabsTrigger value="conversations" className="flex items-center gap-2"><MessageSquare className="h-4 w-4" /> Chats</TabsTrigger>
+              <TabsTrigger value="resources" className="flex items-center gap-2"><HardDrive className="h-4 w-4" /> Recursos</TabsTrigger>
+              <TabsTrigger value="activity" className="flex items-center gap-2"><History className="h-4 w-4" /> Actividad</TabsTrigger>
+              <TabsTrigger value="permissions" className="flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> Permisos</TabsTrigger>
+              <TabsTrigger value="quotas" className="flex items-center gap-2"><BarChart className="h-4 w-4" /> Cuotas</TabsTrigger>
+              <TabsTrigger value="account" className="flex items-center gap-2"><KeyRound className="h-4 w-4" /> Cuenta</TabsTrigger>
+              <TabsTrigger value="moderation" className="flex items-center gap-2"><Shield className="h-4 w-4" /> Moderación</TabsTrigger>
             </TabsList>
             <div className="flex-1 py-4 overflow-hidden">
               <ScrollArea className="h-full w-full">
-                <TabsContent value="servers" className="h-full">
-                  <UserServersTab userId={user.id} />
-                </TabsContent>
-                <TabsContent value="cloudflare" className="h-full">
-                  <UserCloudflareTab userId={user.id} />
-                </TabsContent>
-                <TabsContent value="conversations" className="h-full">
-                  <UserConversationsTab userId={user.id} />
-                </TabsContent>
-                <TabsContent value="resources" className="h-full">
-                  <UserResourcesTab userId={user.id} />
-                </TabsContent>
-                <TabsContent value="activity" className="h-full">
-                  <UserActivityTab userId={user.id} />
-                </TabsContent>
-                <TabsContent value="permissions" className="h-full">
-                  <UserPermissionsTab
-                    userId={user.id}
-                    targetUserRole={user.role}
-                    currentUserRole={currentUserRole}
-                    onPermissionsUpdated={onRoleUpdated}
-                  />
-                </TabsContent>
-                <TabsContent value="account" className="h-full">
-                  <UserAccountTab
-                    userId={user.id}
-                    userEmail={user.email}
-                    currentUserRole={currentUserRole}
-                    targetUserRole={user.role}
-                    onAccountUpdated={onRoleUpdated}
-                  />
-                </TabsContent>
-                <TabsContent value="moderation" className="h-full">
-                  <UserModerationHistoryTab userId={user.id} currentUserRole={currentUserRole} />
-                </TabsContent>
+                <TabsContent value="servers" className="h-full"><UserServersTab userId={user.id} /></TabsContent>
+                <TabsContent value="cloudflare" className="h-full"><UserCloudflareTab userId={user.id} /></TabsContent>
+                <TabsContent value="conversations" className="h-full"><UserConversationsTab userId={user.id} /></TabsContent>
+                <TabsContent value="resources" className="h-full"><UserResourcesTab userId={user.id} /></TabsContent>
+                <TabsContent value="activity" className="h-full"><UserActivityTab userId={user.id} /></TabsContent>
+                <TabsContent value="permissions" className="h-full"><UserPermissionsTab userId={user.id} targetUserRole={user.role} currentUserRole={currentUserRole} onPermissionsUpdated={onRoleUpdated} /></TabsContent>
+                <TabsContent value="quotas" className="h-full"><UserQuotasTab userId={user.id} userName={userName} currentUserRole={currentUserRole} targetUserRole={user.role} onQuotasUpdated={onRoleUpdated} /></TabsContent>
+                <TabsContent value="account" className="h-full"><UserAccountTab userId={user.id} userEmail={user.email} currentUserRole={currentUserRole} targetUserRole={user.role} onAccountUpdated={onRoleUpdated} /></TabsContent>
+                <TabsContent value="moderation" className="h-full"><UserModerationHistoryTab userId={user.id} currentUserRole={currentUserRole} /></TabsContent>
               </ScrollArea>
             </div>
           </Tabs>
         </div>
         <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Cerrar</Button>
-          </DialogClose>
+          <DialogClose asChild><Button variant="outline">Cerrar</Button></DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>
