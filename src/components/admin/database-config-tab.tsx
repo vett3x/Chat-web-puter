@@ -50,6 +50,7 @@ export function DatabaseConfigTab() {
   const [isTestingId, setIsTestingId] = useState<string | null>(null);
   const [editingConfig, setEditingConfig] = useState<DbConfig | null>(null);
   const [isProvisioning, setIsProvisioning] = useState(false);
+  const [provisioningServer, setProvisioningServer] = useState<{ nickname: string; ssh_host: string } | null>(null);
 
   const configForm = useForm<ConfigFormValues>({
     resolver: zodResolver(configSchema),
@@ -117,6 +118,7 @@ export function DatabaseConfigTab() {
 
   const onProvisionSubmit = async (values: ProvisionFormValues) => {
     setIsProvisioning(true);
+    setProvisioningServer({ nickname: values.nickname, ssh_host: values.ssh_host });
     const toastId = toast.loading('Aprovisionando servidor PostgreSQL...');
     try {
       const response = await fetch('/api/admin/database-config/provision', {
@@ -133,6 +135,7 @@ export function DatabaseConfigTab() {
       toast.error(`Error: ${err.message}`, { id: toastId });
     } finally {
       setIsProvisioning(false);
+      setProvisioningServer(null);
     }
   };
 
@@ -225,6 +228,24 @@ export function DatabaseConfigTab() {
             <Table>
               <TableHeader><TableRow><TableHead>Apodo</TableHead><TableHead>Host</TableHead><TableHead>Usuario</TableHead><TableHead>Activo</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
               <TableBody>
+                {provisioningServer && (
+                  <TableRow className="bg-muted/50 opacity-70">
+                    <TableCell className="font-medium">{provisioningServer.nickname}</TableCell>
+                    <TableCell>{provisioningServer.ssh_host}:5432</TableCell>
+                    <TableCell>postgres</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Aprovisionando...</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right space-x-2">
+                      <Button variant="outline" size="sm" disabled><TestTube2 className="h-4 w-4" /></Button>
+                      <Button variant="outline" size="sm" disabled><Edit className="h-4 w-4" /></Button>
+                      <Button variant="destructive" size="sm" disabled><Trash2 className="h-4 w-4" /></Button>
+                    </TableCell>
+                  </TableRow>
+                )}
                 {configs.map((config) => (
                   <TableRow key={config.id}>
                     <TableCell className="font-medium">{config.nickname}</TableCell>
