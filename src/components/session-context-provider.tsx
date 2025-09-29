@@ -146,7 +146,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
       setUserLanguage('es');
       setUserStatus('active');
     }
-  }, [userRole, userPermissions, userAvatarUrl, userLanguage, userStatus]); // Added all state dependencies
+  }, [supabase]); // Removed state variables from dependencies
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
@@ -207,13 +207,17 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
     return () => {
       subscription.unsubscribe();
     };
-  }, [router, pathname, fetchUserProfileAndRole]);
+  }, [router, pathname, fetchUserProfileAndRole, supabase]); // Added supabase to dependencies
 
   useEffect(() => {
     const checkSessionAndGlobalStatus = async () => {
       if (!session || !session.user.id) return;
+      if (document.visibilityState !== 'visible') {
+        console.log("[SessionContext] Tab not visible, skipping real-time status check.");
+        return;
+      }
 
-      console.log(`[SessionContext] Real-time status check for user ${session.user.id}. Current role: ${userRole}, status: ${userStatus}`);
+      console.log(`[SessionContext] Running real-time status check for user ${session.user.id}. Current role: ${userRole}, status: ${userStatus}`);
 
       try {
         // Refresh Supabase session token
@@ -363,7 +367,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
       }
     };
 
-    const intervalId = setInterval(checkSessionAndGlobalStatus, 10000);
+    const intervalId = setInterval(checkSessionAndGlobalStatus, 30000); // Increased interval to 30 seconds
     
     // NEW: Add visibilitychange listener
     const handleVisibilityChange = () => {
@@ -378,7 +382,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
       clearInterval(intervalId);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [session, userRole, userStatus, router, fetchUserProfileAndRole, pathname, triggerGlobalRefresh, lastKnownGlobalSettings, lastKnownProfileStatus]);
+  }, [session, userRole, userStatus, router, fetchUserProfileAndRole, pathname, triggerGlobalRefresh, lastKnownGlobalSettings, lastKnownProfileStatus, supabase]);
 
   if (isLoading) {
     return (
