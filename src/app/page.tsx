@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useSession, SessionContextProvider } from "@/components/session-context-provider"; // Import SessionContextProvider
+import { useSession, SessionContextProvider } from "@/components/session-context-provider";
 import { ConversationSidebar } from "@/components/conversation-sidebar";
-import { ChatInterface, ChatInterfaceRef } from "@/components/chat-interface"; // Import ChatInterfaceRef
+import { ChatInterface, ChatInterfaceRef } from "@/components/chat-interface";
 import { AppBrowserPanel } from "@/components/app-browser-panel";
 import { CodeEditorPanel } from "@/components/code-editor-panel";
-import { NoteEditorPanel, NoteEditorPanelRef } from "@/components/note-editor-panel"; // Import NoteEditorPanelRef
+import { NoteEditorPanel, NoteEditorPanelRef } from "@/components/note-editor-panel";
 import { ProfileSettingsDialog } from "@/components/profile-settings-dialog";
 import { AccountSettingsDialog } from "@/components/account-settings-dialog";
 import { ServerManagementDialog } from "@/components/server-management-dialog";
@@ -15,7 +15,7 @@ import { DeepAiCoderDialog } from "@/components/deep-ai-coder-dialog";
 import { RetryUploadDialog } from "@/components/retry-upload-dialog";
 import { UpdateManagerDialog } from "@/components/update-manager-dialog";
 import { ApiManagementDialog } from "@/components/api-management-dialog";
-import { AlertsDialog } from "@/components/alerts-dialog"; // Import the new dialog
+import { AlertsDialog } from "@/components/alerts-dialog";
 import { AppVersionsBar } from "@/components/app-versions-bar";
 import {
   ResizablePanelGroup,
@@ -24,11 +24,12 @@ import {
 } from "@/components/ui/resizable";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, ShieldAlert } from "lucide-react"; // Import ShieldAlert
+import { Loader2, ShieldAlert, WifiOff, AlertCircle, RefreshCw } from "lucide-react"; // Added RefreshCw
 import { useSidebarData } from "@/hooks/use-sidebar-data";
 import { useUserApiKeys } from "@/hooks/use-user-api-keys";
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Button } from '@/components/ui/button'; // Added Button
 
 interface UserApp {
   id: string;
@@ -57,8 +58,10 @@ interface RetryState {
   files: { path: string; content: string }[] | null;
 }
 
+const HEALTH_CHECK_INTERVAL = 15000; // 15 segundos
+
 export default function Home() {
-  const { session, isLoading: isSessionLoading, userRole, userLanguage, isUserTemporarilyDisabled } = useSession(); // NEW: Get isUserTemporarilyDisabled
+  const { session, isLoading: isSessionLoading, userRole, userLanguage, isUserTemporarilyDisabled } = useSession();
   const userId = session?.user?.id;
   
   const {
@@ -106,8 +109,11 @@ export default function Home() {
   const appBrowserRef = useRef<{ refresh: () => void }>(null);
   const [fileTreeRefreshKey, setFileTreeRefreshKey] = useState(0);
 
-  const chatInterfaceRef = useRef<ChatInterfaceRef>(null); // Use ChatInterfaceRef
-  const noteEditorRef = useRef<NoteEditorPanelRef>(null); // Use NoteEditorPanelRef
+  const chatInterfaceRef = useRef<ChatInterfaceRef>(null);
+  const noteEditorRef = useRef<NoteEditorPanelRef>(null);
+
+  const [isAppHealthy, setIsAppHealthy] = useState(true);
+  const [showHealthWarning, setShowHealthWarning] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -139,11 +145,8 @@ export default function Home() {
     };
   }, [selectedAppDetails, refreshSidebarData]);
 
-  // NEW: Effect to refresh active content after sidebar data refresh
   useEffect(() => {
     const refreshActiveContent = async () => {
-      // This effect runs whenever `isLoadingData` (from useSidebarData) changes from true to false.
-      // We need to ensure the selected item's content is also refreshed.
       if (selectedItem) {
         if (selectedItem.type === 'note' && noteEditorRef.current) {
           console.log("[Home] Refreshing active note content...");
@@ -158,7 +161,50 @@ export default function Home() {
     if (!isLoadingData) {
       refreshActiveContent();
     }
-  }, [isLoadingData, selectedItem]); // Depend on isLoadingData and selectedItem
+  }, [isLoadingData, selectedItem]);
+
+  useEffect(() => {
+    let healthCheckInterval: NodeJS.Timeout;
+
+    const performHealthCheck = async () => {
+      try {
+        const response = await fetch('/api/health');
+        if (response.ok) {
+          if (!isAppHealthy) {
+            console.log("[Home] App health restored. Reloading page.");
+            window.location.reload();
+          }
+          setIsAppHealthy(true);
+          setShowHealthWarning(false);
+        } else {
+          console.warn("[Home] Health check failed with status:", response.status);
+          setIsAppHealthy(false);
+        }
+      } catch (error) {
+        console.error("[Home] Health check failed:", error);
+        setIsAppHealthy(false);
+      }
+    };
+
+    healthCheckInterval = setInterval(performHealthCheck, HEALTH_CHECK_INTERVAL);
+
+    return () => clearInterval(healthCheckInterval);
+  }, [isAppHealthy]);
+
+  useEffect(() => {
+    if (!isAppHealthy && !isSessionLoading && session) {
+      const isNoteEditorActive = selectedItem?.type === 'note';
+      if (isNoteEditorActive) {
+        setShowHealthWarning(true);
+        toast.error("Problemas de conexión detectados. Guarda tu nota manualmente y refresca la página.", { duration: 10000 });
+      } else {
+        console.log("[Home] App unhealthy and no note editor active. Forcing page reload.");
+        window.location.reload();
+      }
+    } else if (isAppHealthy) {
+      setShowHealthWarning(false);
+    }
+  }, [isAppHealthy, isSessionLoading, session, selectedItem]);
 
   const handleSelectItem = useCallback(async (id: string | null, type: SelectedItem['type'] | null) => {
     setActiveFile(null);
@@ -318,12 +364,10 @@ export default function Home() {
     }
   };
 
-  // NEW: Global refresh handler
   const handleGlobalRefresh = useCallback(() => {
     console.log("[Home] Global refresh triggered.");
-    refreshSidebarData(); // Refresh all sidebar data
+    refreshSidebarData();
 
-    // Also refresh active content if any is selected
     if (selectedItem) {
       if (selectedItem.type === 'note' && noteEditorRef.current) {
         console.log("[Home] Refreshing active note content via global refresh.");
@@ -351,7 +395,6 @@ export default function Home() {
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
   const isAppDeleting = selectedItem?.type === 'app' && selectedItem.id === isDeletingAppId;
 
-  // Define these variables from selectedAppDetails
   const appId = selectedAppDetails?.id || undefined;
   const appPrompt = selectedAppDetails?.prompt || undefined;
   const isAppProvisioning = selectedAppDetails?.status === 'provisioning';
@@ -376,7 +419,7 @@ export default function Home() {
   };
 
   return (
-    <SessionContextProvider onGlobalRefresh={handleGlobalRefresh}> {/* Pass handleGlobalRefresh here */}
+    <SessionContextProvider onGlobalRefresh={handleGlobalRefresh}>
       <div className="h-screen bg-background flex relative">
         {isUserTemporarilyDisabled && (
           <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-4 pointer-events-auto">
@@ -389,6 +432,23 @@ export default function Home() {
             <p className="text-sm text-muted-foreground mt-1">
               Se ha cerrado tu sesión. Recarga la página o intenta iniciar sesión de nuevo.
             </p>
+          </div>
+        )}
+
+        {!isAppHealthy && showHealthWarning && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-destructive text-destructive-foreground p-3 rounded-lg shadow-lg flex items-center gap-3 z-50">
+            <AlertCircle className="h-5 w-5" />
+            <span>Problemas de conexión detectados. Guarda tu nota manualmente y refresca la página.</span>
+            <Button variant="ghost" size="icon" onClick={() => window.location.reload()} className="text-destructive-foreground hover:bg-destructive/80">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+        {!isAppHealthy && !showHealthWarning && !isSessionLoading && session && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-destructive text-destructive-foreground p-3 rounded-lg shadow-lg flex items-center gap-3 z-50">
+            <WifiOff className="h-5 w-5" />
+            <span>Conexión perdida. Intentando reconectar...</span>
+            <Loader2 className="h-4 w-4 animate-spin" />
           </div>
         )}
 
@@ -435,7 +495,7 @@ export default function Home() {
           )}
           {selectedItem?.type === 'note' ? (
             <NoteEditorPanel
-              ref={noteEditorRef} // Assign ref here
+              ref={noteEditorRef}
               noteId={selectedItem.id}
               onNoteUpdated={(id, data) => updateLocalItem(id, 'note', data)}
               userApiKeys={userApiKeys}
