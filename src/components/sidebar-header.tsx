@@ -117,6 +117,7 @@ export function SidebarHeader({
           onOpenServerManagement={onOpenServerManagement}
           onOpenUserManagement={onOpenUserManagement}
           onOpenUpdateManager={onOpenUpdateManager}
+          onOpenApiManagement={onOpenApiManagement}
         />
       </div>
       <div className="flex items-center justify-center mb-4">
@@ -172,6 +173,16 @@ export function SidebarHeader({
               <Folder className="h-3.5 w-3.5" />
             )}
           </Button>
+          {/* Always show API Management button */}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onOpenApiManagement}
+            className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7"
+            title="Gestión de API Keys"
+          >
+            <KeyRound className="h-3.5 w-3.5" />
+          </Button>
           {isAdmin && (
             <Button
               variant="outline"
@@ -198,17 +209,6 @@ export function SidebarHeader({
                 </span>
               )}
               <Users className="h-3.5 w-3.5" />
-            </Button>
-          )}
-          {isAdmin && (
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={onOpenApiManagement}
-              className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7"
-              title="Gestión de API Keys"
-            >
-              <KeyRound className="h-3.5 w-3.5" />
             </Button>
           )}
           {isAdmin && (

@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
-import { Moon, Sun, Settings, LogOut, User as UserIcon, Server, Users, Crown, Shield, Bot, GitPullRequest, Ban, LogOut as LogOutIcon } from 'lucide-react'; // Import Ban and LogOut as LogOutIcon
+import { Moon, Sun, Settings, LogOut, User as UserIcon, Server, Users, Crown, Shield, Bot, GitPullRequest, Ban, LogOut as LogOutIcon, KeyRound } from 'lucide-react'; // Import KeyRound
 import { useTheme } from 'next-themes';
 import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
@@ -33,10 +33,11 @@ interface ProfileDropdownProps {
   onOpenServerManagement: () => void;
   onOpenUserManagement: () => void;
   onOpenUpdateManager: () => void;
+  onOpenApiManagement: () => void; // NEW: Add onOpenApiManagement prop
 }
 
-export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOpenServerManagement, onOpenUserManagement, onOpenUpdateManager }: ProfileDropdownProps) {
-  const { session, userRole, userStatus } = useSession(); // NEW: Get userStatus
+export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOpenServerManagement, onOpenUserManagement, onOpenUpdateManager, onOpenApiManagement }: ProfileDropdownProps) {
+  const { session, userRole, userStatus } = useSession();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -90,7 +91,7 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
 
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
   const isSuperAdmin = userRole === 'super_admin';
-  const isBannedOrKicked = userStatus === 'banned' || userStatus === 'kicked'; // NEW: Check if banned or kicked
+  const isBannedOrKicked = userStatus === 'banned' || userStatus === 'kicked';
 
   return (
     <DropdownMenu>
@@ -125,7 +126,7 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
                 {userRole === 'super_admin' ? 'Super Admin' : userRole}
               </Badge>
             )}
-            {isBannedOrKicked && ( // NEW: Display badge if banned or kicked
+            {isBannedOrKicked && (
               <Badge variant={userStatus === 'banned' ? 'destructive' : 'warning'} className="capitalize mt-1">
                 {userStatus === 'banned' ? <Ban className="h-3 w-3 mr-1" /> : <LogOutIcon className="h-3 w-3 mr-1" />}
                 {userStatus === 'banned' ? 'Baneado' : 'Expulsado'}
@@ -165,6 +166,13 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAppSettings, onOp
           <div className="flex items-center">
             <Settings className="mr-2 h-4 w-4" />
             <span>Configuración</span>
+          </div>
+        </DropdownMenuItem>
+        {/* Always show API Management in dropdown */}
+        <DropdownMenuItem onClick={onOpenApiManagement} className="flex items-center cursor-pointer">
+          <div className="flex items-center">
+            <KeyRound className="mr-2 h-4 w-4" />
+            <span>Gestión de API Keys</span>
           </div>
         </DropdownMenuItem>
         {isAdmin && (
