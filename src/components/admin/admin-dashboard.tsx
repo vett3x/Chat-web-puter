@@ -18,7 +18,7 @@ interface DashboardData {
     maintenance_mode_enabled: boolean;
     users_disabled: boolean;
     admins_disabled: boolean;
-  };
+  } | null; // Allow systemStatus to be null
   kpis: {
     totalUsers: number;
     activeServers: number;
@@ -67,7 +67,7 @@ export function AdminDashboardTab() {
     fetchData();
   }, [fetchData]);
 
-  const handleToggleSetting = async (setting: keyof DashboardData['systemStatus'], checked: boolean) => {
+  const handleToggleSetting = async (setting: keyof NonNullable<DashboardData['systemStatus']>, checked: boolean) => {
     setIsToggling(setting);
     try {
       const response = await fetch('/api/settings/security', {
@@ -94,6 +94,14 @@ export function AdminDashboardTab() {
     return <div className="text-center text-destructive">No se pudieron cargar los datos del panel de control.</div>;
   }
 
+  // Provide default values for systemStatus to prevent crash if it's null
+  const systemStatus = data.systemStatus || {
+    security_enabled: true,
+    maintenance_mode_enabled: false,
+    users_disabled: false,
+    admins_disabled: false,
+  };
+
   return (
     <div className="space-y-6 p-1">
       <div className="flex justify-between items-center">
@@ -105,10 +113,10 @@ export function AdminDashboardTab() {
       <Card>
         <CardHeader><CardTitle>Estado del Sistema y Controles Rápidos</CardTitle></CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="security-toggle">Seguridad de Comandos</Label><Switch id="security-toggle" checked={data.systemStatus.security_enabled} onCheckedChange={(c) => handleToggleSetting('security_enabled', c)} disabled={isToggling === 'security_enabled'} /></div>
-          <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="maintenance-toggle">Modo Mantenimiento</Label><Switch id="maintenance-toggle" checked={data.systemStatus.maintenance_mode_enabled} onCheckedChange={(c) => handleToggleSetting('maintenance_mode_enabled', c)} disabled={isToggling === 'maintenance_mode_enabled'} /></div>
-          <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="users-disabled-toggle">Desactivar Usuarios</Label><Switch id="users-disabled-toggle" checked={data.systemStatus.users_disabled} onCheckedChange={(c) => handleToggleSetting('users_disabled', c)} disabled={isToggling === 'users_disabled'} /></div>
-          <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="admins-disabled-toggle">Desactivar Admins</Label><Switch id="admins-disabled-toggle" checked={data.systemStatus.admins_disabled} onCheckedChange={(c) => handleToggleSetting('admins_disabled', c)} disabled={isToggling === 'admins_disabled'} /></div>
+          <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="security-toggle">Seguridad de Comandos</Label><Switch id="security-toggle" checked={systemStatus.security_enabled} onCheckedChange={(c) => handleToggleSetting('security_enabled', c)} disabled={isToggling === 'security_enabled'} /></div>
+          <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="maintenance-toggle">Modo Mantenimiento</Label><Switch id="maintenance-toggle" checked={systemStatus.maintenance_mode_enabled} onCheckedChange={(c) => handleToggleSetting('maintenance_mode_enabled', c)} disabled={isToggling === 'maintenance_mode_enabled'} /></div>
+          <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="users-disabled-toggle">Desactivar Usuarios</Label><Switch id="users-disabled-toggle" checked={systemStatus.users_disabled} onCheckedChange={(c) => handleToggleSetting('users_disabled', c)} disabled={isToggling === 'users_disabled'} /></div>
+          <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="admins-disabled-toggle">Desactivar Admins</Label><Switch id="admins-disabled-toggle" checked={systemStatus.admins_disabled} onCheckedChange={(c) => handleToggleSetting('admins_disabled', c)} disabled={isToggling === 'admins_disabled'} /></div>
         </CardContent>
       </Card>
 
