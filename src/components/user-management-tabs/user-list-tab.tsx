@@ -260,9 +260,9 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div className="flex items-center gap-3 text-xs">
-                            <span className="flex items-center gap-1"><Server className="h-3 w-3" /> {user.max_servers}</span>
-                            <span className="flex items-center gap-1"><Dock className="h-3 w-3" /> {user.max_containers}</span>
-                            <span className="flex items-center gap-1"><Globe className="h-3 w-3" /> {user.max_tunnels}</span>
+                            <span className="flex items-center gap-1"><Server className="h-3 w-3" /> {user.role === 'super_admin' ? '∞' : user.max_servers}</span>
+                            <span className="flex items-center gap-1"><Dock className="h-3 w-3" /> {user.role === 'super_admin' ? '∞' : user.max_containers}</span>
+                            <span className="flex items-center gap-1"><Globe className="h-3 w-3" /> {user.role === 'super_admin' ? '∞' : user.max_tunnels}</span>
                           </div>
                         </TooltipTrigger>
                         <TooltipContent>
