@@ -65,8 +65,8 @@ export async function POST(req: NextRequest) {
         is_active: false,
         db_host: ssh_host,
         db_port: 5432,
-        db_name: 'postgres',
-        db_user: 'postgres',
+        db_name: 'app_db', // Use the dedicated app database name
+        db_user: 'app_user', // Use the dedicated app user
         db_password: encryptedPassword,
         status: 'provisioning',
         provisioning_log: 'Iniciando aprovisionamiento...',

@@ -214,7 +214,7 @@ export function DatabaseConfigTab() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Terminal className="h-6 w-6" /> Aprovisionar Nuevo Servidor PostgreSQL</CardTitle>
           <CardDescription>
-            Instala y configura PostgreSQL en un servidor Ubuntu limpio a través de SSH.
+            Instala y configura PostgreSQL de forma segura en un servidor Ubuntu limpio. Crea un usuario y base de datos dedicados para la aplicación.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -224,8 +224,17 @@ export function DatabaseConfigTab() {
                 <FormField control={provisionForm.control} name="ssh_host" render={({ field }) => (<FormItem><FormLabel>IP del Servidor (CT)</FormLabel><FormControl><Input placeholder="10.10.10.210" {...field} disabled={isProvisioning} /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={provisionForm.control} name="ssh_user" render={({ field }) => (<FormItem><FormLabel>Usuario SSH</FormLabel><FormControl><Input {...field} disabled={isProvisioning} /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={provisionForm.control} name="ssh_password" render={({ field }) => (<FormItem><FormLabel>Contraseña SSH</FormLabel><FormControl><Input type="password" {...field} disabled={isProvisioning} /></FormControl><FormMessage /></FormItem>)} />
-                <FormField control={provisionForm.control} name="nickname" render={({ field }) => (<FormItem><FormLabel>Apodo para esta Conexión</FormLabel><FormControl><Input placeholder="Mi Nuevo Servidor DB" {...field} disabled={isProvisioning} /></FormControl><FormMessage /></FormItem>)} />
-                <FormField control={provisionForm.control} name="db_password" render={({ field }) => (<FormItem><FormLabel>Nueva Contraseña para PostgreSQL</FormLabel><FormControl><Input type="password" {...field} disabled={isProvisioning} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={provisionForm.control} name="nickname" render={({ field }) => (<FormItem><FormLabel>Apodo del Servidor de BD</FormLabel><FormControl><Input placeholder="Mi Nuevo Servidor DB" {...field} disabled={isProvisioning} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={provisionForm.control} name="db_password" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contraseña para la Base de Datos</FormLabel>
+                    <FormControl><Input type="password" {...field} disabled={isProvisioning} /></FormControl>
+                    <FormDescription>
+                      Se creará un usuario 'app_user' y una base de datos 'app_db'. Esta contraseña se asignará tanto al superusuario 'postgres' como a 'app_user'.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )} />
               </div>
               <Button type="submit" disabled={isProvisioning}>
                 {isProvisioning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
