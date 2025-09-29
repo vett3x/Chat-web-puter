@@ -390,11 +390,11 @@ export default function Home() {
 
   // NEW: Initial data fetch for sidebar and API keys when userId becomes available
   useEffect(() => {
-    if (userId && !isLoadingData && !isLoadingApiKeys) {
+    if (userId && !isSessionLoading) { // Trigger when userId is available and session is not loading
       refreshSidebarData();
       refreshApiKeys();
     }
-  }, [userId, isLoadingData, isLoadingApiKeys, refreshSidebarData, refreshApiKeys]);
+  }, [userId, isSessionLoading, refreshSidebarData, refreshApiKeys]);
 
 
   const handleOpenProfileSettings = () => setIsProfileSettingsOpen(true);
