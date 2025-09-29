@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, MessageSquare, ChevronRight, ChevronDown, Wand2, Code, FileText, Folder as FolderIcon } from 'lucide-react';
 import { SidebarHeader } from './sidebar-header';
@@ -13,6 +13,7 @@ import { DraggableAppItem } from './draggable-app-item';
 import { toast } from 'sonner';
 import { FileTree } from './file-tree';
 import { VersionDisplay } from './version-display';
+import { useSidebarData } from '@/hooks/use-sidebar-data'; // Import the hook here
 
 interface Conversation {
   id: string;
@@ -46,62 +47,53 @@ interface SelectedItem {
 }
 
 interface ConversationSidebarProps {
-  apps: UserApp[];
-  conversations: Conversation[];
-  folders: Folder[];
-  notes: Note[];
-  isLoading: boolean;
   selectedItem: SelectedItem | null;
   onSelectItem: (id: string | null, type: SelectedItem['type'] | null) => void;
   onFileSelect: (path: string) => void;
   onOpenProfileSettings: () => void;
-  onOpenAccountSettings: () => void; // Renamed from onOpenAppSettings
+  onOpenAccountSettings: () => void;
   onOpenServerManagement: () => void;
   onOpenUserManagement: () => void;
   onOpenDeepAiCoder: () => void;
   onOpenUpdateManager: () => void;
   onOpenApiManagement: () => void;
-  onOpenAlerts: () => void; // Added missing prop
-  refreshData: () => void;
-  createConversation: (onSuccess: (newItem: Conversation) => void) => Promise<string | null>; // Updated return type
-  createFolder: (parentId?: string | null) => Promise<string | null>; // Updated return type
-  createNote: (onSuccess: (newItem: Note) => void) => Promise<string | null>; // Updated return type
-  moveItem: (itemId: string, itemType: 'conversation' | 'note' | 'folder', targetFolderId: string | null) => void;
+  onOpenAlerts: () => void;
   onDeleteApp: (appId: string) => void;
   isDeletingAppId: string | null;
   fileTreeRefreshKey: number;
-  updateLocalItem: (itemId: string, itemType: 'conversation' | 'note' | 'folder', updatedData: Partial<Conversation | Note | Folder>) => void;
-  removeLocalItem: (itemId: string, itemType: 'conversation' | 'note' | 'folder') => void;
 }
 
-export function ConversationSidebar({
-  apps,
-  conversations,
-  folders,
-  notes,
-  isLoading,
+export const ConversationSidebar = React.memo(({
   selectedItem,
   onSelectItem,
   onFileSelect,
   onOpenProfileSettings,
-  onOpenAccountSettings, // Renamed from onOpenAppSettings
+  onOpenAccountSettings,
   onOpenServerManagement,
   onOpenUserManagement,
   onOpenDeepAiCoder,
   onOpenUpdateManager,
   onOpenApiManagement,
-  onOpenAlerts, // Added missing prop
-  refreshData,
-  createConversation,
-  createFolder,
-  createNote,
-  moveItem,
+  onOpenAlerts,
   onDeleteApp,
   isDeletingAppId,
   fileTreeRefreshKey,
-  updateLocalItem,
-  removeLocalItem,
-}: ConversationSidebarProps) {
+}: ConversationSidebarProps) => {
+  const {
+    apps,
+    conversations,
+    folders,
+    notes,
+    isLoading,
+    fetchData: refreshData,
+    createConversation,
+    createFolder,
+    createNote,
+    moveItem,
+    updateLocalItem,
+    removeLocalItem,
+  } = useSidebarData();
+
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
@@ -207,13 +199,13 @@ export function ConversationSidebar({
         isCreatingFolder={isCreatingFolder}
         isCreatingNote={isCreatingNote}
         onOpenProfileSettings={onOpenProfileSettings}
-        onOpenAccountSettings={onOpenAccountSettings} // Renamed from onOpenAppSettings
+        onOpenAccountSettings={onOpenAccountSettings}
         onOpenServerManagement={onOpenServerManagement}
         onOpenUserManagement={onOpenUserManagement}
         onOpenDeepAiCoder={onOpenDeepAiCoder}
         onOpenUpdateManager={onOpenUpdateManager}
         onOpenApiManagement={onOpenApiManagement}
-        onOpenAlerts={onOpenAlerts} // Pass prop down
+        onOpenAlerts={onOpenAlerts}
       />
       <ScrollArea className="flex-1" onDrop={(e) => handleDrop(e, null)} onDragOver={(e) => e.preventDefault()} onDragEnter={(e) => handleDragEnter(e, null)} onDragLeave={(e) => handleDragLeave(e, null)}>
         <div className="space-y-2">
@@ -264,4 +256,6 @@ export function ConversationSidebar({
       <VersionDisplay />
     </div>
   );
-}
+});
+
+ConversationSidebar.displayName = 'ConversationSidebar';

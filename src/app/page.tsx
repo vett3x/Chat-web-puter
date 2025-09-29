@@ -24,12 +24,11 @@ import {
 } from "@/components/ui/resizable";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, ShieldAlert, WifiOff, AlertCircle, RefreshCw } from "lucide-react"; // Added RefreshCw
-import { useSidebarData } from "@/hooks/use-sidebar-data";
+import { Loader2, ShieldAlert, WifiOff, AlertCircle, RefreshCw } from "lucide-react";
 import { useUserApiKeys } from "@/hooks/use-user-api-keys";
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Button } from '@/components/ui/button'; // Added Button
+import { Button } from '@/components/ui/button';
 
 interface UserApp {
   id: string;
@@ -58,33 +57,17 @@ interface RetryState {
   files: { path: string; content: string }[] | null;
 }
 
-const HEALTH_CHECK_INTERVAL = 15000; // 15 segundos
+const HEALTH_CHECK_INTERVAL = 15000;
 
 // Memoized components
-const MemoizedConversationSidebar = React.memo(ConversationSidebar);
 const MemoizedChatInterface = React.memo(ChatInterface);
 const MemoizedNoteEditorPanel = React.memo(NoteEditorPanel);
 
-export default function Home() {
+function HomePageContent() {
   const { session, isLoading: isSessionLoading, userRole, userLanguage, isUserTemporarilyDisabled } = useSession();
   const userId = session?.user?.id;
   
-  const {
-    apps,
-    conversations,
-    folders,
-    notes,
-    isLoading: isLoadingData,
-    fetchData: refreshSidebarData,
-    createConversation,
-    createFolder,
-    createNote,
-    moveItem,
-    updateLocalItem,
-    removeLocalItem,
-  } = useSidebarData();
-
-  const { userApiKeys, isLoadingApiKeys, refreshApiKeys } = useUserApiKeys(); // Get refreshApiKeys
+  const { userApiKeys, isLoadingApiKeys, refreshApiKeys } = useUserApiKeys();
 
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   const [selectedAppDetails, setSelectedAppDetails] = useState<UserApp | null>(null);
@@ -135,7 +118,6 @@ export default function Home() {
         setSelectedAppDetails(updatedApp);
         if (updatedApp.status === 'ready') {
           toast.success(`La aplicación "${updatedApp.name}" está lista.`);
-          refreshSidebarData();
         } else {
           toast.error(`Falló el aprovisionamiento de "${updatedApp.name}".`);
         }
@@ -148,54 +130,27 @@ export default function Home() {
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [selectedAppDetails, refreshSidebarData]);
-
-  useEffect(() => {
-    const refreshActiveContent = async () => {
-      if (selectedItem) {
-        if (selectedItem.type === 'note' && noteEditorRef.current) {
-          console.log("[Home] Refreshing active note content...");
-          noteEditorRef.current.refreshNoteContent();
-        } else if ((selectedItem.type === 'conversation' || selectedItem.type === 'app') && chatInterfaceRef.current) {
-          console.log("[Home] Refreshing active chat messages...");
-          chatInterfaceRef.current.refreshChatMessages();
-        }
-      }
-    };
-
-    // Trigger refresh when global refresh is called from SessionContextProvider
-    // This useEffect now only runs when `onGlobalRefresh` is explicitly triggered.
-    // The `isLoadingData` dependency is removed to prevent redundant refreshes.
-    if (!isLoadingData) { // Still check isLoadingData to ensure data is loaded initially
-      refreshActiveContent();
-    }
-  }, [selectedItem, isLoadingData]); // Keep isLoadingData to ensure initial load
+  }, [selectedAppDetails]);
 
   useEffect(() => {
     let healthCheckInterval: NodeJS.Timeout;
-
     const performHealthCheck = async () => {
       try {
         const response = await fetch('/api/health');
         if (response.ok) {
           if (!isAppHealthy) {
-            console.log("[Home] App health restored. Reloading page.");
             window.location.reload();
           }
           setIsAppHealthy(true);
           setShowHealthWarning(false);
         } else {
-          console.warn("[Home] Health check failed with status:", response.status);
           setIsAppHealthy(false);
         }
       } catch (error) {
-        console.error("[Home] Health check failed:", error);
         setIsAppHealthy(false);
       }
     };
-
     healthCheckInterval = setInterval(performHealthCheck, HEALTH_CHECK_INTERVAL);
-
     return () => clearInterval(healthCheckInterval);
   }, [isAppHealthy]);
 
@@ -206,7 +161,6 @@ export default function Home() {
         setShowHealthWarning(true);
         toast.error("Problemas de conexión detectados. Guarda tu nota manualmente y refresca la página.", { duration: 10000 });
       } else {
-        console.log("[Home] App unhealthy and no note editor active. Forcing page reload.");
         window.location.reload();
       }
     } else if (isAppHealthy) {
@@ -257,7 +211,7 @@ export default function Home() {
   };
 
   const handleAppCreated = async (newApp: UserApp) => {
-    await refreshSidebarData();
+    // The sidebar will update via realtime, just select the new app
     handleSelectItem(newApp.id, 'app');
   };
 
@@ -271,7 +225,7 @@ export default function Home() {
       if (selectedItem?.id === appId) {
         handleSelectItem(null, null);
       }
-      await refreshSidebarData();
+      // Sidebar will update via realtime
     } catch (error: any) {
       toast.error(`Error al eliminar el proyecto: ${error.message}`);
     } finally {
@@ -281,9 +235,6 @@ export default function Home() {
 
   const writeFilesToApp = async (files: { path: string; content: string }[]) => {
     if (!selectedAppDetails?.id || files.length === 0) return;
-
-    console.log("[Home] writeFilesToApp called with files:", files);
-
     const toastId = toast.loading(`Aplicando ${files.length} archivo(s)...`);
     try {
       const response = await fetch(`/api/apps/${selectedAppDetails.id}/files`, {
@@ -291,26 +242,16 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ files }),
       });
-
       const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.message || 'Error del servidor al guardar los archivos.');
-      }
+      if (!response.ok) throw new Error(result.message || 'Error del servidor al guardar los archivos.');
       toast.success(`Archivos aplicados. Reiniciando servidor...`, { id: toastId });
-
       const restartResponse = await fetch(`/api/apps/${selectedAppDetails.id}/restart`, { method: 'POST' });
       const restartResult = await restartResponse.json();
-      if (!restartResponse.ok) {
-        throw new Error(restartResult.message || 'Error al reiniciar el servidor.');
-      }
-      
+      if (!restartResponse.ok) throw new Error(restartResult.message || 'Error al reiniciar el servidor.');
       toast.success(`¡Listo! Actualizando vista previa...`, { id: toastId });
-      
       setFileTreeRefreshKey(prev => prev + 1);
       setTimeout(() => appBrowserRef.current?.refresh(), 2000);
-
     } catch (error: any) {
-      console.error("[Home] Error writing files or restarting:", error);
       toast.error(`Error: ${error.message}`, { id: toastId });
       setRetryState({ isOpen: true, files: files });
     }
@@ -325,10 +266,8 @@ export default function Home() {
 
   const handleRevertToVersion = async (timestamp: string) => {
     if (!selectedAppDetails?.id) return;
-
     setIsRevertingApp(true);
     const toastId = toast.loading(`Restaurando a la versión del ${format(new Date(timestamp), 'dd/MM/yyyy HH:mm', { locale: es })}...`);
-
     try {
       const response = await fetch(`/api/apps/${selectedAppDetails.id}/versions?timestamp=${encodeURIComponent(timestamp)}`);
       if (!response.ok) {
@@ -336,20 +275,13 @@ export default function Home() {
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
       const filesToRevert: { file_path: string; file_content: string }[] = await response.json();
-
-      if (filesToRevert.length === 0) {
-        throw new Error('No se encontraron archivos para esta versión.');
-      }
-
+      if (filesToRevert.length === 0) throw new Error('No se encontraron archivos para esta versión.');
       const formattedFiles = filesToRevert.map(f => ({ path: f.file_path, content: f.file_content }));
       await writeFilesToApp(formattedFiles);
-
       toast.success('Aplicación restaurada a la versión seleccionada.', { id: toastId });
       setFileTreeRefreshKey(prev => prev + 1);
       appBrowserRef.current?.refresh();
-
     } catch (error: any) {
-      console.error('Error reverting to version:', error);
       toast.error(`Error al restaurar la versión: ${error.message}`, { id: toastId });
     } finally {
       setIsRevertingApp(false);
@@ -357,7 +289,7 @@ export default function Home() {
   };
 
   const handleTriggerFixBuildError = () => {
-    if (chatInterfaceRef.current && chatInterfaceRef.current.triggerFixBuildError) {
+    if (chatInterfaceRef.current?.triggerFixBuildError) {
       chatInterfaceRef.current.triggerFixBuildError();
     } else {
       toast.error("El chat no está listo para corregir errores de compilación.");
@@ -365,37 +297,12 @@ export default function Home() {
   };
 
   const handleTriggerReportWebError = () => {
-    if (chatInterfaceRef.current && chatInterfaceRef.current.triggerReportWebError) {
+    if (chatInterfaceRef.current?.triggerReportWebError) {
       chatInterfaceRef.current.triggerReportWebError();
     } else {
       toast.error("El chat no está listo para reportar errores web.");
     }
   };
-
-  const handleGlobalRefresh = useCallback(() => {
-    console.log("[Home] Global refresh triggered.");
-    refreshSidebarData();
-    refreshApiKeys(); // Refresh API keys on global refresh
-
-    if (selectedItem) {
-      if (selectedItem.type === 'note' && noteEditorRef.current) {
-        console.log("[Home] Refreshing active note content via global refresh.");
-        noteEditorRef.current.refreshNoteContent();
-      } else if ((selectedItem.type === 'conversation' || selectedItem.type === 'app') && chatInterfaceRef.current) {
-        console.log("[Home] Refreshing active chat messages via global refresh.");
-        chatInterfaceRef.current.refreshChatMessages();
-      }
-    }
-  }, [refreshSidebarData, refreshApiKeys, selectedItem]); // Added refreshApiKeys to dependencies
-
-  // NEW: Initial data fetch for sidebar and API keys when userId becomes available
-  useEffect(() => {
-    if (userId && !isSessionLoading) { // Trigger when userId is available and session is not loading
-      refreshSidebarData();
-      refreshApiKeys();
-    }
-  }, [userId, isSessionLoading, refreshSidebarData, refreshApiKeys]);
-
 
   const handleOpenProfileSettings = () => setIsProfileSettingsOpen(true);
   const handleOpenAccountSettings = () => setIsAccountSettingsOpen(true);
@@ -412,20 +319,13 @@ export default function Home() {
 
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
   const isAppDeleting = selectedItem?.type === 'app' && selectedItem.id === isDeletingAppId;
-
   const appId = selectedAppDetails?.id || undefined;
   const appPrompt = selectedAppDetails?.prompt || undefined;
   const isAppProvisioning = selectedAppDetails?.status === 'provisioning';
 
   const renderRightPanelContent = () => {
     if (isAppDeleting) {
-      return (
-        <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-4">
-          <Loader2 className="h-12 w-12 animate-spin text-destructive mb-4" />
-          <h3 className="text-lg font-semibold">Eliminando Proyecto</h3>
-          <p>Por favor, espera mientras se eliminan todos los recursos asociados...</p>
-        </div>
-      );
+      return <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-4"><Loader2 className="h-12 w-12 animate-spin text-destructive mb-4" /><h3>Eliminando Proyecto</h3><p>Por favor, espera...</p></div>;
     }
     if (isFileLoading) {
       return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
@@ -437,146 +337,130 @@ export default function Home() {
   };
 
   return (
-    <SessionContextProvider onGlobalRefresh={handleGlobalRefresh}>
-      <div className="h-screen bg-background flex relative">
-        {isUserTemporarilyDisabled && (
-          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-4 pointer-events-auto">
-            <ShieldAlert className="h-16 w-16 text-destructive mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-destructive">Acceso Restringido</h2>
-            <p className="text-muted-foreground mt-2">
-              Tu cuenta ha sido temporalmente deshabilitada o expulsada.
-              Por favor, contacta al soporte para más información.
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Se ha cerrado tu sesión. Recarga la página o intenta iniciar sesión de nuevo.
-            </p>
-          </div>
-        )}
-
-        {!isAppHealthy && showHealthWarning && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-destructive text-destructive-foreground p-3 rounded-lg shadow-lg flex items-center gap-3 z-50">
-            <AlertCircle className="h-5 w-5" />
-            <span>Problemas de conexión detectados. Guarda tu nota manualmente y refresca la página.</span>
-            <Button variant="ghost" size="icon" onClick={() => window.location.reload()} className="text-destructive-foreground hover:bg-destructive/80">
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-        {!isAppHealthy && !showHealthWarning && !isSessionLoading && session && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-destructive text-destructive-foreground p-3 rounded-lg shadow-lg flex items-center gap-3 z-50">
-            <WifiOff className="h-5 w-5" />
-            <span>Conexión perdida. Intentando reconectar...</span>
-            <Loader2 className="h-4 w-4 animate-spin" />
-          </div>
-        )}
-
-        <div className="w-[320px] flex-shrink-0">
-          <MemoizedConversationSidebar
-            apps={apps}
-            conversations={conversations}
-            folders={folders}
-            notes={notes}
-            isLoading={isLoadingData}
-            selectedItem={selectedItem}
-            onSelectItem={handleSelectItem}
-            onFileSelect={handleFileSelect}
-            onOpenProfileSettings={handleOpenProfileSettings}
-            onOpenAccountSettings={handleOpenAccountSettings}
-            onOpenServerManagement={handleOpenServerManagement}
-            onOpenUserManagement={handleOpenUserManagement}
-            onOpenDeepAiCoder={handleOpenDeepAiCoder}
-            onOpenUpdateManager={handleOpenUpdateManager}
-            onOpenApiManagement={handleOpenApiManagement}
-            onOpenAlerts={handleOpenAlerts}
-            refreshData={refreshSidebarData}
-            createConversation={createConversation as any}
-            createFolder={createFolder}
-            createNote={createNote as any}
-            moveItem={moveItem}
-            onDeleteApp={handleDeleteApp}
-            isDeletingAppId={isDeletingAppId}
-            fileTreeRefreshKey={fileTreeRefreshKey}
-            updateLocalItem={updateLocalItem}
-            removeLocalItem={removeLocalItem}
-          />
+    <div className="h-screen bg-background flex relative">
+      {isUserTemporarilyDisabled && (
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-4 pointer-events-auto">
+          <ShieldAlert className="h-16 w-16 text-destructive mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-destructive">Acceso Restringido</h2>
+          <p className="text-muted-foreground mt-2">Tu cuenta ha sido temporalmente deshabilitada o expulsada.</p>
+          <p className="text-sm text-muted-foreground mt-1">Se ha cerrado tu sesión. Recarga la página o intenta iniciar sesión de nuevo.</p>
         </div>
-        <div className="flex-1 min-w-0 flex flex-col">
-          {selectedItem?.type === 'app' && selectedAppDetails && (
-            <AppVersionsBar
-              appId={selectedAppDetails.id}
-              onRevertToVersion={handleRevertToVersion}
-              isReverting={isRevertingApp}
-              autoFixStatus={chatInterfaceRef.current?.autoFixStatus || 'idle'}
-              onTriggerFixBuildError={handleTriggerFixBuildError}
-              onTriggerReportWebError={handleTriggerReportWebError}
-            />
-          )}
-          {selectedItem?.type === 'note' ? (
-            <MemoizedNoteEditorPanel
-              ref={noteEditorRef}
-              noteId={selectedItem.id}
-              onNoteUpdated={(id, data) => updateLocalItem(id, 'note', data)}
-              userApiKeys={userApiKeys}
-              isLoadingApiKeys={isLoadingApiKeys}
-              userLanguage={userLanguage || 'es'}
-            />
-          ) : (
-            <ResizablePanelGroup direction="horizontal" className="flex-1">
-              <ResizablePanel defaultSize={50} minSize={30}>
-                <MemoizedChatInterface
-                  ref={chatInterfaceRef}
-                  key={selectedItem?.conversationId || 'no-conversation'}
-                  userId={userId}
-                  conversationId={selectedItem?.conversationId || null}
-                  onNewConversationCreated={handleNewConversationCreated}
-                  onConversationTitleUpdate={(id, newTitle) => {}}
-                  aiResponseSpeed={aiResponseSpeed}
-                  isAppProvisioning={isAppProvisioning}
-                  isAppDeleting={isAppDeleting}
-                  appPrompt={appPrompt}
-                  appId={appId}
-                  onWriteFiles={writeFilesToApp}
-                  isAppChat={selectedItem?.type === 'app'}
-                  onSidebarDataRefresh={refreshSidebarData}
-                  userApiKeys={userApiKeys}
-                  isLoadingApiKeys={isLoadingApiKeys}
-                />
-              </ResizablePanel>
-              {selectedItem?.type === 'app' && (
-                <>
-                  <ResizableHandle withHandle />
-                  <ResizablePanel defaultSize={50} minSize={30}>
-                    {renderRightPanelContent()}
-                  </ResizablePanel>
-                </>
-              )}
-            </ResizablePanelGroup>
-          )}
+      )}
+      {!isAppHealthy && showHealthWarning && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-destructive text-destructive-foreground p-3 rounded-lg shadow-lg flex items-center gap-3 z-50">
+          <AlertCircle className="h-5 w-5" />
+          <span>Problemas de conexión. Guarda tu nota y refresca la página.</span>
+          <Button variant="ghost" size="icon" onClick={() => window.location.reload()} className="text-destructive-foreground hover:bg-destructive/80"><RefreshCw className="h-4 w-4" /></Button>
         </div>
-
-        <ProfileSettingsDialog open={isProfileSettingsOpen} onOpenChange={setIsProfileSettingsOpen} />
-        <AccountSettingsDialog
-          open={isAccountSettingsOpen}
-          onOpenChange={setIsAccountSettingsOpen}
-          aiResponseSpeed={aiResponseSpeed}
-          onAiResponseSpeedChange={handleAiResponseSpeedChange}
-          userApiKeys={userApiKeys}
-          isLoadingApiKeys={isLoadingApiKeys}
-          currentUserRole={userRole}
+      )}
+      {!isAppHealthy && !showHealthWarning && !isSessionLoading && session && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-destructive text-destructive-foreground p-3 rounded-lg shadow-lg flex items-center gap-3 z-50">
+          <WifiOff className="h-5 w-5" />
+          <span>Conexión perdida. Intentando reconectar...</span>
+          <Loader2 className="h-4 w-4 animate-spin" />
+        </div>
+      )}
+      <div className="w-[320px] flex-shrink-0">
+        <ConversationSidebar
+          selectedItem={selectedItem}
+          onSelectItem={handleSelectItem}
+          onFileSelect={handleFileSelect}
+          onOpenProfileSettings={handleOpenProfileSettings}
+          onOpenAccountSettings={handleOpenAccountSettings}
+          onOpenServerManagement={handleOpenServerManagement}
+          onOpenUserManagement={handleOpenUserManagement}
+          onOpenDeepAiCoder={handleOpenDeepAiCoder}
+          onOpenUpdateManager={handleOpenUpdateManager}
+          onOpenApiManagement={handleOpenApiManagement}
+          onOpenAlerts={handleOpenAlerts}
+          onDeleteApp={handleDeleteApp}
+          isDeletingAppId={isDeletingAppId}
+          fileTreeRefreshKey={fileTreeRefreshKey}
         />
-        {isAdmin && <ServerManagementDialog open={isServerManagementOpen} onOpenChange={setIsServerManagementOpen} />}
-        {isAdmin && <UserManagementDialog open={isUserManagementOpen} onOpenChange={setIsUserManagementOpen} />}
-        <ApiManagementDialog open={isApiManagementOpen} onOpenChange={setIsApiManagementOpen} />
-        {isAdmin && <AlertsDialog open={isAlertsOpen} onOpenChange={setIsAlertsOpen} />}
-        <DeepAiCoderDialog open={isDeepAiCoderOpen} onOpenChange={setIsDeepAiCoderOpen} onAppCreated={handleAppCreated} />
-        <RetryUploadDialog
-          open={retryState.isOpen}
-          onOpenChange={(open) => setRetryState({ ...retryState, isOpen: open })}
-          onRetry={handleRetryUpload}
-          fileCount={retryState.files?.length || 0}
-        />
-        {userRole === 'super_admin' && <UpdateManagerDialog open={isUpdateManagerOpen} onOpenChange={setIsUpdateManagerOpen} />}
       </div>
+      <div className="flex-1 min-w-0 flex flex-col">
+        {selectedItem?.type === 'app' && selectedAppDetails && (
+          <AppVersionsBar
+            appId={selectedAppDetails.id}
+            onRevertToVersion={handleRevertToVersion}
+            isReverting={isRevertingApp}
+            autoFixStatus={chatInterfaceRef.current?.autoFixStatus || 'idle'}
+            onTriggerFixBuildError={handleTriggerFixBuildError}
+            onTriggerReportWebError={handleTriggerReportWebError}
+          />
+        )}
+        {selectedItem?.type === 'note' ? (
+          <MemoizedNoteEditorPanel
+            ref={noteEditorRef}
+            noteId={selectedItem.id}
+            onNoteUpdated={() => {}} // Local updates are handled by the sidebar's realtime hook
+            userApiKeys={userApiKeys}
+            isLoadingApiKeys={isLoadingApiKeys}
+            userLanguage={userLanguage || 'es'}
+          />
+        ) : (
+          <ResizablePanelGroup direction="horizontal" className="flex-1">
+            <ResizablePanel defaultSize={50} minSize={30}>
+              <MemoizedChatInterface
+                ref={chatInterfaceRef}
+                key={selectedItem?.conversationId || 'no-conversation'}
+                userId={userId}
+                conversationId={selectedItem?.conversationId || null}
+                onNewConversationCreated={handleNewConversationCreated}
+                onConversationTitleUpdate={() => {}} // Local updates are handled by the sidebar's realtime hook
+                aiResponseSpeed={aiResponseSpeed}
+                isAppProvisioning={isAppProvisioning}
+                isAppDeleting={isAppDeleting}
+                appPrompt={appPrompt}
+                appId={appId}
+                onWriteFiles={writeFilesToApp}
+                isAppChat={selectedItem?.type === 'app'}
+                onSidebarDataRefresh={() => {}} // Sidebar refreshes itself
+                userApiKeys={userApiKeys}
+                isLoadingApiKeys={isLoadingApiKeys}
+              />
+            </ResizablePanel>
+            {selectedItem?.type === 'app' && (
+              <>
+                <ResizableHandle withHandle />
+                <ResizablePanel defaultSize={50} minSize={30}>
+                  {renderRightPanelContent()}
+                </ResizablePanel>
+              </>
+            )}
+          </ResizablePanelGroup>
+        )}
+      </div>
+      <ProfileSettingsDialog open={isProfileSettingsOpen} onOpenChange={setIsProfileSettingsOpen} />
+      <AccountSettingsDialog
+        open={isAccountSettingsOpen}
+        onOpenChange={setIsAccountSettingsOpen}
+        aiResponseSpeed={aiResponseSpeed}
+        onAiResponseSpeedChange={handleAiResponseSpeedChange}
+        userApiKeys={userApiKeys}
+        isLoadingApiKeys={isLoadingApiKeys}
+        currentUserRole={userRole}
+      />
+      {isAdmin && <ServerManagementDialog open={isServerManagementOpen} onOpenChange={setIsServerManagementOpen} />}
+      {isAdmin && <UserManagementDialog open={isUserManagementOpen} onOpenChange={setIsUserManagementOpen} />}
+      <ApiManagementDialog open={isApiManagementOpen} onOpenChange={setIsApiManagementOpen} />
+      {isAdmin && <AlertsDialog open={isAlertsOpen} onOpenChange={setIsAlertsOpen} />}
+      <DeepAiCoderDialog open={isDeepAiCoderOpen} onOpenChange={setIsDeepAiCoderOpen} onAppCreated={handleAppCreated} />
+      <RetryUploadDialog
+        open={retryState.isOpen}
+        onOpenChange={(open) => setRetryState({ ...retryState, isOpen: open })}
+        onRetry={handleRetryUpload}
+        fileCount={retryState.files?.length || 0}
+      />
+      {userRole === 'super_admin' && <UpdateManagerDialog open={isUpdateManagerOpen} onOpenChange={setIsUpdateManagerOpen} />}
+    </div>
+  );
+}
+
+export default function HomePageWrapper() {
+  return (
+    <SessionContextProvider>
+      <HomePageContent />
     </SessionContextProvider>
   );
 }
