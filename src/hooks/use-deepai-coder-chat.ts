@@ -212,6 +212,8 @@ export function useDeepAICoderChat({
     const loadConversationData = async () => {
       if (conversationId && userId) {
         setIsLoading(true);
+        setMessages([]); // Clear messages immediately when conversationId changes
+        
         const details = await getConversationDetails(conversationId);
         
         if (details?.model && (details.model.startsWith('puter:') || details.model.startsWith('user_key:'))) {
@@ -222,14 +224,14 @@ export function useDeepAICoderChat({
         }
 
         const fetchedMsgs = await getMessagesFromDB(conversationId);
-        if (!isSendingFirstMessage || fetchedMsgs.length > 0) setMessages(fetchedMsgs);
+        setMessages(fetchedMsgs); // Always set messages from DB
         setIsLoading(false);
       } else {
         setMessages([]);
       }
     };
     loadConversationData();
-  }, [conversationId, userId, getMessagesFromDB, getConversationDetails, isSendingFirstMessage]);
+  }, [conversationId, userId, getMessagesFromDB, getConversationDetails]); // Removed isSendingFirstMessage from dependencies
 
   const createNewConversationInDB = async () => {
     if (!userId) return null;
@@ -732,7 +734,7 @@ export function useDeepAICoderChat({
       setMessages([]);
       toast.success('Chat limpiado correctamente.');
     } catch (error: any) {
-      console.error('Error clearing chat:', error);
+      console.error('Error al limpiar el chat:', error);
       toast.error(`Error al limpiar el chat: ${error.message}`);
     } finally {
       setIsLoading(false);
