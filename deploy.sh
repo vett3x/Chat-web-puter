@@ -81,14 +81,8 @@ function setup_pm2() {
 
 function setup_crontab() {
   echo "--- Configurando tareas CRON para la gestión del ciclo de vida de la aplicación ---"
-  # Obtener la IP pública del servidor
-  SERVER_IP=$(curl -s ifconfig.me)
-  if [ -z "$SERVER_IP" ]; then
-    echo "Advertencia: No se pudo obtener la IP del servidor. Usando 'localhost'."
-    SERVER_IP="localhost"
-  fi
-
-  CRON_JOB="*/5 * * * * curl -s http://${SERVER_IP}:${WEBSOCKET_PORT}/api/cron/manage-app-lifecycle > /dev/null 2>&1"
+  # Usar localhost para la tarea CRON
+  CRON_JOB="*/5 * * * * curl -s http://localhost:${WEBSOCKET_PORT}/api/cron/manage-app-lifecycle > /dev/null 2>&1"
   
   # Comprobar si la tarea CRON ya existe
   if ! sudo crontab -l | grep -Fq "$CRON_JOB"; then
