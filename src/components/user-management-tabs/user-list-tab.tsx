@@ -242,13 +242,15 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      {user.role !== 'user' && (
+                      {user.role === 'user' ? (
+                        <Badge variant="outline">Usuario</Badge>
+                      ) : (
                         <Badge className={cn(
                           user.role === 'super_admin' && 'bg-yellow-500 text-yellow-900 dark:bg-yellow-400 dark:text-yellow-950 border-transparent',
                           user.role === 'admin' && 'bg-primary-light-purple text-white border-transparent'
                         )}>
                           {user.role === 'super_admin' ? <Crown className="h-3 w-3 mr-1" /> : <Shield className="h-3 w-3 mr-1" />}
-                          {user.role === 'super_admin' ? 'Super Admin' : user.role}
+                          {user.role === 'super_admin' ? 'Super Admin' : 'Admin'}
                         </Badge>
                       )}
                     </div>
