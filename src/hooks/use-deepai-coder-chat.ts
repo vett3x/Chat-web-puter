@@ -572,7 +572,7 @@ export function useDeepAICoderChat({
       clearTimeout(timeoutId);
       setIsLoading(false);
     }
-  }, [appId, appPrompt, userId, saveMessageToDB, chatMode, userApiKeys, onWriteFiles, conversationId, allowedCommands, executeCommandsInContainer, executeSqlCommands]); // Removed selectedModel and autoFixStatus from dependencies
+  }, [appId, appPrompt, userId, saveMessageToDB, chatMode, userApiKeys, onWriteFiles, conversationId, allowedCommands, executeCommandsInContainer, executeSqlCommands]);
 
   const createNewConversationInDB = async () => {
     if (!userId) return null;
@@ -619,25 +619,37 @@ export function useDeepAICoderChat({
 
         const fetchedMsgs = await getMessagesFromDB(conversationId, 0);
 
-        // NEW LOGIC: Check for initial app prompt
-        if (fetchedMsgs.length === 1 && fetchedMsgs[0].role === 'user' && isAppChat) {
-          // This is a new app conversation. Don't show the initial prompt.
-          // Instead, immediately trigger the AI response.
-          setMessages([]); // Keep messages empty for now
-          setIsLoading(false); // Set loading to false before calling AI
-          await getAndStreamAIResponse(conversationId, fetchedMsgs);
-        } else {
-          setMessages(fetchedMsgs);
-          if (fetchedMsgs.length < MESSAGES_PER_PAGE) {
-            setHasMoreMessages(false);
-          }
-          setIsLoading(false);
+        // REMOVED THE SPECIAL LOGIC FROM HERE
+        setMessages(fetchedMsgs);
+        if (fetchedMsgs.length < MESSAGES_PER_PAGE) {
+          setHasMoreMessages(false);
         }
+        setIsLoading(false);
+        
       } else {
         setMessages([]);
       }
     }, 100);
-  }, [conversationId, userId, getMessagesFromDB, getConversationDetails, userApiKeys, isAppChat, getAndStreamAIResponse]); // Removed getAndStreamAIResponse from dependencies
+  }, [conversationId, userId, getMessagesFromDB, getConversationDetails, userApiKeys]);
+
+  // Main effect to load data when conversationId changes
+  useEffect(() => {
+    loadConversationData();
+  }, [loadConversationData]);
+
+  // NEW EFFECT to handle initial AI response for new apps
+  useEffect(() => {
+    if (
+        isAppChat &&
+        conversationId &&
+        !isLoading && // Make sure we are not already loading/fetching
+        messages.length === 1 && // Only one message exists
+        messages[0].role === 'user' // And it's the initial user prompt
+    ) {
+        // This is a new app conversation. Trigger the AI response.
+        getAndStreamAIResponse(conversationId, messages);
+    }
+  }, [messages, conversationId, isAppChat, isLoading, getAndStreamAIResponse]);
 
   const loadMoreMessages = useCallback(async () => {
     if (!conversationId || !hasMoreMessages || isLoading) return;
@@ -653,10 +665,6 @@ export function useDeepAICoderChat({
       setHasMoreMessages(false);
     }
   }, [conversationId, hasMoreMessages, isLoading, page, getMessagesFromDB]);
-
-  useEffect(() => {
-    loadConversationData();
-  }, [loadConversationData]);
 
   const sendMessage = useCallback(async (content: PuterContentPart[], messageText: string) => {
     if (!userId) {
