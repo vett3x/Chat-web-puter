@@ -10,9 +10,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
-import { Loader2, Shield, PlusCircle, Trash2, RefreshCw, Users, UserCog } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
+import { Loader2, Shield, PlusCircle, Trash2, RefreshCw } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,8 +22,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { useSession } from '@/components/session-context-provider';
 import {
   Dialog,
@@ -60,16 +56,6 @@ export function SecurityTab() {
   const [isSubmittingCommand, setIsSubmittingCommand] = useState(false);
   const [isAddCommandDialogOpen, setIsAddCommandDialogOpen] = useState(false);
 
-  const [securityEnabled, setSecurityEnabled] = useState(true);
-  const [maintenanceModeEnabled, setMaintenanceModeEnabled] = useState(false);
-  const [usersDisabled, setUsersDisabled] = useState(false);
-  const [adminsDisabled, setAdminsDisabled] = useState(false);
-  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
-  const [isTogglingSecurity, setIsTogglingSecurity] = useState(false);
-  const [isTogglingMaintenance, setIsTogglingMaintenance] = useState(false);
-  const [isTogglingUsers, setIsTogglingUsers] = useState(false);
-  const [isTogglingAdmins, setIsTogglingAdmins] = useState(false);
-
   const form = useForm<CommandFormValues>({
     resolver: zodResolver(commandSchema),
     defaultValues: { command: '', description: '' },
@@ -88,29 +74,9 @@ export function SecurityTab() {
     }
   }, []);
 
-  const fetchGlobalSettings = useCallback(async () => {
-    setIsLoadingSettings(true);
-    try {
-      const response = await fetch('/api/settings/security');
-      if (!response.ok) throw new Error((await response.json()).message || 'Error al cargar la configuración.');
-      const data = await response.json();
-      setSecurityEnabled(data.security_enabled);
-      setMaintenanceModeEnabled(data.maintenance_mode_enabled);
-      setUsersDisabled(data.users_disabled);
-      setAdminsDisabled(data.admins_disabled);
-    } catch (err: any) {
-      if (isSuperAdmin) toast.error(err.message);
-    } finally {
-      setIsLoadingSettings(false);
-    }
-  }, [isSuperAdmin]);
-
   useEffect(() => {
-    if (isSuperAdmin) {
-      fetchGlobalSettings();
-    }
     fetchCommands();
-  }, [fetchCommands, fetchGlobalSettings, isSuperAdmin]);
+  }, [fetchCommands]);
 
   const onSubmit = async (values: CommandFormValues) => {
     setIsSubmittingCommand(true);
@@ -141,76 +107,8 @@ export function SecurityTab() {
     }
   };
 
-  const handleToggleSetting = async (
-    setting: 'security_enabled' | 'maintenance_mode_enabled' | 'users_disabled' | 'admins_disabled',
-    checked: boolean,
-    setLoading: React.Dispatch<React.SetStateAction<boolean>>,
-    setValue: React.Dispatch<React.SetStateAction<boolean>>
-  ) => {
-    setLoading(true);
-    try {
-      const response = await fetch('/api/settings/security', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [setting]: checked }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message);
-      setValue(result[setting]);
-      toast.success(result.message || 'Configuración actualizada.');
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="space-y-8 h-full overflow-y-auto p-1">
-      {isSuperAdmin && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Shield className="h-6 w-6" /> Control del Sistema</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoadingSettings ? (
-              <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Cargando configuración...</div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="security-toggle" className="text-base">Activar Sistema de Seguridad de Comandos</Label>
-                    <p className="text-sm text-muted-foreground">Cuando está desactivado, la IA puede ejecutar cualquier comando. Úsalo con precaución.</p>
-                  </div>
-                  <Switch id="security-toggle" checked={securityEnabled} onCheckedChange={(c) => handleToggleSetting('security_enabled', c, setIsTogglingSecurity, setSecurityEnabled)} disabled={isTogglingSecurity} />
-                </div>
-                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="maintenance-toggle" className="text-base">Activar Modo Mantenimiento</Label>
-                    <p className="text-sm text-muted-foreground">Expulsa a todos (excepto Super Admins) y muestra una página de mantenimiento.</p>
-                  </div>
-                  <Switch id="maintenance-toggle" checked={maintenanceModeEnabled} onCheckedChange={(c) => handleToggleSetting('maintenance_mode_enabled', c, setIsTogglingMaintenance, setMaintenanceModeEnabled)} disabled={isTogglingMaintenance} />
-                </div>
-                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="users-disabled-toggle" className="text-base">Desactivar Cuentas de Usuario</Label>
-                    <p className="text-sm text-muted-foreground">Expulsa a todos los usuarios con rol 'user' y les impide iniciar sesión.</p>
-                  </div>
-                  <Switch id="users-disabled-toggle" checked={usersDisabled} onCheckedChange={(c) => handleToggleSetting('users_disabled', c, setIsTogglingUsers, setUsersDisabled)} disabled={isTogglingUsers} />
-                </div>
-                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="admins-disabled-toggle" className="text-base">Desactivar Cuentas de Admin</Label>
-                    <p className="text-sm text-muted-foreground">Expulsa a todos los usuarios con rol 'admin' y les impide iniciar sesión.</p>
-                  </div>
-                  <Switch id="admins-disabled-toggle" checked={adminsDisabled} onCheckedChange={(c) => handleToggleSetting('admins_disabled', c, setIsTogglingAdmins, setAdminsDisabled)} disabled={isTogglingAdmins} />
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2"><Shield className="h-6 w-6" /> Comandos Permitidos</CardTitle>
