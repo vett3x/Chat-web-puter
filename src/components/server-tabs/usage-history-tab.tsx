@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { History, Loader2, XCircle, Server } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale'; // Import Spanish locale
@@ -66,7 +65,7 @@ export function UsageHistoryTab() {
   };
 
   return (
-    <Card className="h-full flex flex-col">
+    <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="flex items-center gap-2">
           <History className="h-5 w-5" /> Historial de Uso
@@ -76,49 +75,47 @@ export function UsageHistoryTab() {
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
         </Button> */}
       </CardHeader>
-      <CardContent className="flex-1 overflow-hidden pt-0">
+      <CardContent className="pt-0">
         {isLoading && events.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
+          <div className="flex items-center justify-center h-full py-8">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="ml-2 text-muted-foreground">Cargando historial...</p>
           </div>
         ) : error && events.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-destructive">
+          <div className="flex items-center justify-center h-full py-8 text-destructive">
             <XCircle className="h-6 w-6 mr-2" />
             <p>{error}</p>
           </div>
         ) : events.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-muted-foreground">
+          <div className="flex items-center justify-center h-full py-8 text-muted-foreground">
             <p>No hay eventos registrados aún.</p>
           </div>
         ) : (
-          <ScrollArea className="h-full w-full">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[150px]">Fecha</TableHead>
-                  <TableHead className="w-[150px]">Tipo de Evento</TableHead>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead className="w-[150px]">Servidor</TableHead>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[150px]">Fecha</TableHead>
+                <TableHead className="w-[150px]">Tipo de Evento</TableHead>
+                <TableHead>Descripción</TableHead>
+                <TableHead className="w-[150px]">Servidor</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {events.map((event) => (
+                <TableRow key={event.id}>
+                  <TableCell className="text-xs">
+                    {format(new Date(event.created_at), 'dd/MM/yyyy HH:mm:ss', { locale: es })}
+                  </TableCell>
+                  <TableCell className="font-medium text-xs">{getEventTypeLabel(event.event_type)}</TableCell>
+                  <TableCell className="text-sm">{event.description}</TableCell>
+                  <TableCell className="text-xs flex items-center gap-1">
+                    {event.server_name !== 'N/A' && <Server className="h-3 w-3 text-muted-foreground" />}
+                    {event.server_name}
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {events.map((event) => (
-                  <TableRow key={event.id}>
-                    <TableCell className="text-xs">
-                      {format(new Date(event.created_at), 'dd/MM/yyyy HH:mm:ss', { locale: es })}
-                    </TableCell>
-                    <TableCell className="font-medium text-xs">{getEventTypeLabel(event.event_type)}</TableCell>
-                    <TableCell className="text-sm">{event.description}</TableCell>
-                    <TableCell className="text-xs flex items-center gap-1">
-                      {event.server_name !== 'N/A' && <Server className="h-3 w-3 text-muted-foreground" />}
-                      {event.server_name}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </ScrollArea>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </CardContent>
     </Card>

@@ -31,7 +31,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useSession } from '@/components/session-context-provider'; // Import useSession
 
@@ -186,225 +185,223 @@ export function CloudflareTunnelTab() {
   };
 
   return (
-    <ScrollArea className="h-full w-full p-1">
-      <div className="space-y-8 h-full">
-        {/* Add New Cloudflare Domain */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <PlusCircle className="h-6 w-6" /> Añadir Dominio de Cloudflare
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!canManageCloudflareDomains ? (
-              <p className="text-muted-foreground">No tienes permiso para añadir nuevos dominios de Cloudflare.</p>
-            ) : (
-              <Form {...domainForm}>
-                <form onSubmit={domainForm.handleSubmit(handleAddDomain)} className="space-y-6">
-                  <FormField
-                    control={domainForm.control}
-                    name="domain_name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nombre de Dominio (ej. example.com)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="tudominio.com" {...field} disabled={isAddingDomain} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={domainForm.control}
-                    name="api_token"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Cloudflare API Token</FormLabel>
-                        <FormControl>
-                          <Input type="password" placeholder="Tu API Token de Cloudflare" {...field} disabled={isAddingDomain} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={domainForm.control}
-                    name="zone_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Cloudflare Zone ID</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Tu Zone ID de Cloudflare" {...field} disabled={isAddingDomain} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={domainForm.control}
-                    name="account_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Cloudflare Account ID</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Tu Account ID de Cloudflare" {...field} disabled={isAddingDomain} />
-                        </FormControl>
-                        <FormDescription>
-                          Puedes encontrar tu Account ID en la página de resumen de tu dominio en Cloudflare, en la barra lateral derecha.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button type="submit" disabled={isAddingDomain}>
-                    {isAddingDomain ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <PlusCircle className="mr-2 h-4 w-4" />
-                    )}
-                    Añadir Dominio
-                  </Button>
-                </form>
-              </Form>
-            )}
-          </CardContent>
-        </Card>
+    <div className="space-y-8 p-1">
+      {/* Add New Cloudflare Domain */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <PlusCircle className="h-6 w-6" /> Añadir Dominio de Cloudflare
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!canManageCloudflareDomains ? (
+            <p className="text-muted-foreground">No tienes permiso para añadir nuevos dominios de Cloudflare.</p>
+          ) : (
+            <Form {...domainForm}>
+              <form onSubmit={domainForm.handleSubmit(handleAddDomain)} className="space-y-6">
+                <FormField
+                  control={domainForm.control}
+                  name="domain_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nombre de Dominio (ej. example.com)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="tudominio.com" {...field} disabled={isAddingDomain} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={domainForm.control}
+                  name="api_token"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cloudflare API Token</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="Tu API Token de Cloudflare" {...field} disabled={isAddingDomain} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={domainForm.control}
+                  name="zone_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cloudflare Zone ID</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Tu Zone ID de Cloudflare" {...field} disabled={isAddingDomain} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={domainForm.control}
+                  name="account_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cloudflare Account ID</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Tu Account ID de Cloudflare" {...field} disabled={isAddingDomain} />
+                      </FormControl>
+                      <FormDescription>
+                        Puedes encontrar tu Account ID en la página de resumen de tu dominio en Cloudflare, en la barra lateral derecha.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" disabled={isAddingDomain}>
+                  {isAddingDomain ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                  )}
+                  Añadir Dominio
+                </Button>
+              </form>
+            </Form>
+          )}
+        </CardContent>
+      </Card>
 
-        <Separator />
+      <Separator />
 
-        {/* Registered Cloudflare Domains */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="flex items-center gap-2">
-              <Cloud className="h-6 w-6" /> Dominios de Cloudflare Registrados
-            </CardTitle>
-            <Button variant="ghost" size="icon" onClick={fetchCloudflareDomains} disabled={isLoadingDomains} title="Refrescar">
-              {isLoadingDomains ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {isLoadingDomains ? (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                <p className="ml-2 text-muted-foreground">Cargando dominios...</p>
-              </div>
-            ) : errorDomains ? (
-              <div className="flex items-center justify-center h-full text-destructive">
-                <AlertCircle className="h-6 w-6 mr-2" />
-                <p>{errorDomains}</p>
-              </div>
-            ) : cloudflareDomains.length === 0 ? (
-              <p className="text-muted-foreground">No hay dominios de Cloudflare registrados aún.</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow><TableHead>Dominio</TableHead><TableHead>Zone ID</TableHead><TableHead>Account ID</TableHead>{/* Added Account ID header */}<TableHead className="text-right">Acciones</TableHead></TableRow>
-                </TableHeader>
-                <TableBody>
-                  {cloudflareDomains.map((domain) => (
-                    <TableRow key={domain.id}>
-                      <TableCell className="font-medium">{domain.domain_name}</TableCell><TableCell className="font-mono text-xs">{domain.zone_id}</TableCell><TableCell className="font-mono text-xs">{domain.account_id}</TableCell>{/* Display Account ID */}
-                      <TableCell className="text-right">
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="icon" className="h-8 w-8" disabled={!canManageCloudflareDomains}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>¿Estás seguro de eliminar este dominio?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Esta acción eliminará el dominio "{domain.domain_name}" y todos los túneles asociados a él.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDeleteDomain(domain.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                Eliminar
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+      {/* Registered Cloudflare Domains */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="flex items-center gap-2">
+            <Cloud className="h-6 w-6" /> Dominios de Cloudflare Registrados
+          </CardTitle>
+          <Button variant="ghost" size="icon" onClick={fetchCloudflareDomains} disabled={isLoadingDomains} title="Refrescar">
+            {isLoadingDomains ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {isLoadingDomains ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <p className="ml-2 text-muted-foreground">Cargando dominios...</p>
+            </div>
+          ) : errorDomains ? (
+            <div className="flex items-center justify-center h-full text-destructive">
+              <AlertCircle className="h-6 w-6 mr-2" />
+              <p>{errorDomains}</p>
+            </div>
+          ) : cloudflareDomains.length === 0 ? (
+            <p className="text-muted-foreground">No hay dominios de Cloudflare registrados aún.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow><TableHead>Dominio</TableHead><TableHead>Zone ID</TableHead><TableHead>Account ID</TableHead>{/* Added Account ID header */}<TableHead className="text-right">Acciones</TableHead></TableRow>
+              </TableHeader>
+              <TableBody>
+                {cloudflareDomains.map((domain) => (
+                  <TableRow key={domain.id}>
+                    <TableCell className="font-medium">{domain.domain_name}</TableCell><TableCell className="font-mono text-xs">{domain.zone_id}</TableCell><TableCell className="font-mono text-xs">{domain.account_id}</TableCell>{/* Display Account ID */}
+                    <TableCell className="text-right">
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive" size="icon" className="h-8 w-8" disabled={!canManageCloudflareDomains}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>¿Estás seguro de eliminar este dominio?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta acción eliminará el dominio "{domain.domain_name}" y todos los túneles asociados a él.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDeleteDomain(domain.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                              Eliminar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
-        <Separator />
+      <Separator />
 
-        {/* Docker Tunnels */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="flex items-center gap-2">
-              <Cloud className="h-6 w-6" /> Túneles Docker de Cloudflare
-            </CardTitle>
-            <Button variant="ghost" size="icon" onClick={fetchDockerTunnels} disabled={isLoadingTunnels} title="Refrescar">
-              {isLoadingTunnels ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {isLoadingTunnels ? (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                <p className="ml-2 text-muted-foreground">Cargando túneles...</p>
-              </div>
-            ) : errorTunnels ? (
-              <div className="flex items-center justify-center h-full text-destructive">
-                <AlertCircle className="h-6 w-6 mr-2" />
-                <p>{errorTunnels}</p>
-              </div>
-            ) : dockerTunnels.length === 0 ? (
-              <p className="text-muted-foreground">No hay túneles Docker de Cloudflare configurados aún.</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow><TableHead>Dominio Completo</TableHead><TableHead>Servidor</TableHead><TableHead>Contenedor</TableHead><TableHead>Puerto</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow>
-                </TableHeader>
-                <TableBody>
-                  {dockerTunnels.map((tunnel) => (
-                    <TableRow key={tunnel.id}>
-                      <TableCell className="font-medium">
-                        <a href={`https://${tunnel.full_domain}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline flex items-center gap-1">
-                          <Globe className="h-4 w-4" /> {tunnel.full_domain}
-                        </a>
-                      </TableCell>
-                      <TableCell>{tunnel.server_name}</TableCell>
-                      <TableCell className="font-mono text-xs">{tunnel.container_id?.substring(0, 12) || 'N/A'}</TableCell>
-                      <TableCell>{tunnel.container_port}</TableCell>
-                      <TableCell>
-                        <span className={cn(
-                          "flex items-center gap-1",
-                          tunnel.status === 'active' && "text-green-500",
-                          tunnel.status === 'failed' && "text-destructive",
-                          (tunnel.status === 'pending' || tunnel.status === 'provisioning') && "text-blue-500"
-                        )}>
-                          {tunnel.status === 'active' && <CheckCircle2 className="h-4 w-4" />}
-                          {tunnel.status === 'failed' && <AlertCircle className="h-4 w-4" />}
-                          {(tunnel.status === 'pending' || tunnel.status === 'provisioning') && <Loader2 className="h-4 w-4 animate-spin" />}
-                          {tunnel.status === 'pending' && 'Pendiente'}
-                          {tunnel.status === 'provisioning' && 'Aprovisionando'}
-                          {tunnel.status === 'active' && 'Activo'}
-                          {tunnel.status === 'failed' && 'Fallido'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="destructive" size="icon" className="h-8 w-8" disabled={!canManageCloudflareDomains}> {/* Disabled based on canManageCloudflareDomains */}
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </ScrollArea>
+      {/* Docker Tunnels */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="flex items-center gap-2">
+            <Cloud className="h-6 w-6" /> Túneles Docker de Cloudflare
+          </CardTitle>
+          <Button variant="ghost" size="icon" onClick={fetchDockerTunnels} disabled={isLoadingTunnels} title="Refrescar">
+            {isLoadingTunnels ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {isLoadingTunnels ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <p className="ml-2 text-muted-foreground">Cargando túneles...</p>
+            </div>
+          ) : errorTunnels ? (
+            <div className="flex items-center justify-center h-full text-destructive">
+              <AlertCircle className="h-6 w-6 mr-2" />
+              <p>{errorTunnels}</p>
+            </div>
+          ) : dockerTunnels.length === 0 ? (
+            <p className="text-muted-foreground">No hay túneles Docker de Cloudflare configurados aún.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow><TableHead>Dominio Completo</TableHead><TableHead>Servidor</TableHead><TableHead>Contenedor</TableHead><TableHead>Puerto</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow>
+              </TableHeader>
+              <TableBody>
+                {dockerTunnels.map((tunnel) => (
+                  <TableRow key={tunnel.id}>
+                    <TableCell className="font-medium">
+                      <a href={`https://${tunnel.full_domain}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline flex items-center gap-1">
+                        <Globe className="h-4 w-4" /> {tunnel.full_domain}
+                      </a>
+                    </TableCell>
+                    <TableCell>{tunnel.server_name}</TableCell>
+                    <TableCell className="font-mono text-xs">{tunnel.container_id?.substring(0, 12) || 'N/A'}</TableCell>
+                    <TableCell>{tunnel.container_port}</TableCell>
+                    <TableCell>
+                      <span className={cn(
+                        "flex items-center gap-1",
+                        tunnel.status === 'active' && "text-green-500",
+                        tunnel.status === 'failed' && "text-destructive",
+                        (tunnel.status === 'pending' || tunnel.status === 'provisioning') && "text-blue-500"
+                      )}>
+                        {tunnel.status === 'active' && <CheckCircle2 className="h-4 w-4" />}
+                        {tunnel.status === 'failed' && <AlertCircle className="h-4 w-4" />}
+                        {(tunnel.status === 'pending' || tunnel.status === 'provisioning') && <Loader2 className="h-4 w-4 animate-spin" />}
+                        {tunnel.status === 'pending' && 'Pendiente'}
+                        {tunnel.status === 'provisioning' && 'Aprovisionando'}
+                        {tunnel.status === 'active' && 'Activo'}
+                        {tunnel.status === 'failed' && 'Fallido'}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="destructive" size="icon" className="h-8 w-8" disabled={!canManageCloudflareDomains}> {/* Disabled based on canManageCloudflareDomains */}
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

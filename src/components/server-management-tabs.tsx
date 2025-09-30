@@ -7,7 +7,6 @@ import { ServerListTab } from './server-tabs/server-list-tab';
 import { AllDockerContainersTab } from './server-tabs/all-docker-containers-tab';
 import { UsageHistoryTab } from './server-tabs/usage-history-tab';
 import { CloudflareTunnelTab } from './server-tabs/cloudflare-tunnel-tab';
-import { ScrollArea } from './ui/scroll-area';
 
 export function ServerManagementTabs() {
   const [activeTab, setActiveTab] = useState('server-list');
@@ -28,21 +27,19 @@ export function ServerManagementTabs() {
           <History className="h-4 w-4" /> Historial de Uso
         </TabsTrigger>
       </TabsList>
-      <div className="flex-1 overflow-hidden mt-4">
-        <ScrollArea className="h-full w-full">
-          <TabsContent value="server-list" className="h-full">
-            <ServerListTab />
-          </TabsContent>
-          <TabsContent value="docker" className="h-full">
-            <AllDockerContainersTab />
-          </TabsContent>
-          <TabsContent value="cloudflare" className="h-full">
-            <CloudflareTunnelTab />
-          </TabsContent>
-          <TabsContent value="history" className="h-full">
-            <UsageHistoryTab />
-          </TabsContent>
-        </ScrollArea>
+      <div className="mt-4">
+        <TabsContent value="server-list">
+          <ServerListTab />
+        </TabsContent>
+        <TabsContent value="docker">
+          <AllDockerContainersTab />
+        </TabsContent>
+        <TabsContent value="cloudflare">
+          <CloudflareTunnelTab />
+        </TabsContent>
+        <TabsContent value="history">
+          <UsageHistoryTab />
+        </TabsContent>
       </div>
     </Tabs>
   );

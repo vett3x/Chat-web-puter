@@ -280,7 +280,7 @@ export function ServerListTab() {
   };
 
   return (
-    <div className="space-y-8 h-full overflow-y-auto p-1">
+    <div className="space-y-8 p-1">
       <AddServerForm onServerAdded={fetchServers} />
       <Separator />
       <Card>
