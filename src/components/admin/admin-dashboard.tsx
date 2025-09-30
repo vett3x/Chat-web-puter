@@ -140,7 +140,7 @@ export function AdminDashboardTab({ onOpenAlerts }: AdminDashboardTabProps) {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2"><ShieldAlert className="text-destructive" /> Alertas Críticas Recientes</CardTitle>
-            <Button variant="link" size="sm" onClick={onOpenAlerts}>Ver Todas</Button>
+            <Button size="sm" onClick={onOpenAlerts} className="bg-green-600 hover:bg-green-700 text-white">Ver Todas</Button>
           </CardHeader>
           <CardContent>
             {criticalAlerts.length === 0 ? <p className="text-sm text-muted-foreground">No hay alertas críticas.</p> : (
