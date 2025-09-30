@@ -145,7 +145,7 @@ wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
       port: server.ssh_port || 22,
       username: server.ssh_username,
       password: server.ssh_password,
-      readyTimeout: 20000,
+      readyTimeout: 300000, // Increased to 5 minutes (300000 ms)
     });
 
     ws.onclose = () => {
