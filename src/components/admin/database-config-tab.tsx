@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose, DialogTrigger } from '@/components/ui/dialog';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
@@ -64,6 +64,8 @@ export function DatabaseConfigTab() {
   const [isProvisioning, setIsProvisioning] = useState(false);
   const [viewingLogConfig, setViewingLogConfig] = useState<DbConfig | null>(null);
   const [reprovisioningConfig, setReprovisioningConfig] = useState<DbConfig | null>(null);
+  const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
+  const [isProvisionDialogOpen, setIsProvisionDialogOpen] = useState(false);
 
   const configForm = useForm<ConfigFormValues>({
     resolver: zodResolver(configSchema),
@@ -100,11 +102,13 @@ export function DatabaseConfigTab() {
   const handleEdit = (config: DbConfig) => {
     setEditingConfig(config);
     configForm.reset({ ...config, db_password: '' });
+    setIsAddEditDialogOpen(true);
   };
 
   const handleCancelEdit = () => {
     setEditingConfig(null);
     configForm.reset({ nickname: '', is_active: false, db_host: '', db_port: 5432, db_name: 'postgres', db_user: 'postgres', db_password: '' });
+    setIsAddEditDialogOpen(false);
   };
 
   const onConfigSubmit = async (values: ConfigFormValues) => {
@@ -147,11 +151,12 @@ export function DatabaseConfigTab() {
       if (!response.ok) throw new Error(result.message);
       toast.success(result.message, { id: toastId });
       provisionForm.reset();
+      setIsProvisionDialogOpen(false);
     } catch (err: any) {
       toast.error(`Error: ${err.message}`, { id: toastId });
     } finally {
       setIsProvisioning(false);
-      fetchConfigs(); // Always refresh after provisioning attempt
+      fetchConfigs();
     }
   };
 
@@ -233,44 +238,68 @@ export function DatabaseConfigTab() {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Terminal className="h-6 w-6" /> Aprovisionar Nuevo Servidor PostgreSQL</CardTitle>
-          <CardDescription>
-            Instala y configura PostgreSQL de forma segura en un servidor Ubuntu limpio. Crea un usuario y base de datos dedicados para la aplicación.
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Servidores de Base de Datos Configurados</CardTitle>
+          <div className="flex gap-2">
+            <Dialog open={isProvisionDialogOpen} onOpenChange={setIsProvisionDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm"><Terminal className="mr-2 h-4 w-4" /> Aprovisionar Servidor</Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[600px]">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2"><Terminal className="h-6 w-6" /> Aprovisionar Nuevo Servidor PostgreSQL</DialogTitle>
+                  <DialogDescription>Instala y configura PostgreSQL de forma segura en un servidor Ubuntu limpio.</DialogDescription>
+                </DialogHeader>
+                <Form {...provisionForm}>
+                  <form onSubmit={provisionForm.handleSubmit(onProvisionSubmit)} className="space-y-4 py-4">
+                    <FormField control={provisionForm.control} name="ssh_host" render={({ field }) => (<FormItem><FormLabel>IP del Servidor (CT)</FormLabel><FormControl><Input placeholder="10.10.10.210" {...field} disabled={isProvisioning} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={provisionForm.control} name="ssh_user" render={({ field }) => (<FormItem><FormLabel>Usuario SSH</FormLabel><FormControl><Input {...field} disabled={isProvisioning} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={provisionForm.control} name="ssh_password" render={({ field }) => (<FormItem><FormLabel>Contraseña SSH</FormLabel><FormControl><Input type="password" {...field} disabled={isProvisioning} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={provisionForm.control} name="nickname" render={({ field }) => (<FormItem><FormLabel>Apodo del Servidor de BD</FormLabel><FormControl><Input placeholder="Mi Nuevo Servidor DB" {...field} disabled={isProvisioning} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={provisionForm.control} name="db_password" render={({ field }) => (<FormItem><FormLabel>Contraseña para la Base de Datos</FormLabel><FormControl><Input type="password" {...field} disabled={isProvisioning} /></FormControl><FormDescription>Se creará un usuario 'app_user' y una base de datos 'app_db'. Esta contraseña se asignará tanto al superusuario 'postgres' como a 'app_user'.</FormDescription><FormMessage /></FormItem>)} />
+                    <DialogFooter>
+                      <DialogClose asChild><Button type="button" variant="outline" disabled={isProvisioning}>Cancelar</Button></DialogClose>
+                      <Button type="submit" disabled={isProvisioning}>
+                        {isProvisioning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                        Aprovisionar e Instalar
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+            <Dialog open={isAddEditDialogOpen} onOpenChange={setIsAddEditDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline" onClick={() => { setEditingConfig(null); configForm.reset({ nickname: '', is_active: false, db_host: '', db_port: 5432, db_name: 'postgres', db_user: 'postgres', db_password: '' }); setIsAddEditDialogOpen(true); }}>
+                  <PlusCircle className="mr-2 h-4 w-4" /> Añadir Conexión
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[525px]">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2"><Database className="h-6 w-6" /> {editingConfig ? 'Editar Conexión Existente' : 'Añadir Conexión a Base de Datos Existente'}</DialogTitle>
+                </DialogHeader>
+                <Form {...configForm}>
+                  <form onSubmit={configForm.handleSubmit(onConfigSubmit)} className="space-y-4 py-4">
+                    <FormField control={configForm.control} name="nickname" render={({ field }) => (<FormItem><FormLabel>Apodo</FormLabel><FormControl><Input placeholder="Servidor Principal (EU)" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={configForm.control} name="db_host" render={({ field }) => (<FormItem><FormLabel>Host / IP</FormLabel><FormControl><Input placeholder="192.168.1.10" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={configForm.control} name="db_port" render={({ field }) => (<FormItem><FormLabel>Puerto</FormLabel><FormControl><Input type="number" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={configForm.control} name="db_name" render={({ field }) => (<FormItem><FormLabel>Nombre de la Base de Datos</FormLabel><FormControl><Input {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={configForm.control} name="db_user" render={({ field }) => (<FormItem><FormLabel>Usuario Administrador</FormLabel><FormControl><Input {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={configForm.control} name="db_password" render={({ field }) => (<FormItem><FormLabel>Contraseña de Administrador</FormLabel><FormControl><Input type="password" placeholder={editingConfig ? "Dejar en blanco para no cambiar" : "••••••••"} {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={configForm.control} name="is_active" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm"><div className="space-y-0.5"><FormLabel>Activar para nuevos proyectos</FormLabel></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSubmitting} /></FormControl></FormItem>)} />
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={handleCancelEdit} disabled={isSubmitting}>Cancelar</Button>
+                      <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingConfig ? <Save className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />)}
+                        {editingConfig ? 'Guardar Cambios' : 'Añadir Conexión'}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardHeader>
-        <CardContent>
-          <Form {...provisionForm}>
-            <form onSubmit={provisionForm.handleSubmit(onProvisionSubmit)} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField control={provisionForm.control} name="ssh_host" render={({ field }) => (<FormItem><FormLabel>IP del Servidor (CT)</FormLabel><FormControl><Input placeholder="10.10.10.210" {...field} disabled={isProvisioning} /></FormControl><FormMessage /></FormItem>)} />
-                <FormField control={provisionForm.control} name="ssh_user" render={({ field }) => (<FormItem><FormLabel>Usuario SSH</FormLabel><FormControl><Input {...field} disabled={isProvisioning} /></FormControl><FormMessage /></FormItem>)} />
-                <FormField control={provisionForm.control} name="ssh_password" render={({ field }) => (<FormItem><FormLabel>Contraseña SSH</FormLabel><FormControl><Input type="password" {...field} disabled={isProvisioning} /></FormControl><FormMessage /></FormItem>)} />
-                <FormField control={provisionForm.control} name="nickname" render={({ field }) => (<FormItem><FormLabel>Apodo del Servidor de BD</FormLabel><FormControl><Input placeholder="Mi Nuevo Servidor DB" {...field} disabled={isProvisioning} /></FormControl><FormMessage /></FormItem>)} />
-                <FormField control={provisionForm.control} name="db_password" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Contraseña para la Base de Datos</FormLabel>
-                    <FormControl><Input type="password" {...field} disabled={isProvisioning} /></FormControl>
-                    <FormDescription>
-                      Se creará un usuario 'app_user' y una base de datos 'app_db'. Esta contraseña se asignará tanto al superusuario 'postgres' como a 'app_user'.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              </div>
-              <Button type="submit" disabled={isProvisioning}>
-                {isProvisioning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
-                Aprovisionar e Instalar
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-
-      <Separator />
-
-      <Card>
-        <CardHeader><CardTitle>Servidores de Base de Datos Configurados</CardTitle></CardHeader>
         <CardContent>
           {isLoading ? <div className="flex items-center justify-center py-4"><Loader2 className="h-6 w-6 animate-spin" /></div> : (
             <Table>
@@ -306,34 +335,6 @@ export function DatabaseConfigTab() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
-
-      <Separator />
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Database className="h-6 w-6" /> {editingConfig ? 'Editar Conexión Existente' : 'Añadir Conexión a Base de Datos Existente'}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Form {...configForm}>
-            <form onSubmit={configForm.handleSubmit(onConfigSubmit)} className="space-y-4">
-              <FormField control={configForm.control} name="nickname" render={({ field }) => (<FormItem><FormLabel>Apodo</FormLabel><FormControl><Input placeholder="Servidor Principal (EU)" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={configForm.control} name="db_host" render={({ field }) => (<FormItem><FormLabel>Host / IP</FormLabel><FormControl><Input placeholder="192.168.1.10" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={configForm.control} name="db_port" render={({ field }) => (<FormItem><FormLabel>Puerto</FormLabel><FormControl><Input type="number" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={configForm.control} name="db_name" render={({ field }) => (<FormItem><FormLabel>Nombre de la Base de Datos</FormLabel><FormControl><Input {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={configForm.control} name="db_user" render={({ field }) => (<FormItem><FormLabel>Usuario Administrador</FormLabel><FormControl><Input {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={configForm.control} name="db_password" render={({ field }) => (<FormItem><FormLabel>Contraseña de Administrador</FormLabel><FormControl><Input type="password" placeholder={editingConfig ? "Dejar en blanco para no cambiar" : "••••••••"} {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={configForm.control} name="is_active" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm"><div className="space-y-0.5"><FormLabel>Activar para nuevos proyectos</FormLabel></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSubmitting} /></FormControl></FormItem>)} />
-              <div className="flex gap-2">
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingConfig ? <Save className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />)}
-                  {editingConfig ? 'Guardar Cambios' : 'Añadir Conexión'}
-                </Button>
-                {editingConfig && <Button type="button" variant="outline" onClick={handleCancelEdit} disabled={isSubmitting}>Cancelar</Button>}
-              </div>
-            </form>
-          </Form>
         </CardContent>
       </Card>
 
