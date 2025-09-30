@@ -88,16 +88,22 @@ export async function provisionApp(data: AppProvisioningData) {
     server = serverData;
     serverIdForLog = server.id;
 
-    appDbCredentials = await createAppDatabaseSchema(appId);
+    let dbEnvVars = '';
+    if (false) { // <--- AQUÍ ESTÁ LA PRUEBA QUE PEDISTE
+      await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Creando esquema de base de datos dedicado para la aplicación...\n`);
+      appDbCredentials = await createAppDatabaseSchema(appId);
+      await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Esquema de base de datos '${appDbCredentials.db_name}' y usuario creados.\n`);
+      dbEnvVars = `-e DB_HOST=${appDbCredentials.db_host} -e DB_PORT=${appDbCredentials.db_port} -e DB_NAME=${appDbCredentials.db_name} -e DB_USER=${appDbCredentials.db_user} -e DB_PASSWORD=${appDbCredentials.db_password}`;
+    } else {
+      await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] OMITIENDO la creación de la base de datos para la prueba.\n`);
+    }
 
     const containerPort = 3000;
     const hostPort = generateRandomPort();
     containerName = `app-${appName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${appId.substring(0, 8)}`;
     
     const quotaFlags = profile.role !== 'super_admin' ? `--cpus="${profile.cpu_limit}" --memory="${profile.memory_limit_mb}m"` : '';
-    const dbEnvVars = `-e DB_HOST=${appDbCredentials.db_host} -e DB_PORT=${appDbCredentials.db_port} -e DB_NAME=${appDbCredentials.db_name} -e DB_USER=${appDbCredentials.db_user} -e DB_PASSWORD=${appDbCredentials.db_password}`;
 
-    // Fetch the dynamic docker run template
     const { data: settings, error: settingsError } = await supabaseAdmin.from('global_settings').select('docker_run_template').single();
     if (settingsError || !settings?.docker_run_template) throw new Error('No se pudo cargar la plantilla de aprovisionamiento.');
     
@@ -106,7 +112,7 @@ export async function provisionApp(data: AppProvisioningData) {
       .replace('[nombre-generado]', containerName)
       .replace('[puerto-aleatorio]', String(hostPort))
       .replace('[quota_flags]', quotaFlags)
-      .replace('[variables_de_entorno_bd]', dbEnvVars)
+      .replace('[variables_de_entorno_bd]', dbEnvVars) // Esto será una cadena vacía
       .replace('[volumen-generado]', `${containerName}-app-data:/app`)
       .replace('[imagen_base]', 'node:lts-bookworm')
       .replace('[entrypoint_command]', 'tail -f /dev/null');
@@ -119,11 +125,11 @@ export async function provisionApp(data: AppProvisioningData) {
     await supabaseAdmin.from('user_apps').update({ 
       server_id: server.id, 
       container_id: containerId,
-      db_host: appDbCredentials.db_host,
-      db_port: appDbCredentials.db_port,
-      db_name: appDbCredentials.db_name,
-      db_user: appDbCredentials.db_user,
-      db_password: appDbCredentials.db_password,
+      db_host: appDbCredentials?.db_host || null,
+      db_port: appDbCredentials?.db_port || null,
+      db_name: appDbCredentials?.db_name || null,
+      db_user: appDbCredentials?.db_user || null,
+      db_password: appDbCredentials?.db_password || null,
     }).eq('id', appId);
 
     const finalInstallScript = DEFAULT_INSTALL_DEPS_SCRIPT.replace(/__CONTAINER_PORT__/g, String(containerPort));
