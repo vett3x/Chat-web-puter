@@ -17,6 +17,7 @@ import { UpdateManagerDialog } from "@/components/update-manager-dialog";
 import { ApiManagementDialog } from "@/components/api-management-dialog";
 import { AlertsDialog } from "@/components/alerts-dialog";
 import { AppVersionsBar } from "@/components/app-versions-bar";
+import { AppProvisioningChatPanel } from "@/components/app-provisioning-chat-panel"; // NEW IMPORT
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -450,24 +451,28 @@ function HomePageContent() {
         ) : (
           <ResizablePanelGroup direction="horizontal" className="flex-1">
             <ResizablePanel defaultSize={50} minSize={30}>
-              <MemoizedChatInterface
-                ref={chatInterfaceRef}
-                key={selectedItem?.conversationId || 'no-conversation'}
-                userId={userId}
-                conversationId={selectedItem?.conversationId || null}
-                onNewConversationCreated={handleNewConversationCreated}
-                onConversationTitleUpdate={() => {}} // Local updates are handled by the sidebar's realtime hook
-                aiResponseSpeed={aiResponseSpeed}
-                isAppProvisioning={isAppProvisioning}
-                isAppDeleting={isAppDeleting}
-                appPrompt={appPrompt} // Pass the constructed appPrompt
-                appId={appId}
-                onWriteFiles={writeFilesToApp}
-                isAppChat={selectedItem?.type === 'app'}
-                onSidebarDataRefresh={() => {}} // Sidebar refreshes itself
-                userApiKeys={userApiKeys}
-                isLoadingApiKeys={isLoadingApiKeys}
-              />
+              {isAppProvisioning ? (
+                <AppProvisioningChatPanel />
+              ) : (
+                <MemoizedChatInterface
+                  ref={chatInterfaceRef}
+                  key={selectedItem?.conversationId || 'no-conversation'}
+                  userId={userId}
+                  conversationId={selectedItem?.conversationId || null}
+                  onNewConversationCreated={handleNewConversationCreated}
+                  onConversationTitleUpdate={() => {}} // Local updates are handled by the sidebar's realtime hook
+                  aiResponseSpeed={aiResponseSpeed}
+                  isAppProvisioning={isAppProvisioning}
+                  isAppDeleting={isAppDeleting}
+                  appPrompt={appPrompt} // Pass the constructed appPrompt
+                  appId={appId}
+                  onWriteFiles={writeFilesToApp}
+                  isAppChat={selectedItem?.type === 'app'}
+                  onSidebarDataRefresh={() => {}} // Sidebar refreshes itself
+                  userApiKeys={userApiKeys}
+                  isLoadingApiKeys={isLoadingApiKeys}
+                />
+              )}
             </ResizablePanel>
             {selectedItem?.type === 'app' && (
               <>
