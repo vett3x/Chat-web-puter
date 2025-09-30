@@ -17,9 +17,10 @@ import { AdminPanelTabs } from './admin-panel-tabs'; // Import the new tabs comp
 interface AdminPanelDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onOpenAlerts: () => void;
 }
 
-export function AdminPanelDialog({ open, onOpenChange }: AdminPanelDialogProps) {
+export function AdminPanelDialog({ open, onOpenChange, onOpenAlerts }: AdminPanelDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[95vw] p-6 h-[95vh] flex flex-col">
@@ -32,7 +33,7 @@ export function AdminPanelDialog({ open, onOpenChange }: AdminPanelDialogProps) 
           </DialogDescription>
         </DialogHeader>
         <div className="flex-1 py-4 overflow-hidden">
-          <AdminPanelTabs />
+          <AdminPanelTabs onOpenAlerts={onOpenAlerts} />
         </div>
         <DialogFooter>
           <DialogClose asChild>

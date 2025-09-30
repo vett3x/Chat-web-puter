@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, ShieldAlert, RefreshCw, AlertTriangle, Trash2 } from 'lucide-react';
+import { Loader2, ShieldAlert, RefreshCw, AlertTriangle, Trash2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -30,6 +30,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Input } from '@/components/ui/input';
 
 interface Alert {
   id: string;
@@ -51,8 +52,10 @@ export function AlertsDialog({ open, onOpenChange }: AlertsDialogProps) {
   const isSuperAdmin = userRole === 'super_admin';
 
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [filteredAlerts, setFilteredAlerts] = useState<Alert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isClearingAll, setIsClearingAll] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const fetchAlerts = useCallback(async () => {
     setIsLoading(true);
@@ -76,6 +79,17 @@ export function AlertsDialog({ open, onOpenChange }: AlertsDialogProps) {
       fetchAlerts();
     }
   }, [open, fetchAlerts]);
+
+  useEffect(() => {
+    const lowerCaseSearch = searchTerm.toLowerCase();
+    const filtered = alerts.filter(alert =>
+      alert.description.toLowerCase().includes(lowerCaseSearch) ||
+      alert.event_type.toLowerCase().includes(lowerCaseSearch) ||
+      alert.user_name.toLowerCase().includes(lowerCaseSearch) ||
+      alert.server_name.toLowerCase().includes(lowerCaseSearch)
+    );
+    setFilteredAlerts(filtered);
+  }, [searchTerm, alerts]);
 
   const handleClearAllAlerts = async () => {
     setIsClearingAll(true);
@@ -106,13 +120,22 @@ export function AlertsDialog({ open, onOpenChange }: AlertsDialogProps) {
           </DialogDescription>
         </DialogHeader>
         <div className="flex-1 py-4 overflow-hidden">
-          <div className="flex justify-end gap-2 mb-2">
+          <div className="flex justify-between items-center mb-2 gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar alertas..."
+                className="pl-9"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
             {isSuperAdmin && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive" size="sm" disabled={isLoading || isClearingAll || alerts.length === 0}>
                     {isClearingAll ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                    Limpiar Todo el Historial
+                    Limpiar Todo
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
@@ -144,6 +167,10 @@ export function AlertsDialog({ open, onOpenChange }: AlertsDialogProps) {
               <div className="flex items-center justify-center h-full text-muted-foreground">
                 <p>No hay alertas críticas.</p>
               </div>
+            ) : filteredAlerts.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                <p>No hay alertas que coincidan con tu búsqueda.</p>
+              </div>
             ) : (
               <Table className="table-fixed w-full">
                 <TableHeader>
@@ -156,7 +183,7 @@ export function AlertsDialog({ open, onOpenChange }: AlertsDialogProps) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {alerts.map((alert) => (
+                  {filteredAlerts.map((alert) => (
                     <TableRow key={alert.id} className="bg-destructive/10 hover:bg-destructive/20 text-destructive-foreground">
                       <TableCell className="text-xs font-mono align-top">
                         {format(new Date(alert.created_at), 'dd/MM/yyyy HH:mm:ss', { locale: es })}

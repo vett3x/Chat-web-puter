@@ -462,7 +462,7 @@ function HomePageContent() {
         isLoadingApiKeys={isLoadingApiKeys}
         currentUserRole={userRole}
       />
-      {isAdmin && <AdminPanelDialog open={isAdminPanelOpen} onOpenChange={setIsAdminPanelOpen} />}
+      {isAdmin && <AdminPanelDialog open={isAdminPanelOpen} onOpenChange={setIsAdminPanelOpen} onOpenAlerts={handleOpenAlerts} />}
       {isAdmin && <UserManagementDialog open={isUserManagementOpen} onOpenChange={setIsUserManagementOpen} />}
       <ApiManagementDialog open={isApiManagementOpen} onOpenChange={setIsApiManagementOpen} />
       {isAdmin && <AlertsDialog open={isAlertsOpen} onOpenChange={setIsAlertsOpen} />}

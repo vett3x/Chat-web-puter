@@ -11,7 +11,11 @@ import { AdminDashboardTab } from './admin/admin-dashboard';
 import { DatabaseConfigTab } from './admin/database-config-tab';
 import { InfrastructureTab } from './server-tabs/infrastructure-tab'; // New import
 
-export function AdminPanelTabs() {
+interface AdminPanelTabsProps {
+  onOpenAlerts: () => void;
+}
+
+export function AdminPanelTabs({ onOpenAlerts }: AdminPanelTabsProps) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const { userRole } = useSession();
   const isSuperAdmin = userRole === 'super_admin';
@@ -42,7 +46,7 @@ export function AdminPanelTabs() {
         <ScrollArea className="h-full w-full">
           {isSuperAdmin && (
             <TabsContent value="dashboard" className="h-full">
-              <AdminDashboardTab />
+              <AdminDashboardTab onOpenAlerts={onOpenAlerts} />
             </TabsContent>
           )}
           <TabsContent value="servers" className="h-full">

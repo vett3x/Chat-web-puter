@@ -46,7 +46,11 @@ const KpiCard = ({ title, value, icon, className }: { title: string; value: numb
   </Card>
 );
 
-export function AdminDashboardTab() {
+interface AdminDashboardTabProps {
+  onOpenAlerts: () => void;
+}
+
+export function AdminDashboardTab({ onOpenAlerts }: AdminDashboardTabProps) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isToggling, setIsToggling] = useState<string | null>(null);
@@ -134,7 +138,10 @@ export function AdminDashboardTab() {
       {/* Alerts & Tickets */}
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><ShieldAlert className="text-destructive" /> Alertas Críticas Recientes</CardTitle></CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2"><ShieldAlert className="text-destructive" /> Alertas Críticas Recientes</CardTitle>
+            <Button variant="link" size="sm" onClick={onOpenAlerts}>Ver Todas</Button>
+          </CardHeader>
           <CardContent>
             {criticalAlerts.length === 0 ? <p className="text-sm text-muted-foreground">No hay alertas críticas.</p> : (
               <ul className="space-y-2">{criticalAlerts.map(alert => (<li key={alert.id} className="text-xs"><span className="font-semibold">{alert.event_type}:</span> {alert.description.substring(0, 80)}...</li>))}</ul>
