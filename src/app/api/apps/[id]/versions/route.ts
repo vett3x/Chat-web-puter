@@ -25,52 +25,46 @@ export async function GET(req: NextRequest, context: any) {
     const userId = await getUserId();
 
     if (timestamp) {
-      // Fetch all files for a specific timestamp (version)
+      // Fetch all files for a specific version's timestamp
+      const { data: version, error: versionError } = await supabaseAdmin
+        .from('app_versions')
+        .select('id')
+        .eq('app_id', appId)
+        .eq('user_id', userId)
+        .eq('created_at', timestamp)
+        .single();
+
+      if (versionError || !version) {
+        throw new Error('Versión no encontrada.');
+      }
+
       const { data: files, error } = await supabaseAdmin
         .from('app_file_backups')
         .select('file_path, file_content')
-        .eq('app_id', appId)
-        .eq('user_id', userId)
-        .eq('created_at', timestamp); // Filter by exact timestamp
+        .eq('version_id', version.id);
 
       if (error) {
-        console.error(`[API /apps/${appId}/versions] Error fetching files for timestamp ${timestamp}:`, error);
+        console.error(`[API /apps/${appId}/versions] Error fetching files for version ${version.id}:`, error);
         throw new Error('Error al cargar los archivos de la versión.');
       }
 
       return NextResponse.json(files);
 
     } else {
-      // Fetch unique timestamps (versions) and their file counts
+      // Fetch unique versions and their file counts
       const { data, error } = await supabaseAdmin
-        .from('app_file_backups')
-        .select('created_at, file_path') // Select file_path to count
-        .eq('app_id', appId)
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+        .rpc('get_app_versions_with_file_counts', {
+          p_app_id: appId,
+          p_user_id: userId,
+          p_limit: MAX_VERSIONS_TO_SHOW
+        });
 
       if (error) {
-        console.error(`[API /apps/${appId}/versions] Error fetching versions:`, error);
+        console.error(`[API /apps/${appId}/versions] Error fetching versions with RPC:`, error);
         throw new Error('Error al cargar las versiones de la aplicación.');
       }
 
-      // Group by created_at and count files
-      const versionsMap = new Map<string, number>();
-      data?.forEach(row => {
-        const createdAt = row.created_at;
-        versionsMap.set(createdAt, (versionsMap.get(createdAt) || 0) + 1);
-      });
-
-      const versions = Array.from(versionsMap.entries()).map(([createdAt, file_count]) => ({
-        created_at: createdAt,
-        file_count: file_count,
-      }));
-
-      // Sort again just in case the map doesn't preserve order perfectly, and limit
-      const sortedVersions = versions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      const limitedVersions = sortedVersions.slice(0, MAX_VERSIONS_TO_SHOW);
-
-      return NextResponse.json(limitedVersions);
+      return NextResponse.json(data || []);
     }
   } catch (error: any) {
     console.error(`[API /apps/${appId}/versions] Error:`, error);
