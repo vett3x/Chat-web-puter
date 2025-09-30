@@ -65,6 +65,8 @@ export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCo
     userApiKeys,
     isLoadingApiKeys,
     onProjectDetailsGathered: (details) => {
+      // This callback is triggered when the AI is ready to create
+      // The actual creation will happen when the user clicks the button
       console.log("AI is ready to create project with details:", details);
     },
   });
@@ -85,6 +87,7 @@ export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCo
       return;
     }
     
+    // Use the projectDetails gathered by the AI
     const { name, main_purpose, key_features, preferred_technologies } = projectDetails;
 
     setIsGeneratingApp(true);
@@ -130,7 +133,7 @@ export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] p-6 h-[80vh] flex flex-col"> {/* Increased width */}
+      <DialogContent className="sm:max-w-[800px] p-6 h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Wand2 className="h-6 w-6 text-primary-light-purple" /> Nuevo Proyecto DeepAI Coder
@@ -144,17 +147,17 @@ export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCo
             <div className="space-y-4">
               {messages.map((msg, index) => (
                 <div key={index} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`flex gap-2 w-full ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}> {/* Full width for bubbles */}
+                  <div className={`flex gap-2 w-full ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                     <div className="flex-shrink-0">
                       {msg.role === 'user' ? (
-                        <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center"><User className="h-4 w-4 text-primary-foreground" /></div>
+                        <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center"><User className="h-3 w-3 text-primary-foreground" /></div>
                       ) : (
                         <div className="w-8 h-8 bg-secondary rounded-md flex items-center justify-center">
                           <Bot className="h-4 w-4 text-secondary-foreground" />
-                        </div> {/* Square AI avatar */}
+                        </div>
                       )}
                     </div>
-                    <div className={`rounded-xl p-3 text-sm ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}> {/* Rounded-xl for Apple style */}
+                    <div className={`rounded-xl p-3 text-sm ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
                       {msg.isTyping ? (
                         <div className="flex items-center gap-2">
                           <Loader2 className="h-4 w-4 animate-spin" />
