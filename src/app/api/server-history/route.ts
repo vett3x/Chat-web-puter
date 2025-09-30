@@ -107,7 +107,7 @@ export async function GET(req: NextRequest) {
 
   // Both Admins and Super Admins see all events, so no user_id filter is applied here.
 
-  const { data: events, error: fetchError } = await query.order('created_at', { ascending: false });
+  const { data: events, error: fetchError } = await query.order('created_at', { ascending: false }).limit(100);
 
   if (fetchError) {
     console.error('Error fetching server events from Supabase (admin):', fetchError);
