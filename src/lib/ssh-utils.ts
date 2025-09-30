@@ -21,7 +21,7 @@ interface ServerDetails {
 }
 
 // Common SSH options to avoid interactive prompts and add a connection timeout
-const SSH_OPTIONS = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10";
+const SSH_OPTIONS = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30"; // Increased timeout to 30 seconds
 
 /**
  * Executes an SSH command on a remote server using the native ssh client.
