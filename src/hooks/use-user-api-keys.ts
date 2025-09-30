@@ -37,16 +37,24 @@ export function useUserApiKeys() {
       const response = await fetch('/api/ai-keys');
       const data = await response.json();
       if (!response.ok) throw new Error(data.message);
-      setKeys(data);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(`api_keys_${userId}`, JSON.stringify(data));
-      }
+      
+      // NEW: Only update state if the data has actually changed
+      setKeys(prevKeys => {
+        if (JSON.stringify(prevKeys) === JSON.stringify(data)) {
+          return prevKeys; // No change, return previous state to prevent re-render
+        }
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`api_keys_${userId}`, JSON.stringify(data));
+        }
+        return data; // Data changed, update state
+      });
+
     } catch (error: any) {
       toast.error(`Error al refrescar las claves de API: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
-  }, [userId]);
+  }, [userId]); // Dependency on userId is correct
 
   useEffect(() => {
     if (isSessionLoading) return;
@@ -55,9 +63,11 @@ export function useUserApiKeys() {
       const cachedKeys = typeof window !== 'undefined' ? localStorage.getItem(`api_keys_${userId}`) : null;
       if (cachedKeys) {
         try {
-          setKeys(JSON.parse(cachedKeys));
+          const parsedCachedKeys = JSON.parse(cachedKeys);
+          setKeys(parsedCachedKeys);
           setIsLoading(false);
         } catch (e) {
+          console.error("Error parsing cached API keys:", e);
           localStorage.removeItem(`api_keys_${userId}`);
         }
       } else {
@@ -70,7 +80,7 @@ export function useUserApiKeys() {
     }
   }, [userId, isSessionLoading, fetchKeys]);
 
-  // NEW: Realtime subscription instead of polling
+  // Realtime subscription
   useEffect(() => {
     if (!userId) return;
 
@@ -80,8 +90,14 @@ export function useUserApiKeys() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'user_api_keys' },
         (payload) => {
-          console.log('Realtime change detected on user_api_keys, refetching.', payload);
-          fetchKeys();
+          // Cast payload.new and payload.old to Partial<ApiKey> for type safety
+          const newKey = payload.new as Partial<ApiKey>;
+          const oldKey = payload.old as Partial<ApiKey>;
+          // Check if the change is relevant to the current user or a global key
+          const isRelevant = newKey?.user_id === userId || newKey?.is_global || oldKey?.user_id === userId || oldKey?.is_global;
+          if (isRelevant) {
+            fetchKeys();
+          }
         }
       )
       .subscribe();

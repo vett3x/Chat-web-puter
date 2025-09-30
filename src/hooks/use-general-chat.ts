@@ -135,6 +135,12 @@ export function useGeneralChat({
   const [page, setPage] = useState(0);
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
 
+  // NEW: Refs for selectedModel and autoFixStatus
+  const selectedModelRef = useRef(selectedModel);
+  useEffect(() => { selectedModelRef.current = selectedModel; }, [selectedModel]);
+  const autoFixStatusRef = useRef<AutoFixStatus>('idle'); // Initialize ref with default status
+  useEffect(() => { autoFixStatusRef.current = 'idle'; }, []); // Reset on mount
+
   useEffect(() => {
     const checkPuter = () => {
       if (typeof window !== 'undefined' && window.puter) {
@@ -210,80 +216,6 @@ export function useGeneralChat({
     }));
   }, []);
 
-  const loadConversationData = useCallback(async () => {
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-    debounceTimeoutRef.current = setTimeout(async () => {
-      if (conversationId && userId) {
-        setIsLoading(true);
-        setMessages([]);
-        setPage(0);
-        setHasMoreMessages(true);
-        
-        const details = await getConversationDetails(conversationId);
-        
-        if (details?.model && (details.model.startsWith('puter:') || details.model.startsWith('user_key:'))) {
-          setSelectedModel(details.model);
-        } else {
-          setSelectedModel(determineDefaultModel(userApiKeys));
-        }
-
-        const fetchedMsgs = await getMessagesFromDB(conversationId, 0);
-        setMessages(fetchedMsgs);
-        if (fetchedMsgs.length < MESSAGES_PER_PAGE) {
-          setHasMoreMessages(false);
-        }
-        setIsLoading(false);
-      } else {
-        setMessages([]);
-      }
-    }, 100);
-  }, [conversationId, userId, getMessagesFromDB, getConversationDetails, userApiKeys]);
-
-  const loadMoreMessages = useCallback(async () => {
-    if (!conversationId || !hasMoreMessages || isLoading) return;
-
-    const nextPage = page + 1;
-    const olderMessages = await getMessagesFromDB(conversationId, nextPage);
-
-    if (olderMessages.length > 0) {
-      setMessages(prev => [...olderMessages, ...prev]);
-      setPage(nextPage);
-    }
-    if (olderMessages.length < MESSAGES_PER_PAGE) {
-      setHasMoreMessages(false);
-    }
-  }, [conversationId, hasMoreMessages, isLoading, page, getMessagesFromDB]);
-
-  useEffect(() => {
-    loadConversationData();
-  }, [loadConversationData]);
-
-  const createNewConversationInDB = async () => {
-    if (!userId) return null;
-    const { data, error } = await supabase.from('conversations').insert({ user_id: userId, title: 'Nueva conversación', model: selectedModel }).select('id, title').single();
-    if (error) {
-      toast.error('Error al crear una nueva conversación.');
-      return null;
-    }
-    onNewConversationCreated(data.id);
-    onConversationTitleUpdate(data.id, data.title);
-    onSidebarDataRefresh();
-    return data.id;
-  };
-
-  const updateConversationModelInDB = async (convId: string, model: string) => {
-    if (!userId) return;
-    const { error } = await supabase.from('conversations').update({ model }).eq('id', convId);
-    if (error) toast.error('Error al actualizar el modelo de la conversación.');
-  };
-
-  const handleModelChange = (modelValue: string) => {
-    setSelectedModel(modelValue);
-    if (conversationId) updateConversationModelInDB(conversationId, modelValue);
-  };
-
   const saveMessageToDB = async (convId: string, msg: Omit<Message, 'timestamp' | 'id'>) => {
     if (!userId) return null;
     const { data, error } = await supabase.from('messages').insert({ 
@@ -338,12 +270,12 @@ export function useGeneralChat({
       const finalMessagesForApi = [systemMessage, ...messagesForApi];
 
       let fullResponseText = '';
-      let modelUsedForResponse = selectedModel;
+      let modelUsedForResponse = selectedModelRef.current; // Use ref here
 
-      const selectedKey = userApiKeys.find(k => `user_key:${k.id}` === selectedModel);
+      const selectedKey = userApiKeys.find(k => `user_key:${k.id}` === selectedModelRef.current); // Use ref here
       const isCustomEndpoint = selectedKey?.provider === 'custom_endpoint';
 
-      if (selectedModel.startsWith('puter:') || isCustomEndpoint) {
+      if (selectedModelRef.current.startsWith('puter:') || isCustomEndpoint) { // Use ref here
         let response;
         if (isCustomEndpoint) {
           const apiResponse = await Promise.race([
@@ -352,7 +284,7 @@ export function useGeneralChat({
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 messages: finalMessagesForApi,
-                selectedKeyId: selectedModel.substring(9),
+                selectedKeyId: selectedModelRef.current.substring(9), // Use ref here
                 stream: false,
               }),
               signal: controller.signal,
@@ -366,7 +298,7 @@ export function useGeneralChat({
             throw new Error('Respuesta inesperada del endpoint personalizado.');
           }
         } else {
-          const actualModelForPuter = selectedModel.substring(6);
+          const actualModelForPuter = selectedModelRef.current.substring(6); // Use ref here
           response = await Promise.race([
             window.puter.ai.chat(finalMessagesForApi, { model: actualModelForPuter }),
             timeoutPromise
@@ -374,14 +306,14 @@ export function useGeneralChat({
         }
         if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
         fullResponseText = response?.message?.content || 'Sin contenido.';
-      } else if (selectedModel.startsWith('user_key:')) {
+      } else if (selectedModelRef.current.startsWith('user_key:')) { // Use ref here
         const apiResponse = await Promise.race([
           fetch('/api/ai/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               messages: finalMessagesForApi,
-              selectedKeyId: selectedModel.substring(9),
+              selectedKeyId: selectedModelRef.current.substring(9), // Use ref here
               stream: true,
             }),
             signal: controller.signal,
@@ -439,7 +371,81 @@ export function useGeneralChat({
       clearTimeout(timeoutId);
       setIsLoading(false);
     }
-  }, [userId, saveMessageToDB, selectedModel, userApiKeys]);
+  }, [userId, saveMessageToDB, userApiKeys]); // Removed selectedModel and autoFixStatus from dependencies
+
+  const loadConversationData = useCallback(async () => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    debounceTimeoutRef.current = setTimeout(async () => {
+      if (conversationId && userId) {
+        setIsLoading(true);
+        setMessages([]);
+        setPage(0);
+        setHasMoreMessages(true);
+        
+        const details = await getConversationDetails(conversationId);
+        
+        if (details?.model && (details.model.startsWith('puter:') || details.model.startsWith('user_key:'))) {
+          setSelectedModel(details.model);
+        } else {
+          setSelectedModel(determineDefaultModel(userApiKeys));
+        }
+
+        const fetchedMsgs = await getMessagesFromDB(conversationId, 0);
+        setMessages(fetchedMsgs);
+        if (fetchedMsgs.length < MESSAGES_PER_PAGE) {
+          setHasMoreMessages(false);
+        }
+        setIsLoading(false);
+      } else {
+        setMessages([]);
+      }
+    }, 100);
+  }, [conversationId, userId, getMessagesFromDB, getConversationDetails, userApiKeys]); // Removed getAndStreamAIResponse from dependencies
+
+  const loadMoreMessages = useCallback(async () => {
+    if (!conversationId || !hasMoreMessages || isLoading) return;
+
+    const nextPage = page + 1;
+    const olderMessages = await getMessagesFromDB(conversationId, nextPage);
+
+    if (olderMessages.length > 0) {
+      setMessages(prev => [...olderMessages, ...prev]);
+      setPage(nextPage);
+    }
+    if (olderMessages.length < MESSAGES_PER_PAGE) {
+      setHasMoreMessages(false);
+    }
+  }, [conversationId, hasMoreMessages, isLoading, page, getMessagesFromDB]);
+
+  useEffect(() => {
+    loadConversationData();
+  }, [loadConversationData]);
+
+  const createNewConversationInDB = async () => {
+    if (!userId) return null;
+    const { data, error } = await supabase.from('conversations').insert({ user_id: userId, title: 'Nueva conversación', model: selectedModelRef.current }).select('id, title').single(); // Use ref here
+    if (error) {
+      toast.error('Error al crear una nueva conversación.');
+      return null;
+    }
+    onNewConversationCreated(data.id);
+    onConversationTitleUpdate(data.id, data.title);
+    onSidebarDataRefresh();
+    return data.id;
+  };
+
+  const updateConversationModelInDB = async (convId: string, model: string) => {
+    if (!userId) return;
+    const { error } = await supabase.from('conversations').update({ model }).eq('id', convId);
+    if (error) toast.error('Error al actualizar el modelo de la conversación.');
+  };
+
+  const handleModelChange = (modelValue: string) => {
+    setSelectedModel(modelValue);
+    if (conversationId) updateConversationModelInDB(conversationId, modelValue);
+  };
 
   const sendMessage = useCallback(async (content: PuterContentPart[], messageText: string) => {
     if (!userId) {

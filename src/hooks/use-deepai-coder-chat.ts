@@ -149,6 +149,12 @@ export function useDeepAICoderChat({
   const [hasMoreMessages, setHasMoreMessages] = useState(true); // Corrected line
   const [allowedCommands, setAllowedCommands] = useState<string[]>([]); // 1. Estado para almacenar los comandos permitidos
 
+  // NEW: Refs for selectedModel and autoFixStatus
+  const selectedModelRef = useRef(selectedModel);
+  useEffect(() => { selectedModelRef.current = selectedModel; }, [selectedModel]);
+  const autoFixStatusRef = useRef(autoFixStatus);
+  useEffect(() => { autoFixStatusRef.current = autoFixStatus; }, [autoFixStatus]);
+
   // 2. Cargar los comandos permitidos al montar el componente
   useEffect(() => {
     const fetchAllowedCommands = async () => {
@@ -428,12 +434,12 @@ export function useDeepAICoderChat({
       const finalMessagesForApi = [systemMessage, ...conversationMessagesForApi];
 
       let fullResponseText = '';
-      let modelUsedForResponse = selectedModel;
+      let modelUsedForResponse = selectedModelRef.current; // Use ref here
 
-      const selectedKey = userApiKeys.find(k => `user_key:${k.id}` === selectedModel);
+      const selectedKey = userApiKeys.find(k => `user_key:${k.id}` === selectedModelRef.current); // Use ref here
       const isCustomEndpoint = selectedKey?.provider === 'custom_endpoint';
 
-      if (selectedModel.startsWith('puter:') || isCustomEndpoint) {
+      if (selectedModelRef.current.startsWith('puter:') || isCustomEndpoint) { // Use ref here
         let response;
         if (isCustomEndpoint) {
           const apiResponse = await Promise.race([
@@ -442,7 +448,7 @@ export function useDeepAICoderChat({
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 messages: finalMessagesForApi,
-                selectedKeyId: selectedModel.substring(9),
+                selectedKeyId: selectedModelRef.current.substring(9), // Use ref here
                 stream: false,
               }),
               signal: controller.signal,
@@ -456,7 +462,7 @@ export function useDeepAICoderChat({
             throw new Error('Respuesta inesperada del endpoint personalizado.');
           }
         } else {
-          const actualModelForPuter = selectedModel.substring(6);
+          const actualModelForPuter = selectedModelRef.current.substring(6); // Use ref here
           response = await Promise.race([
             window.puter.ai.chat(finalMessagesForApi, { model: actualModelForPuter }),
             timeoutPromise
@@ -464,14 +470,14 @@ export function useDeepAICoderChat({
         }
         if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
         fullResponseText = response?.message?.content || 'Sin contenido.';
-      } else if (selectedModel.startsWith('user_key:')) {
+      } else if (selectedModelRef.current.startsWith('user_key:')) { // Use ref here
         const apiResponse = await Promise.race([
           fetch('/api/ai/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               messages: finalMessagesForApi,
-              selectedKeyId: selectedModel.substring(9),
+              selectedKeyId: selectedModelRef.current.substring(9), // Use ref here
               stream: true,
             }),
             signal: controller.signal,
@@ -559,18 +565,18 @@ export function useDeepAICoderChat({
     } catch (error: any) {
       console.error('[API /ai/chat] Error:', error);
       let userFriendlyMessage = `Error en la API de IA: ${error.name === 'AbortError' ? 'La IA tardó demasiado en responder.' : error.message}`;
-      setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: userFriendlyMessage, isTyping: false, isNew: true, isConstructionPlan: false, planApproved: false, isCorrectionPlan: false, correctionApproved: false, isErrorAnalysisRequest: false, isAnimated: false } : m));
+      setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: userFriendlyMessage, isTyping: false, isNew: true, isConstructionPlan: false, planApproved: false, isCorrectionPlan: false, isErrorAnalysisRequest: false, isAnimated: false } : m));
       toast.error(userFriendlyMessage);
       setAutoFixStatus('failed');
     } finally {
       clearTimeout(timeoutId);
       setIsLoading(false);
     }
-  }, [appId, appPrompt, userId, saveMessageToDB, chatMode, userApiKeys, onWriteFiles, selectedModel, autoFixStatus, conversationId, allowedCommands, executeCommandsInContainer, executeSqlCommands]);
+  }, [appId, appPrompt, userId, saveMessageToDB, chatMode, userApiKeys, onWriteFiles, conversationId, allowedCommands, executeCommandsInContainer, executeSqlCommands]); // Removed selectedModel and autoFixStatus from dependencies
 
   const createNewConversationInDB = async () => {
     if (!userId) return null;
-    const { data, error } = await supabase.from('conversations').insert({ user_id: userId, title: 'Nueva conversación', model: selectedModel }).select('id, title').single();
+    const { data, error } = await supabase.from('conversations').insert({ user_id: userId, title: 'Nueva conversación', model: selectedModelRef.current }).select('id, title').single(); // Use ref here
     if (error) {
       toast.error('Error al crear una nueva conversación.');
       return null;
@@ -631,7 +637,7 @@ export function useDeepAICoderChat({
         setMessages([]);
       }
     }, 100);
-  }, [conversationId, userId, getMessagesFromDB, getConversationDetails, userApiKeys, isAppChat, getAndStreamAIResponse]);
+  }, [conversationId, userId, getMessagesFromDB, getConversationDetails, userApiKeys, isAppChat, getAndStreamAIResponse]); // Removed getAndStreamAIResponse from dependencies
 
   const loadMoreMessages = useCallback(async () => {
     if (!conversationId || !hasMoreMessages || isLoading) return;
@@ -825,8 +831,8 @@ export function useDeepAICoderChat({
     if (Array.isArray(content)) {
       content.forEach(part => {
         if (part.type === 'code') {
-          if (part.filename && part.code) {
-            filesToWrite.push({ path: part.filename, content: part.code });
+          if (part.filename) {
+            filesToWrite.push({ path: part.filename, content: part.code || '' });
           }
         }
       });
@@ -881,7 +887,7 @@ export function useDeepAICoderChat({
       toast.error("No se puede corregir el error de compilación. Asegúrate de que haya un proyecto y chat activos.");
       return;
     }
-    if (autoFixStatus !== 'idle' && autoFixStatus !== 'failed') {
+    if (autoFixStatusRef.current !== 'idle' && autoFixStatusRef.current !== 'failed') { // Use ref here
       toast.info("Ya hay un proceso de auto-corrección en curso.");
       return;
     }
@@ -920,6 +926,7 @@ export function useDeepAICoderChat({
       console.error("Error fetching build logs for auto-fix:", error);
       toast.error(`Error al obtener los logs de compilación: ${error.message}`);
       setAutoFixStatus('failed');
+      // Define errorMessage here
       const errorMessage: Message = {
         id: `error-fix-build-${Date.now()}`,
         conversation_id: conversationId,
@@ -938,14 +945,14 @@ export function useDeepAICoderChat({
       };
       setMessages(prev => [...prev, errorMessage]);
     }
-  }, [appId, conversationId, isLoading, autoFixStatus, messages, getAndStreamAIResponse]);
+  }, [appId, conversationId, isLoading, messages, getAndStreamAIResponse]);
 
   const triggerReportWebError = useCallback(async () => {
     if (!appId || !conversationId || isLoading) {
       toast.error("No se puede reportar el error web. Asegúrate de que haya un proyecto y chat activos.");
       return;
     }
-    if (autoFixStatus !== 'idle') {
+    if (autoFixStatusRef.current !== 'idle') { // Use ref here
       toast.info("Ya hay un proceso de auto-corrección en curso. Por favor, espera a que termine.");
       return;
     }
@@ -988,6 +995,7 @@ export function useDeepAICoderChat({
       console.error("Error fetching activity logs for web error report:", error);
       toast.error(`Error al obtener los logs de actividad para el reporte web: ${error.message}`);
       setAutoFixStatus('failed');
+      // Define errorMessage here
       const errorMessage: Message = {
         id: `error-report-web-${Date.now()}`,
         conversation_id: conversationId,
@@ -1006,7 +1014,7 @@ export function useDeepAICoderChat({
       };
       setMessages(prev => [...prev, errorMessage]);
     }
-  }, [appId, conversationId, isLoading, autoFixStatus, messages, getAndStreamAIResponse]);
+  }, [appId, conversationId, isLoading, messages, getAndStreamAIResponse]);
 
 
   return {
