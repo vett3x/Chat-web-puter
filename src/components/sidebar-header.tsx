@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Loader2, Folder, Wand2, FileText } from 'lucide-react';
+import { Plus, Loader2, Folder, Wand2, FileText, ShieldAlert } from 'lucide-react';
 import { ProfileDropdown } from './profile-dropdown';
 import { SettingsMenu } from './settings-menu'; // Import the new menu
 import { useSession } from './session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface SidebarHeaderProps {
   onNewConversation: () => void;
@@ -163,7 +164,26 @@ export function SidebarHeader({
             )}
           </Button>
           
-          {/* New Settings Menu */}
+          {/* New dedicated Alerts Button */}
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => {
+                setHasNewCriticalAlerts(false);
+                onOpenAlerts();
+              }}
+              className={cn(
+                "relative text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7",
+                hasNewCriticalAlerts && "text-destructive animate-pulse-red"
+              )}
+              title="Alertas Críticas"
+            >
+              <ShieldAlert className="h-4 w-4" />
+            </Button>
+          )}
+
+          {/* Settings Menu */}
           <SettingsMenu
             onOpenAdminPanel={onOpenAdminPanel}
             onOpenUserManagement={() => {
