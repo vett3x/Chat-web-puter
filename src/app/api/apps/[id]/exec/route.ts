@@ -56,11 +56,31 @@ function isCommandSafe(command: string, allowedCommands: string[]): boolean {
   // Specific, stricter rules for potentially dangerous commands
   switch (mainCommand) {
     case 'rm':
+      // Allow `rm -rf` only on specific, safe-to-delete directories
+      const safeRmRfTargets = ['.next', 'node_modules', 'dist', 'build', 'out'];
+      const safeRmTargets = ['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml'];
+
+      if (parts[1] === '-rf' && parts.length === 3 && safeRmRfTargets.includes(parts[2])) {
+        return true; // It's a safe `rm -rf` command
+      }
+      if (parts.length === 2 && safeRmTargets.includes(parts[1])) {
+        return true; // It's a safe `rm` command for a lock file
+      }
+      
+      // For other file operations, ensure all paths involved are safe
+      const fileOperationPaths = parts.slice(1).filter(p => p && !p.startsWith('-')); // Filter out options
+      for (const p of fileOperationPaths) {
+        if (!isPathSafeForFileOperation(p)) {
+          console.warn(`[SECURITY] Blocked unsafe file operation path: "${p}" in command "${trimmedCommand}"`);
+          return false;
+        }
+      }
+      break;
     case 'mv':
     case 'cp':
       // For file operations, ensure all paths involved are safe
-      const fileOperationPaths = parts.slice(1).filter(p => p && !p.startsWith('-')); // Filter out options
-      for (const p of fileOperationPaths) {
+      const moveCopyPaths = parts.slice(1).filter(p => p && !p.startsWith('-')); // Filter out options
+      for (const p of moveCopyPaths) {
         if (!isPathSafeForFileOperation(p)) {
           console.warn(`[SECURITY] Blocked unsafe file operation path: "${p}" in command "${trimmedCommand}"`);
           return false;
