@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/integrations/supabase/client';
 import { Session } from '@supabase/supabase-js';
 import { Loader2 } from 'lucide-react';
-import { SUPERUSER_EMAILS } from '@/lib/constants';
+import { SUPERUSER_EMAILS, PERMISSION_KEYS } from '@/lib/constants';
 import { toast } from 'sonner';
 import { addMinutes } from 'date-fns';
 
@@ -57,12 +57,6 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
     }
 
     try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('role, permissions, avatar_url, language, status, kicked_at')
-        .eq('id', currentSession.user.id)
-        .single();
-
       let determinedRole: UserRole | null = null;
       let determinedPermissions: UserPermissions = {};
       let determinedAvatarUrl: string | null = null;
@@ -70,18 +64,41 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
       let determinedStatus: UserStatus = 'active';
       let determinedKickedAt: string | null = null;
 
-      if (error) {
-        console.error('[SessionContext] Error fetching user profile:', error);
-        determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
-      } else if (profile) {
-        determinedRole = profile.role as UserRole;
-        determinedPermissions = profile.permissions || {};
-        determinedAvatarUrl = profile.avatar_url;
-        determinedLanguage = profile.language || 'es';
-        determinedStatus = profile.status as UserStatus;
-        determinedKickedAt = profile.kicked_at;
+      if (SUPERUSER_EMAILS.includes(currentSession.user.email || '')) {
+        determinedRole = 'super_admin';
+        // Super Admins get all permissions programmatically
+        for (const key of Object.values(PERMISSION_KEYS)) {
+          determinedPermissions[key] = true;
+        }
+        // Fetch profile for avatar/language but role is already set
+        const { data: profile } = await supabase.from('profiles').select('avatar_url, language, status, kicked_at').eq('id', currentSession.user.id).single();
+        if (profile) {
+          determinedAvatarUrl = profile.avatar_url;
+          determinedLanguage = profile.language || 'es';
+          determinedStatus = profile.status as UserStatus;
+          determinedKickedAt = profile.kicked_at;
+        }
       } else {
-        determinedRole = SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user';
+        // For regular users and admins, fetch everything from the profile
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('role, permissions, avatar_url, language, status, kicked_at')
+          .eq('id', currentSession.user.id)
+          .single();
+
+        if (error) {
+          console.error('[SessionContext] Error fetching user profile:', error);
+          determinedRole = 'user'; // Fallback to 'user'
+        } else if (profile) {
+          determinedRole = profile.role as UserRole;
+          determinedPermissions = profile.permissions || {};
+          determinedAvatarUrl = profile.avatar_url;
+          determinedLanguage = profile.language || 'es';
+          determinedStatus = profile.status as UserStatus;
+          determinedKickedAt = profile.kicked_at;
+        } else {
+          determinedRole = 'user'; // Fallback if no profile found
+        }
       }
       
       if (determinedStatus === 'kicked' && determinedKickedAt) {
