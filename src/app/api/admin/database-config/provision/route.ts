@@ -5,7 +5,6 @@ import { createServerClient } from '@supabase/ssr';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
-import { encrypt } from '@/lib/encryption';
 import { executeSshCommand, writeRemoteFile } from '@/lib/ssh-utils';
 import fs from 'fs/promises';
 import path from 'path';
@@ -59,7 +58,6 @@ export async function POST(req: NextRequest) {
       ssh_password: ssh_password,
     };
 
-    const encryptedPassword = encrypt(dbConfig.db_password);
     const { data: newConfig, error: insertError } = await supabaseAdmin
       .from('database_config')
       .insert({
@@ -69,7 +67,7 @@ export async function POST(req: NextRequest) {
         db_port: 5432,
         db_name: 'app_db',
         db_user: 'app_user',
-        db_password: encryptedPassword,
+        db_password: dbConfig.db_password, // Store plain text
         status: 'provisioning',
         provisioning_log: 'Iniciando aprovisionamiento...',
       })
@@ -110,7 +108,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: error.message }, { status: 500 });
   } finally {
     if (sshDetails) {
-      // Clean up the remote script file, the password file is deleted by the script itself
       await executeSshCommand(sshDetails, `rm -f /tmp/install_postgres.sh`).catch(e => console.warn("Failed to cleanup remote script file"));
     }
   }

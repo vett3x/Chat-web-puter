@@ -5,7 +5,6 @@ import { createServerClient } from '@supabase/ssr';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
-import { encrypt } from '@/lib/encryption';
 import { executeSshCommand, writeRemoteFile } from '@/lib/ssh-utils';
 import fs from 'fs/promises';
 import path from 'path';
@@ -81,11 +80,10 @@ export async function POST(req: NextRequest, context: any) {
       throw new Error(`Error durante la reinstalación (código de salida: ${code}).\n\n${logOutput}`);
     }
 
-    const encryptedPassword = encrypt(db_password);
     await supabaseAdmin.from('database_config').update({ 
       status: 'ready', 
       provisioning_log: logOutput,
-      db_password: encryptedPassword
+      db_password: db_password // Store plain text
     }).eq('id', configId);
 
     return NextResponse.json({ message: 'Servidor PostgreSQL reinstalado y configurado exitosamente.', output: stdout });

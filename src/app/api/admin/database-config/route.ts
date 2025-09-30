@@ -5,7 +5,6 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
-import { encrypt, decrypt } from '@/lib/encryption';
 
 const configSchema = z.object({
   id: z.string().uuid().optional(),
@@ -79,8 +78,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'La contraseña es requerida para crear una nueva configuración.' }, { status: 400 });
     }
 
-    const encryptedPassword = encrypt(config.db_password);
-
     // Transaction to ensure only one is active
     if (config.is_active) {
       const { error: updateError } = await supabaseAdmin
@@ -99,7 +96,7 @@ export async function POST(req: NextRequest) {
         db_port: config.db_port,
         db_name: config.db_name,
         db_user: config.db_user,
-        db_password: encryptedPassword,
+        db_password: config.db_password, // Store plain text
       })
       .select()
       .single();
@@ -140,7 +137,7 @@ export async function PUT(req: NextRequest) {
     };
 
     if (config.db_password) {
-      updateData.db_password = encrypt(config.db_password);
+      updateData.db_password = config.db_password; // Store plain text
     }
 
     // Transaction to ensure only one is active

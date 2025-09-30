@@ -4,7 +4,6 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
-import { decrypt } from '@/lib/encryption';
 import { Client as PgClient } from 'pg';
 
 async function getIsSuperAdmin(): Promise<boolean> {
@@ -59,17 +58,14 @@ export async function POST(req: NextRequest) {
       throw new Error('No se encontró la configuración de la base de datos para probar.');
     }
 
-    const decryptedPassword = decrypt(config.db_password);
-
     pgClient.host = config.db_host;
     pgClient.port = config.db_port;
     pgClient.database = config.db_name;
     pgClient.user = config.db_user;
-    pgClient.password = decryptedPassword;
+    pgClient.password = config.db_password; // Use plain text password
 
     await pgClient.connect();
 
-    // Test permissions by creating, inserting into, and dropping a temporary table
     const testTableName = `dyad_connection_test_${Date.now()}`;
     await pgClient.query(`CREATE TABLE ${testTableName} (id INT);`);
     await pgClient.query(`INSERT INTO ${testTableName} (id) VALUES (1);`);
@@ -83,7 +79,6 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error('[DB Test Connection] Error:', error);
-    // Provide a more user-friendly error message
     let errorMessage = 'Error desconocido.';
     if (error.code === '28P01') {
       errorMessage = 'Autenticación fallida. Revisa el usuario y la contraseña.';
