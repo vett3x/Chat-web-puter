@@ -38,6 +38,7 @@ interface Alert {
   description: string;
   command_details: string | null;
   server_name: string;
+  user_name: string;
 }
 
 interface AlertsDialogProps {
@@ -150,6 +151,7 @@ export function AlertsDialog({ open, onOpenChange }: AlertsDialogProps) {
                     <TableHead className="w-[180px]">Fecha</TableHead>
                     <TableHead className="w-[220px]">Tipo de Alerta</TableHead>
                     <TableHead className="w-[150px]">Servidor</TableHead>
+                    <TableHead className="w-[150px]">Usuario</TableHead>
                     <TableHead>Descripción</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -166,6 +168,7 @@ export function AlertsDialog({ open, onOpenChange }: AlertsDialogProps) {
                         </div>
                       </TableCell>
                       <TableCell className="text-xs align-top">{alert.server_name}</TableCell>
+                      <TableCell className="text-xs align-top">{alert.user_name}</TableCell>
                       <TableCell className="text-sm align-top">
                         <p className="break-words">{alert.description}</p>
                         {alert.command_details && (
@@ -182,9 +185,7 @@ export function AlertsDialog({ open, onOpenChange }: AlertsDialogProps) {
           </ScrollArea>
         </div>
         <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Cerrar</Button>
-          </DialogClose>
+          <DialogClose asChild><Button variant="outline">Cerrar</Button></DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>

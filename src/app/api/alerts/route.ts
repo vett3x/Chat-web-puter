@@ -62,6 +62,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
   }
 
+  // Fetch all users to create a map of ID to email
+  const { data: { users }, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
+  if (usersError) {
+    console.error('[API /alerts] Error fetching users:', usersError);
+    return NextResponse.json({ message: 'Error al obtener la lista de usuarios.' }, { status: 500 });
+  }
+  const userEmailMap = new Map(users.map(u => [u.id, u.email]));
+
   const { data, error } = await supabaseAdmin
     .from('server_events_log')
     .select(`
@@ -71,9 +79,14 @@ export async function GET(req: NextRequest) {
       description,
       command_details,
       server_id,
+      user_id,
       user_servers (
         name,
         ip_address
+      ),
+      profiles (
+        first_name,
+        last_name
       )
     `)
     .in('event_type', CRITICAL_EVENT_TYPES)
@@ -85,11 +98,26 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
 
-  const formattedAlerts = data.map(alert => ({
-    ...alert,
-    server_name: (alert.user_servers as any)?.name || (alert.user_servers as any)?.ip_address || 'N/A',
-    command_details: sanitizeCommandDetails(alert.command_details), // Apply sanitization here
-  }));
+  const formattedAlerts = data.map(alert => {
+    const profile = (alert.profiles as any);
+    let userName = 'Usuario Desconocido';
+    if (profile) {
+      userName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
+    }
+    if (!userName) {
+      userName = userEmailMap.get(alert.user_id) || alert.user_id;
+    }
+
+    return {
+      id: alert.id,
+      created_at: alert.created_at,
+      event_type: alert.event_type,
+      description: alert.description,
+      command_details: sanitizeCommandDetails(alert.command_details),
+      server_name: (alert.user_servers as any)?.name || (alert.user_servers as any)?.ip_address || 'N/A',
+      user_name: userName,
+    };
+  });
 
   return NextResponse.json(formattedAlerts);
 }
