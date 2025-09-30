@@ -159,7 +159,7 @@ export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCo
             <Button variant="outline" disabled={isGeneratingApp}>Cancelar</Button>
           </DialogClose>
           {currentStep < questions.length ? (
-            <Button onClick={handleNextStep} disabled={isTransitioning}>
+            <Button onClick={handleNextStep} disabled={isTransitioning} className="bg-primary-light-purple hover:bg-primary-light-purple/90 text-white">
               Siguiente <Send className="ml-2 h-4 w-4" />
             </Button>
           ) : (
