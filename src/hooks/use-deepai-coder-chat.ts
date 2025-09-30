@@ -96,6 +96,7 @@ interface UseDeepAICoderChatProps {
   userApiKeys: ApiKey[];
   isLoadingApiKeys: boolean;
   chatMode: ChatMode;
+  isAppChat?: boolean;
 }
 
 function messageContentToApiFormat(content: Message['content']): string | PuterContentPart[] {
@@ -134,6 +135,7 @@ export function useDeepAICoderChat({
   userApiKeys,
   isLoadingApiKeys,
   chatMode,
+  isAppChat,
 }: UseDeepAICoderChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -230,81 +232,6 @@ export function useDeepAICoderChat({
       isAnimated: true, // Messages from DB are considered animated
     }));
   }, []);
-
-  const loadConversationData = useCallback(async () => {
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-    debounceTimeoutRef.current = setTimeout(async () => {
-      if (conversationId && userId) {
-        setIsLoading(true);
-        setMessages([]); // Clear messages immediately when conversationId changes
-        setPage(0);
-        setHasMoreMessages(true);
-        
-        const details = await getConversationDetails(conversationId);
-        
-        if (details?.model && (details.model.startsWith('puter:') || details.model.startsWith('user_key:'))) {
-          setSelectedModel(details.model);
-        } else {
-          // If conversation has no model, use the determined default model
-          setSelectedModel(determineDefaultModel(userApiKeys));
-        }
-
-        const fetchedMsgs = await getMessagesFromDB(conversationId, 0);
-        setMessages(fetchedMsgs); // Always set messages from DB
-        if (fetchedMsgs.length < MESSAGES_PER_PAGE) {
-          setHasMoreMessages(false);
-        }
-        setIsLoading(false);
-      } else {
-        setMessages([]);
-      }
-    }, 100); // Debounce for 100ms
-  }, [conversationId, userId, getMessagesFromDB, getConversationDetails, userApiKeys]);
-
-  const loadMoreMessages = useCallback(async () => {
-    if (!conversationId || !hasMoreMessages || isLoading) return;
-
-    const nextPage = page + 1;
-    const olderMessages = await getMessagesFromDB(conversationId, nextPage);
-
-    if (olderMessages.length > 0) {
-      setMessages(prev => [...olderMessages, ...prev]);
-      setPage(nextPage);
-    }
-    if (olderMessages.length < MESSAGES_PER_PAGE) {
-      setHasMoreMessages(false);
-    }
-  }, [conversationId, hasMoreMessages, isLoading, page, getMessagesFromDB]);
-
-  useEffect(() => {
-    loadConversationData();
-  }, [loadConversationData]);
-
-  const createNewConversationInDB = async () => {
-    if (!userId) return null;
-    const { data, error } = await supabase.from('conversations').insert({ user_id: userId, title: 'Nueva conversación', model: selectedModel }).select('id, title').single();
-    if (error) {
-      toast.error('Error al crear una nueva conversación.');
-      return null;
-    }
-    onNewConversationCreated(data.id);
-    onConversationTitleUpdate(data.id, data.title);
-    onSidebarDataRefresh();
-    return data.id;
-  };
-
-  const updateConversationModelInDB = async (convId: string, model: string) => {
-    if (!userId) return;
-    const { error } = await supabase.from('conversations').update({ model }).eq('id', convId);
-    if (error) toast.error('Error al actualizar el modelo de la conversación.');
-  };
-
-  const handleModelChange = (modelValue: string) => {
-    setSelectedModel(modelValue);
-    if (conversationId) updateConversationModelInDB(conversationId, modelValue);
-  };
 
   const saveMessageToDB = async (convId: string, msg: Omit<Message, 'timestamp' | 'id'>) => {
     if (!userId) return null;
@@ -640,6 +567,19 @@ export function useDeepAICoderChat({
       setIsLoading(false);
     }
   }, [appId, appPrompt, userId, saveMessageToDB, chatMode, userApiKeys, onWriteFiles, selectedModel, autoFixStatus, conversationId, allowedCommands, executeCommandsInContainer, executeSqlCommands]);
+
+  const createNewConversationInDB = async () => {
+    if (!userId) return null;
+    const { data, error } = await supabase.from('conversations').insert({ user_id: userId, title: 'Nueva conversación', model: selectedModel }).select('id, title').single();
+    if (error) {
+      toast.error('Error al crear una nueva conversación.');
+      return null;
+    }
+    onNewConversationCreated(data.id);
+    onConversationTitleUpdate(data.id, data.title);
+    onSidebarDataRefresh();
+    return data.id;
+  };
 
   const sendMessage = useCallback(async (content: PuterContentPart[], messageText: string) => {
     if (!userId) {
@@ -997,6 +937,31 @@ export function useDeepAICoderChat({
     }
   }, [appId, conversationId, isLoading, autoFixStatus, messages, getAndStreamAIResponse]);
 
+  const updateConversationModelInDB = async (convId: string, model: string) => {
+    if (!userId) return;
+    const { error } = await supabase.from('conversations').update({ model }).eq('id', convId);
+    if (error) toast.error('Error al actualizar el modelo de la conversación.');
+  };
+
+  const handleModelChange = (modelValue: string) => {
+    setSelectedModel(modelValue);
+    if (conversationId) updateConversationModelInDB(conversationId, modelValue);
+  };
+
+  const loadMoreMessages = useCallback(async () => {
+    if (!conversationId || !hasMoreMessages || isLoading) return;
+
+    const nextPage = page + 1;
+    const olderMessages = await getMessagesFromDB(conversationId, nextPage);
+
+    if (olderMessages.length > 0) {
+      setMessages(prev => [...olderMessages, ...prev]);
+      setPage(nextPage);
+    }
+    if (olderMessages.length < MESSAGES_PER_PAGE) {
+      setHasMoreMessages(false);
+    }
+  }, [conversationId, hasMoreMessages, isLoading, page, getMessagesFromDB]);
 
   return {
     messages,

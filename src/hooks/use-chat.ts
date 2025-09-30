@@ -80,6 +80,7 @@ export function useChat({
     userApiKeys,
     isLoadingApiKeys,
     chatMode,
+    isAppChat,
   });
 
   // The NoteAssistantChat hook is used directly within NoteAiChat component,
