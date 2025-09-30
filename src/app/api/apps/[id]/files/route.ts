@@ -11,7 +11,10 @@ import fs from 'fs/promises';
 import os from 'os';
 import crypto from 'crypto';
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
+const execAsync = promisify(exec);
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 const MAX_VERSIONS_TO_KEEP = 20;
 
@@ -95,27 +98,23 @@ function buildFileTree(paths: string[]): FileNode[] {
 
 async function pruneOldVersions(appId: string, userId: string) {
   try {
-    const { data: allBackups, error: fetchError } = await supabaseAdmin
-      .from('app_file_backups')
-      .select('created_at')
+    const { data: versions, error: fetchError } = await supabaseAdmin
+      .from('app_versions')
+      .select('id')
       .eq('app_id', appId)
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
 
     if (fetchError) throw fetchError;
 
-    const uniqueTimestamps = [...new Set(allBackups.map(b => b.created_at))];
-    uniqueTimestamps.sort((a, b) => new Date(b).getTime() - new Date(a).getTime()); // Sort descending (newest first)
-
-    if (uniqueTimestamps.length > MAX_VERSIONS_TO_KEEP) {
-      const timestampsToDelete = uniqueTimestamps.slice(MAX_VERSIONS_TO_KEEP);
-      console.log(`[Pruning] App ${appId}: Found ${uniqueTimestamps.length} versions. Deleting ${timestampsToDelete.length} oldest versions.`);
+    if (versions.length > MAX_VERSIONS_TO_KEEP) {
+      const versionsToDelete = versions.slice(MAX_VERSIONS_TO_KEEP).map(v => v.id);
+      console.log(`[Pruning] App ${appId}: Found ${versions.length} versions. Deleting ${versionsToDelete.length} oldest versions.`);
       
       const { error: deleteError } = await supabaseAdmin
-        .from('app_file_backups')
+        .from('app_versions')
         .delete()
-        .in('created_at', timestampsToDelete)
-        .eq('app_id', appId)
-        .eq('user_id', userId);
+        .in('id', versionsToDelete);
 
       if (deleteError) {
         console.error(`[Pruning] Error deleting old versions for app ${appId}:`, deleteError);
@@ -182,13 +181,51 @@ export async function POST(req: NextRequest, context: any) {
       return NextResponse.json({ message: 'Se requiere una lista de archivos.' }, { status: 400 });
     }
 
+    // --- START: Comprehensive Versioning ---
+    let dbSchemaDump = '';
+    let dbDataDump = '';
+
+    if (app.db_host && app.db_user && app.db_password && app.db_name) {
+      const pgEnv = {
+        ...process.env,
+        PGPASSWORD: app.db_password,
+      };
+      const pgOptions = `-h ${app.db_host} -p ${app.db_port} -U ${app.db_user} -d postgres`; // Connect to main db to specify schema
+
+      try {
+        const { stdout: schemaOut } = await execAsync(`pg_dump ${pgOptions} --schema=${app.db_name} --schema-only`, { env: pgEnv });
+        dbSchemaDump = schemaOut;
+      } catch (e: any) {
+        console.warn(`[Versioning] Could not dump schema for app ${appId}: ${e.stderr || e.message}`);
+      }
+
+      try {
+        const { stdout: dataOut } = await execAsync(`pg_dump ${pgOptions} --schema=${app.db_name} --data-only`, { env: pgEnv });
+        dbDataDump = dataOut;
+      } catch (e: any) {
+        console.warn(`[Versioning] Could not dump data for app ${appId}: ${e.stderr || e.message}`);
+      }
+    }
+
+    const { data: newVersion, error: versionError } = await supabaseAdmin
+      .from('app_versions')
+      .insert({
+        app_id: appId,
+        user_id: userId,
+        db_schema_dump: dbSchemaDump,
+        db_data_dump: dbDataDump,
+      })
+      .select('id')
+      .single();
+
+    if (versionError) throw new Error(`Error al crear el registro de la versión: ${versionError.message}`);
+    const versionId = newVersion.id;
+    // --- END: Comprehensive Versioning ---
+
     await fs.mkdir(localTempDir, { recursive: true });
     for (const file of files) {
       const localFilePath = path.join(localTempDir, file.path);
-      
-      // Check if the path is likely a directory (ends with / or has no extension)
       const isDirectory = file.path.endsWith('/') || !path.extname(file.path);
-
       if (isDirectory) {
         await fs.mkdir(localFilePath, { recursive: true });
       } else {
@@ -209,45 +246,26 @@ export async function POST(req: NextRequest, context: any) {
 
     const hasPackageJson = files.some((file: { path: string }) => file.path === 'package.json');
     if (hasPackageJson) {
-      await supabaseAdmin.from('server_events_log').insert({
-        user_id: userId,
-        server_id: server.id,
-        event_type: 'npm_install_started',
-        description: `package.json modificado. Ejecutando 'npm install' en el contenedor ${app.container_id.substring(0, 12)}.`
-      });
-
+      await supabaseAdmin.from('server_events_log').insert({ user_id: userId, server_id: server.id, event_type: 'npm_install_started', description: `package.json modificado. Ejecutando 'npm install' en el contenedor ${app.container_id.substring(0, 12)}.` });
       const { stderr: installStderr, code: installCode } = await executeSshCommand(server, `docker exec ${app.container_id} bash -c "cd /app && npm install"`);
-      
       if (installCode !== 0) {
-        await supabaseAdmin.from('server_events_log').insert({
-          user_id: userId,
-          server_id: server.id,
-          event_type: 'npm_install_failed',
-          description: `Falló 'npm install' en el contenedor ${app.container_id.substring(0, 12)}. Error: ${installStderr}`
-        });
+        await supabaseAdmin.from('server_events_log').insert({ user_id: userId, server_id: server.id, event_type: 'npm_install_failed', description: `Falló 'npm install' en el contenedor ${app.container_id.substring(0, 12)}. Error: ${installStderr}` });
         throw new Error(`Error al ejecutar 'npm install' en el contenedor: ${installStderr}`);
       }
-
-      await supabaseAdmin.from('server_events_log').insert({
-        user_id: userId,
-        server_id: server.id,
-        event_type: 'npm_install_succeeded',
-        description: `'npm install' completado exitosamente en el contenedor ${app.container_id.substring(0, 12)}.`
-      });
+      await supabaseAdmin.from('server_events_log').insert({ user_id: userId, server_id: server.id, event_type: 'npm_install_succeeded', description: `'npm install' completado exitosamente en el contenedor ${app.container_id.substring(0, 12)}.` });
     }
 
-    const backups = files.map(file => ({ app_id: appId, user_id: userId, file_path: file.path, file_content: file.content }));
+    const backups = files.map(file => ({ app_id: appId, user_id: userId, file_path: file.path, file_content: file.content, version_id: versionId }));
     const logEntries = files.map(file => ({ user_id: userId, server_id: server.id, event_type: 'file_written', description: `Archivo '${file.path}' escrito en el contenedor ${app.container_id.substring(0, 12)}.` }));
     
     await Promise.all([
-      supabaseAdmin.from('app_file_backups').upsert(backups, { onConflict: 'app_id, file_path' }),
+      supabaseAdmin.from('app_file_backups').insert(backups),
       supabaseAdmin.from('server_events_log').insert(logEntries)
     ]);
 
-    // Prune old versions after successful save
     await pruneOldVersions(appId, userId);
 
-    return NextResponse.json({ message: 'Archivos guardados y respaldados correctamente.' });
+    return NextResponse.json({ message: 'Archivos guardados y nueva versión creada correctamente.' });
 
   } catch (error: any) {
     console.error(`[API /apps/${appId}/files] Error en POST:`, error);
