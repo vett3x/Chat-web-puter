@@ -581,6 +581,77 @@ export function useDeepAICoderChat({
     return data.id;
   };
 
+  const updateConversationModelInDB = async (convId: string, model: string) => {
+    if (!userId) return;
+    const { error } = await supabase.from('conversations').update({ model }).eq('id', convId);
+    if (error) toast.error('Error al actualizar el modelo de la conversación.');
+  };
+
+  const handleModelChange = useCallback((modelValue: string) => {
+    setSelectedModel(modelValue);
+    if (conversationId) updateConversationModelInDB(conversationId, modelValue);
+  }, [conversationId, userId]); // Added userId to dependencies
+
+  const loadConversationData = useCallback(async () => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    debounceTimeoutRef.current = setTimeout(async () => {
+      if (conversationId && userId) {
+        setIsLoading(true);
+        setMessages([]);
+        setPage(0);
+        setHasMoreMessages(true);
+        
+        const details = await getConversationDetails(conversationId);
+        
+        if (details?.model && (details.model.startsWith('puter:') || details.model.startsWith('user_key:'))) {
+          setSelectedModel(details.model);
+        } else {
+          setSelectedModel(determineDefaultModel(userApiKeys));
+        }
+
+        const fetchedMsgs = await getMessagesFromDB(conversationId, 0);
+
+        // NEW LOGIC: Check for initial app prompt
+        if (fetchedMsgs.length === 1 && fetchedMsgs[0].role === 'user' && isAppChat) {
+          // This is a new app conversation. Don't show the initial prompt.
+          // Instead, immediately trigger the AI response.
+          setMessages([]); // Keep messages empty for now
+          setIsLoading(false); // Set loading to false before calling AI
+          await getAndStreamAIResponse(conversationId, fetchedMsgs);
+        } else {
+          setMessages(fetchedMsgs);
+          if (fetchedMsgs.length < MESSAGES_PER_PAGE) {
+            setHasMoreMessages(false);
+          }
+          setIsLoading(false);
+        }
+      } else {
+        setMessages([]);
+      }
+    }, 100);
+  }, [conversationId, userId, getMessagesFromDB, getConversationDetails, userApiKeys, isAppChat, getAndStreamAIResponse]);
+
+  const loadMoreMessages = useCallback(async () => {
+    if (!conversationId || !hasMoreMessages || isLoading) return;
+
+    const nextPage = page + 1;
+    const olderMessages = await getMessagesFromDB(conversationId, nextPage);
+
+    if (olderMessages.length > 0) {
+      setMessages(prev => [...olderMessages, ...prev]);
+      setPage(nextPage);
+    }
+    if (olderMessages.length < MESSAGES_PER_PAGE) {
+      setHasMoreMessages(false);
+    }
+  }, [conversationId, hasMoreMessages, isLoading, page, getMessagesFromDB]);
+
+  useEffect(() => {
+    loadConversationData();
+  }, [loadConversationData]);
+
   const sendMessage = useCallback(async (content: PuterContentPart[], messageText: string) => {
     if (!userId) {
       toast.error('No hay usuario autenticado.');
@@ -937,31 +1008,6 @@ export function useDeepAICoderChat({
     }
   }, [appId, conversationId, isLoading, autoFixStatus, messages, getAndStreamAIResponse]);
 
-  const updateConversationModelInDB = async (convId: string, model: string) => {
-    if (!userId) return;
-    const { error } = await supabase.from('conversations').update({ model }).eq('id', convId);
-    if (error) toast.error('Error al actualizar el modelo de la conversación.');
-  };
-
-  const handleModelChange = (modelValue: string) => {
-    setSelectedModel(modelValue);
-    if (conversationId) updateConversationModelInDB(conversationId, modelValue);
-  };
-
-  const loadMoreMessages = useCallback(async () => {
-    if (!conversationId || !hasMoreMessages || isLoading) return;
-
-    const nextPage = page + 1;
-    const olderMessages = await getMessagesFromDB(conversationId, nextPage);
-
-    if (olderMessages.length > 0) {
-      setMessages(prev => [...olderMessages, ...prev]);
-      setPage(nextPage);
-    }
-    if (olderMessages.length < MESSAGES_PER_PAGE) {
-      setHasMoreMessages(false);
-    }
-  }, [conversationId, hasMoreMessages, isLoading, page, getMessagesFromDB]);
 
   return {
     messages,
