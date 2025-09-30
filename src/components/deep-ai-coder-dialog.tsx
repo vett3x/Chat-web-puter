@@ -38,12 +38,11 @@ const questions = [
   { key: 'name', prompt: '¡Hola! Soy tu asistente. ¿Cómo se llamará tu aplicación?', placeholder: 'Ej: Mi increíble app de fotos' },
   { key: 'main_purpose', prompt: 'Perfecto. Ahora, ¿cuál es el propósito principal de tu aplicación? Sé lo más descriptivo posible.', placeholder: 'Ej: Una red social para compartir fotos de paisajes' },
   { key: 'key_features', prompt: 'Entendido. ¿Hay alguna característica clave o funcionalidad específica que te gustaría incluir? (Opcional)', placeholder: 'Ej: Perfiles de usuario, subida de imágenes, sistema de "me gusta"' },
-  { key: 'preferred_technologies', prompt: 'Genial. Finalmente, ¿tienes alguna tecnología o framework preferido, además de Next.js y Tailwind? (Opcional)', placeholder: 'Ej: Drizzle ORM, Auth.js' },
 ];
 
 export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCoderDialogProps) {
   const [currentStep, setCurrentStep] = useState(0);
-  const [projectDetails, setProjectDetails] = useState({ name: '', main_purpose: '', key_features: '', preferred_technologies: '' });
+  const [projectDetails, setProjectDetails] = useState({ name: '', main_purpose: '', key_features: '' });
   const [userInput, setUserInput] = useState('');
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isGeneratingApp, setIsGeneratingApp] = useState(false);
@@ -52,7 +51,7 @@ export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCo
     if (open) {
       // Reset state when dialog opens
       setCurrentStep(0);
-      setProjectDetails({ name: '', main_purpose: '', key_features: '', preferred_technologies: '' });
+      setProjectDetails({ name: '', main_purpose: '', key_features: '' });
       setUserInput('');
       setIsTransitioning(false);
       setIsGeneratingApp(false);
@@ -60,7 +59,7 @@ export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCo
   }, [open]);
 
   const handleNextStep = () => {
-    if (!userInput.trim() && questions[currentStep].key !== 'key_features' && questions[currentStep].key !== 'preferred_technologies') {
+    if (!userInput.trim() && questions[currentStep].key !== 'key_features') {
       toast.error('Por favor, responde a la pregunta.');
       return;
     }
@@ -112,7 +111,6 @@ export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCo
             <p><strong>Nombre:</strong> {projectDetails.name}</p>
             <p><strong>Propósito:</strong> {projectDetails.main_purpose}</p>
             <p><strong>Características:</strong> {projectDetails.key_features || 'No especificadas'}</p>
-            <p><strong>Tecnologías:</strong> {projectDetails.preferred_technologies || 'No especificadas'}</p>
           </div>
         </div>
       );
