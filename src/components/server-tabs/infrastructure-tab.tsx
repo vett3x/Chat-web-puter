@@ -1,41 +1,123 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ServerListTab } from './server-list-tab';
 import { AllDockerContainersTab } from './all-docker-containers-tab';
 import { UsageHistoryTab } from './usage-history-tab';
 import { CloudflareTunnelTab } from './cloudflare-tunnel-tab';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Wand2 } from 'lucide-react';
+import { Wand2, Save, Loader2 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
+
+const templateSchema = z.object({
+  template: z.string().min(1, 'La plantilla no puede estar vacía.'),
+});
+type TemplateFormValues = z.infer<typeof templateSchema>;
+
+function ProvisioningTemplateCard() {
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const form = useForm<TemplateFormValues>({
+    resolver: zodResolver(templateSchema),
+    defaultValues: { template: '' },
+  });
+
+  const fetchTemplate = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/settings/provisioning');
+      if (!response.ok) throw new Error((await response.json()).message);
+      const data = await response.json();
+      form.reset({ template: data.template });
+    } catch (err: any) {
+      toast.error(`Error al cargar la plantilla: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [form]);
+
+  useEffect(() => {
+    fetchTemplate();
+  }, [fetchTemplate]);
+
+  const onSubmit = async (values: TemplateFormValues) => {
+    setIsSaving(true);
+    try {
+      const response = await fetch('/api/settings/provisioning', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message);
+      toast.success(result.message);
+    } catch (err: any) {
+      toast.error(`Error al guardar: ${err.message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Wand2 className="h-6 w-6 text-primary-light-purple" />
+          Configuración de Aprovisionamiento de DeepAI Coder
+        </CardTitle>
+        <CardDescription>
+          Modifica la plantilla del comando `docker run` que se utiliza para crear nuevos contenedores. Las cuotas se basan en el perfil del usuario que crea la aplicación.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="template"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Plantilla del Comando `docker run`</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        className="font-mono text-xs h-48"
+                        disabled={isSaving}
+                        spellCheck="false"
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Placeholders disponibles: [nombre-generado], [puerto-aleatorio], [quota_flags], [variables_de_entorno_bd], [volumen-generado], [imagen_base], [entrypoint_command]
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Guardar Plantilla
+              </Button>
+            </form>
+          </Form>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export function InfrastructureTab() {
   return (
     <div className="space-y-8 p-1">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Wand2 className="h-6 w-6 text-primary-light-purple" />
-            Configuración de Aprovisionamiento de DeepAI Coder
-          </CardTitle>
-          <CardDescription>
-            Estos son los parámetros base que DeepAI Coder utiliza para crear nuevos contenedores de aplicaciones. Las cuotas se basan en el perfil del usuario que crea la aplicación.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="text-sm">
-          <p className="font-semibold mb-2">Plantilla del Comando `docker run`:</p>
-          <div className="bg-muted p-4 rounded-lg font-mono text-xs space-y-2 overflow-x-auto">
-            <p><span className="text-purple-400">docker run -d</span> <span className="text-gray-400"># Ejecutar en segundo plano</span></p>
-            <p>  <span className="text-purple-400">--name</span> [nombre-generado]</p>
-            <p>  <span className="text-purple-400">-p</span> [puerto-aleatorio]:3000</p>
-            <p>  <span className="text-purple-400">--cpus</span>="[limite_cpu_usuario]"</p>
-            <p>  <span className="text-purple-400">--memory</span>="[limite_memoria_usuario]m"</p>
-            <p>  <span className="text-purple-400">-e</span> DB_HOST=[...] <span className="text-gray-400"># Variables de entorno de la BD</span></p>
-            <p>  <span className="text-purple-400">-v</span> [volumen-generado]:/app</p>
-            <p>  <span className="text-purple-400">--entrypoint</span> tail node:lts-bookworm -f /dev/null</p>
-          </div>
-        </CardContent>
-      </Card>
+      <ProvisioningTemplateCard />
       <Separator />
       <ServerListTab />
       <Separator />
