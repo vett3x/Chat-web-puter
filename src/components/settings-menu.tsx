@@ -70,11 +70,6 @@ export function SettingsMenu({
           <span>Gestión de Usuarios</span>
           {hasNewErrorTickets && <span className="ml-auto w-2 h-2 rounded-full bg-red-500" />}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={onOpenAlerts} className="cursor-pointer">
-          <ShieldAlert className="mr-2 h-4 w-4" />
-          <span>Alertas Críticas</span>
-          {hasNewCriticalAlerts && <span className="ml-auto w-2 h-2 rounded-full bg-red-500" />}
-        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Configuración</DropdownMenuLabel>
         <DropdownMenuSeparator />
