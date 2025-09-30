@@ -37,14 +37,14 @@ export async function executeSshCommand(
 
   try {
     // Add a timeout to execAsync as a fallback for the entire operation
-    const { stdout, stderr } = await execAsync(sshCommand, { timeout: 15000 }); // 15 second timeout
+    const { stdout, stderr } = await execAsync(sshCommand, { timeout: 300000 }); // 5 minute timeout (was 15 seconds)
     return { stdout, stderr, code: 0 };
   } catch (error: any) {
     // If the error is a timeout error, provide a more specific message
     if (error.killed && error.signal === 'SIGTERM') {
       return {
         stdout: '',
-        stderr: `Comando SSH excedió el tiempo de espera de 15 segundos. El servidor puede estar inaccesible o sobrecargado.`,
+        stderr: `Comando SSH excedió el tiempo de espera de 5 minutos. El servidor puede estar inaccesible o sobrecargado.`,
         code: 1,
       };
     }
@@ -71,10 +71,10 @@ export async function transferDirectoryScp(
   const scpCommand = `sshpass -p '${serverDetails.ssh_password}' scp ${SSH_OPTIONS} -r -P ${serverDetails.ssh_port || 22} '${localPath}' ${serverDetails.ssh_username}@${serverDetails.ip_address}:'${remotePath}'`;
 
   try {
-    await execAsync(scpCommand, { timeout: 60000 }); // 60 second timeout for file transfers
+    await execAsync(scpCommand, { timeout: 300000 }); // 5 minute timeout for file transfers (was 60 seconds)
   } catch (error: any) {
     if (error.killed && error.signal === 'SIGTERM') {
-      throw new Error(`La transferencia de archivos excedió el tiempo de espera de 60 segundos.`);
+      throw new Error(`La transferencia de archivos excedió el tiempo de espera de 5 minutos.`);
     }
     throw new Error(`Failed to transfer directory via scp. Stderr: ${error.stderr || error.message}`);
   }
@@ -98,11 +98,11 @@ export async function writeRemoteFile(
   try {
     await fs.writeFile(localFilePath, content);
     const scpCommand = `sshpass -p '${serverDetails.ssh_password}' scp ${SSH_OPTIONS} -P ${serverDetails.ssh_port || 22} '${localFilePath}' ${serverDetails.ssh_username}@${serverDetails.ip_address}:'${remoteFilePath}'`;
-    await execAsync(scpCommand, { timeout: 30000 }); // 30 second timeout for single file transfers
+    await execAsync(scpCommand, { timeout: 300000 }); // 5 minute timeout for single file transfers (was 30 seconds)
   } catch (error: any) {
     // The error from execAsync will have code and stderr on failure
     if (error.killed && error.signal === 'SIGTERM') {
-      throw new Error(`La escritura de archivo remoto excedió el tiempo de espera de 30 segundos.`);
+      throw new Error(`La escritura de archivo remoto excedió el tiempo de espera de 5 minutos.`);
     }
     if (error.code) {
       throw new Error(`scp failed with code ${error.code}: ${error.stderr}`);
