@@ -9,7 +9,7 @@ import { createClient } from '@supabase/supabase-js'; // Import the admin client
 
 const createAppSchema = z.object({
   name: z.string().min(3, { message: 'El nombre del proyecto debe tener al menos 3 caracteres.' }).max(50),
-  main_purpose: z.string().min(10, { message: 'El propósito principal debe tener al menos 10 caracteres.' }), // NEW
+  main_purpose: z.string().min(3, { message: 'El propósito principal debe tener al menos 3 caracteres.' }), // NEW
   key_features: z.string().optional(), // NEW
 });
 
