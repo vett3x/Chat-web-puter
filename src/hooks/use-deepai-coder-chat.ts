@@ -307,11 +307,103 @@ export function useDeepAICoderChat({
     }
   };
 
+  // --- Start of functions with circular dependency ---
+  const getAndStreamAIResponseRef = useRef<((convId: string, history: Message[]) => Promise<void>) | null>(null);
+
+  const approvePlan = useCallback(async (messageId: string, rawContent?: string) => {
+    const planMessageContent = rawContent || messages.find(m => m.id === messageId)?.content;
+    if (!planMessageContent || !conversationId) return;
+  
+    const isCorrection = typeof planMessageContent === 'string' && planMessageContent.includes('### 💡 Error Detectado');
+    
+    const dbUpdatePayload = isCorrection ? { correction_approved: true } : { plan_approved: true };
+    const approvalMessageContent = isCorrection ? '[USER_APPROVED_CORRECTION_PLAN]' : '[USER_APPROVED_PLAN]';
+    const successToastMessage = isCorrection ? 'Plan de corrección aprobado.' : 'Plan de construcción aprobado.';
+  
+    // Update UI immediately
+    setMessages(prev => prev.map(m => m.id === messageId ? (isCorrection ? { ...m, correctionApproved: true } : { ...m, planApproved: true }) : m));
+  
+    // Update DB
+    if (messageId && !messageId.startsWith('temp-plan-')) { // Don't update DB for temp ID
+      const { error } = await supabase
+        .from('messages')
+        .update(dbUpdatePayload)
+        .eq('id', messageId);
+    
+      if (error) {
+        console.error('Error updating plan approval status in DB:', error);
+        toast.error('Error al guardar la aprobación del plan.');
+        // Revert UI on error
+        setMessages(prev => prev.map(m => m.id === messageId ? (isCorrection ? { ...m, correctionApproved: false } : { ...m, planApproved: false }) : m));
+        return;
+      }
+    }
+    toast.success(successToastMessage);
+  
+    // Extract and execute commands
+    const commandsToExecute: string[] = [];
+    const sqlCommandsToExecute: string[] = [];
+    const contentToParse = typeof planMessageContent === 'string' ? planMessageContent : '';
+    const parsedContent = parseAiResponseToRenderableParts(contentToParse, true);
+    
+    parsedContent.forEach(part => {
+      if (part.type === 'code' && part.code) {
+        if (part.language === 'bash' && part.filename === 'exec') {
+          commandsToExecute.push(part.code);
+        } else if (part.language === 'sql' && part.filename === 'exec') {
+          sqlCommandsToExecute.push(part.code);
+        }
+      }
+    });
+
+    if (commandsToExecute.length > 0) {
+      toast.info(`Ejecutando ${commandsToExecute.length} comando(s) de terminal...`);
+      await executeCommandsInContainer(commandsToExecute);
+    }
+
+    if (sqlCommandsToExecute.length > 0) {
+      toast.info(`Ejecutando ${sqlCommandsToExecute.length} comando(s) SQL...`);
+      await executeSqlCommands(sqlCommandsToExecute);
+    }
+  
+    const approvalMessage: Message = {
+      id: `user-approval-${Date.now()}`,
+      conversation_id: conversationId,
+      content: approvalMessageContent,
+      role: 'user',
+      timestamp: new Date(),
+      type: 'text',
+      isNew: true,
+      isTyping: false,
+      isConstructionPlan: false,
+      planApproved: false,
+      isCorrectionPlan: false,
+      correctionApproved: false,
+      isErrorAnalysisRequest: false,
+      isAnimated: true,
+    };
+  
+    const historyWithApproval = [...messages, approvalMessage];
+    
+    if (isCorrection) {
+      setAutoFixStatus('fixing');
+    }
+  
+    if (getAndStreamAIResponseRef.current) {
+      await getAndStreamAIResponseRef.current(conversationId, historyWithApproval);
+    }
+  
+  }, [messages, conversationId, userId, executeCommandsInContainer, executeSqlCommands]);
+
   const getAndStreamAIResponse = useCallback(async (convId: string, history: Message[]) => {
     setIsLoading(true);
     const assistantMessageId = `assistant-${Date.now()}`;
     
-    setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant', content: '', isTyping: true, isNew: true, isConstructionPlan: false, planApproved: false, isCorrectionPlan: false, correctionApproved: false, isErrorAnalysisRequest: false, isAnimated: false, timestamp: new Date() }]);
+    const isFirstAssistantMessageInAppChat = isAppChat && history.length === 1;
+
+    if (!isFirstAssistantMessageInAppChat) {
+      setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant', content: '', isTyping: true, isNew: true, isConstructionPlan: false, planApproved: false, isCorrectionPlan: false, correctionApproved: false, isErrorAnalysisRequest: false, isAnimated: false, timestamp: new Date() }]);
+    }
     
     const userMessages = history.filter(m => m.role === 'user');
     const userMessageToSave = userMessages.length > 0 ? userMessages[userMessages.length - 1] : undefined;
@@ -326,28 +418,21 @@ export function useDeepAICoderChat({
       timeoutId = setTimeout(() => {
         controller.abort();
         reject(new Error('La IA tardó demasiado en responder. Por favor, inténtalo de nuevo.'));
-      }, 120000); // Increased timeout to 2 minutes
+      }, 120000);
     });
 
     try {
       const isDeepAICoderBuildMode = chatMode === 'build';
       const isDeepAICoderChatMode = chatMode === 'chat';
-
-      // First, prepare the conversation messages for the API, excluding any system messages
       const conversationMessagesForApi = history.map(msg => ({
         role: msg.role,
         content: messageContentToApiFormat(msg.content),
       }));
-
-      // Now, determine the system prompt content based on context and last user message
       let systemPromptContent: string;
       const lastUserMessageContent = conversationMessagesForApi[conversationMessagesForApi.length - 1]?.content;
-
-      // 3. Inyectar la lista de comandos en el prompt del sistema
       const allowedCommandsList = allowedCommands.length > 0 ? allowedCommands.join(', ') : 'ninguno';
 
       if (isDeepAICoderBuildMode) {
-        // DeepAI Coder - Build Mode
         systemPromptContent = `Eres un desarrollador experto en Next.js (App Router), TypeScript y Tailwind CSS. Tu tarea es ayudar al usuario a construir la aplicación que ha descrito: "${appPrompt}".
         La aplicación se conectará a una base de datos PostgreSQL dedicada por esquema. Las credenciales de la base de datos se inyectarán como variables de entorno en el contenedor Docker:
         - DB_HOST
@@ -393,14 +478,11 @@ export function useDeepAICoderChat({
         2.  **ESPERAR APROBACIÓN DE CORRECCIÓN:** Después de enviar un plan de corrección, detente y espera. El usuario te responderá con "[USER_APPROVED_CORRECTION_PLAN]".
         3.  **GENERAR CÓDIGO Y/O COMANDOS DE CORRECCIÓN:** SOLO cuando recibas el mensaje "[USER_APPROVED_CORRECTION_PLAN]", responde ÚNICAMENTE con los bloques de código para los archivos completos (\`\`\`language:ruta/del/archivo.tsx\`\`\`) que propusiste en el plan. NO incluyas texto conversacional ni bloques \`bash:exec\` o \`sql:exec\` en esta respuesta, ya que los comandos ya habrán sido ejecutados.`;
       } else if (isDeepAICoderChatMode) {
-        // DeepAI Coder - Chat Mode
         systemPromptContent = `Eres un asistente de código experto y depurador para un proyecto Next.js. Estás en 'Modo Chat'. Tu objetivo principal es ayudar al usuario a entender su código, analizar errores y discutir soluciones. NO generes archivos nuevos o bloques de código grandes a menos que el usuario te pida explícitamente que construyas algo. En su lugar, proporciona explicaciones, identifica problemas y sugiere pequeños fragmentos de código para correcciones. Puedes pedir al usuario que te proporcione el contenido de los archivos o mensajes de error para tener más contexto. El proyecto es: "${appPrompt}".`;
       } else {
-        // Fallback, though this hook should only be used in DeepAI Coder context
         systemPromptContent = "Cuando generes un bloque de código, siempre debes especificar el lenguaje y un nombre de archivo descriptivo. Usa el formato ```language:filename.ext. Por ejemplo: ```python:chess_game.py. Esto es muy importante.";
       }
 
-      // NEW: Add specific system prompts for auto-fix actions
       if (typeof lastUserMessageContent === 'string') {
         if (lastUserMessageContent.includes('[USER_REQUESTED_BUILD_FIX]')) {
           systemPromptContent += `\n\nEl usuario ha solicitado corregir un error de compilación. Analiza los logs de compilación proporcionados en el último mensaje del usuario y propón un "Plan de Corrección" detallado. Utiliza el siguiente formato Markdown exacto:
@@ -413,7 +495,7 @@ export function useDeepAICoderChat({
             ### ✅ Confirmación
             [Pregunta de confirmación al usuario para aplicar el arreglo]`;
         } else if (lastUserMessageContent.includes('[USER_REPORTED_WEB_ERROR]')) {
-          systemPromptContent += `\n\nEl usuario ha reportado un error en la vista previa web de la aplicación. Aquí están los logs de actividad recientes del servidor:\n\n\`\`\`text\n${lastUserMessageContent.split('[USER_REPORTED_WEB_ERROR]')[0].split('Aquí están los logs de actividad recientes del servidor:')[1].trim() || 'No se encontraron logs de actividad recientes.'}\n\`\`\`\n\n[USER_REPORTED_WEB_ERROR]`; // Internal prompt for AI
+          systemPromptContent += `\n\nEl usuario ha reportado un error en la vista previa web de la aplicación. Aquí están los logs de actividad recientes del servidor:\n\n\`\`\`text\n${lastUserMessageContent.split('[USER_REPORTED_WEB_ERROR]')[0].split('Aquí están los logs de actividad recientes del servidor:')[1].trim() || 'No se encontraron logs de actividad recientes.'}\n\`\`\`\n\n[USER_REPORTED_WEB_ERROR]`;
           systemPromptContent += `\n\nEl usuario ha reportado un error en la vista previa web. Analiza los logs de actividad del servidor proporcionados en el último mensaje del usuario. Luego, solicita al usuario que describa el error visual o de comportamiento que está viendo en la vista previa web. Utiliza el siguiente formato Markdown exacto:
             ### 💡 Entendido! Has reportado un error en la web.
             ### 📄 Contexto del Error
@@ -432,25 +514,19 @@ export function useDeepAICoderChat({
 
       const systemMessage: PuterMessage = { role: 'system', content: systemPromptContent };
       const finalMessagesForApi = [systemMessage, ...conversationMessagesForApi];
-
       let fullResponseText = '';
-      let modelUsedForResponse = selectedModelRef.current; // Use ref here
-
-      const selectedKey = userApiKeys.find(k => `user_key:${k.id}` === selectedModelRef.current); // Use ref here
+      let modelUsedForResponse = selectedModelRef.current;
+      const selectedKey = userApiKeys.find(k => `user_key:${k.id}` === selectedModelRef.current);
       const isCustomEndpoint = selectedKey?.provider === 'custom_endpoint';
 
-      if (selectedModelRef.current.startsWith('puter:') || isCustomEndpoint) { // Use ref here
+      if (selectedModelRef.current.startsWith('puter:') || isCustomEndpoint) {
         let response;
         if (isCustomEndpoint) {
           const apiResponse = await Promise.race([
             fetch('/api/ai/chat', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                messages: finalMessagesForApi,
-                selectedKeyId: selectedModelRef.current.substring(9), // Use ref here
-                stream: false,
-              }),
+              body: JSON.stringify({ messages: finalMessagesForApi, selectedKeyId: selectedModelRef.current.substring(9), stream: false }),
               signal: controller.signal,
             }),
             timeoutPromise
@@ -462,7 +538,7 @@ export function useDeepAICoderChat({
             throw new Error('Respuesta inesperada del endpoint personalizado.');
           }
         } else {
-          const actualModelForPuter = selectedModelRef.current.substring(6); // Use ref here
+          const actualModelForPuter = selectedModelRef.current.substring(6);
           response = await Promise.race([
             window.puter.ai.chat(finalMessagesForApi, { model: actualModelForPuter }),
             timeoutPromise
@@ -470,16 +546,12 @@ export function useDeepAICoderChat({
         }
         if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
         fullResponseText = response?.message?.content || 'Sin contenido.';
-      } else if (selectedModelRef.current.startsWith('user_key:')) { // Use ref here
+      } else if (selectedModelRef.current.startsWith('user_key:')) {
         const apiResponse = await Promise.race([
           fetch('/api/ai/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              messages: finalMessagesForApi,
-              selectedKeyId: selectedModelRef.current.substring(9), // Use ref here
-              stream: true,
-            }),
+            body: JSON.stringify({ messages: finalMessagesForApi, selectedKeyId: selectedModelRef.current.substring(9), stream: true }),
             signal: controller.signal,
           }),
           timeoutPromise
@@ -497,7 +569,6 @@ export function useDeepAICoderChat({
             if (done) break;
             const chunk = decoder.decode(value, { stream: true });
             fullResponseText += chunk;
-
             const isCurrentResponseStructured = fullResponseText.includes('### 1. Análisis del Requerimiento') || fullResponseText.includes('### 💡 Entendido!') || fullResponseText.includes('### 💡 Error Detectado');
             if (!isDeepAICoderBuildMode || !isCurrentResponseStructured) {
               setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: parseAiResponseToRenderableParts(fullResponseText, true), isTyping: false, isNew: true } : m));
@@ -514,16 +585,18 @@ export function useDeepAICoderChat({
       const isErrorAnalysisRequest = fullResponseText.includes('### 💡 Entendido!');
       const isCorrectionPlan = fullResponseText.includes('### 💡 Error Detectado');
       
+      if (isFirstAssistantMessageInAppChat && isConstructionPlan) {
+        const tempMessageId = `temp-plan-${Date.now()}`;
+        await approvePlan(tempMessageId, fullResponseText);
+        return;
+      }
+
       const finalContentForMessage = (isConstructionPlan || isErrorAnalysisRequest || isCorrectionPlan) ? fullResponseText : parseAiResponseToRenderableParts(fullResponseText, true);
-      
       const filesToWrite: { path: string; content: string }[] = [];
-      // Commands are now handled by approvePlan, so this part should only extract files
-      // if it's NOT a plan message.
       if (!isConstructionPlan && !isErrorAnalysisRequest && !isCorrectionPlan && Array.isArray(finalContentForMessage)) {
         (finalContentForMessage as RenderablePart[]).forEach(part => {
           if (part.type === 'code' && appId) {
-            // Only extract code files, not bash:exec commands here
-            if (part.filename && part.code && part.language !== 'bash') { // Exclude bash:exec
+            if (part.filename && part.code && part.language !== 'bash') {
               filesToWrite.push({ path: part.filename, content: part.code });
             }
           }
@@ -551,9 +624,6 @@ export function useDeepAICoderChat({
       if (filesToWrite.length > 0) {
         onWriteFiles(filesToWrite);
       }
-      // Removed direct command execution here, as it's now part of approvePlan for plans.
-      // If AI generates commands outside a plan, they would still be executed here.
-      // But the prompt guides it to put commands *inside* plans.
 
       setAutoFixStatus(prevStatus => {
         if (isErrorAnalysisRequest || isConstructionPlan || isCorrectionPlan) {
@@ -572,7 +642,12 @@ export function useDeepAICoderChat({
       clearTimeout(timeoutId);
       setIsLoading(false);
     }
-  }, [appId, appPrompt, userId, saveMessageToDB, chatMode, userApiKeys, onWriteFiles, conversationId, allowedCommands, executeCommandsInContainer, executeSqlCommands]);
+  }, [appId, appPrompt, userId, saveMessageToDB, chatMode, userApiKeys, onWriteFiles, conversationId, allowedCommands, executeCommandsInContainer, executeSqlCommands, approvePlan]);
+
+  useEffect(() => {
+    getAndStreamAIResponseRef.current = getAndStreamAIResponse;
+  }, [getAndStreamAIResponse]);
+  // --- End of functions with circular dependency ---
 
   const createNewConversationInDB = async () => {
     if (!userId) return null;
@@ -705,103 +780,6 @@ export function useDeepAICoderChat({
     await getAndStreamAIResponse(currentConversationId, [...messages, newUserMessage]);
     setIsSendingFirstMessage(false);
   }, [userId, conversationId, messages, createNewConversationInDB, getAndStreamAIResponse]);
-
-  const approvePlan = useCallback(async (messageId: string) => {
-    const planMessage = messages.find(m => m.id === messageId);
-    if (!planMessage || !conversationId) return;
-  
-    const isCorrection = planMessage.isCorrectionPlan;
-    
-    const dbUpdatePayload = isCorrection ? { correction_approved: true } : { plan_approved: true };
-    const approvalMessageContent = isCorrection ? '[USER_APPROVED_CORRECTION_PLAN]' : '[USER_APPROVED_PLAN]';
-    const successToastMessage = isCorrection ? 'Plan de corrección aprobado.' : 'Plan de construcción aprobado.';
-  
-    const updatedPlanMessage = isCorrection 
-      ? { ...planMessage, correctionApproved: true }
-      : { ...planMessage, planApproved: true };
-  
-    setMessages(prev => prev.map(m => m.id === messageId ? updatedPlanMessage : m));
-  
-    const { error } = await supabase
-      .from('messages')
-      .update(dbUpdatePayload)
-      .eq('id', messageId);
-  
-    if (error) {
-      console.error('Error updating plan approval status in DB:', error);
-      toast.error('Error al guardar la aprobación del plan.');
-      setMessages(prev => prev.map(m => m.id === messageId ? planMessage : m));
-      return;
-    }
-    toast.success(successToastMessage);
-  
-    // --- NEW LOGIC: Extract and execute commands from the approved plan ---
-    const commandsToExecute: string[] = [];
-    const sqlCommandsToExecute: string[] = []; // NEW: Array for SQL commands
-
-    if (typeof planMessage.content === 'string') {
-      const parsedContent = parseAiResponseToRenderableParts(planMessage.content, true); // Parse the string content
-      parsedContent.forEach(part => {
-        if (part.type === 'code' && part.code) {
-          if (part.language === 'bash' && part.filename === 'exec') {
-            commandsToExecute.push(part.code);
-          } else if (part.language === 'sql' && part.filename === 'exec') { // NEW: Detect sql:exec
-            sqlCommandsToExecute.push(part.code);
-          }
-        }
-      });
-    } else if (Array.isArray(planMessage.content)) {
-      // If content is already parsed (shouldn't be for plans, but for safety)
-      planMessage.content.forEach(part => {
-        if (part.type === 'code' && part.code) {
-          if (part.language === 'bash' && part.filename === 'exec') {
-            commandsToExecute.push(part.code);
-          } else if (part.language === 'sql' && part.filename === 'exec') { // NEW: Detect sql:exec
-            sqlCommandsToExecute.push(part.code);
-          }
-        }
-      });
-    }
-
-    if (commandsToExecute.length > 0) {
-      toast.info(`Ejecutando ${commandsToExecute.length} comando(s) de terminal del plan...`);
-      await executeCommandsInContainer(commandsToExecute); // Execute the commands
-    }
-
-    if (sqlCommandsToExecute.length > 0) { // NEW: Execute SQL commands
-      toast.info(`Ejecutando ${sqlCommandsToExecute.length} comando(s) SQL del plan...`);
-      await executeSqlCommands(sqlCommandsToExecute);
-    }
-    // --- END NEW LOGIC ---
-
-    const approvalMessage: Message = {
-      id: `user-approval-${Date.now()}`,
-      conversation_id: conversationId,
-      content: approvalMessageContent,
-      role: 'user',
-      timestamp: new Date(),
-      type: 'text',
-      isNew: true,
-      isTyping: false,
-      isConstructionPlan: false,
-      planApproved: false,
-      isCorrectionPlan: false,
-      correctionApproved: false,
-      isErrorAnalysisRequest: false,
-      isAnimated: true,
-    };
-  
-    const historyWithUpdatedPlan = messages.map(m => m.id === messageId ? updatedPlanMessage : m);
-    const historyWithApproval = [...historyWithUpdatedPlan, approvalMessage];
-    
-    if (isCorrection) {
-      setAutoFixStatus('fixing');
-    }
-  
-    await getAndStreamAIResponse(conversationId, historyWithApproval);
-  
-  }, [messages, conversationId, getAndStreamAIResponse, userId, executeCommandsInContainer, executeSqlCommands]);
-
 
   const regenerateLastResponse = useCallback(async () => {
     if (isLoading) return;
