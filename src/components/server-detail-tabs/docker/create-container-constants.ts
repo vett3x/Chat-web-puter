@@ -63,6 +63,7 @@ cat <<EOF > package.json
     "lint": "next lint"
   },
   "dependencies": {
+    "lucide-react": "latest",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest"
@@ -94,6 +95,7 @@ cat <<EOF > postcss.config.mjs
 /** @type {import('postcss-load-config').Config} */
 const config = {
   plugins: {
+    'tailwindcss/nesting': {},
     tailwindcss: {},
     autoprefixer: {},
   },
@@ -161,11 +163,29 @@ EOF
 
 # Create src/app/page.tsx
 cat <<EOF > src/app/page.tsx
+import { Wand2 } from 'lucide-react';
+
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <h1 className="text-4xl font-bold">Welcome to your Next.js App!</h1>
-      <p className="text-lg">Start building with DeepAI Coder.</p>
+    <main className="flex min-h-screen flex-col items-center justify-center bg-gray-900 text-white p-8">
+      <div className="text-center space-y-6">
+        <div className="inline-block p-4 bg-purple-500/20 rounded-full animate-pulse">
+          <Wand2 className="h-12 w-12 text-purple-400" />
+        </div>
+        <h1 className="text-5xl font-bold tracking-tight">
+          Proyecto Generado por DeepAI Coder
+        </h1>
+        <p className="text-lg text-gray-400 max-w-2xl mx-auto">
+          ¡Felicidades! Tu entorno de desarrollo está listo. Este es el punto de partida para tu nueva aplicación.
+          Vuelve al chat y dime qué quieres construir a continuación.
+        </p>
+        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 text-sm text-left">
+          <p className="font-mono text-gray-500">// Próximos pasos sugeridos:</p>
+          <p className="font-mono text-green-400">1. "Crea una barra de navegación con un logo y enlaces."</p>
+          <p className="font-mono text-green-400">2. "Añade un formulario de contacto en la página principal."</p>
+          <p className="font-mono text-green-400">3. "Configura una tabla de 'productos' en la base de datos."</p>
+        </div>
+      </div>
     </main>
   );
 }
