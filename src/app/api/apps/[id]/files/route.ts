@@ -11,10 +11,12 @@ import fs from 'fs/promises';
 import os from 'os';
 import crypto from 'crypto';
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants';
+import { Client as PgClient } from 'pg'; // Import pg client for pg_dump
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
+
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 const MAX_VERSIONS_TO_KEEP = 20;
 
@@ -100,7 +102,7 @@ async function pruneOldVersions(appId: string, userId: string) {
   try {
     const { data: versions, error: fetchError } = await supabaseAdmin
       .from('app_versions')
-      .select('id')
+      .select('id, created_at')
       .eq('app_id', appId)
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
@@ -108,13 +110,15 @@ async function pruneOldVersions(appId: string, userId: string) {
     if (fetchError) throw fetchError;
 
     if (versions.length > MAX_VERSIONS_TO_KEEP) {
-      const versionsToDelete = versions.slice(MAX_VERSIONS_TO_KEEP).map(v => v.id);
-      console.log(`[Pruning] App ${appId}: Found ${versions.length} versions. Deleting ${versionsToDelete.length} oldest versions.`);
+      const versionsToDelete = versions.slice(MAX_VERSIONS_TO_KEEP);
+      const versionIdsToDelete = versionsToDelete.map(v => v.id);
+      
+      console.log(`[Pruning] App ${appId}: Found ${versions.length} versions. Deleting ${versionIdsToDelete.length} oldest versions.`);
       
       const { error: deleteError } = await supabaseAdmin
         .from('app_versions')
         .delete()
-        .in('id', versionsToDelete);
+        .in('id', versionIdsToDelete);
 
       if (deleteError) {
         console.error(`[Pruning] Error deleting old versions for app ${appId}:`, deleteError);
@@ -181,32 +185,35 @@ export async function POST(req: NextRequest, context: any) {
       return NextResponse.json({ message: 'Se requiere una lista de archivos.' }, { status: 400 });
     }
 
-    // --- START: Comprehensive Versioning ---
+    // --- START: Enhanced Versioning ---
     let dbSchemaDump = '';
     let dbDataDump = '';
 
-    if (app.db_host && app.db_user && app.db_password && app.db_name) {
-      const pgEnv = {
-        ...process.env,
-        PGPASSWORD: app.db_password,
+    // 1. Get active DB config and app-specific credentials
+    const { data: activeDbConfig } = await supabaseAdmin.from('database_config').select('*').eq('is_active', true).single();
+    if (activeDbConfig && app.db_name && app.db_user && app.db_password) {
+      const pgDumpEnv = {
+        PGHOST: activeDbConfig.db_host,
+        PGPORT: activeDbConfig.db_port,
+        PGUSER: activeDbConfig.db_user, // Use admin user for dumping
+        PGPASSWORD: activeDbConfig.db_password,
+        PGDATABASE: activeDbConfig.db_name, // Connect to the main DB
       };
-      const pgOptions = `-h ${app.db_host} -p ${app.db_port} -U ${app.db_user} -d postgres`; // Connect to main db to specify schema
+      
+      const pgDumpOptions = `--clean --if-exists --schema=${app.db_name}`; // Dump only the app's schema
 
-      try {
-        const { stdout: schemaOut } = await execAsync(`pg_dump ${pgOptions} --schema=${app.db_name} --schema-only`, { env: pgEnv });
-        dbSchemaDump = schemaOut;
-      } catch (e: any) {
-        console.warn(`[Versioning] Could not dump schema for app ${appId}: ${e.stderr || e.message}`);
-      }
+      // 2. Dump schema
+      const { stdout: schemaOut, stderr: schemaErr } = await execAsync(`pg_dump --schema-only ${pgDumpOptions}`, { env: { ...process.env, ...pgDumpEnv } });
+      if (schemaErr) console.warn(`[Versioning] pg_dump (schema) stderr: ${schemaErr}`);
+      dbSchemaDump = schemaOut;
 
-      try {
-        const { stdout: dataOut } = await execAsync(`pg_dump ${pgOptions} --schema=${app.db_name} --data-only`, { env: pgEnv });
-        dbDataDump = dataOut;
-      } catch (e: any) {
-        console.warn(`[Versioning] Could not dump data for app ${appId}: ${e.stderr || e.message}`);
-      }
+      // 3. Dump data
+      const { stdout: dataOut, stderr: dataErr } = await execAsync(`pg_dump --data-only ${pgDumpOptions}`, { env: { ...process.env, ...pgDumpEnv } });
+      if (dataErr) console.warn(`[Versioning] pg_dump (data) stderr: ${dataErr}`);
+      dbDataDump = dataOut;
     }
 
+    // 4. Create a new version entry
     const { data: newVersion, error: versionError } = await supabaseAdmin
       .from('app_versions')
       .insert({
@@ -218,9 +225,8 @@ export async function POST(req: NextRequest, context: any) {
       .select('id')
       .single();
 
-    if (versionError) throw new Error(`Error al crear el registro de la versión: ${versionError.message}`);
-    const versionId = newVersion.id;
-    // --- END: Comprehensive Versioning ---
+    if (versionError) throw new Error(`Error al crear la entrada de versión: ${versionError.message}`);
+    // --- END: Enhanced Versioning ---
 
     await fs.mkdir(localTempDir, { recursive: true });
     for (const file of files) {
@@ -255,7 +261,7 @@ export async function POST(req: NextRequest, context: any) {
       await supabaseAdmin.from('server_events_log').insert({ user_id: userId, server_id: server.id, event_type: 'npm_install_succeeded', description: `'npm install' completado exitosamente en el contenedor ${app.container_id.substring(0, 12)}.` });
     }
 
-    const backups = files.map(file => ({ app_id: appId, user_id: userId, file_path: file.path, file_content: file.content, version_id: versionId }));
+    const backups = files.map(file => ({ app_id: appId, user_id: userId, file_path: file.path, file_content: file.content, version_id: newVersion.id }));
     const logEntries = files.map(file => ({ user_id: userId, server_id: server.id, event_type: 'file_written', description: `Archivo '${file.path}' escrito en el contenedor ${app.container_id.substring(0, 12)}.` }));
     
     await Promise.all([
@@ -265,7 +271,7 @@ export async function POST(req: NextRequest, context: any) {
 
     await pruneOldVersions(appId, userId);
 
-    return NextResponse.json({ message: 'Archivos guardados y nueva versión creada correctamente.' });
+    return NextResponse.json({ message: 'Archivos guardados y versión creada correctamente.' });
 
   } catch (error: any) {
     console.error(`[API /apps/${appId}/files] Error en POST:`, error);
