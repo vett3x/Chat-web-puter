@@ -32,27 +32,27 @@ declare global {
 
 // Function to determine the default model based on user preferences and available keys
 const determineDefaultModel = (userApiKeys: ApiKey[]): string => {
-  if (typeof window !== 'undefined') {
-    const storedDefaultModel = localStorage.getItem('default_ai_model');
-    if (storedDefaultModel && (userApiKeys.some(key => `user_key:${key.id}` === storedDefaultModel) || AI_PROVIDERS.some(p => p.models.some(m => `puter:${m.value}` === storedDefaultModel)))) {
-      return storedDefaultModel;
-    }
+  // Prioritize the specific global Gemini 2.5 Flash model
+  const globalGeminiFlashKey = userApiKeys.find(key => 
+    key.is_global && key.provider === 'google_gemini' && key.model_name === 'gemini-2.5-flash' && !key.use_vertex_ai
+  );
+  if (globalGeminiFlashKey) {
+    return `user_key:${globalGeminiFlashKey.id}`;
   }
 
+  // Fallback to any other global key
   const globalKey = userApiKeys.find(key => key.is_global);
   if (globalKey) {
     return `user_key:${globalKey.id}`;
   }
 
+  // Fallback to a Puter.js Claude model if no global keys are found
   const claudeModel = AI_PROVIDERS.find(p => p.value === 'anthropic_claude')?.models[0];
   if (claudeModel) {
     return `puter:${claudeModel.value}`;
   }
 
-  if (userApiKeys.length > 0) {
-    return `user_key:${userApiKeys[0].id}`;
-  }
-
+  // Final fallback if nothing else works
   return 'puter:claude-sonnet-4';
 };
 
@@ -103,7 +103,7 @@ export function useProjectCreationChat({
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isPuterReady, setIsPuterReady] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>('');
+  const [selectedModel, setSelectedModel] = useState<string>(''); // Will be set by determineDefaultModel
   const [projectDetails, setProjectDetails] = useState<ProjectDetails>({
     name: '',
     main_purpose: '',
