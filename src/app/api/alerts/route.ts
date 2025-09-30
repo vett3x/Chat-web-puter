@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
         name,
         ip_address
       ),
-      profile:profiles!user_id (
+      profiles:profiles!user_id (
         first_name,
         last_name
       )
@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
   }
 
   const formattedAlerts = data.map(alert => {
-    const profile = (alert.profile as any);
+    const profile = (alert.profiles as any);
     let userName = 'Usuario Desconocido';
     if (profile) {
       userName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
