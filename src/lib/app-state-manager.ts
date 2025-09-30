@@ -77,7 +77,7 @@ export async function getAppAndServerWithStateCheck(appId: string, userId: strin
         .from('user_apps')
         .update({ last_activity_at: new Date().toISOString() })
         .eq('id', appId)
-        .select('*, user_servers(id, ip_address, ssh_port, ssh_username, ssh_password), main_purpose, key_features, preferred_technologies') // NEW: Select new fields
+        .select('*, user_servers(id, ip_address, ssh_port, ssh_username, ssh_password), main_purpose, key_features') // REMOVED: preferred_technologies
         .single();
 
     if (appError || !app) throw new Error('Aplicación no encontrada o acceso denegado.');
@@ -89,8 +89,7 @@ export async function getAppAndServerWithStateCheck(appId: string, userId: strin
           app.name, 
           app.conversation_id!, 
           app.main_purpose || '', // NEW: Pass main_purpose
-          app.key_features || undefined, // NEW: Pass key_features
-          // preferredTechnologies // REMOVED
+          app.key_features || undefined // NEW: Pass key_features
         );
         const { data: restoredApp, error: restoredAppError } = await supabaseAdmin.from('user_apps').select('*, user_servers(id, ip_address, ssh_port, ssh_username, ssh_password)').eq('id', appId).single();
         if (restoredAppError || !restoredApp || !restoredApp.user_servers) throw new Error('No se pudo obtener la información del servidor después de la restauración.');
@@ -128,8 +127,7 @@ async function restoreAppFromArchive(
   appName: string, 
   conversationId: string, 
   mainPurpose: string, // NEW: Accept mainPurpose
-  keyFeatures?: string, // NEW: Accept keyFeatures
-  // preferredTechnologies?: string // REMOVED
+  keyFeatures?: string // NEW: Accept keyFeatures
 ) {
     await provisionApp({ 
       appId, 
@@ -137,8 +135,7 @@ async function restoreAppFromArchive(
       appName, 
       conversationId, 
       mainPurpose, // NEW: Pass mainPurpose
-      keyFeatures, // NEW: Pass keyFeatures
-      // preferredTechnologies, // REMOVED
+      keyFeatures // NEW: Pass keyFeatures
     });
 
     const { data: appDetails, error: appDetailsError } = await supabaseAdmin.from('user_apps').select('container_id, user_servers(id, ip_address, ssh_port, ssh_username, ssh_password)').eq('id', appId).single();
