@@ -10,7 +10,7 @@ const createAppSchema = z.object({
   name: z.string().min(3, { message: 'El nombre del proyecto debe tener al menos 3 caracteres.' }).max(50),
   main_purpose: z.string().min(10, { message: 'El propósito principal debe tener al menos 10 caracteres.' }), // NEW
   key_features: z.string().optional(), // NEW
-  preferred_technologies: z.string().optional(), // NEW
+  // preferred_technologies: z.string().optional(), // REMOVED
 });
 
 export async function POST(req: NextRequest) {
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { name, main_purpose, key_features, preferred_technologies } = createAppSchema.parse(body); // Parse new fields
+    const { name, main_purpose, key_features } = createAppSchema.parse(body); // Parse new fields, removed preferred_technologies
 
     // 1. Create a conversation for the app
     const { data: conversation, error: convError } = await supabase
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
         prompt: main_purpose, // Keep prompt for backward compatibility, but use main_purpose
         main_purpose: main_purpose, // NEW
         key_features: key_features, // NEW
-        preferred_technologies: preferred_technologies, // NEW
+        // preferred_technologies: preferred_technologies, // REMOVED
       })
       .select('*')
       .single();
@@ -66,7 +66,6 @@ export async function POST(req: NextRequest) {
     const initialUserPrompt = `Mi proyecto se llama "${name}".
 Propósito Principal: ${main_purpose}
 ${key_features ? `Características Clave: ${key_features}` : ''}
-${preferred_technologies ? `Tecnologías Preferidas: ${preferred_technologies}` : ''}
 
 Por favor, genera un "Plan de Construcción" para una aplicación web básica con una barra de navegación, una página principal y un pie de página, utilizando Next.js, TypeScript y Tailwind CSS.`;
 
@@ -94,7 +93,7 @@ Por favor, genera un "Plan de Construcción" para una aplicación web básica co
       conversationId: newApp.conversation_id!,
       mainPurpose: main_purpose, // Pass new fields
       keyFeatures: key_features,
-      preferredTechnologies: preferred_technologies,
+      // preferredTechnologies: preferred_technologies, // REMOVED
     });
 
     // 5. Return the newly created app data immediately

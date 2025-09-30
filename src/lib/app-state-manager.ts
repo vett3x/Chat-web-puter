@@ -90,7 +90,7 @@ export async function getAppAndServerWithStateCheck(appId: string, userId: strin
           app.conversation_id!, 
           app.main_purpose || '', // NEW: Pass main_purpose
           app.key_features || undefined, // NEW: Pass key_features
-          app.preferred_technologies || undefined // NEW: Pass preferred_technologies
+          // preferredTechnologies // REMOVED
         );
         const { data: restoredApp, error: restoredAppError } = await supabaseAdmin.from('user_apps').select('*, user_servers(id, ip_address, ssh_port, ssh_username, ssh_password)').eq('id', appId).single();
         if (restoredAppError || !restoredApp || !restoredApp.user_servers) throw new Error('No se pudo obtener la información del servidor después de la restauración.');
@@ -129,7 +129,7 @@ async function restoreAppFromArchive(
   conversationId: string, 
   mainPurpose: string, // NEW: Accept mainPurpose
   keyFeatures?: string, // NEW: Accept keyFeatures
-  preferredTechnologies?: string // NEW: Accept preferredTechnologies
+  // preferredTechnologies?: string // REMOVED
 ) {
     await provisionApp({ 
       appId, 
@@ -138,7 +138,7 @@ async function restoreAppFromArchive(
       conversationId, 
       mainPurpose, // NEW: Pass mainPurpose
       keyFeatures, // NEW: Pass keyFeatures
-      preferredTechnologies // NEW: Pass preferredTechnologies
+      // preferredTechnologies, // REMOVED
     });
 
     const { data: appDetails, error: appDetailsError } = await supabaseAdmin.from('user_apps').select('container_id, user_servers(id, ip_address, ssh_port, ssh_username, ssh_password)').eq('id', appId).single();
