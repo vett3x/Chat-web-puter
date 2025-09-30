@@ -25,10 +25,6 @@ export function AllDockerContainersTab() {
   const [previousStats, setPreviousStats] = useState<Map<string, { netRxBytes: number; netTxBytes: number; timestamp: number }>>(new Map());
 
   const fetchAllDockerStats = useCallback(async () => {
-    // Don't set loading to true on silent refreshes, only on the first load.
-    if (containerStats.length === 0) {
-      setIsLoading(true);
-    }
     setError(null);
     try {
       const response = await fetch('/api/docker-stats');
@@ -78,7 +74,7 @@ export function AllDockerContainersTab() {
     } finally {
       setIsLoading(false);
     }
-  }, [previousStats, containerStats.length]);
+  }, [previousStats]);
 
   useEffect(() => {
     fetchAllDockerStats();
