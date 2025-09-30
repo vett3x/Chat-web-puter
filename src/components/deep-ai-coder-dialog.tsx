@@ -150,7 +150,7 @@ export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCo
                   <div className={`flex gap-2 w-full ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                     <div className="flex-shrink-0">
                       {msg.role === 'user' ? (
-                        <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center"><User className="h-3 w-3 text-primary-foreground" /></div>
+                        <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center"><User className="h-4 w-4 text-primary-foreground" /></div>
                       ) : (
                         <div className="w-8 h-8 bg-secondary rounded-md flex items-center justify-center">
                           <Bot className="h-4 w-4 text-secondary-foreground" />
@@ -203,10 +203,12 @@ export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCo
           <DialogClose asChild>
             <Button variant="outline" disabled={isLoading || isGeneratingApp}>Cancelar</Button>
           </DialogClose>
-          <Button type="submit" className="bg-primary-light-purple hover:bg-primary-light-purple/90 text-white" onClick={handleGenerate} disabled={isLoading || !isReadyToCreate || isGeneratingApp}>
-            {isGeneratingApp ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-            Crear Aplicación
-          </Button>
+          {isReadyToCreate && ( // Only show the button when AI is ready
+            <Button type="submit" className="bg-primary-light-purple hover:bg-primary-light-purple/90 text-white" onClick={handleGenerate} disabled={isLoading || isGeneratingApp}>
+              {isGeneratingApp ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+              Crear Aplicación
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

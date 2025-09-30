@@ -111,16 +111,26 @@ export function useProjectCreationChat({
     preferred_technologies: '',
   });
   const [isReadyToCreate, setIsReadyToCreate] = useState(false);
+  const currentQuestion = useRef(0); // Track which question the AI is currently asking
 
-  const systemPrompt = `Eres un asistente de IA especializado en la creación de proyectos Next.js. Tu objetivo es guiar al usuario para recopilar la siguiente información de un nuevo proyecto:
+  const questions = [
+    "¡Hola! Soy tu asistente para crear proyectos. ¿Cómo se llamará tu aplicación?",
+    "Perfecto. Ahora, ¿cuál es el propósito principal de tu aplicación? Sé lo más descriptivo posible.",
+    "Entendido. ¿Hay alguna característica clave o funcionalidad específica que te gustaría incluir en tu aplicación? (O puedes decir 'no' si no tienes preferencias por ahora).",
+    "Genial. Finalmente, ¿tienes alguna tecnología o framework preferido que te gustaría usar, además de Next.js, TypeScript y Tailwind CSS? (O puedes decir 'no' si no tienes preferencias adicionales).",
+  ];
+
+  const systemPrompt = `Eres un asistente de IA especializado en la creación de proyectos Next.js. Tu objetivo es guiar al usuario para recopilar la siguiente información de un nuevo proyecto, **haciendo una pregunta a la vez y esperando la respuesta del usuario**:
 1.  **Nombre del Proyecto** (requerido)
 2.  **Propósito Principal de la Aplicación** (requerido)
 3.  **Características Clave** (opcional)
 4.  **Tecnologías Preferidas** (opcional, aunque la base es Next.js, TypeScript, Tailwind CSS, el usuario puede especificar más)
 
-Tu interacción debe ser conversacional y amigable. Haz preguntas claras para obtener cada pieza de información. Una vez que hayas recopilado el "Nombre del Proyecto" y el "Propósito Principal", y hayas preguntado por las características y tecnologías (incluso si el usuario dice que no tiene preferencias), debes indicar que estás listo para crear la aplicación.
+Tu interacción debe ser conversacional, amigable y **elegante**. Haz preguntas claras para obtener cada pieza de información. **NO hagas la siguiente pregunta hasta que el usuario haya respondido a la anterior.**
 
-Cuando hayas recopilado toda la información necesaria, responde con un mensaje que contenga el siguiente formato JSON al final, además de tu texto conversacional:
+Una vez que hayas recopilado el "Nombre del Proyecto" y el "Propósito Principal", y hayas preguntado por las "Características Clave" y "Tecnologías Preferidas" (incluso si el usuario dice que no tiene preferencias), debes indicar que estás listo para crear la aplicación.
+
+Cuando hayas recopilado **toda la información necesaria**, responde con un mensaje que contenga el siguiente formato JSON al final, además de tu texto conversacional. **Este JSON solo debe aparecer en la respuesta final, una vez que toda la información esté completa.**
 
 \`\`\`json
 {
@@ -132,7 +142,7 @@ Cuando hayas recopilado toda la información necesaria, responde con un mensaje 
 }
 \`\`\`
 
-Hasta que no tengas al menos el nombre y el propósito principal, sigue preguntando. Si el usuario te da múltiples piezas de información en un solo mensaje, extráelas y actualiza tu estado interno. Sé proactivo en la conversación.`;
+Hasta que no tengas al menos el nombre y el propósito principal, sigue preguntando. Si el usuario te da múltiples piezas de información en un solo mensaje, extráelas y actualiza tu estado interno. Sé proactivo en la conversación, pero siempre espera la respuesta a la pregunta actual antes de pasar a la siguiente.`;
 
   useEffect(() => {
     const checkPuter = () => {
@@ -157,7 +167,7 @@ Hasta que no tengas al menos el nombre y el propósito principal, sigue pregunta
     const initialAiMessage: Message = {
       id: `assistant-initial-${Date.now()}`,
       role: 'assistant',
-      content: '¡Hola! Soy tu asistente para crear proyectos. ¿Cómo se llamará tu aplicación y cuál es su propósito principal?',
+      content: questions[0], // Start with the first question
       timestamp: new Date(),
       isNew: true,
       isTyping: false,
@@ -169,6 +179,7 @@ Hasta que no tengas al menos el nombre y el propósito principal, sigue pregunta
       isAnimated: true,
     };
     setMessages([initialAiMessage]);
+    currentQuestion.current = 0; // Reset current question index
   }, [userId, isPuterReady, isLoading, messages.length]);
 
   const processAiResponse = useCallback((responseText: string) => {
