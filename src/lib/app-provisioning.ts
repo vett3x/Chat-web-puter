@@ -118,13 +118,6 @@ export async function provisionApp(data: AppProvisioningData) {
     containerName = `app-${appName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${appId.substring(0, 8)}`;
     
     // --- CAPA 3: FORTALECIMIENTO DEL CONTENEDOR Y APLICACIÓN DE CUOTAS ---
-    const securityFlags = [
-      '--read-only',
-      '--tmpfs /tmp',
-      '--cap-drop=ALL',
-      '--security-opt no-new-privileges',
-    ].join(' ');
-
     const quotaFlags = profile.role !== 'super_admin' ? `--cpus="${profile.cpu_limit}" --memory="${profile.memory_limit_mb}m"` : '';
 
     // NEW: Add database credentials as environment variables to the Docker run command
@@ -136,7 +129,7 @@ export async function provisionApp(data: AppProvisioningData) {
       -e DB_PASSWORD=${appDbCredentials.db_password}
     `.replace(/\n/g, ' ').trim(); // Format for single line
 
-    const runCommand = `docker run -d --name ${containerName} -p ${hostPort}:${containerPort} ${securityFlags} ${quotaFlags} ${dbEnvVars} -v ${containerName}-app-data:/app --entrypoint tail node:lts-bookworm -f /dev/null`;
+    const runCommand = `docker run -d --name ${containerName} -p ${hostPort}:${containerPort} ${quotaFlags} ${dbEnvVars} -v ${containerName}-app-data:/app --entrypoint tail node:lts-bookworm -f /dev/null`;
     
     await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Ejecutando comando Docker para crear contenedor: ${runCommand}\n`);
     const { stdout: newContainerId, stderr: runStderr, code: runCode } = await executeSshCommand(server, runCommand);
