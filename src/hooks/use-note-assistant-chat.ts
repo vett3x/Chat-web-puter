@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { ApiKey } from '@/hooks/use-user-api-keys';
 import { AI_PROVIDERS } from '@/lib/ai-models';
 import { parseAiResponseToRenderableParts, RenderablePart } from '@/lib/utils';
+import { Message } from '../hooks/use-general-chat'; // Import Message type
 
 // Define unified part types
 interface TextPart { type: 'text'; text: string; }
@@ -30,14 +31,7 @@ declare global {
   }
 }
 
-export interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string | RenderablePart[]; // MODIFICADO: Ahora content puede ser string o RenderablePart[]
-  id?: string;
-  isTyping?: boolean;
-  isNew?: boolean; // Añadido para consistencia con el tipo Message
-  isAnimated?: boolean; // Añadido para consistencia con el tipo Message
-}
+export type ChatMessage = Message; // ChatMessage is now an alias for Message
 
 // Function to determine the default model based on user preferences and available keys
 const determineDefaultModel = (userApiKeys: ApiKey[]): string => {
@@ -116,7 +110,20 @@ export function useNoteAssistantChat({
   const [selectedModel, setSelectedModel] = useState<string>(''); // Initialize as empty string
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref for debounce
 
-  const defaultWelcomeMessage: ChatMessage = { role: 'assistant', content: 'Hola, soy tu asistente. Pregúntame cualquier cosa sobre esta nota.' };
+  const defaultWelcomeMessage: ChatMessage = { 
+    id: 'welcome-message', 
+    role: 'assistant', 
+    content: 'Hola, soy tu asistente. Pregúntame cualquier cosa sobre esta nota.',
+    timestamp: new Date(),
+    isNew: true,
+    isTyping: false,
+    isConstructionPlan: false,
+    planApproved: false,
+    isCorrectionPlan: false,
+    correctionApproved: false,
+    isErrorAnalysisRequest: false,
+    isAnimated: true,
+  };
 
   useEffect(() => {
     const checkPuter = () => {
@@ -152,13 +159,39 @@ export function useNoteAssistantChat({
   const handleSendMessage = useCallback(async (userInput: string) => {
     if (!userInput.trim() || isLoading) return;
 
-    const userMessageForUI: ChatMessage = { role: 'user', content: userInput, isNew: true, isAnimated: true };
+    const userMessageForUI: ChatMessage = { 
+      id: `user-${Date.now()}`,
+      role: 'user', 
+      content: userInput, 
+      isNew: true, 
+      isAnimated: true,
+      timestamp: new Date(),
+      isTyping: false,
+      isConstructionPlan: false,
+      planApproved: false,
+      isCorrectionPlan: false,
+      correctionApproved: false,
+      isErrorAnalysisRequest: false,
+    };
     const newMessages: ChatMessage[] = [...messages, userMessageForUI];
     setMessages(newMessages);
     setIsLoading(true);
 
     const assistantMessageId = `assistant-${Date.now()}`;
-    setMessages(prev => [...prev, { role: 'assistant', content: '', isTyping: true, id: assistantMessageId, isNew: true, isAnimated: false }]);
+    setMessages(prev => [...prev, { 
+      id: assistantMessageId, 
+      role: 'assistant', 
+      content: '', 
+      isTyping: true, 
+      isNew: true, 
+      isAnimated: false,
+      timestamp: new Date(),
+      isConstructionPlan: false,
+      planApproved: false,
+      isCorrectionPlan: false,
+      correctionApproved: false,
+      isErrorAnalysisRequest: false,
+    }]);
 
     try {
       const systemPromptContent = `Eres un asistente de notas. Tu tarea es responder preguntas sobre la nota proporcionada. Sé conciso y directo.
@@ -210,7 +243,20 @@ ${noteContent}
 
       const finalContentForMessage = parseAiResponseToRenderableParts(fullResponseText, false);
 
-      const finalMessages = [...newMessages, { role: 'assistant' as const, content: finalContentForMessage, isNew: true, isAnimated: false }];
+      const finalMessages = [...newMessages, { 
+        id: assistantMessageId, // Use the same ID
+        role: 'assistant' as const, 
+        content: finalContentForMessage, 
+        isNew: true, 
+        isAnimated: false,
+        timestamp: new Date(),
+        isTyping: false,
+        isConstructionPlan: false,
+        planApproved: false,
+        isCorrectionPlan: false,
+        correctionApproved: false,
+        isErrorAnalysisRequest: false,
+      }];
       setMessages(finalMessages);
       onSaveHistory(finalMessages);
 

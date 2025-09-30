@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Button } from '@/components/ui/button';
-import { Check, Clipboard, Download, ChevronsUpDown, Loader2, CheckCircle2 } from 'lucide-react';
+import { Check, Clipboard, Download, ChevronsUpDown, Loader2, CheckCircle2, Terminal } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -67,6 +67,16 @@ export function CodeBlock({ language, code, filename, isNew, onAnimationComplete
     URL.revokeObjectURL(url);
     toast.success(`Archivo ${a.download} descargado.`);
   };
+
+  if (language === 'bash' && filename === 'exec') {
+    // Render a simplified block for bash:exec commands, hiding the actual code
+    return (
+      <div className="rounded-lg border bg-muted/50 my-2 p-3 flex items-center gap-2 text-sm text-muted-foreground">
+        <Terminal className="h-5 w-5 flex-shrink-0" />
+        <span>Comando de Terminal (ejecutado automáticamente al aprobar el plan)</span>
+      </div>
+    );
+  }
 
   return (
     <Collapsible

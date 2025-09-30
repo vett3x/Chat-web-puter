@@ -2,19 +2,21 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, BrainCircuit, Wrench, Check, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { AlertTriangle, BrainCircuit, Wrench, Check, ThumbsUp, ThumbsDown, Loader2, Terminal } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { cn } from '@/lib/utils';
+import { cn, parseAiResponseToRenderableParts, RenderablePart } from '@/lib/utils'; // Import parseAiResponseToRenderableParts and RenderablePart
+import { Message } from '@/hooks/use-general-chat'; // Import Message type
 
 interface CorrectionPlanProps {
+  message: Message; // NEW: Pass the full message object
   content: string;
   onApprove: () => void;
   onRequestManualFix: () => void;
   isApproved: boolean;
-  isNew?: boolean; // Prop para indicar si el plan es nuevo y debe animarse
-  onAnimationComplete?: () => void; // Callback cuando la animación del plan termina
-  isLoading: boolean; // NEW: Prop to disable buttons while AI is thinking
+  isNew?: boolean;
+  onAnimationComplete?: () => void;
+  isLoading: boolean;
 }
 
 interface PlanSection {
@@ -23,7 +25,7 @@ interface PlanSection {
   icon: React.ReactNode;
 }
 
-export function CorrectionPlan({ content, onApprove, onRequestManualFix, isApproved, isNew, onAnimationComplete, isLoading }: CorrectionPlanProps) {
+export function CorrectionPlan({ message, content, onApprove, onRequestManualFix, isApproved, isNew, onAnimationComplete, isLoading }: CorrectionPlanProps) {
   const [sections, setSections] = useState<PlanSection[]>([]);
   const [animatedSectionsCount, setAnimatedSectionsCount] = useState(0);
 
@@ -45,35 +47,68 @@ export function CorrectionPlan({ content, onApprove, onRequestManualFix, isAppro
       const mapping = sectionMappings.find(m => title.toLowerCase().includes(m.title.toLowerCase()));
       
       if (mapping) {
+        // NEW: Special handling for "Plan de Corrección" section to hide bash:exec
+        let finalSectionContent = sectionContent;
+        if (mapping.title === "Plan de Corrección") {
+          const commands = extractBashExecCommands(sectionContent);
+          if (commands.length > 0) {
+            finalSectionContent = `Se ejecutarán los siguientes comandos de terminal:\n\n${commands.map((cmd, i) => `${i + 1}. \`${cmd.split('\n')[0].substring(0, 50)}...\``).join('\n')}\n\n(Los comandos exactos se ejecutarán automáticamente al aprobar el plan.)`;
+          } else {
+            // If no commands, just show the original content (which might be code files or text)
+            // For correction plans, AI might generate code files directly in this section.
+            // We need to ensure that if it's a code file, it's still rendered as a code block.
+            // This means we should NOT replace the content if it's not a bash:exec.
+            // The current `parseAiResponseToRenderableParts` in `message-content` will handle code blocks.
+            // So, here we only hide bash:exec.
+            const codeFileParts = parseAiResponseToRenderableParts(sectionContent, true).filter((p: RenderablePart) => p.type === 'code' && p.language !== 'bash');
+            if (codeFileParts.length > 0) {
+              finalSectionContent = sectionContent; // Keep original content if it contains code files
+            } else {
+              finalSectionContent = sectionContent.replace(/```bash:exec[\s\S]*?```/g, "Se ejecutarán comandos de terminal.");
+            }
+          }
+        }
+
         parsedSections.push({
           title: mapping.title,
-          content: sectionContent,
+          content: finalSectionContent,
           icon: mapping.icon,
         });
       }
     });
     setSections(parsedSections);
     if (isNew) {
-      setAnimatedSectionsCount(0); // Reset animation count when new plan arrives
+      setAnimatedSectionsCount(0);
     } else {
-      setAnimatedSectionsCount(parsedSections.length); // Show all if not new
+      setAnimatedSectionsCount(parsedSections.length);
     }
   }, [content, isNew]);
 
   useEffect(() => {
     if (!isNew || animatedSectionsCount >= sections.length) {
       if (isNew && animatedSectionsCount >= sections.length) {
-        onAnimationComplete?.(); // Notify parent when all sections are animated
+        onAnimationComplete?.();
       }
       return;
     }
 
     const timer = setTimeout(() => {
       setAnimatedSectionsCount(prev => prev + 1);
-    }, 500); // Delay between sections
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [animatedSectionsCount, sections.length, isNew, onAnimationComplete]);
+
+  // Helper to extract bash:exec commands from the raw markdown content
+  const extractBashExecCommands = (markdown: string): string[] => {
+    const commands: string[] = [];
+    const regex = /```bash:exec\n([\s\S]*?)\n```/g;
+    let match;
+    while ((match = regex.exec(markdown)) !== null) {
+      commands.push(match[1].trim());
+    }
+    return commands;
+  };
 
   return (
     <div className="space-y-4 max-w-full">

@@ -3,12 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, Puzzle, Package, Check, Wand2, ThumbsUp, ThumbsDown, Loader2 } from 'lucide-react';
+import { FileText, Puzzle, Package, Check, Wand2, ThumbsUp, ThumbsDown, Loader2, Terminal } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
+import { Message } from '@/hooks/use-general-chat'; // Import Message type
 
 interface ConstructionPlanProps {
+  message: Message; // NEW: Pass the full message object
   content: string;
   onApprove: () => void;
   onRequestChanges: () => void;
@@ -24,7 +26,7 @@ interface PlanSection {
   icon: React.ReactNode;
 }
 
-export function ConstructionPlan({ content, onApprove, onRequestChanges, isApproved, isNew, onAnimationComplete, isLoading }: ConstructionPlanProps) {
+export function ConstructionPlan({ message, content, onApprove, onRequestChanges, isApproved, isNew, onAnimationComplete, isLoading }: ConstructionPlanProps) {
   const [sections, setSections] = useState<PlanSection[]>([]);
   const [animatedSectionsCount, setAnimatedSectionsCount] = useState(0);
 
@@ -33,6 +35,7 @@ export function ConstructionPlan({ content, onApprove, onRequestChanges, isAppro
     { title: "Estructura de Archivos y Componentes", icon: <FileText className="h-5 w-5 text-blue-400" /> },
     { title: "Lógica de Componentes", icon: <Puzzle className="h-5 w-5 text-orange-400" /> },
     { title: "Dependencias Necesarias", icon: <Package className="h-5 w-5 text-green-400" /> },
+    { title: "Acciones de Terminal Necesarias", icon: <Terminal className="h-5 w-5 text-gray-400" /> }, // NEW: Icon for terminal actions
     { title: "Resumen y Confirmación", icon: <Check className="h-5 w-5 text-teal-400" /> },
   ];
 
@@ -47,9 +50,20 @@ export function ConstructionPlan({ content, onApprove, onRequestChanges, isAppro
       const mapping = sectionMappings.find(m => title.toLowerCase().includes(m.title.toLowerCase()));
       
       if (mapping) {
+        // NEW: Special handling for "Acciones de Terminal Necesarias"
+        let finalSectionContent = sectionContent;
+        if (mapping.title === "Acciones de Terminal Necesarias") {
+          const commands = extractBashExecCommands(sectionContent);
+          if (commands.length > 0) {
+            finalSectionContent = `Se ejecutarán los siguientes comandos de terminal:\n\n${commands.map((cmd, i) => `${i + 1}. \`${cmd.split('\n')[0].substring(0, 50)}...\``).join('\n')}\n\n(Los comandos exactos se ejecutarán automáticamente al aprobar el plan.)`;
+          } else {
+            finalSectionContent = "No se requieren comandos de terminal adicionales.";
+          }
+        }
+
         parsedSections.push({
           title: mapping.title,
-          content: sectionContent,
+          content: finalSectionContent,
           icon: mapping.icon,
         });
       }
@@ -76,6 +90,17 @@ export function ConstructionPlan({ content, onApprove, onRequestChanges, isAppro
 
     return () => clearTimeout(timer);
   }, [animatedSectionsCount, sections.length, isNew, onAnimationComplete]);
+
+  // Helper to extract bash:exec commands from the raw markdown content
+  const extractBashExecCommands = (markdown: string): string[] => {
+    const commands: string[] = [];
+    const regex = /```bash:exec\n([\s\S]*?)\n```/g;
+    let match;
+    while ((match = regex.exec(markdown)) !== null) {
+      commands.push(match[1].trim());
+    }
+    return commands;
+  };
 
   return (
     <div className="space-y-4 max-w-full">

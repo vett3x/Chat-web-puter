@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react'; // Import useState directly
 import { Bot, User, Loader2, Clipboard, RefreshCw, Upload, Check } from 'lucide-react';
 import { MessageContent } from '@/components/message-content';
 import { Button } from '@/components/ui/button';
@@ -36,7 +36,7 @@ const ChatMessageItemComponent: React.FC<ChatMessageItemProps> = ({
   isLoading,
   userApiKeys,
 }) => {
-  const [isCopied, setIsCopied] = React.useState(false);
+  const [isCopied, setIsCopied] = useState(false); // Corrected useState syntax
 
   const handleCopy = (content: Message['content']) => {
     let textToCopy = '';
@@ -89,6 +89,7 @@ const ChatMessageItemComponent: React.FC<ChatMessageItemProps> = ({
             </div>
           ) : (
             <MessageContent
+              message={message} // Pass the full message object
               content={message.content}
               isNew={isLastMessage && !message.isAnimated}
               aiResponseSpeed={aiResponseSpeed}

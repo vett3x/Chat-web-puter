@@ -8,8 +8,10 @@ import { RenderablePart } from '@/lib/utils'; // Importar RenderablePart desde u
 import { ConstructionPlan } from './chat/construction-plan'; // Importar ConstructionPlan
 import { ErrorAnalysisRequest } from './chat/error-analysis-request'; // NEW: Import ErrorAnalysisRequest
 import { CorrectionPlan } from './chat/correction-plan'; // NEW: Import CorrectionPlan
+import { Message } from '@/hooks/use-general-chat'; // Import Message type
 
 interface MessageContentProps {
+  message: Message; // NEW: Pass the full message object
   content: string | RenderablePart[]; // MODIFICADO: Ahora acepta string o RenderablePart[]
   isNew?: boolean;
   aiResponseSpeed: 'slow' | 'normal' | 'fast';
@@ -27,6 +29,7 @@ interface MessageContentProps {
 }
 
 export function MessageContent({ 
+  message, // NEW: Destructure message
   content, 
   isNew, 
   aiResponseSpeed, 
@@ -130,6 +133,7 @@ export function MessageContent({
   if (looksLikeCorrectionPlan && typeof content === 'string' && messageId && onApprovePlan && onRequestChanges) {
     return (
       <CorrectionPlan
+        message={message} // Pass the full message object
         content={content}
         onApprove={() => onApprovePlan(messageId)} // Reusing onApprovePlan for now
         onRequestManualFix={onRequestChanges} // Reusing onRequestChanges for now
@@ -145,6 +149,7 @@ export function MessageContent({
   if (looksLikeConstructionPlan && typeof content === 'string' && messageId && onApprovePlan && onRequestChanges) {
     return (
       <ConstructionPlan
+        message={message} // Pass the full message object
         content={content}
         onApprove={() => onApprovePlan(messageId)}
         onRequestChanges={onRequestChanges}

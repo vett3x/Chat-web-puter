@@ -151,6 +151,7 @@ export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialCha
                       </div>
                     ) : (
                       <MessageContent
+                        message={msg} // Pass the full message object
                         content={msg.content}
                         isNew={msg.isNew}
                         aiResponseSpeed="normal" // Fixed to normal for note chat
