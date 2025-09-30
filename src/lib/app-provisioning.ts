@@ -92,10 +92,17 @@ export async function provisionApp(data: AppProvisioningData) {
     await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Cuotas de usuario verificadas. Límite de contenedores: ${profile.max_containers}.\n`);
     // --- END QUOTA ENFORCEMENT ---
 
-    await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Buscando servidor listo disponible...\n`);
-    const { data: serverData, error: serverError } = await supabaseAdmin.from('user_servers').select('id, ip_address, ssh_port, ssh_username, ssh_password, name').eq('status', 'ready').limit(1).single();
+    await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Buscando servidor listo disponible para el usuario ${userId}...\n`);
+    const { data: serverData, error: serverError } = await supabaseAdmin
+      .from('user_servers')
+      .select('id, ip_address, ssh_port, ssh_username, ssh_password, name')
+      .eq('user_id', userId) // <-- THE FIX IS HERE
+      .eq('status', 'ready')
+      .limit(1)
+      .single();
+      
     if (serverError || !serverData) {
-      throw new Error('No hay servidores listos disponibles. Asegúrate de haber añadido y aprovisionado un servidor.');
+      throw new Error('No hay servidores listos disponibles para tu usuario. Asegúrate de haber añadido y aprovisionado un servidor.');
     }
     server = serverData;
     serverIdForLog = server.id; // Assign value here
