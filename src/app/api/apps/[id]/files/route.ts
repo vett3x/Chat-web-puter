@@ -11,7 +11,6 @@ import fs from 'fs/promises';
 import os from 'os';
 import crypto from 'crypto';
 import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants';
-import { Client as PgClient } from 'pg';
 
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 const MAX_VERSIONS_TO_KEEP = 20;
@@ -96,25 +95,27 @@ function buildFileTree(paths: string[]): FileNode[] {
 
 async function pruneOldVersions(appId: string, userId: string) {
   try {
-    const { data: allVersions, error: fetchError } = await supabaseAdmin
-      .from('app_versions')
-      .select('id, created_at')
+    const { data: allBackups, error: fetchError } = await supabaseAdmin
+      .from('app_file_backups')
+      .select('created_at')
       .eq('app_id', appId)
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+      .eq('user_id', userId);
 
     if (fetchError) throw fetchError;
 
-    if (allVersions.length > MAX_VERSIONS_TO_KEEP) {
-      const versionsToDelete = allVersions.slice(MAX_VERSIONS_TO_KEEP);
-      const versionIdsToDelete = versionsToDelete.map(v => v.id);
-      
-      console.log(`[Pruning] App ${appId}: Found ${allVersions.length} versions. Deleting ${versionsToDelete.length} oldest versions.`);
+    const uniqueTimestamps = [...new Set(allBackups.map(b => b.created_at))];
+    uniqueTimestamps.sort((a, b) => new Date(b).getTime() - new Date(a).getTime()); // Sort descending (newest first)
+
+    if (uniqueTimestamps.length > MAX_VERSIONS_TO_KEEP) {
+      const timestampsToDelete = uniqueTimestamps.slice(MAX_VERSIONS_TO_KEEP);
+      console.log(`[Pruning] App ${appId}: Found ${uniqueTimestamps.length} versions. Deleting ${timestampsToDelete.length} oldest versions.`);
       
       const { error: deleteError } = await supabaseAdmin
-        .from('app_versions')
+        .from('app_file_backups')
         .delete()
-        .in('id', versionIdsToDelete);
+        .in('created_at', timestampsToDelete)
+        .eq('app_id', appId)
+        .eq('user_id', userId);
 
       if (deleteError) {
         console.error(`[Pruning] Error deleting old versions for app ${appId}:`, deleteError);
@@ -181,40 +182,11 @@ export async function POST(req: NextRequest, context: any) {
       return NextResponse.json({ message: 'Se requiere una lista de archivos.' }, { status: 400 });
     }
 
-    // --- Database Snapshot ---
-    let dbSchemaDump = '';
-    let dbDataDump = '';
-    if (app.db_host && app.db_user && app.db_password && app.db_name) {
-      const pgDumpCommandBase = `PGPASSWORD='${app.db_password}' pg_dump -h ${app.db_host} -p ${app.db_port} -U ${app.db_user} -d postgres --schema=${app.db_name}`;
-      const { stdout: schemaStdout, stderr: schemaStderr } = await executeSshCommand(server, `${pgDumpCommandBase} --schema-only`);
-      if (schemaStderr) console.warn(`[DB DUMP] Schema dump stderr for app ${appId}:`, schemaStderr);
-      dbSchemaDump = schemaStdout;
-
-      const { stdout: dataStdout, stderr: dataStderr } = await executeSshCommand(server, `${pgDumpCommandBase} --data-only`);
-      if (dataStderr) console.warn(`[DB DUMP] Data dump stderr for app ${appId}:`, dataStderr);
-      dbDataDump = dataStdout;
-    }
-    // --- End Database Snapshot ---
-
-    // Create a new version entry
-    const { data: newVersion, error: versionError } = await supabaseAdmin
-      .from('app_versions')
-      .insert({
-        app_id: appId,
-        user_id: userId,
-        db_schema_dump: dbSchemaDump,
-        db_data_dump: dbDataDump,
-      })
-      .select('id')
-      .single();
-
-    if (versionError) throw new Error(`Error al crear la versión: ${versionError.message}`);
-    const versionId = newVersion.id;
-
     await fs.mkdir(localTempDir, { recursive: true });
     for (const file of files) {
       const localFilePath = path.join(localTempDir, file.path);
       
+      // Check if the path is likely a directory (ends with / or has no extension)
       const isDirectory = file.path.endsWith('/') || !path.extname(file.path);
 
       if (isDirectory) {
@@ -264,17 +236,18 @@ export async function POST(req: NextRequest, context: any) {
       });
     }
 
-    const backups = files.map(file => ({ app_id: appId, user_id: userId, file_path: file.path, file_content: file.content, version_id: versionId }));
+    const backups = files.map(file => ({ app_id: appId, user_id: userId, file_path: file.path, file_content: file.content }));
     const logEntries = files.map(file => ({ user_id: userId, server_id: server.id, event_type: 'file_written', description: `Archivo '${file.path}' escrito en el contenedor ${app.container_id.substring(0, 12)}.` }));
     
     await Promise.all([
-      supabaseAdmin.from('app_file_backups').insert(backups),
+      supabaseAdmin.from('app_file_backups').upsert(backups, { onConflict: 'app_id, file_path' }),
       supabaseAdmin.from('server_events_log').insert(logEntries)
     ]);
 
+    // Prune old versions after successful save
     await pruneOldVersions(appId, userId);
 
-    return NextResponse.json({ message: 'Archivos guardados y versión creada correctamente.' });
+    return NextResponse.json({ message: 'Archivos guardados y respaldados correctamente.' });
 
   } catch (error: any) {
     console.error(`[API /apps/${appId}/files] Error en POST:`, error);
