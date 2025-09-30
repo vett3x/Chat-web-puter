@@ -17,7 +17,6 @@ import { Button } from '@/components/ui/button';
 import { Loader2, PlusCircle, Server, Trash2, Info, CheckCircle2, XCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,8 +32,18 @@ import { ServerDetailDialog } from '../server-detail-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { useSession } from '@/components/session-context-provider'; // Import useSession
-import { PERMISSION_KEYS } from '@/lib/constants'; // Import PERMISSION_KEYS
+import { useSession } from '@/components/session-context-provider';
+import { PERMISSION_KEYS } from '@/lib/constants';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
 
 const serverFormSchema = z.object({
   ip_address: z.string().ip({ message: 'Dirección IP inválida.' }),
@@ -55,89 +64,7 @@ interface RegisteredServer {
   provisioning_log?: string | null;
 }
 
-const DEEPCODER_API_BASE_PATH = '/api/servers'; // Variable name remains for consistency
-
-function AddServerForm({ onServerAdded }: { onServerAdded: () => void }) {
-  const { userPermissions } = useSession(); // Get user permissions
-  const [isAddingServer, setIsAddingServer] = useState(false);
-  const canCreateServer = userPermissions[PERMISSION_KEYS.CAN_CREATE_SERVER];
-
-  const form = useForm<ServerFormValues>({
-    resolver: zodResolver(serverFormSchema),
-    defaultValues: {
-      ip_address: '',
-      ssh_username: '',
-      ssh_password: '',
-      ssh_port: 22,
-      name: '',
-    },
-  });
-
-  const onSubmit = async (values: ServerFormValues) => {
-    setIsAddingServer(true);
-    try {
-      const response = await fetch(DEEPCODER_API_BASE_PATH, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(values),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || `HTTP error! status: ${response.status}`);
-      }
-
-      toast.success(result.message || 'Servidor añadido correctamente.');
-      form.reset({ ssh_port: 22 });
-      onServerAdded();
-    } catch (error: any) {
-      console.error('Error adding server:', error);
-      toast.error(`Error al añadir el servidor: ${error.message}`);
-    } finally {
-      setIsAddingServer(false);
-    }
-  };
-
-  if (!canCreateServer) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-muted-foreground">
-            <PlusCircle className="h-6 w-6" /> Añadir Nuevo Servidor
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">No tienes permiso para añadir nuevos servidores.</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <PlusCircle className="h-6 w-6" /> Añadir Nuevo Servidor
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nombre del Servidor (Opcional)</FormLabel><FormControl><Input placeholder="Mi Servidor de Desarrollo" {...field} disabled={isAddingServer} /></FormControl><FormMessage /></FormItem>)} />
-            <FormField control={form.control} name="ip_address" render={({ field }) => (<FormItem><FormLabel>Dirección IP</FormLabel><FormControl><Input placeholder="192.168.1.100" {...field} disabled={isAddingServer} /></FormControl><FormMessage /></FormItem>)} />
-            <FormField control={form.control} name="ssh_username" render={({ field }) => (<FormItem><FormLabel>Usuario SSH</FormLabel><FormControl><Input placeholder="root" {...field} disabled={isAddingServer} /></FormControl><FormMessage /></FormItem>)} />
-            <FormField control={form.control} name="ssh_password" render={({ field }) => (<FormItem><FormLabel>Contraseña SSH</FormLabel><FormControl><Input type="password" placeholder="••••••••" {...field} disabled={isAddingServer} /></FormControl><FormMessage /></FormItem>)} />
-            <FormField control={form.control} name="ssh_port" render={({ field }) => (<FormItem><FormLabel>Puerto SSH</FormLabel><FormControl><Input type="number" placeholder="22" {...field} disabled={isAddingServer} /></FormControl><FormMessage /></FormItem>)} />
-            <Button type="submit" disabled={isAddingServer}>{isAddingServer ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Añadiendo...</>) : (<><PlusCircle className="mr-2 h-4 w-4" /> Añadir Servidor</>)}</Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
-  );
-}
+const DEEPCODER_API_BASE_PATH = '/api/servers';
 
 function ServerListItem({ server, onDeleteServer, onSelectServerForDetails, userRole }: { server: RegisteredServer; onDeleteServer: (serverId: string) => void; onSelectServerForDetails: (server: RegisteredServer) => void; userRole: 'user' | 'admin' | 'super_admin' | null }) {
   const [isLogOpen, setIsLogOpen] = useState(false);
@@ -160,7 +87,7 @@ function ServerListItem({ server, onDeleteServer, onSelectServerForDetails, user
   return (
     <Collapsible open={isLogOpen} onOpenChange={setIsLogOpen}>
       <div className="border p-4 rounded-md bg-muted/50 flex items-center justify-between">
-        <div className="flex items-center gap-3 flex-1"> {/* flex-1 para ocupar espacio disponible */}
+        <div className="flex items-center gap-3 flex-1">
           <div className="flex-shrink-0 flex items-center justify-center w-5 h-5">
             {getStatusIndicator()}
           </div>
@@ -170,13 +97,13 @@ function ServerListItem({ server, onDeleteServer, onSelectServerForDetails, user
           </div>
           {server.provisioning_log && (
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="icon" title={isLogOpen ? "Ocultar log" : "Mostrar log"} className="h-8 w-8 ml-2"> {/* Añadido ml-2 para espaciado */}
+              <Button variant="ghost" size="icon" title={isLogOpen ? "Ocultar log" : "Mostrar log"} className="h-8 w-8 ml-2">
                 {isLogOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </Button>
             </CollapsibleTrigger>
           )}
         </div>
-        <div className="flex gap-2 flex-shrink-0"> {/* flex-shrink-0 para que no se encoja */}
+        <div className="flex gap-2 flex-shrink-0">
           <Button variant="outline" size="icon" onClick={() => onSelectServerForDetails(server)} title="Ver detalles" disabled={server.status !== 'ready'} className="h-8 w-8">
             <Info className="h-4 w-4" />
           </Button>
@@ -199,20 +126,8 @@ function ServerListItem({ server, onDeleteServer, onSelectServerForDetails, user
             <SyntaxHighlighter 
               language="bash" 
               style={vscDarkPlus} 
-              customStyle={{ 
-                margin: 0,
-                padding: '1rem',
-                fontSize: '0.875rem',
-                lineHeight: '1.25rem',
-              }} 
-              codeTagProps={{ 
-                style: { 
-                  fontFamily: 'var(--font-geist-mono)',
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
-                  overflowWrap: 'break-word',
-                } 
-              }}
+              customStyle={{ margin: 0, padding: '1rem', fontSize: '0.875rem', lineHeight: '1.25rem' }} 
+              codeTagProps={{ style: { fontFamily: 'var(--font-geist-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'break-word' } }}
               wrapLines={true}
               wrapLongLines={true}
             >
@@ -226,12 +141,21 @@ function ServerListItem({ server, onDeleteServer, onSelectServerForDetails, user
 }
 
 export function ServerListTab() {
-  const { userRole } = useSession(); // Get user role
+  const { userRole, userPermissions } = useSession();
+  const canCreateServer = userPermissions[PERMISSION_KEYS.CAN_CREATE_SERVER];
+
   const [servers, setServers] = useState<RegisteredServer[]>([]);
   const [isLoadingServers, setIsLoadingServers] = useState(true);
   const [selectedServer, setSelectedServer] = useState<RegisteredServer | null>(null);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
-  const POLLING_INTERVAL = 5000; // 5 seconds
+  const [isAddServerDialogOpen, setIsAddServerDialogOpen] = useState(false);
+  const [isAddingServer, setIsAddingServer] = useState(false);
+  const POLLING_INTERVAL = 5000;
+
+  const form = useForm<ServerFormValues>({
+    resolver: zodResolver(serverFormSchema),
+    defaultValues: { ip_address: '', ssh_username: '', ssh_password: '', ssh_port: 22, name: '' },
+  });
 
   const fetchServers = useCallback(async () => {
     try {
@@ -261,6 +185,28 @@ export function ServerListTab() {
     return () => clearInterval(interval);
   }, [fetchServers]);
 
+  const onAddServerSubmit = async (values: ServerFormValues) => {
+    setIsAddingServer(true);
+    try {
+      const response = await fetch(DEEPCODER_API_BASE_PATH, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || `HTTP error! status: ${response.status}`);
+      toast.success(result.message || 'Servidor añadido correctamente.');
+      form.reset({ ssh_port: 22 });
+      fetchServers();
+      setIsAddServerDialogOpen(false);
+    } catch (error: any) {
+      console.error('Error adding server:', error);
+      toast.error(`Error al añadir el servidor: ${error.message}`);
+    } finally {
+      setIsAddingServer(false);
+    }
+  };
+
   const handleDeleteServer = async (serverId: string) => {
     try {
       const response = await fetch(`${DEEPCODER_API_BASE_PATH}?id=${serverId}`, { method: 'DELETE' });
@@ -281,10 +227,41 @@ export function ServerListTab() {
 
   return (
     <div className="space-y-8 p-1">
-      <AddServerForm onServerAdded={fetchServers} />
-      <Separator />
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><Server className="h-6 w-6" /> Servidores Registrados</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="flex items-center gap-2"><Server className="h-6 w-6" /> Servidores Registrados</CardTitle>
+          <Dialog open={isAddServerDialogOpen} onOpenChange={setIsAddServerDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" disabled={!canCreateServer}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Añadir Servidor
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[525px]">
+              <DialogHeader>
+                <DialogTitle>Añadir Nuevo Servidor</DialogTitle>
+                <DialogDescription>
+                  Introduce los detalles de tu servidor para registrarlo y empezar a usarlo.
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onAddServerSubmit)} className="space-y-4 py-4">
+                  <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nombre del Servidor (Opcional)</FormLabel><FormControl><Input placeholder="Mi Servidor de Desarrollo" {...field} disabled={isAddingServer} /></FormControl><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name="ip_address" render={({ field }) => (<FormItem><FormLabel>Dirección IP</FormLabel><FormControl><Input placeholder="192.168.1.100" {...field} disabled={isAddingServer} /></FormControl><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name="ssh_username" render={({ field }) => (<FormItem><FormLabel>Usuario SSH</FormLabel><FormControl><Input placeholder="root" {...field} disabled={isAddingServer} /></FormControl><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name="ssh_password" render={({ field }) => (<FormItem><FormLabel>Contraseña SSH</FormLabel><FormControl><Input type="password" placeholder="••••••••" {...field} disabled={isAddingServer} /></FormControl><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name="ssh_port" render={({ field }) => (<FormItem><FormLabel>Puerto SSH</FormLabel><FormControl><Input type="number" placeholder="22" {...field} disabled={isAddingServer} /></FormControl><FormMessage /></FormItem>)} />
+                  <DialogFooter>
+                    <DialogClose asChild><Button type="button" variant="outline" disabled={isAddingServer}>Cancelar</Button></DialogClose>
+                    <Button type="submit" disabled={isAddingServer}>
+                      {isAddingServer ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                      Añadir Servidor
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        </CardHeader>
         <CardContent>
           {isLoadingServers && servers.length === 0 ? (
             <div className="flex items-center justify-center py-4"><Loader2 className="h-6 w-6 animate-spin text-primary" /><p className="ml-2 text-muted-foreground">Cargando servidores...</p></div>
