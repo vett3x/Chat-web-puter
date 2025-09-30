@@ -326,7 +326,7 @@ export function useDeepAICoderChat({
       timeoutId = setTimeout(() => {
         controller.abort();
         reject(new Error('La IA tardó demasiado en responder. Por favor, inténtalo de nuevo.'));
-      }, 30000);
+      }, 120000); // Increased timeout to 2 minutes
     });
 
     try {

@@ -282,7 +282,7 @@ export async function POST(req: NextRequest) {
           messages: customApiMessages,
           stream: false, // Force non-streaming for custom endpoints
         }),
-        signal: AbortSignal.timeout(30000) // 30 seconds timeout for external API call
+        signal: AbortSignal.timeout(120000) // 2 minutes timeout for external API call
       });
 
       console.log(`[API /ai/chat] Custom endpoint response status: ${customEndpointResponse.status}`);

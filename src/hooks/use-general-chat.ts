@@ -255,7 +255,7 @@ export function useGeneralChat({
       timeoutId = setTimeout(() => {
         controller.abort();
         reject(new Error('La IA tardó demasiado en responder. Por favor, inténtalo de nuevo.'));
-      }, 30000);
+      }, 120000); // Increased timeout to 2 minutes
     });
 
     try {
@@ -365,7 +365,7 @@ export function useGeneralChat({
     } catch (error: any) {
       console.error('[API /ai/chat] Error:', error);
       let userFriendlyMessage = `Error en la API de IA: ${error.name === 'AbortError' ? 'La IA tardó demasiado en responder.' : error.message}`;
-      setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: userFriendlyMessage, isTyping: false, isNew: true, isConstructionPlan: false, planApproved: false, isCorrectionPlan: false, correctionApproved: false, isErrorAnalysisRequest: false, isAnimated: false } : m));
+      setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: userFriendlyMessage, isTyping: false, isNew: true, isConstructionPlan: false, planApproved: false, isCorrectionPlan: false, isErrorAnalysisRequest: false, isAnimated: false } : m));
       toast.error(userFriendlyMessage);
     } finally {
       clearTimeout(timeoutId);
