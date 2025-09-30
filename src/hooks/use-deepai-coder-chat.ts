@@ -419,7 +419,7 @@ export function useDeepAICoderChat({
             ### 5. Acciones de Terminal Necesarias
             [Si necesitas ejecutar comandos (ej. \`npm install\`), inclúyelos aquí como bloques \`\`\`bash:exec\`\`\`. Por ejemplo: \`\`\`bash:exec\nnpm install some-package\n\`\`\`]
             ### 6. Resumen y Confirmación
-            [Resumen y pregunta de confirmación aquí]
+            [Resumen y pregunta de confirmación aquí. Al final de tu primer plan de construcción, incluye también sugerencias de próximos pasos para el usuario, como 'Ahora que tienes la base, ¿qué te gustaría añadir? ¿Un formulario de contacto, una sección de productos, o quizás autenticación de usuarios?']
         2.  **ESPERAR APROBACIÓN:** Después de enviar el plan, detente y espera. NO generes código ni ejecutes comandos. El usuario te responderá con un mensaje especial: "[USER_APPROVED_PLAN]".
         3.  **GENERAR CÓDIGO:** SOLO cuando recibas el mensaje "[USER_APPROVED_PLAN]", responde ÚNICAMENTE con los bloques de código para los archivos completos (\`\`\`language:ruta/del/archivo.tsx\`\`\`) que propusiste en el plan. NO incluyas texto conversacional ni bloques \`bash:exec\` en esta respuesta, ya que los comandos ya habrán sido ejecutados.
         

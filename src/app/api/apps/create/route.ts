@@ -62,7 +62,31 @@ export async function POST(req: NextRequest) {
       .single();
     if (appError) throw new Error(`Error al crear el registro de la aplicación: ${appError.message}`);
 
-    // 3. Trigger the provisioning process in the background (don't await it)
+    // 3. Insert an initial user message to guide the AI
+    const initialUserPrompt = `Mi proyecto se llama "${name}".
+Propósito Principal: ${main_purpose}
+${key_features ? `Características Clave: ${key_features}` : ''}
+${preferred_technologies ? `Tecnologías Preferidas: ${preferred_technologies}` : ''}
+
+Por favor, genera un "Plan de Construcción" para una aplicación web básica con una barra de navegación, una página principal y un pie de página, utilizando Next.js, TypeScript y Tailwind CSS.`;
+
+    const { error: messageError } = await supabase.from('messages').insert({
+      conversation_id: conversation.id,
+      user_id: userId,
+      role: 'user',
+      content: initialUserPrompt,
+      type: 'text',
+      is_construction_plan: false,
+      plan_approved: false,
+      is_correction_plan: false,
+      correction_approved: false,
+    });
+    if (messageError) {
+      console.error('Error inserting initial message:', messageError);
+      // Don't block app creation, but log the error
+    }
+
+    // 4. Trigger the provisioning process in the background (don't await it)
     provisionApp({
       appId: newApp.id,
       userId: userId,
@@ -73,7 +97,7 @@ export async function POST(req: NextRequest) {
       preferredTechnologies: preferred_technologies,
     });
 
-    // 4. Return the newly created app data immediately
+    // 5. Return the newly created app data immediately
     return NextResponse.json(newApp, { status: 201 });
 
   } catch (error: any) {
