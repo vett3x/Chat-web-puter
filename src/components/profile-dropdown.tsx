@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
-import { Moon, Sun, Settings, LogOut, User as UserIcon, Server, Users, Crown, Shield, Bot, GitPullRequest, Ban, LogOut as LogOutIcon, KeyRound } from 'lucide-react'; // Import KeyRound
+import { Moon, Sun, Settings, LogOut, User as UserIcon, Bot, Ban, LogOut as LogOutIcon, Crown, Shield } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,16 +30,17 @@ interface Profile {
 interface ProfileDropdownProps {
   onOpenProfileSettings: () => void;
   onOpenAccountSettings: () => void;
-  onOpenAdminPanel: () => void; // Renamed from onOpenServerManagement
+  // Admin-related props are no longer needed here
+  onOpenAdminPanel: () => void;
   onOpenUserManagement: () => void;
   onOpenUpdateManager: () => void;
-  onOpenApiManagement: () => void; // NEW: Add onOpenApiManagement prop
+  onOpenApiManagement: () => void;
 }
 
-export function ProfileDropdown({ onOpenProfileSettings, onOpenAccountSettings, onOpenAdminPanel, onOpenUserManagement, onOpenUpdateManager, onOpenApiManagement }: ProfileDropdownProps) {
+export function ProfileDropdown({ onOpenProfileSettings, onOpenAccountSettings }: ProfileDropdownProps) {
   const { session, userRole, userStatus } = useSession();
   const router = useRouter();
-  const { theme, setTheme, resolvedTheme } = useTheme(); // Get resolvedTheme
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -89,10 +90,8 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAccountSettings, 
     return null;
   }
 
-  const isAdmin = userRole === 'admin' || userRole === 'super_admin';
-  const isSuperAdmin = userRole === 'super_admin';
   const isBannedOrKicked = userStatus === 'banned' || userStatus === 'kicked';
-  const isDarkMode = resolvedTheme === 'dark'; // Use resolvedTheme for actual display
+  const isDarkMode = resolvedTheme === 'dark';
 
   return (
     <DropdownMenu>
@@ -137,15 +136,11 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAccountSettings, 
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56 bg-popover text-popover-foreground border-border">
-        <DropdownMenuLabel className="flex items-center justify-between">
-          <span>Mi Cuenta</span>
-        </DropdownMenuLabel>
+        <DropdownMenuLabel>Mi Cuenta</DropdownMenuLabel>
         <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem onClick={onOpenProfileSettings} className="flex items-center cursor-pointer">
-          <div className="flex items-center">
-            <UserIcon className="mr-2 h-4 w-4" />
-            <span>Perfil</span>
-          </div>
+          <UserIcon className="mr-2 h-4 w-4" />
+          <span>Perfil</span>
         </DropdownMenuItem>
         <DropdownMenuItem
           className="flex items-center justify-between cursor-pointer"
@@ -157,54 +152,20 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAccountSettings, 
           </div>
           {isMounted && (
             <Switch
-              checked={isDarkMode} // Use isDarkMode (resolvedTheme) here
+              checked={isDarkMode}
               onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
               onClick={(e) => e.stopPropagation()}
             />
           )}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onOpenAccountSettings} className="flex items-center cursor-pointer">
-          <div className="flex items-center">
-            <Settings className="mr-2 h-4 w-4" />
-            <span>Configuración de Cuenta</span>
-          </div>
+          <Settings className="mr-2 h-4 w-4" />
+          <span>Configuración de Cuenta</span>
         </DropdownMenuItem>
-        {/* Always show API Management in dropdown */}
-        <DropdownMenuItem onClick={onOpenApiManagement} className="flex items-center cursor-pointer">
-          <div className="flex items-center">
-            <KeyRound className="mr-2 h-4 w-4" />
-            <span>Gestión de API Keys</span>
-          </div>
-        </DropdownMenuItem>
-        {isAdmin && (
-          <DropdownMenuItem onClick={onOpenAdminPanel} className="flex items-center cursor-pointer">
-            <div className="flex items-center">
-              <Server className="mr-2 h-4 w-4" />
-              <span>Panel de Administración</span>
-            </div>
-          </DropdownMenuItem>
-        )}
-        {isAdmin && (
-          <DropdownMenuItem onClick={onOpenUserManagement} className="flex items-center cursor-pointer">
-            <div className="flex items-center">
-              <Users className="mr-2 h-4 w-4" />
-              <span>Gestión de Usuarios</span>
-            </div>
-          </DropdownMenuItem>
-        )}
-        {isSuperAdmin && (
-          <DropdownMenuItem onClick={onOpenUpdateManager} className="flex items-center cursor-pointer">
-            <div className="flex items-center">
-              <GitPullRequest className="mr-2 h-4 w-4" />
-              <span>Gestión de Actualizaciones</span>
-            </div>
-          </DropdownMenuItem>
-        )}
+        <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive" onClick={handleSignOut}>
-          <div className="flex items-center">
-            <LogOut className="mr-2 h-4 w-4" />
-            <span>Cerrar Sesión</span>
-          </div>
+          <LogOut className="mr-2 h-4 w-4" />
+          <span>Cerrar Sesión</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
