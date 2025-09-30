@@ -9,7 +9,7 @@ import { useSession } from '@/components/session-context-provider';
 import { cn } from '@/lib/utils';
 import { AdminDashboardTab } from './admin/admin-dashboard';
 import { DatabaseConfigTab } from './admin/database-config-tab';
-import { ServerManagementTabs } from './server-management-tabs'; // Import the new nested tabs component
+import { InfrastructureTab } from './server-tabs/infrastructure-tab'; // New import
 
 export function AdminPanelTabs() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -46,7 +46,7 @@ export function AdminPanelTabs() {
             </TabsContent>
           )}
           <TabsContent value="servers" className="h-full">
-            <ServerManagementTabs />
+            <InfrastructureTab />
           </TabsContent>
           {isSuperAdmin && (
             <TabsContent value="database" className="h-full">
