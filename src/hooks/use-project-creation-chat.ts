@@ -111,27 +111,28 @@ export function useProjectCreationChat({
     preferred_technologies: '',
   });
   const [isReadyToCreate, setIsReadyToCreate] = useState(false);
-  const currentQuestion = useRef(0); // Track which question the AI is currently asking
 
-  const questions = [
-    "¡Hola! Soy tu asistente para crear proyectos. ¿Cómo se llamará tu aplicación?",
-    "Perfecto. Ahora, ¿cuál es el propósito principal de tu aplicación? Sé lo más descriptivo posible.",
-    "Entendido. ¿Hay alguna característica clave o funcionalidad específica que te gustaría incluir en tu aplicación? (O puedes decir 'no' si no tienes preferencias por ahora).",
-    "Genial. Finalmente, ¿tienes alguna tecnología o framework preferido que te gustaría usar, además de Next.js, TypeScript y Tailwind CSS? (O puedes decir 'no' si no tienes preferencias adicionales).",
-  ];
+  const systemPrompt = `Eres un asistente de IA especializado en la creación de proyectos Next.js. Tu objetivo es recopilar la siguiente información del usuario de forma conversacional, amigable y elegante, **haciendo una pregunta a la vez y esperando la respuesta del usuario**:
 
-  const systemPrompt = `Eres un asistente de IA especializado en la creación de proyectos Next.js. Tu objetivo es guiar al usuario para recopilar la siguiente información de un nuevo proyecto, **haciendo una pregunta a la vez y esperando la respuesta del usuario**:
+Información requerida:
 1.  **Nombre del Proyecto** (requerido)
 2.  **Propósito Principal de la Aplicación** (requerido)
 3.  **Características Clave** (opcional)
-4.  **Tecnologías Preferidas** (opcional, aunque la base es Next.js, TypeScript, Tailwind CSS, el usuario puede especificar más)
+4.  **Tecnologías Preferidas** (opcional, además de Next.js, TypeScript, Tailwind CSS)
 
-Tu interacción debe ser conversacional, amigable y **elegante**. Haz preguntas claras para obtener cada pieza de información. **NO hagas la siguiente pregunta hasta que el usuario haya respondido a la anterior.**
+Tu proceso de interacción es el siguiente:
+-   **Paso 1: Nombre del Proyecto.** Si el nombre del proyecto no ha sido proporcionado, pregunta: "¿Cómo se llamará tu aplicación?"
+-   **Paso 2: Propósito Principal.** Si el nombre del proyecto ya está, pero el propósito principal no, pregunta: "Excelente. Ahora, ¿cuál es el propósito principal de tu aplicación? Sé lo más descriptivo posible."
+-   **Paso 3: Características Clave.** Si el nombre y el propósito principal ya están, pero las características clave no, pregunta: "Entendido. ¿Hay alguna característica clave o funcionalidad específica que te gustaría incluir en tu aplicación? (O puedes decir 'no' si no tienes preferencias por ahora)."
+-   **Paso 4: Tecnologías Preferidas.** Si el nombre, propósito y características clave ya están, pero las tecnologías preferidas no, pregunta: "Genial. Finalmente, ¿tienes alguna tecnología o framework preferido que te gustaría usar, además de Next.js, TypeScript y Tailwind CSS? (O puedes decir 'no' si no tienes preferencias adicionales)."
+-   **Paso 5: Listo para Crear.** Si toda la información ha sido recopilada (nombre, propósito, características y tecnologías - incluso si las opcionales son 'no'), entonces responde con un mensaje elegante que indique que estás listo para crear la aplicación, y **al final de ese mensaje, incluye el JSON con todos los detalles**.
 
-Una vez que hayas recopilado el "Nombre del Proyecto" y el "Propósito Principal", y hayas preguntado por las "Características Clave" y "Tecnologías Preferidas" (incluso si el usuario dice que no tiene preferencias), debes indicar que estás listo para crear la aplicación.
+**Reglas Adicionales:**
+-   Si el usuario proporciona múltiples piezas de información en un solo mensaje, extráelas y actualiza tu estado interno, luego pasa a la siguiente pregunta relevante.
+-   Siempre espera la respuesta del usuario a la pregunta actual antes de pasar a la siguiente.
+-   El JSON final solo debe aparecer UNA VEZ, cuando toda la información esté completa.
 
-Cuando hayas recopilado **toda la información necesaria**, responde con un mensaje que contenga el siguiente formato JSON al final, además de tu texto conversacional. **Este JSON solo debe aparecer en la respuesta final, una vez que toda la información esté completa.**
-
+**Formato del JSON final:**
 \`\`\`json
 {
   "status": "ready_to_create",
@@ -141,8 +142,7 @@ Cuando hayas recopilado **toda la información necesaria**, responde con un mens
   "preferred_technologies": "[Tecnologías Preferidas o 'No especificado']"
 }
 \`\`\`
-
-Hasta que no tengas al menos el nombre y el propósito principal, sigue preguntando. Si el usuario te da múltiples piezas de información en un solo mensaje, extráelas y actualiza tu estado interno. Sé proactivo en la conversación, pero siempre espera la respuesta a la pregunta actual antes de pasar a la siguiente.`;
+`;
 
   useEffect(() => {
     const checkPuter = () => {
@@ -167,7 +167,7 @@ Hasta que no tengas al menos el nombre y el propósito principal, sigue pregunta
     const initialAiMessage: Message = {
       id: `assistant-initial-${Date.now()}`,
       role: 'assistant',
-      content: questions[0], // Start with the first question
+      content: "¡Hola! Soy tu asistente para crear proyectos. ¿Cómo se llamará tu aplicación?",
       timestamp: new Date(),
       isNew: true,
       isTyping: false,
@@ -179,23 +179,62 @@ Hasta que no tengas al menos el nombre y el propósito principal, sigue pregunta
       isAnimated: true,
     };
     setMessages([initialAiMessage]);
-    currentQuestion.current = 0; // Reset current question index
   }, [userId, isPuterReady, isLoading, messages.length]);
 
   const processAiResponse = useCallback((responseText: string) => {
     const jsonRegex = /```json\n([\s\S]*?)\n```/;
     const match = responseText.match(jsonRegex);
 
+    // Extract information from AI's response even if not the final JSON
+    let updatedDetails = { ...projectDetails };
+
+    // Try to extract project name
+    if (!updatedDetails.name) {
+        const nameMatch = responseText.match(/(?:mi aplicación se llamará|el nombre de mi aplicación es|se llamará|nombre del proyecto es)\s*["']?([^"'\n]+)["']?/i);
+        if (nameMatch && nameMatch[1]) {
+            updatedDetails.name = nameMatch[1].trim();
+        }
+    }
+    // Try to extract main purpose
+    if (updatedDetails.name && !updatedDetails.main_purpose) {
+        const purposeMatch = responseText.match(/(?:el propósito principal es|su propósito principal es|propósito principal:)\s*([^.\n]+)/i);
+        if (purposeMatch && purposeMatch[1]) {
+            updatedDetails.main_purpose = purposeMatch[1].trim();
+        }
+    }
+    // Try to extract key features
+    if (updatedDetails.name && updatedDetails.main_purpose && !updatedDetails.key_features) {
+        const featuresMatch = responseText.match(/(?:características clave:|características:)\s*([^.\n]+)/i);
+        if (featuresMatch && featuresMatch[1]) {
+            updatedDetails.key_features = featuresMatch[1].trim();
+        } else if (responseText.toLowerCase().includes('no tengo preferencias por ahora') || responseText.toLowerCase().includes('no')) {
+            updatedDetails.key_features = 'No especificado';
+        }
+    }
+    // Try to extract preferred technologies
+    if (updatedDetails.name && updatedDetails.main_purpose && updatedDetails.key_features && !updatedDetails.preferred_technologies) {
+        const techMatch = responseText.match(/(?:tecnologías preferidas:|tecnologías:)\s*([^.\n]+)/i);
+        if (techMatch && techMatch[1]) {
+            updatedDetails.preferred_technologies = techMatch[1].trim();
+        } else if (responseText.toLowerCase().includes('no tengo preferencias adicionales') || responseText.toLowerCase().includes('no')) {
+            updatedDetails.preferred_technologies = 'No especificado';
+        }
+    }
+
+    setProjectDetails(updatedDetails);
+
     if (match && match[1]) {
       try {
         const parsedJson = JSON.parse(match[1]);
         if (parsedJson.status === 'ready_to_create') {
-          setProjectDetails({
-            name: parsedJson.project_name,
-            main_purpose: parsedJson.main_purpose,
-            key_features: parsedJson.key_features === 'No especificado' ? '' : parsedJson.key_features,
-            preferred_technologies: parsedJson.preferred_technologies === 'No especificado' ? '' : parsedJson.preferred_technologies,
-          });
+          // Use the details extracted from the conversation, not just the JSON
+          setProjectDetails(prev => ({
+            ...prev,
+            name: parsedJson.project_name || prev.name,
+            main_purpose: parsedJson.main_purpose || prev.main_purpose,
+            key_features: parsedJson.key_features === 'No especificado' ? '' : (parsedJson.key_features || prev.key_features),
+            preferred_technologies: parsedJson.preferred_technologies === 'No especificado' ? '' : (parsedJson.preferred_technologies || prev.preferred_technologies),
+          }));
           setIsReadyToCreate(true);
           onProjectDetailsGathered({
             name: parsedJson.project_name,
@@ -208,7 +247,7 @@ Hasta que no tengas al menos el nombre y el propósito principal, sigue pregunta
         console.error("Error parsing AI's JSON response:", e);
       }
     }
-  }, [onProjectDetailsGathered]);
+  }, [onProjectDetailsGathered, projectDetails]); // Add projectDetails to dependencies
 
   const getAndStreamAIResponse = useCallback(async (history: Message[]) => {
     setIsLoading(true);

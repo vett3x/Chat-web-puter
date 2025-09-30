@@ -147,7 +147,7 @@ export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCo
             <div className="space-y-4">
               {messages.map((msg, index) => (
                 <div key={index} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`flex gap-2 w-full ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                  <div className={`flex gap-2 max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                     <div className="flex-shrink-0">
                       {msg.role === 'user' ? (
                         <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center"><User className="h-4 w-4 text-primary-foreground" /></div>
@@ -157,7 +157,7 @@ export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCo
                         </div>
                       )}
                     </div>
-                    <div className={`rounded-xl p-3 text-sm ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                    <div className={`rounded-2xl p-3 text-sm shadow-md ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
                       {msg.isTyping ? (
                         <div className="flex items-center gap-2">
                           <Loader2 className="h-4 w-4 animate-spin" />
