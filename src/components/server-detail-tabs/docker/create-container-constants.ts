@@ -20,12 +20,8 @@ echo "--- Initial apt update... ---"
 apt-get update -y || { echo "ERROR: initial apt-get update failed"; exit 1; }
 echo "--- Initial apt update complete. ---"
 
-echo "--- Installing sudo (if not present)... ---"
-apt-get install -y sudo || { echo "WARNING: sudo installation failed or already present. Continuing..."; }
-echo "--- sudo check complete. ---"
-
 echo "--- Installing core dependencies (curl, gnupg, lsb-release, apt-utils, git)..."
-sudo apt-get install -y curl gnupg lsb-release apt-utils git || { echo "ERROR: core dependencies installation failed"; exit 1; }
+apt-get install -y curl gnupg lsb-release apt-utils git || { echo "ERROR: core dependencies installation failed"; exit 1; }
 echo "--- Core dependencies installed. ---"
 
 echo "--- Verifying Node.js and npm installation... ---"
@@ -35,15 +31,15 @@ echo "--- Node.js and npm are present. ---"
 
 echo "--- Installing cloudflared... ---"
 # Add cloudflare gpg key
-sudo mkdir -p --mode=0755 /usr/share/keyrings || { echo "ERROR: mkdir /usr/share/keyrings failed"; exit 1; }
-curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null || { echo "ERROR: adding cloudflare gpg key failed"; exit 1; }
+mkdir -p --mode=0755 /usr/share/keyrings || { echo "ERROR: mkdir /usr/share/keyrings failed"; exit 1; }
+curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null || { echo "ERROR: adding cloudflare gpg key failed"; exit 1; }
 chmod a+r /usr/share/keyrings/cloudflare-main.gpg # Ensure correct permissions
 
 # Add this repo to your apt repositories
-echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' | sudo tee /etc/apt/sources.list.d/cloudflared.list >/dev/null || { echo "ERROR: adding cloudflared repo failed"; exit 1; }
+echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' | tee /etc/apt/sources.list.d/cloudflared.list >/dev/null || { echo "ERROR: adding cloudflared repo failed"; exit 1; }
 
 # install cloudflared
-sudo apt-get update -y && sudo apt-get install -y cloudflared || { echo "ERROR: cloudflared installation failed"; exit 1; }
+apt-get update -y && apt-get install -y cloudflared || { echo "ERROR: cloudflared installation failed"; exit 1; }
 
 echo "--- Verifying cloudflared installation ---"
 which cloudflared || { echo "ERROR: cloudflared binary not found in PATH"; exit 1; }
