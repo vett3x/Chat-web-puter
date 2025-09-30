@@ -96,7 +96,7 @@ export async function provisionApp(data: AppProvisioningData) {
     const { data: serverData, error: serverError } = await supabaseAdmin
       .from('user_servers')
       .select('id, ip_address, ssh_port, ssh_username, ssh_password, name')
-      .eq('user_id', userId) // <-- THE FIX IS HERE
+      .eq('user_id', userId)
       .eq('status', 'ready')
       .limit(1)
       .single();
@@ -117,7 +117,7 @@ export async function provisionApp(data: AppProvisioningData) {
     const hostPort = generateRandomPort();
     containerName = `app-${appName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${appId.substring(0, 8)}`;
     
-    // --- CAPA 3: FORTALECIMIENTO DEL CONTENEDOR Y APLICACIÓN DE CUOTAS ---
+    // --- APLICACIÓN DE CUOTAS ---
     const quotaFlags = profile.role !== 'super_admin' ? `--cpus="${profile.cpu_limit}" --memory="${profile.memory_limit_mb}m"` : '';
 
     // NEW: Add database credentials as environment variables to the Docker run command
