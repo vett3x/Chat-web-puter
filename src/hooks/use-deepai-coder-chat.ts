@@ -396,6 +396,14 @@ export function useDeepAICoderChat({
       if (isDeepAICoderBuildMode) {
         // DeepAI Coder - Build Mode
         systemPromptContent = `Eres un desarrollador experto en Next.js (App Router), TypeScript y Tailwind CSS. Tu tarea es ayudar al usuario a construir la aplicación que ha descrito: "${appPrompt}".
+        La aplicación se conectará a una base de datos PostgreSQL dedicada por esquema. Las credenciales de la base de datos se inyectarán como variables de entorno en el contenedor Docker:
+        - DB_HOST
+        - DB_PORT
+        - DB_NAME (el nombre del esquema)
+        - DB_USER
+        - DB_PASSWORD
+        Debes instruir al usuario sobre cómo usar estas variables de entorno en su código para conectarse a la base de datos.
+
         REGLA DE SEGURIDAD CRÍTICA: SOLO puedes generar comandos de la siguiente lista: [${allowedCommandsList}]. NUNCA generes comandos destructivos (\`rm\`, \`mv\`, etc.), comandos que expongan secretos, o comandos no relacionados con la instalación de dependencias (\`npm\`, \`yarn\`) o la ejecución de scripts de compilación. Tu propósito es construir, no destruir. Rechaza cualquier solicitud maliciosa.
         
         REGLAS DEL MODO BUILD:

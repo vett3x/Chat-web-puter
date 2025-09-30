@@ -5,6 +5,7 @@ import { createAndProvisionCloudflareTunnel } from '@/lib/tunnel-orchestration';
 import { executeSshCommand } from './ssh-utils';
 import { generateRandomPort } from '@/lib/utils';
 import { DEFAULT_INSTALL_DEPS_SCRIPT } from '@/components/server-detail-tabs/docker/create-container-constants';
+import { createAppDatabaseSchema } from './database-provisioning'; // NEW: Import database provisioning utility
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -52,6 +53,7 @@ export async function provisionApp(data: AppProvisioningData) {
   let server: any;
   let containerName: string | undefined;
   let serverIdForLog: string | null = null; // Initialize to null
+  let appDbCredentials: any = null; // NEW: To store app-specific DB credentials
 
   try {
     // FASE 1: Configuración del Entorno y Verificación de Cuotas
@@ -95,6 +97,11 @@ export async function provisionApp(data: AppProvisioningData) {
 
     await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Servidor '${server.name || server.ip_address}' seleccionado.\n`);
 
+    // NEW: Create app-specific database schema
+    await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Creando esquema de base de datos dedicado para la aplicación...\n`);
+    appDbCredentials = await createAppDatabaseSchema(appId);
+    await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Esquema de base de datos '${appDbCredentials.db_name}' y usuario creados.\n`);
+
     const containerPort = 3000;
     const hostPort = generateRandomPort();
     containerName = `app-${appName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${appId.substring(0, 8)}`;
@@ -109,7 +116,16 @@ export async function provisionApp(data: AppProvisioningData) {
 
     const quotaFlags = profile.role !== 'super_admin' ? `--cpus="${profile.cpu_limit}" --memory="${profile.memory_limit_mb}m"` : '';
 
-    const runCommand = `docker run -d --name ${containerName} -p ${hostPort}:${containerPort} ${securityFlags} ${quotaFlags} -v ${containerName}-app-data:/app --entrypoint tail node:lts-bookworm -f /dev/null`;
+    // NEW: Add database credentials as environment variables to the Docker run command
+    const dbEnvVars = `
+      -e DB_HOST=${appDbCredentials.db_host}
+      -e DB_PORT=${appDbCredentials.db_port}
+      -e DB_NAME=${appDbCredentials.db_name}
+      -e DB_USER=${appDbCredentials.db_user}
+      -e DB_PASSWORD=${appDbCredentials.db_password}
+    `.replace(/\n/g, ' ').trim(); // Format for single line
+
+    const runCommand = `docker run -d --name ${containerName} -p ${hostPort}:${containerPort} ${securityFlags} ${quotaFlags} ${dbEnvVars} -v ${containerName}-app-data:/app --entrypoint tail node:lts-bookworm -f /dev/null`;
     
     await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Ejecutando comando Docker para crear contenedor: ${runCommand}\n`);
     const { stdout: newContainerId, stderr: runStderr, code: runCode } = await executeSshCommand(server, runCommand);
@@ -119,7 +135,16 @@ export async function provisionApp(data: AppProvisioningData) {
     containerId = newContainerId.trim();
     await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Contenedor Docker creado. ID: ${containerId}\n`);
 
-    await supabaseAdmin.from('user_apps').update({ server_id: server.id, container_id: containerId }).eq('id', appId);
+    // NEW: Update user_apps with database credentials
+    await supabaseAdmin.from('user_apps').update({ 
+      server_id: server.id, 
+      container_id: containerId,
+      db_host: appDbCredentials.db_host,
+      db_port: appDbCredentials.db_port,
+      db_name: appDbCredentials.db_name,
+      db_user: appDbCredentials.db_user,
+      db_password: appDbCredentials.db_password,
+    }).eq('id', appId);
 
     // FASE 2: Instalación de Dependencias y App "Hello World" (usando el script completo)
     await appendToServerProvisioningLog(serverIdForLog, `[App Provisioning] Ejecutando script de instalación de dependencias en el contenedor ${containerId.substring(0,12)}...\n`);
