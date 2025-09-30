@@ -24,6 +24,7 @@ interface DashboardData {
     activeServers: number;
     runningContainers: number;
     activeTunnels: number;
+    criticalAlerts: number;
   };
   criticalAlerts: { id: string; created_at: string; event_type: string; description: string }[] | null;
   errorTickets: { id: string; created_at: string; user_id: string; profiles: { first_name: string | null; last_name: string | null } | null }[] | null;
@@ -33,8 +34,8 @@ interface DashboardData {
   };
 }
 
-const KpiCard = ({ title, value, icon }: { title: string; value: number; icon: React.ReactNode }) => (
-  <Card>
+const KpiCard = ({ title, value, icon, className }: { title: string; value: number; icon: React.ReactNode, className?: string }) => (
+  <Card className={className}>
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
       <CardTitle className="text-sm font-medium">{title}</CardTitle>
       {icon}
@@ -122,11 +123,12 @@ export function AdminDashboardTab() {
       </Card>
 
       {/* KPIs */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <KpiCard title="Usuarios Totales" value={data.kpis.totalUsers} icon={<Users className="h-4 w-4 text-muted-foreground" />} />
         <KpiCard title="Servidores Activos" value={data.kpis.activeServers} icon={<Server className="h-4 w-4 text-muted-foreground" />} />
         <KpiCard title="Contenedores Activos" value={data.kpis.runningContainers} icon={<Dock className="h-4 w-4 text-muted-foreground" />} />
         <KpiCard title="Túneles Activos" value={data.kpis.activeTunnels} icon={<Globe className="h-4 w-4 text-muted-foreground" />} />
+        <KpiCard title="Alertas Críticas" value={data.kpis.criticalAlerts} icon={<ShieldAlert className="h-4 w-4 text-destructive" />} className="border-destructive/50" />
       </div>
 
       {/* Alerts & Tickets */}

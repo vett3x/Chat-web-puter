@@ -57,7 +57,8 @@ export async function GET(req: NextRequest) {
       tunnelCountRes,
       alertsRes,
       ticketsRes,
-      resourcesRes
+      resourcesRes,
+      criticalAlertsCountRes
     ] = await Promise.all([
       supabaseAdmin.from('global_settings').select('*').single(),
       supabaseAdmin.from('profiles').select('id', { count: 'exact', head: true }),
@@ -66,7 +67,8 @@ export async function GET(req: NextRequest) {
       supabaseAdmin.from('docker_tunnels').select('id', { count: 'exact', head: true }).eq('status', 'active'),
       supabaseAdmin.from('server_events_log').select('id, created_at, event_type, description').in('event_type', CRITICAL_EVENT_TYPES).order('created_at', { ascending: false }).limit(5),
       supabaseAdmin.from('error_tickets').select('id, created_at, user_id, profiles(first_name, last_name)').eq('status', 'new').order('created_at', { ascending: false }).limit(3),
-      supabaseAdmin.from('server_resource_logs').select('server_id, cpu_usage, memory_usage_mib').order('created_at', { ascending: false }).limit(200) // Fetch recent logs
+      supabaseAdmin.from('server_resource_logs').select('server_id, cpu_usage, memory_usage_mib').order('created_at', { ascending: false }).limit(200), // Fetch recent logs
+      supabaseAdmin.from('server_events_log').select('id', { count: 'exact', head: true }).in('event_type', CRITICAL_EVENT_TYPES)
     ]);
 
     // Aggregate resource usage
@@ -92,6 +94,7 @@ export async function GET(req: NextRequest) {
         activeServers: serverCountRes.count,
         runningContainers: containerCountRes.count,
         activeTunnels: tunnelCountRes.count,
+        criticalAlerts: criticalAlertsCountRes.count,
       },
       criticalAlerts: alertsRes.data,
       errorTickets: ticketsRes.data,

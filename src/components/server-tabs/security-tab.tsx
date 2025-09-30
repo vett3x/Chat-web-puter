@@ -27,6 +27,16 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useSession } from '@/components/session-context-provider';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
 
 interface AllowedCommand {
   command: string;
@@ -48,16 +58,17 @@ export function SecurityTab() {
   const [commands, setCommands] = useState<AllowedCommand[]>([]);
   const [isLoadingCommands, setIsLoadingCommands] = useState(true);
   const [isSubmittingCommand, setIsSubmittingCommand] = useState(false);
+  const [isAddCommandDialogOpen, setIsAddCommandDialogOpen] = useState(false);
 
   const [securityEnabled, setSecurityEnabled] = useState(true);
   const [maintenanceModeEnabled, setMaintenanceModeEnabled] = useState(false);
-  const [usersDisabled, setUsersDisabled] = useState(false); // NEW
-  const [adminsDisabled, setAdminsDisabled] = useState(false); // NEW
+  const [usersDisabled, setUsersDisabled] = useState(false);
+  const [adminsDisabled, setAdminsDisabled] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
   const [isTogglingSecurity, setIsTogglingSecurity] = useState(false);
   const [isTogglingMaintenance, setIsTogglingMaintenance] = useState(false);
-  const [isTogglingUsers, setIsTogglingUsers] = useState(false); // NEW
-  const [isTogglingAdmins, setIsTogglingAdmins] = useState(false); // NEW
+  const [isTogglingUsers, setIsTogglingUsers] = useState(false);
+  const [isTogglingAdmins, setIsTogglingAdmins] = useState(false);
 
   const form = useForm<CommandFormValues>({
     resolver: zodResolver(commandSchema),
@@ -85,8 +96,8 @@ export function SecurityTab() {
       const data = await response.json();
       setSecurityEnabled(data.security_enabled);
       setMaintenanceModeEnabled(data.maintenance_mode_enabled);
-      setUsersDisabled(data.users_disabled); // NEW
-      setAdminsDisabled(data.admins_disabled); // NEW
+      setUsersDisabled(data.users_disabled);
+      setAdminsDisabled(data.admins_disabled);
     } catch (err: any) {
       if (isSuperAdmin) toast.error(err.message);
     } finally {
@@ -110,6 +121,7 @@ export function SecurityTab() {
       toast.success(result.message);
       form.reset();
       fetchCommands();
+      setIsAddCommandDialogOpen(false);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -200,30 +212,38 @@ export function SecurityTab() {
       )}
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><PlusCircle className="h-6 w-6" /> Añadir Comando a la Lista Blanca</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!isSuperAdmin ? (
-            <p className="text-muted-foreground">Solo los Super Admins pueden añadir comandos a la lista blanca.</p>
-          ) : (
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField control={form.control} name="command" render={({ field }) => (<FormItem><FormLabel>Comando</FormLabel><FormControl><Input placeholder="ej: npm" {...field} disabled={isSubmittingCommand} /></FormControl><FormMessage /></FormItem>)} />
-                <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Descripción (Opcional)</FormLabel><FormControl><Input placeholder="ej: Node Package Manager" {...field} disabled={isSubmittingCommand} /></FormControl><FormMessage /></FormItem>)} />
-                <Button type="submit" disabled={isSubmittingCommand}>{isSubmittingCommand ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />} Añadir Comando</Button>
-              </form>
-            </Form>
-          )}
-        </CardContent>
-      </Card>
-
-      <Separator />
-
-      <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2"><Shield className="h-6 w-6" /> Comandos Permitidos</CardTitle>
-          <Button variant="ghost" size="icon" onClick={fetchCommands} disabled={isLoadingCommands}>{isLoadingCommands ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}</Button>
+          <div className="flex items-center gap-2">
+            <Dialog open={isAddCommandDialogOpen} onOpenChange={setIsAddCommandDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" disabled={!isSuperAdmin}>
+                  <PlusCircle className="mr-2 h-4 w-4" /> Añadir Comando
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Añadir Comando a la Lista Blanca</DialogTitle>
+                </DialogHeader>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+                    <FormField control={form.control} name="command" render={({ field }) => (<FormItem><FormLabel>Comando</FormLabel><FormControl><Input placeholder="ej: npm" {...field} disabled={isSubmittingCommand} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Descripción (Opcional)</FormLabel><FormControl><Input placeholder="ej: Node Package Manager" {...field} disabled={isSubmittingCommand} /></FormControl><FormMessage /></FormItem>)} />
+                    <DialogFooter>
+                      <DialogClose asChild><Button type="button" variant="outline" disabled={isSubmittingCommand}>Cancelar</Button></DialogClose>
+                      <Button type="submit" disabled={isSubmittingCommand}>
+                        {isSubmittingCommand ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                        Añadir Comando
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+            <Button variant="ghost" size="icon" onClick={fetchCommands} disabled={isLoadingCommands}>
+              {isLoadingCommands ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoadingCommands ? (
