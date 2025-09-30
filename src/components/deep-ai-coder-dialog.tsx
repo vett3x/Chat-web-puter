@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -11,18 +11,10 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Wand2, Loader2, Send, Bot, KeyRound, User } from 'lucide-react';
+import { Wand2, Loader2, Send, Bot } from 'lucide-react';
 import { toast } from 'sonner';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { useProjectCreationChat } from '@/hooks/use-project-creation-chat';
-import { MessageContent } from './message-content';
-import { useSession } from '@/components/session-context-provider';
-import { useUserApiKeys } from '@/hooks/use-user-api-keys';
-import { AI_PROVIDERS } from '@/lib/ai-models';
-// import { ModelSelectorDropdown } from './chat/model-selector-dropdown'; // REMOVED: ModelSelectorDropdown
+import { cn } from '@/lib/utils';
 
 interface UserApp {
   id: string;
@@ -42,74 +34,67 @@ interface DeepAiCoderDialogProps {
   onAppCreated: (newApp: UserApp) => void;
 }
 
-export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCoderDialogProps) {
-  const { session } = useSession();
-  const userId = session?.user?.id;
-  const { userApiKeys, isLoadingApiKeys } = useUserApiKeys();
+const questions = [
+  { key: 'name', prompt: '¡Hola! Soy tu asistente. ¿Cómo se llamará tu aplicación?', placeholder: 'Ej: Mi increíble app de fotos' },
+  { key: 'main_purpose', prompt: 'Perfecto. Ahora, ¿cuál es el propósito principal de tu aplicación? Sé lo más descriptivo posible.', placeholder: 'Ej: Una red social para compartir fotos de paisajes' },
+  { key: 'key_features', prompt: 'Entendido. ¿Hay alguna característica clave o funcionalidad específica que te gustaría incluir? (Opcional)', placeholder: 'Ej: Perfiles de usuario, subida de imágenes, sistema de "me gusta"' },
+  { key: 'preferred_technologies', prompt: 'Genial. Finalmente, ¿tienes alguna tecnología o framework preferido, además de Next.js y Tailwind? (Opcional)', placeholder: 'Ej: Drizzle ORM, Auth.js' },
+];
 
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCoderDialogProps) {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [projectDetails, setProjectDetails] = useState({ name: '', main_purpose: '', key_features: '', preferred_technologies: '' });
   const [userInput, setUserInput] = useState('');
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const [isGeneratingApp, setIsGeneratingApp] = useState(false);
 
-  const {
-    messages,
-    isLoading,
-    isPuterReady,
-    selectedModel, // Keep selectedModel for API call, but not for UI selection
-    handleModelChange, // Keep handleModelChange for internal use if needed, but not for UI selection
-    sendMessage,
-    projectDetails,
-    isReadyToCreate,
-  } = useProjectCreationChat({
-    userId,
-    userApiKeys,
-    isLoadingApiKeys,
-    onProjectDetailsGathered: (details) => {
-      // This callback is triggered when the AI is ready to create
-      // The actual creation will happen when the user clicks the button
-      console.log("AI is ready to create project with details:", details);
-    },
-  });
-
   useEffect(() => {
-    if (scrollAreaRef.current) {
-      const scrollElement = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollElement) {
-        scrollElement.scrollTop = scrollElement.scrollHeight;
-      }
+    if (open) {
+      // Reset state when dialog opens
+      setCurrentStep(0);
+      setProjectDetails({ name: '', main_purpose: '', key_features: '', preferred_technologies: '' });
+      setUserInput('');
+      setIsTransitioning(false);
+      setIsGeneratingApp(false);
     }
-  }, [messages]);
+  }, [open]);
+
+  const handleNextStep = () => {
+    if (!userInput.trim() && questions[currentStep].key !== 'key_features' && questions[currentStep].key !== 'preferred_technologies') {
+      toast.error('Por favor, responde a la pregunta.');
+      return;
+    }
+
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setProjectDetails(prev => ({ ...prev, [questions[currentStep].key]: userInput.trim() }));
+      setCurrentStep(prev => prev + 1);
+      setUserInput('');
+      setIsTransitioning(false);
+    }, 300); // Match animation duration
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleNextStep();
+    }
+  };
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isReadyToCreate || !projectDetails.name.trim() || !projectDetails.main_purpose.trim()) {
-      toast.error('La IA aún no ha recopilado suficiente información o el nombre/propósito principal está vacío.');
-      return;
-    }
-    
-    // Use the projectDetails gathered by the AI
-    const { name, main_purpose, key_features, preferred_technologies } = projectDetails;
-
     setIsGeneratingApp(true);
     try {
       const response = await fetch('/api/apps/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          name, 
-          main_purpose, 
-          key_features,
-          preferred_technologies,
-        }),
+        body: JSON.stringify(projectDetails),
       });
       const newApp = await response.json();
-      if (!response.ok) {
-        throw new Error(newApp.message || 'Error al iniciar la creación de la aplicación.');
-      }
-      toast.success(`Iniciando la creación de "${name}"...`);
+      if (!response.ok) throw new Error(newApp.message || 'Error al iniciar la creación de la aplicación.');
+      toast.success(`Iniciando la creación de "${projectDetails.name}"...`);
       onAppCreated(newApp);
       onOpenChange(false);
-      setUserInput('');
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -117,94 +102,68 @@ export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCo
     }
   };
 
-  const handleUserSendMessage = async () => {
-    await sendMessage(userInput);
-    setUserInput('');
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleUserSendMessage();
+  const renderStepContent = () => {
+    if (currentStep >= questions.length) {
+      return (
+        <div className="text-center space-y-4">
+          <h3 className="text-xl font-semibold">¡Todo listo para empezar!</h3>
+          <p className="text-muted-foreground">He recopilado toda la información necesaria. Cuando estés listo, crearé la base de tu proyecto.</p>
+          <div className="text-left bg-muted p-4 rounded-lg text-sm space-y-2">
+            <p><strong>Nombre:</strong> {projectDetails.name}</p>
+            <p><strong>Propósito:</strong> {projectDetails.main_purpose}</p>
+            <p><strong>Características:</strong> {projectDetails.key_features || 'No especificadas'}</p>
+            <p><strong>Tecnologías:</strong> {projectDetails.preferred_technologies || 'No especificadas'}</p>
+          </div>
+        </div>
+      );
     }
-  };
 
-  // REMOVED: SelectedModelIcon memoization as ModelSelectorDropdown is removed
+    const { prompt, placeholder } = questions[currentStep];
+    return (
+      <div className="flex flex-col items-center text-center space-y-4">
+        <div className="w-12 h-12 bg-secondary rounded-lg flex items-center justify-center shadow-md">
+          <Bot className="h-6 w-6 text-secondary-foreground" />
+        </div>
+        <p className="text-lg font-medium text-foreground">{prompt}</p>
+        <Textarea
+          value={userInput}
+          onChange={(e) => setUserInput(e.target.value)}
+          onKeyPress={handleKeyPress}
+          placeholder={placeholder}
+          disabled={isTransitioning}
+          className="w-full resize-none min-h-20"
+          autoFocus
+        />
+      </div>
+    );
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] p-6 h-[80vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      <DialogContent className="sm:max-w-lg p-8 flex flex-col">
+        <DialogHeader className="text-center">
+          <DialogTitle className="flex items-center justify-center gap-2 text-2xl">
             <Wand2 className="h-6 w-6 text-primary-light-purple" /> Nuevo Proyecto DeepAI Coder
           </DialogTitle>
           <DialogDescription>
-            Chatea con la IA para definir tu aplicación. Ella recopilará los detalles y la pondrá en línea por ti.
+            Déjame guiarte para definir tu nueva aplicación.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex-1 overflow-hidden py-4 flex flex-col">
-          <ScrollArea className="flex-1 pr-4" ref={scrollAreaRef}>
-            <div className="space-y-4">
-              {messages.map((msg, index) => (
-                <div key={index} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`flex gap-2 max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                    <div className="flex-shrink-0">
-                      {msg.role === 'user' ? (
-                        <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center"><User className="h-4 w-4 text-primary-foreground" /></div>
-                      ) : (
-                        <div className="w-8 h-8 bg-secondary rounded-md flex items-center justify-center">
-                          <Bot className="h-4 w-4 text-secondary-foreground" />
-                        </div>
-                      )}
-                    </div>
-                    <div className={`rounded-2xl p-3 text-sm shadow-md ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                      {msg.isTyping ? (
-                        <div className="flex items-center gap-2">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        </div>
-                      ) : (
-                        <MessageContent
-                          message={msg}
-                          content={msg.content}
-                          isNew={msg.isNew}
-                          aiResponseSpeed="normal"
-                          isAppChat={false}
-                          isConstructionPlan={false}
-                          planApproved={false}
-                          isCorrectionPlan={false}
-                          correctionApproved={false}
-                          isErrorAnalysisRequest={false}
-                          isLoading={isLoading}
-                        />
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
-          <div className="mt-4 flex items-center gap-2 border-t pt-4">
-            <Textarea
-              value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Describe tu proyecto..."
-              disabled={isLoading || !isPuterReady || isLoadingApiKeys}
-              className="flex-1 resize-none min-h-10"
-              rows={1}
-            />
-            {/* REMOVED: ModelSelectorDropdown */}
-            <Button onClick={handleUserSendMessage} disabled={isLoading || !userInput.trim() || !isPuterReady || isLoadingApiKeys}>
-              <Send className="h-4 w-4" />
-            </Button>
+        <div className="flex-1 py-4 flex items-center justify-center">
+          <div className={cn('w-full transition-opacity duration-300', isTransitioning ? 'animate-fade-out' : 'animate-fade-in')}>
+            {renderStepContent()}
           </div>
         </div>
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline" disabled={isLoading || isGeneratingApp}>Cancelar</Button>
+            <Button variant="outline" disabled={isGeneratingApp}>Cancelar</Button>
           </DialogClose>
-          {isReadyToCreate && ( // Only show the button when AI is ready
-            <Button type="submit" className="bg-primary-light-purple hover:bg-primary-light-purple/90 text-white" onClick={handleGenerate} disabled={isLoading || isGeneratingApp}>
+          {currentStep < questions.length ? (
+            <Button onClick={handleNextStep} disabled={isTransitioning}>
+              Siguiente <Send className="ml-2 h-4 w-4" />
+            </Button>
+          ) : (
+            <Button type="submit" className="bg-primary-light-purple hover:bg-primary-light-purple/90 text-white" onClick={handleGenerate} disabled={isGeneratingApp}>
               {isGeneratingApp ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
               Crear Aplicación
             </Button>
