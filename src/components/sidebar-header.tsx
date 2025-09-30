@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Loader2, Folder, Wand2, FileText, ShieldAlert } from 'lucide-react';
+import { Plus, Loader2, Folder, Wand2, FileText, ShieldAlert, Download } from 'lucide-react';
 import { ProfileDropdown } from './profile-dropdown';
 import { SettingsMenu } from './settings-menu'; // Import the new menu
-import { useSession } from './session-context-provider';
+import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -25,6 +25,7 @@ interface SidebarHeaderProps {
   onOpenUpdateManager: () => void;
   onOpenApiManagement: () => void;
   onOpenAlerts: () => void;
+  onDownloadProject: () => void; // New prop
 }
 
 export function SidebarHeader({
@@ -42,6 +43,7 @@ export function SidebarHeader({
   onOpenUpdateManager,
   onOpenApiManagement,
   onOpenAlerts,
+  onDownloadProject, // New prop
 }: SidebarHeaderProps) {
   const { userRole } = useSession();
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
@@ -164,24 +166,15 @@ export function SidebarHeader({
             )}
           </Button>
           
-          {/* New dedicated Alerts Button */}
-          {isAdmin && (
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => {
-                setHasNewCriticalAlerts(false);
-                onOpenAlerts();
-              }}
-              className={cn(
-                "relative text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7",
-                hasNewCriticalAlerts && "text-destructive animate-pulse-red"
-              )}
-              title="Alertas Críticas"
-            >
-              <ShieldAlert className="h-4 w-4" />
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onDownloadProject}
+            className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7"
+            title="Descargar Proyecto"
+          >
+            <Download className="h-3.5 w-3.5" />
+          </Button>
 
           {/* Settings Menu */}
           <SettingsMenu

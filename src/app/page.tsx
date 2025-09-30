@@ -318,6 +318,33 @@ function HomePageContent() {
     }
   };
 
+  const handleDownloadProject = async () => {
+    if (selectedItem?.type !== 'app' || !selectedItem.id) {
+      toast.info('Por favor, selecciona un proyecto para descargar.');
+      return;
+    }
+    const toastId = toast.loading('Preparando la descarga de tu proyecto...');
+    try {
+      const response = await fetch(`/api/apps/${selectedItem.id}/download`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'No se pudo descargar el proyecto.');
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${selectedAppDetails?.name || 'proyecto'}.tar.gz`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('¡Descarga iniciada!', { id: toastId });
+    } catch (error: any) {
+      toast.error(`Error en la descarga: ${error.message}`, { id: toastId });
+    }
+  };
+
   const handleOpenProfileSettings = () => setIsProfileSettingsOpen(true);
   const handleOpenAccountSettings = () => setIsAccountSettingsOpen(true);
   const handleOpenAdminPanel = () => setIsAdminPanelOpen(true); // Renamed handler
@@ -397,6 +424,7 @@ function HomePageContent() {
           onDeleteApp={handleDeleteApp}
           isDeletingAppId={isDeletingAppId}
           fileTreeRefreshKey={fileTreeRefreshKey}
+          onDownloadProject={handleDownloadProject}
         />
       </div>
       <div className="flex-1 min-w-0 flex flex-col">

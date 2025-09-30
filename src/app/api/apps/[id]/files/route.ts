@@ -151,10 +151,10 @@ export async function GET(req: NextRequest, context: any) {
       if (code !== 0) throw new Error(`Error al leer el archivo: ${stderr || stdout}`);
       return NextResponse.json({ content: stdout });
     } else {
-      const command = `find /app -path /app/node_modules -prune -o -path /app/.next -prune -o -path /app/dev.log -prune -o -path /app/cloudflared.log -prune -o -print`;
+      const command = `find /app`; // Simplified command to list all files and directories
       const { stdout, stderr, code } = await executeSshCommand(server, `docker exec ${app.container_id} bash -c "${command}"`);
       if (code !== 0) throw new Error(`Error al listar archivos: ${stderr || stdout}`);
-      const paths = stdout.trim().split('\n').map(p => p.replace('/app/', '')).filter(p => p && p !== '/app');
+      const paths = stdout.trim().split('\n').map(p => p.replace('/app/', '')).filter(p => p && p !== '/app' && p !== '');
       const fileTree = buildFileTree(paths);
       return NextResponse.json(fileTree);
     }

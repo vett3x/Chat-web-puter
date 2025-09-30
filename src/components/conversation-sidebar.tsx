@@ -61,6 +61,7 @@ interface ConversationSidebarProps {
   onDeleteApp: (appId: string) => void;
   isDeletingAppId: string | null;
   fileTreeRefreshKey: number;
+  onDownloadProject: () => void;
 }
 
 export const ConversationSidebar = React.memo(({
@@ -78,6 +79,7 @@ export const ConversationSidebar = React.memo(({
   onDeleteApp,
   isDeletingAppId,
   fileTreeRefreshKey,
+  onDownloadProject,
 }: ConversationSidebarProps) => {
   const {
     apps,
@@ -206,6 +208,7 @@ export const ConversationSidebar = React.memo(({
         onOpenUpdateManager={onOpenUpdateManager}
         onOpenApiManagement={onOpenApiManagement}
         onOpenAlerts={onOpenAlerts}
+        onDownloadProject={onDownloadProject}
       />
       <ScrollArea className="flex-1" onDrop={(e) => handleDrop(e, null)} onDragOver={(e) => e.preventDefault()} onDragEnter={(e) => handleDragEnter(e, null)} onDragLeave={(e) => handleDragLeave(e, null)}>
         <div className="space-y-2">
