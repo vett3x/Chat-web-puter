@@ -24,6 +24,9 @@ interface UserApp {
   url: string | null;
   conversation_id: string | null;
   prompt: string | null;
+  main_purpose: string | null; // NEW
+  key_features: string | null; // NEW
+  preferred_technologies: string | null; // NEW
 }
 
 interface DeepAiCoderDialogProps {
@@ -34,13 +37,15 @@ interface DeepAiCoderDialogProps {
 
 export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCoderDialogProps) {
   const [projectName, setProjectName] = useState('');
-  const [projectPrompt, setProjectPrompt] = useState(''); // Nuevo estado para el prompt
+  const [mainPurpose, setMainPurpose] = useState(''); // NEW state for main purpose
+  const [keyFeatures, setKeyFeatures] = useState(''); // NEW state for key features
+  const [preferredTechnologies, setPreferredTechnologies] = useState(''); // NEW state for preferred technologies
   const [isGenerating, setIsGenerating] = useState(false);
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!projectName.trim() || !projectPrompt.trim()) {
-      toast.error('Por favor, completa el nombre y la descripción del proyecto.');
+    if (!projectName.trim() || !mainPurpose.trim()) { // Only mainPurpose is strictly required for now
+      toast.error('Por favor, completa el nombre y el propósito principal del proyecto.');
       return;
     }
     setIsGenerating(true);
@@ -48,7 +53,12 @@ export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCo
       const response = await fetch('/api/apps/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: projectName, prompt: projectPrompt }), // Enviar también el prompt
+        body: JSON.stringify({ 
+          name: projectName, 
+          main_purpose: mainPurpose, // Send new fields
+          key_features: keyFeatures,
+          preferred_technologies: preferredTechnologies,
+        }),
       });
       const newApp = await response.json();
       if (!response.ok) {
@@ -58,7 +68,9 @@ export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCo
       onAppCreated(newApp);
       onOpenChange(false);
       setProjectName('');
-      setProjectPrompt('');
+      setMainPurpose(''); // Reset new fields
+      setKeyFeatures('');
+      setPreferredTechnologies('');
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -92,16 +104,42 @@ export function DeepAiCoderDialog({ open, onOpenChange, onAppCreated }: DeepAiCo
               />
             </div>
             <div>
-              <Label htmlFor="project-prompt" className="text-left mb-2 block">
-                Describe tu aplicación
+              <Label htmlFor="main-purpose" className="text-left mb-2 block">
+                Propósito Principal de la Aplicación
               </Label>
               <Textarea
-                id="project-prompt"
-                placeholder="Ej: 'Una landing page para una tienda de artículos gamer con una sección de productos destacados y un formulario de contacto.'"
-                value={projectPrompt}
-                onChange={(e) => setProjectPrompt(e.target.value)}
+                id="main-purpose"
+                placeholder="Ej: 'Una plataforma de e-commerce para vender videojuegos y accesorios.'"
+                value={mainPurpose}
+                onChange={(e) => setMainPurpose(e.target.value)}
                 disabled={isGenerating}
-                rows={4}
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label htmlFor="key-features" className="text-left mb-2 block">
+                Características Clave (Opcional)
+              </Label>
+              <Textarea
+                id="key-features"
+                placeholder="Ej: 'Catálogo de productos, carrito de compras, autenticación de usuarios, pasarela de pago.'"
+                value={keyFeatures}
+                onChange={(e) => setKeyFeatures(e.target.value)}
+                disabled={isGenerating}
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label htmlFor="preferred-technologies" className="text-left mb-2 block">
+                Tecnologías Preferidas (Opcional)
+              </Label>
+              <Textarea
+                id="preferred-technologies"
+                placeholder="Ej: 'Tailwind CSS para estilos, Shadcn/UI para componentes, React Hook Form para formularios.'"
+                value={preferredTechnologies}
+                onChange={(e) => setPreferredTechnologies(e.target.value)}
+                disabled={isGenerating}
+                rows={2}
               />
             </div>
           </div>

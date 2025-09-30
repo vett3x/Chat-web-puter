@@ -37,6 +37,9 @@ interface UserApp {
   url: string | null;
   conversation_id: string | null;
   prompt: string | null;
+  main_purpose: string | null; // NEW
+  key_features: string | null; // NEW
+  preferred_technologies: string | null; // NEW
 }
 
 interface SelectedItem {
@@ -331,7 +334,14 @@ function HomePageContent() {
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
   const isAppDeleting = selectedItem?.type === 'app' && selectedItem.id === isDeletingAppId;
   const appId = selectedAppDetails?.id || undefined;
-  const appPrompt = selectedAppDetails?.prompt || undefined;
+  
+  // Construct appPrompt from new structured fields
+  const appPrompt = selectedAppDetails?.main_purpose 
+    ? `Propósito Principal: ${selectedAppDetails.main_purpose}` +
+      (selectedAppDetails.key_features ? `\nCaracterísticas Clave: ${selectedAppDetails.key_features}` : '') +
+      (selectedAppDetails.preferred_technologies ? `\nTecnologías Preferidas: ${selectedAppDetails.preferred_technologies}` : '')
+    : undefined;
+
   const isAppProvisioning = selectedAppDetails?.status === 'provisioning';
 
   const renderRightPanelContent = () => {
@@ -422,7 +432,7 @@ function HomePageContent() {
                 aiResponseSpeed={aiResponseSpeed}
                 isAppProvisioning={isAppProvisioning}
                 isAppDeleting={isAppDeleting}
-                appPrompt={appPrompt}
+                appPrompt={appPrompt} // Pass the constructed appPrompt
                 appId={appId}
                 onWriteFiles={writeFilesToApp}
                 isAppChat={selectedItem?.type === 'app'}

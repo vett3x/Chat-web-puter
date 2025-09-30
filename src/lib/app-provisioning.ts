@@ -16,7 +16,9 @@ interface AppProvisioningData {
   userId: string;
   appName: string;
   conversationId: string;
-  prompt: string;
+  mainPurpose: string; // NEW
+  keyFeatures?: string; // NEW
+  preferredTechnologies?: string; // NEW
 }
 
 async function updateAppStatus(appId: string, status: 'ready' | 'failed', details: object = {}) {
@@ -45,7 +47,7 @@ async function appendToServerProvisioningLog(serverId: string | null, logContent
 }
 
 export async function provisionApp(data: AppProvisioningData) {
-  const { appId, userId, appName, conversationId, prompt } = data;
+  const { appId, userId, appName, conversationId, mainPurpose, keyFeatures, preferredTechnologies } = data;
   let containerId: string | undefined;
   let server: any;
   let containerName: string | undefined;

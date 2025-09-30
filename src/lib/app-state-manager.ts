@@ -77,13 +77,21 @@ export async function getAppAndServerWithStateCheck(appId: string, userId: strin
         .from('user_apps')
         .update({ last_activity_at: new Date().toISOString() })
         .eq('id', appId)
-        .select('*, user_servers(id, ip_address, ssh_port, ssh_username, ssh_password)')
+        .select('*, user_servers(id, ip_address, ssh_port, ssh_username, ssh_password), main_purpose, key_features, preferred_technologies') // NEW: Select new fields
         .single();
 
     if (appError || !app) throw new Error('Aplicación no encontrada o acceso denegado.');
 
     if (app.status === 'hibernated') {
-        await restoreAppFromArchive(app.id, userId, app.name, app.conversation_id!, app.prompt || '');
+        await restoreAppFromArchive(
+          app.id, 
+          userId, 
+          app.name, 
+          app.conversation_id!, 
+          app.main_purpose || '', // NEW: Pass main_purpose
+          app.key_features || undefined, // NEW: Pass key_features
+          app.preferred_technologies || undefined // NEW: Pass preferred_technologies
+        );
         const { data: restoredApp, error: restoredAppError } = await supabaseAdmin.from('user_apps').select('*, user_servers(id, ip_address, ssh_port, ssh_username, ssh_password)').eq('id', appId).single();
         if (restoredAppError || !restoredApp || !restoredApp.user_servers) throw new Error('No se pudo obtener la información del servidor después de la restauración.');
         return { app: restoredApp, server: restoredApp.user_servers as any };
@@ -114,8 +122,24 @@ export async function getAppAndServerWithStateCheck(appId: string, userId: strin
     return { app, server: app.user_servers as any };
 }
 
-async function restoreAppFromArchive(appId: string, userId: string, appName: string, conversationId: string, prompt: string) {
-    await provisionApp({ appId, userId, appName, conversationId, prompt });
+async function restoreAppFromArchive(
+  appId: string, 
+  userId: string, 
+  appName: string, 
+  conversationId: string, 
+  mainPurpose: string, // NEW: Accept mainPurpose
+  keyFeatures?: string, // NEW: Accept keyFeatures
+  preferredTechnologies?: string // NEW: Accept preferredTechnologies
+) {
+    await provisionApp({ 
+      appId, 
+      userId, 
+      appName, 
+      conversationId, 
+      mainPurpose, // NEW: Pass mainPurpose
+      keyFeatures, // NEW: Pass keyFeatures
+      preferredTechnologies // NEW: Pass preferredTechnologies
+    });
 
     const { data: appDetails, error: appDetailsError } = await supabaseAdmin.from('user_apps').select('container_id, user_servers(id, ip_address, ssh_port, ssh_username, ssh_password)').eq('id', appId).single();
     if (appDetailsError || !appDetails || !appDetails.container_id || !appDetails.user_servers) {

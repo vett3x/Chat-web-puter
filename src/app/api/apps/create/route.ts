@@ -8,7 +8,9 @@ import { provisionApp } from '@/lib/app-provisioning';
 
 const createAppSchema = z.object({
   name: z.string().min(3, { message: 'El nombre del proyecto debe tener al menos 3 caracteres.' }).max(50),
-  prompt: z.string().min(10, { message: 'La descripción debe tener al menos 10 caracteres.' }),
+  main_purpose: z.string().min(10, { message: 'El propósito principal debe tener al menos 10 caracteres.' }), // NEW
+  key_features: z.string().optional(), // NEW
+  preferred_technologies: z.string().optional(), // NEW
 });
 
 export async function POST(req: NextRequest) {
@@ -33,7 +35,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { name, prompt } = createAppSchema.parse(body);
+    const { name, main_purpose, key_features, preferred_technologies } = createAppSchema.parse(body); // Parse new fields
 
     // 1. Create a conversation for the app
     const { data: conversation, error: convError } = await supabase
@@ -51,7 +53,10 @@ export async function POST(req: NextRequest) {
         name: name,
         conversation_id: conversation.id,
         status: 'provisioning',
-        prompt: prompt, // Save the prompt
+        prompt: main_purpose, // Keep prompt for backward compatibility, but use main_purpose
+        main_purpose: main_purpose, // NEW
+        key_features: key_features, // NEW
+        preferred_technologies: preferred_technologies, // NEW
       })
       .select('*')
       .single();
@@ -63,7 +68,9 @@ export async function POST(req: NextRequest) {
       userId: userId,
       appName: newApp.name,
       conversationId: newApp.conversation_id!,
-      prompt: prompt, // Pass the prompt
+      mainPurpose: main_purpose, // Pass new fields
+      keyFeatures: key_features,
+      preferredTechnologies: preferred_technologies,
     });
 
     // 4. Return the newly created app data immediately

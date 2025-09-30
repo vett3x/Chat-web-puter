@@ -89,7 +89,7 @@ interface UseDeepAICoderChatProps {
   conversationId: string | null;
   onNewConversationCreated: (conversationId: string) => void;
   onConversationTitleUpdate: (conversationId: string, newTitle: string) => void;
-  appPrompt: string; // Required for DeepAI Coder
+  appPrompt: string; // Required for DeepAI Coder (now combines structured fields)
   appId: string; // Required for DeepAI Coder
   onWriteFiles: (files: { path: string; content: string }[]) => Promise<void>;
   onSidebarDataRefresh: () => void;
@@ -127,7 +127,7 @@ export function useDeepAICoderChat({
   conversationId,
   onNewConversationCreated,
   onConversationTitleUpdate,
-  appPrompt,
+  appPrompt, // Now combines structured fields
   appId,
   onWriteFiles,
   onSidebarDataRefresh,
