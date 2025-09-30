@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
   }
   const userEmailMap = new Map(users.map(u => [u.id, u.email]));
 
-  const { data, error } = await supabaseAdmin
+  const { data: alertsData, error } = await supabaseAdmin
     .from('server_events_log')
     .select(`
       id,
@@ -83,10 +83,6 @@ export async function GET(req: NextRequest) {
       user_servers (
         name,
         ip_address
-      ),
-      profiles:profiles!user_id (
-        first_name,
-        last_name
       )
     `)
     .in('event_type', CRITICAL_EVENT_TYPES)
@@ -98,8 +94,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
 
-  const formattedAlerts = data.map(alert => {
-    const profile = (alert.profiles as any);
+  // Manually fetch profiles for the users in the alerts
+  const userIds = [...new Set(alertsData.map(alert => alert.user_id).filter(Boolean))];
+  let profilesMap = new Map();
+  if (userIds.length > 0) {
+    const { data: profiles, error: profilesError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, first_name, last_name')
+      .in('id', userIds);
+    
+    if (profilesError) {
+      console.error('[API /alerts] Error fetching profiles for alerts:', profilesError);
+      // Non-fatal, continue without profile info
+    } else {
+      profilesMap = new Map(profiles.map(p => [p.id, p]));
+    }
+  }
+
+  const formattedAlerts = alertsData.map(alert => {
+    const profile = profilesMap.get(alert.user_id);
     let userName = 'Usuario Desconocido';
     if (profile) {
       userName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
