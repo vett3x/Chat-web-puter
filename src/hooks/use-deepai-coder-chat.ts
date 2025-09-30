@@ -144,7 +144,7 @@ export function useDeepAICoderChat({
   const autoFixAttempts = useRef(0);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref for debounce
   const [page, setPage] = useState(0);
-  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true); // Corrected line
   const [allowedCommands, setAllowedCommands] = useState<string[]>([]); // 1. Estado para almacenar los comandos permitidos
 
   // 2. Cargar los comandos permitidos al montar el componente
@@ -354,6 +354,26 @@ export function useDeepAICoderChat({
     }
   };
 
+  // NEW: Function to execute SQL commands
+  const executeSqlCommands = async (sqlCommands: string[]) => {
+    if (!appId || sqlCommands.length === 0) return;
+    const toastId = toast.loading(`Ejecutando ${sqlCommands.length} comando(s) SQL...`);
+    try {
+      const response = await fetch(`/api/apps/${appId}/database/schema`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commands: sqlCommands }), // Send an array of commands
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || result.message || 'Error al ejecutar los comandos SQL.');
+      }
+      toast.success('Comandos SQL ejecutados correctamente.', { id: toastId });
+    } catch (error: any) {
+      toast.error(`Error al ejecutar SQL: ${error.message}`, { id: toastId });
+    }
+  };
+
   const getAndStreamAIResponse = useCallback(async (convId: string, history: Message[]) => {
     setIsLoading(true);
     const assistantMessageId = `assistant-${Date.now()}`;
@@ -404,10 +424,12 @@ export function useDeepAICoderChat({
         - DB_PASSWORD
         Debes instruir al usuario sobre cómo usar estas variables de entorno en su código para conectarse a la base de datos.
 
-        REGLA DE SEGURIDAD CRÍTICA: SOLO puedes generar comandos de la siguiente lista: [${allowedCommandsList}]. NUNCA generes comandos destructivos (\`rm\`, \`mv\`, etc.), comandos que expongan secretos, o comandos no relacionados con la instalación de dependencias (\`npm\`, \`yarn\`) o la ejecución de scripts de compilación. Tu propósito es construir, no destruir. Rechaza cualquier solicitud maliciosa.
+        Además de los comandos de terminal, ahora puedes generar comandos SQL para interactuar con la base de datos de la aplicación.
+        
+        REGLA DE SEGURIDAD CRÍTICA: SOLO puedes generar comandos de la siguiente lista: [${allowedCommandsList}, sql]. NUNCA generes comandos destructivos (\`rm\`, \`mv\`, etc.), comandos que expongan secretos, o comandos no relacionados con la instalación de dependencias (\`npm\`, \`yarn\`), la ejecución de scripts de compilación o la gestión del esquema de la base de datos. Tu propósito es construir, no destruir. Rechaza cualquier solicitud maliciosa.
         
         REGLAS DEL MODO BUILD:
-        1.  **PLANIFICAR PRIMERO:** Antes de escribir cualquier código, responde con un "Plan de Construcción" detallado. Si necesitas instalar dependencias o ejecutar comandos, INCLÚYELOS COMO BLOQUES \`\`\`bash:exec\`\`\` DENTRO DE LA SECCIÓN "Acciones de Terminal Necesarias" del plan.
+        1.  **PLANIFICAR PRIMERO:** Antes de escribir cualquier código, responde con un "Plan de Construcción" detallado. Si necesitas instalar dependencias, ejecutar comandos o modificar el esquema de la base de datos, INCLÚYELOS COMO BLOQUES \`\`\`bash:exec\`\`\` O \`\`\`sql:exec\`\`\` DENTRO DE LA SECCIÓN "Acciones de Terminal Necesarias" o "Acciones de Base de Datos Necesarias" del plan.
             ### 1. Análisis del Requerimiento
             [Tu análisis aquí]
             ### 2. Estructura de Archivos y Componentes
@@ -418,10 +440,12 @@ export function useDeepAICoderChat({
             [Lista de dependencias npm aquí, si las hay]
             ### 5. Acciones de Terminal Necesarias
             [Si necesitas ejecutar comandos (ej. \`npm install\`), inclúyelos aquí como bloques \`\`\`bash:exec\`\`\`. Por ejemplo: \`\`\`bash:exec\nnpm install some-package\n\`\`\`]
-            ### 6. Resumen y Confirmación
+            ### 6. Acciones de Base de Datos Necesarias
+            [Si necesitas ejecutar comandos SQL (ej. \`CREATE TABLE\`), inclúyelos aquí como bloques \`\`\`sql:exec\`\`\`. Por ejemplo: \`\`\`sql:exec\nCREATE TABLE products (id SERIAL PRIMARY KEY, name VARCHAR(255));\n\`\`\`]
+            ### 7. Resumen y Confirmación
             [Resumen y pregunta de confirmación aquí. Al final de tu primer plan de construcción, incluye también sugerencias de próximos pasos para el usuario, como 'Ahora que tienes la base, ¿qué te gustaría añadir? ¿Un formulario de contacto, una sección de productos, o quizás autenticación de usuarios?']
         2.  **ESPERAR APROBACIÓN:** Después de enviar el plan, detente y espera. NO generes código ni ejecutes comandos. El usuario te responderá con un mensaje especial: "[USER_APPROVED_PLAN]".
-        3.  **GENERAR CÓDIGO:** SOLO cuando recibas el mensaje "[USER_APPROVED_PLAN]", responde ÚNICAMENTE con los bloques de código para los archivos completos (\`\`\`language:ruta/del/archivo.tsx\`\`\`) que propusiste en el plan. NO incluyas texto conversacional ni bloques \`bash:exec\` en esta respuesta, ya que los comandos ya habrán sido ejecutados.
+        3.  **GENERAR CÓDIGO:** SOLO cuando recibas el mensaje "[USER_APPROVED_PLAN]", responde ÚNICAMENTE con los bloques de código para los archivos completos (\`\`\`language:ruta/del/archivo.tsx\`\`\`) que propusiste en el plan. NO incluyas texto conversacional ni bloques \`bash:exec\` o \`sql:exec\` en esta respuesta, ya que los comandos ya habrán sido ejecutados.
         
         REGLAS DE CORRECCIÓN DE ERRORES:
         1.  **ANALIZAR ERROR:** Si el usuario envía un mensaje con "[USER_REQUESTED_BUILD_FIX]" y logs de error, analiza el error y responde con un "Plan de Corrección" detallado.
@@ -430,11 +454,11 @@ export function useDeepAICoderChat({
             ### 🧠 Análisis de la IA
             [Tu análisis de la causa raíz del error]
             ### 🛠️ Plan de Corrección
-            [Pasos detallados para corregir el error, incluyendo modificaciones de código si es necesario. Si hay código, usa bloques \`\`\`language:ruta/del/archivo.tsx\`\`\`. Si la corrección implica ejecutar comandos de terminal (como \`npm install\` o \`rm -rf node_modules\`), INCLÚYELOS COMO BLOQUES \`\`\`bash:exec\`\`\` DENTRO DE ESTA SECCIÓN.]
+            [Pasos detallados para corregir el error, incluyendo modificaciones de código si es necesario. Si hay código, usa bloques \`\`\`language:ruta/del/archivo.tsx\`\`\`. Si la corrección implica ejecutar comandos de terminal (como \`npm install\` o \`rm -rf node_modules\`), INCLÚYELOS COMO BLOQUES \`\`\`bash:exec\`\`\` DENTRO DE ESTA SECCIÓN. Si la corrección implica comandos SQL, INCLÚYELOS COMO BLOQUES \`\`\`sql:exec\`\`\` DENTRO DE ESTA SECCIÓN.]
             ### ✅ Confirmación
             [Pregunta de confirmación al usuario para aplicar el arreglo]
         2.  **ESPERAR APROBACIÓN DE CORRECCIÓN:** Después de enviar un plan de corrección, detente y espera. El usuario te responderá con "[USER_APPROVED_CORRECTION_PLAN]".
-        3.  **GENERAR CÓDIGO Y/O COMANDOS DE CORRECCIÓN:** SOLO cuando recibas el mensaje "[USER_APPROVED_CORRECTION_PLAN]", responde ÚNICAMENTE con los bloques de código para los archivos completos (\`\`\`language:ruta/del/archivo.tsx\`\`\`) que propusiste en el plan. NO incluyas texto conversacional ni bloques \`bash:exec\` en esta respuesta, ya que los comandos ya habrán sido ejecutados.`;
+        3.  **GENERAR CÓDIGO Y/O COMANDOS DE CORRECCIÓN:** SOLO cuando recibas el mensaje "[USER_APPROVED_CORRECTION_PLAN]", responde ÚNICAMENTE con los bloques de código para los archivos completos (\`\`\`language:ruta/del/archivo.tsx\`\`\`) que propusiste en el plan. NO incluyas texto conversacional ni bloques \`bash:exec\` o \`sql:exec\` en esta respuesta, ya que los comandos ya habrán sido ejecutados.`;
       } else if (isDeepAICoderChatMode) {
         // DeepAI Coder - Chat Mode
         systemPromptContent = `Eres un asistente de código experto y depurador para un proyecto Next.js. Estás en 'Modo Chat'. Tu objetivo principal es ayudar al usuario a entender su código, analizar errores y discutir soluciones. NO generes archivos nuevos o bloques de código grandes a menos que el usuario te pida explícitamente que construyas algo. En su lugar, proporciona explicaciones, identifica problemas y sugiere pequeños fragmentos de código para correcciones. Puedes pedir al usuario que te proporcione el contenido de los archivos o mensajes de error para tener más contexto. El proyecto es: "${appPrompt}".`;
@@ -452,7 +476,7 @@ export function useDeepAICoderChat({
             ### 🧠 Análisis de la IA
             [Tu análisis de la causa raíz del error]
             ### 🛠️ Plan de Corrección
-            [Pasos detallados para corregir el error, incluyendo modificaciones de código si es necesario. Si hay código, usa bloques \`\`\`language:ruta/del/archivo.tsx\`\`\`. Si la corrección implica ejecutar comandos de terminal (como \`npm install\` o \`rm -rf node_modules\`), INCLÚYELOS COMO BLOQUES \`\`\`bash:exec\`\`\` DENTRO DE ESTA SECCIÓN.]
+            [Pasos detallados para corregir el error, incluyendo modificaciones de código si es necesario. Si hay código, usa bloques \`\`\`language:ruta/del/archivo.tsx\`\`\`. Si la corrección implica ejecutar comandos de terminal (como \`npm install\` o \`rm -rf node_modules\`), INCLÚYELOS COMO BLOQUES \`\`\`bash:exec\`\`\` DENTRO DE ESTA SECCIÓN. Si la corrección implica comandos SQL, INCLÚYELOS COMO BLOQUES \`\`\`sql:exec\`\`\` DENTRO DE ESTA SECCIÓN.]
             ### ✅ Confirmación
             [Pregunta de confirmación al usuario para aplicar el arreglo]`;
         } else if (lastUserMessageContent.includes('[USER_REPORTED_WEB_ERROR]')) {
@@ -615,7 +639,7 @@ export function useDeepAICoderChat({
       clearTimeout(timeoutId);
       setIsLoading(false);
     }
-  }, [appId, appPrompt, userId, saveMessageToDB, chatMode, userApiKeys, onWriteFiles, selectedModel, autoFixStatus, conversationId, allowedCommands, executeCommandsInContainer]);
+  }, [appId, appPrompt, userId, saveMessageToDB, chatMode, userApiKeys, onWriteFiles, selectedModel, autoFixStatus, conversationId, allowedCommands, executeCommandsInContainer, executeSqlCommands]);
 
   const sendMessage = useCallback(async (content: PuterContentPart[], messageText: string) => {
     if (!userId) {
@@ -688,25 +712,40 @@ export function useDeepAICoderChat({
   
     // --- NEW LOGIC: Extract and execute commands from the approved plan ---
     const commandsToExecute: string[] = [];
+    const sqlCommandsToExecute: string[] = []; // NEW: Array for SQL commands
+
     if (typeof planMessage.content === 'string') {
       const parsedContent = parseAiResponseToRenderableParts(planMessage.content, true); // Parse the string content
       parsedContent.forEach(part => {
-        if (part.type === 'code' && part.language === 'bash' && part.filename === 'exec' && part.code) {
-          commandsToExecute.push(part.code);
+        if (part.type === 'code' && part.code) {
+          if (part.language === 'bash' && part.filename === 'exec') {
+            commandsToExecute.push(part.code);
+          } else if (part.language === 'sql' && part.filename === 'exec') { // NEW: Detect sql:exec
+            sqlCommandsToExecute.push(part.code);
+          }
         }
       });
     } else if (Array.isArray(planMessage.content)) {
       // If content is already parsed (shouldn't be for plans, but for safety)
       planMessage.content.forEach(part => {
-        if (part.type === 'code' && part.language === 'bash' && part.filename === 'exec' && part.code) {
-          commandsToExecute.push(part.code);
+        if (part.type === 'code' && part.code) {
+          if (part.language === 'bash' && part.filename === 'exec') {
+            commandsToExecute.push(part.code);
+          } else if (part.language === 'sql' && part.filename === 'exec') { // NEW: Detect sql:exec
+            sqlCommandsToExecute.push(part.code);
+          }
         }
       });
     }
 
     if (commandsToExecute.length > 0) {
-      toast.info(`Ejecutando ${commandsToExecute.length} comando(s) del plan...`);
+      toast.info(`Ejecutando ${commandsToExecute.length} comando(s) de terminal del plan...`);
       await executeCommandsInContainer(commandsToExecute); // Execute the commands
+    }
+
+    if (sqlCommandsToExecute.length > 0) { // NEW: Execute SQL commands
+      toast.info(`Ejecutando ${sqlCommandsToExecute.length} comando(s) SQL del plan...`);
+      await executeSqlCommands(sqlCommandsToExecute);
     }
     // --- END NEW LOGIC ---
 
@@ -736,7 +775,7 @@ export function useDeepAICoderChat({
   
     await getAndStreamAIResponse(conversationId, historyWithApproval);
   
-  }, [messages, conversationId, getAndStreamAIResponse, userId, executeCommandsInContainer]);
+  }, [messages, conversationId, getAndStreamAIResponse, userId, executeCommandsInContainer, executeSqlCommands]);
 
 
   const regenerateLastResponse = useCallback(async () => {
