@@ -22,7 +22,7 @@ PGDATABASE_CLOUD=${PGDATABASE_CLOUD:-postgres} # Valor por defecto
 # --- 2. Configurar Credenciales de Supabase Local ---
 echo -e "\n${YELLOW}Configurando credenciales para tu base de datos de Supabase LOCAL:${NC}"
 PGHOST_LOCAL="localhost"
-PGPORT_LOCAL="54322" # <--- ¡CORREGIDO AQUÍ! Usar el puerto mapeado en el host
+PGPORT_LOCAL="54322" # Corregido para usar el puerto mapeado en el host
 PGUSER_LOCAL="postgres"
 PGPASSWORD_LOCAL="postgres" # Contraseña por defecto de Supabase local
 PGDATABASE_LOCAL="postgres" # Base de datos por defecto de Supabase local
@@ -36,9 +36,9 @@ echo "Base de Datos Local: $PGDATABASE_LOCAL"
 SCHEMA_FILE="cloud_schema.sql"
 DATA_FILE="cloud_data.sql"
 
-# --- 4. Esquemas a Excluir (CRÍTICO para Supabase) ---
+# --- 4. Esquemas a Excluir (AHORA SIN 'auth') ---
 EXCLUDE_SCHEMAS=(
-  "auth" "storage" "extensions" "graphql_public" "realtime"
+  "storage" "extensions" "graphql_public" "realtime"
   "supabase_functions" "vault" "pgbouncer" "pgsodium" "net"
   "pg_graphql" "pgaudit" "repmgr" "cron" "information_schema" "pg_catalog"
 )
