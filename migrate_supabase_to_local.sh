@@ -22,7 +22,7 @@ PGDATABASE_CLOUD=${PGDATABASE_CLOUD:-postgres} # Valor por defecto
 # --- 2. Configurar Credenciales de Supabase Local ---
 echo -e "\n${YELLOW}Configurando credenciales para tu base de datos de Supabase LOCAL:${NC}"
 PGHOST_LOCAL="localhost"
-PGPORT_LOCAL="5432" # Puerto por defecto de Supabase local
+PGPORT_LOCAL="54322" # <--- ¡CORREGIDO AQUÍ! Usar el puerto mapeado en el host
 PGUSER_LOCAL="postgres"
 PGPASSWORD_LOCAL="postgres" # Contraseña por defecto de Supabase local
 PGDATABASE_LOCAL="postgres" # Base de datos por defecto de Supabase local
