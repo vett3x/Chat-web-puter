@@ -8,13 +8,12 @@ NC='\033[0m' # No Color
 
 echo -e "${GREEN}=== Inicio de la Migración de Supabase Cloud a Local ===${NC}"
 
-# --- 1. Obtener Credenciales de Supabase Cloud ---
-echo -e "${YELLOW}Por favor, introduce las credenciales de tu base de datos de Supabase en la NUBE:${NC}"
-read -p "Host de la base de datos (ej. db.<project-ref>.supabase.co): " PGHOST_CLOUD
-read -p "Puerto de la base de datos (por defecto 5432): " PGPORT_CLOUD
-PGPORT_CLOUD=${PGPORT_CLOUD:-5432} # Valor por defecto
-read -p "Usuario de la base de datos (por defecto postgres): " PGUSER_CLOUD
-PGUSER_CLOUD=${PGUSER_CLOUD:-postgres} # Valor por defecto
+# --- 1. Obtener Credenciales de Supabase Cloud (usando Session Pooler) ---
+echo -e "${YELLOW}Por favor, introduce las credenciales de tu base de datos de Supabase en la NUBE (usando Session Pooler para compatibilidad IPv4):${NC}"
+read -p "Host del Session Pooler (ej. aws-1-eu-west-3.pooler.supabase.com): " PGHOST_CLOUD
+read -p "Puerto del Session Pooler (por defecto 6543): " PGPORT_CLOUD
+PGPORT_CLOUD=${PGPORT_CLOUD:-6543} # Valor por defecto para Session Pooler
+read -p "Usuario del Session Pooler (ej. postgres.juxrggowingqlchwfuct): " PGUSER_CLOUD
 read -s -p "Contraseña de la base de datos: " PGPASSWORD_CLOUD
 echo ""
 read -p "Nombre de la base de datos (por defecto postgres): " PGDATABASE_CLOUD
