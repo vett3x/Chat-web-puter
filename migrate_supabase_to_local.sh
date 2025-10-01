@@ -36,9 +36,9 @@ echo "Base de Datos Local: $PGDATABASE_LOCAL"
 SCHEMA_FILE="cloud_schema.sql"
 DATA_FILE="cloud_data.sql"
 
-# --- 4. Esquemas a Excluir (AHORA SIN 'auth' NI 'storage') ---
+# --- 4. Esquemas a Excluir (AHORA CON 'auth' DE NUEVO) ---
 EXCLUDE_SCHEMAS=(
-  "extensions" "graphql_public" "realtime"
+  "auth" "extensions" "graphql_public" "realtime"
   "supabase_functions" "vault" "pgbouncer" "pgsodium" "net"
   "pg_graphql" "pgaudit" "repmgr" "cron" "information_schema" "pg_catalog"
 )
