@@ -895,7 +895,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                               const canManageKey = isSuperAdmin || (key.user_id === currentUserId && !key.is_global);
                               return (
                                 <TableRow key={key.id} className={cn(key.status === 'failed' && 'bg-destructive/10', key.status === 'blocked' && 'bg-red-900/20')}>
-                                  <TableCell className="pl-8">{key.nickname || 'N/A'}</TableCell>
+                                  <TableCell className="pl-8"><div className="flex items-center gap-2"><KeyRound className="h-4 w-4 text-muted-foreground" /> {key.nickname || 'N/A'}</div></TableCell>
                                   <TableCell>{providerOptions.find(p => p.value === key.provider)?.label || key.provider}</TableCell>
                                   <TableCell className="font-mono text-xs">
                                     {key.provider === 'custom_endpoint' ? (
@@ -939,8 +939,10 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                       })}
                       {filteredStandaloneKeys.length > 0 && (
                         <TableRow className="bg-muted/50 hover:bg-muted/70">
-                          <TableCell colSpan={isSuperAdmin ? 6 : 5} className="font-semibold flex items-center gap-2">
-                            <KeyRound className="h-4 w-4" /> Claves Individuales
+                          <TableCell colSpan={isSuperAdmin ? 6 : 5} className="font-semibold">
+                            <div className="flex items-center gap-2">
+                              <KeyRound className="h-4 w-4" /> Claves Individuales
+                            </div>
                           </TableCell>
                         </TableRow>
                       )}
@@ -948,7 +950,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                         const canManageKey = isSuperAdmin || (key.user_id === currentUserId && !key.is_global);
                         return (
                           <TableRow key={key.id} className={cn(key.status === 'failed' && 'bg-destructive/10', key.status === 'blocked' && 'bg-red-900/20')}>
-                            <TableCell className="pl-8">{key.nickname || 'N/A'}</TableCell>
+                            <TableCell><div className="flex items-center gap-2">{key.nickname || 'N/A'}</div></TableCell>
                             <TableCell>{providerOptions.find(p => p.value === key.provider)?.label || key.provider}</TableCell>
                             <TableCell className="font-mono text-xs">
                               {key.provider === 'custom_endpoint' ? (
