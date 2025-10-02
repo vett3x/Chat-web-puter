@@ -25,7 +25,6 @@ interface SidebarHeaderProps {
   onOpenUpdateManager: () => void;
   onOpenApiManagement: () => void;
   onOpenAlerts: () => void;
-  onDownloadProject: () => void; // New prop
 }
 
 export function SidebarHeader({
@@ -43,7 +42,6 @@ export function SidebarHeader({
   onOpenUpdateManager,
   onOpenApiManagement,
   onOpenAlerts,
-  onDownloadProject, // New prop
 }: SidebarHeaderProps) {
   const { userRole } = useSession();
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
@@ -166,16 +164,6 @@ export function SidebarHeader({
             )}
           </Button>
           
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={onDownloadProject}
-            className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7"
-            title="Descargar Proyecto"
-          >
-            <Download className="h-3.5 w-3.5" />
-          </Button>
-
           {/* Settings Menu */}
           <SettingsMenu
             onOpenAdminPanel={onOpenAdminPanel}

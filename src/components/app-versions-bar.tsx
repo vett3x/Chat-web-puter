@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Loader2, History, CheckCircle2, AlertCircle, GitPullRequest, RefreshCw, Wrench, Bug } from 'lucide-react';
+import { Loader2, History, CheckCircle2, AlertCircle, GitPullRequest, RefreshCw, Wrench, Bug, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -29,9 +29,10 @@ interface AppVersionsBarProps {
   autoFixStatus: AutoFixStatus;
   onTriggerFixBuildError: () => void;
   onTriggerReportWebError: () => void;
+  onDownloadProject: () => void; // New prop
 }
 
-export function AppVersionsBar({ appId, onRevertToVersion, isReverting, autoFixStatus, onTriggerFixBuildError, onTriggerReportWebError }: AppVersionsBarProps) {
+export function AppVersionsBar({ appId, onRevertToVersion, isReverting, autoFixStatus, onTriggerFixBuildError, onTriggerReportWebError, onDownloadProject }: AppVersionsBarProps) {
   const [versions, setVersions] = useState<AppVersion[]>([]);
   const [activeVersion, setActiveVersion] = useState<string | null>(null);
   const [isLoadingVersions, setIsLoadingVersions] = useState(true);
@@ -148,6 +149,15 @@ export function AppVersionsBar({ appId, onRevertToVersion, isReverting, autoFixS
           title="Reportar un error en la vista previa web"
         >
           <Bug className="mr-2 h-4 w-4" /> Reportar Error en App
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onDownloadProject}
+          disabled={isAutoFixing || isReverting}
+          title="Descargar los archivos de este proyecto"
+        >
+          <Download className="mr-2 h-4 w-4" /> Descargar Proyecto
         </Button>
         <Button variant="ghost" size="icon" onClick={fetchVersions} disabled={isLoadingVersions || isReverting || isAutoFixing} title="Refrescar versiones">
           {isLoadingVersions ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}

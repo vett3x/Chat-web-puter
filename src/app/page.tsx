@@ -431,7 +431,6 @@ function HomePageContent() {
           onDeleteApp={handleDeleteApp}
           isDeletingAppId={isDeletingAppId}
           fileTreeRefreshKey={fileTreeRefreshKey}
-          onDownloadProject={handleDownloadProject}
         />
       </div>
       <div className="flex-1 min-w-0 flex flex-col">
@@ -443,6 +442,7 @@ function HomePageContent() {
             autoFixStatus={chatInterfaceRef.current?.autoFixStatus || 'idle'}
             onTriggerFixBuildError={handleTriggerFixBuildError}
             onTriggerReportWebError={handleTriggerReportWebError}
+            onDownloadProject={handleDownloadProject}
           />
         )}
         {selectedItem?.type === 'note' ? (
