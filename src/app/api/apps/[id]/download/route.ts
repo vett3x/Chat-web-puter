@@ -5,10 +5,6 @@ import { getAppAndServerWithStateCheck } from '@/lib/app-state-manager';
 import { executeSshCommand } from '@/lib/ssh-utils';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import path from 'path';
-import fs from 'fs/promises';
-import os from 'os';
-import crypto from 'crypto';
 
 async function getUserId() {
   const cookieStore = cookies() as any;
@@ -20,8 +16,6 @@ async function getUserId() {
 
 export async function GET(req: NextRequest, context: any) {
   const appId = context.params.id;
-  const tempDir = path.join(os.tmpdir(), `dyad-download-${crypto.randomBytes(16).toString('hex')}`);
-  const archivePath = path.join(tempDir, 'project.tar.gz');
 
   try {
     const userId = await getUserId();
@@ -31,40 +25,30 @@ export async function GET(req: NextRequest, context: any) {
       throw new Error('La aplicación no tiene un contenedor asociado para descargar.');
     }
 
-    // 1. Create a temporary directory on the host machine
-    await fs.mkdir(tempDir, { recursive: true });
+    // 1. Create a gzipped tar archive of the /app directory inside the container and stream it to stdout
+    const command = `docker exec ${app.container_id} tar -cz -C /app .`;
+    const { stdout, stderr, code } = await executeSshCommand(server, command);
 
-    // 2. Copy the /app directory from the container to the temporary host directory
-    const { stderr: cpStderr, code: cpCode } = await executeSshCommand(server, `docker cp ${app.container_id}:/app/. ${tempDir}`);
-    if (cpCode !== 0) {
-      throw new Error(`Error al copiar los archivos del contenedor: ${cpStderr}`);
+    if (code !== 0) {
+      throw new Error(`Error al crear el archivo del proyecto: ${stderr}`);
     }
 
-    // 3. Create a compressed tarball of the directory
-    const { stderr: tarStderr, code: tarCode } = await executeSshCommand(server, `tar -czf ${archivePath} -C ${tempDir} .`);
-    if (tarCode !== 0) {
-      throw new Error(`Error al comprimir los archivos del proyecto: ${tarStderr}`);
-    }
+    // 2. Convert the binary stdout string to a Buffer
+    const fileBuffer = Buffer.from(stdout, 'binary');
 
-    // 4. Read the archive file into a buffer
-    const fileBuffer = await fs.readFile(archivePath);
-
-    // 5. Create the response with appropriate headers
+    // 3. Create the response with appropriate headers
     const headers = new Headers();
     headers.append('Content-Disposition', `attachment; filename="${app.name || 'project'}.tar.gz"`);
     headers.append('Content-Type', 'application/gzip');
+    headers.append('Content-Length', fileBuffer.length.toString());
 
-    return new NextResponse(fileBuffer, { headers });
+    // 4. Return a standard Response object, which is compatible with Next.js Route Handlers
+    // This also resolves the TypeScript build error.
+    return new Response(fileBuffer, { headers });
 
   } catch (error: any) {
     console.error(`[API /apps/${appId}/download] Error:`, error);
     return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
-  } finally {
-    // 6. Clean up the temporary directory and archive
-    try {
-      await fs.rm(tempDir, { recursive: true, force: true });
-    } catch (cleanupError) {
-      console.warn(`[API /apps/${appId}/download] Advertencia: Fallo al limpiar el directorio temporal '${tempDir}':`, cleanupError);
-    }
   }
+  // No finally block needed as we are not creating temporary files anymore.
 }
