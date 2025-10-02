@@ -2,8 +2,8 @@
 
 import ClaudeAILogo from '@/components/claude-ai-logo';
 import GoogleGeminiLogo from '@/components/google-gemini-logo';
-import { KeyRound, Folder } from 'lucide-react'; // Import a generic icon for custom endpoint and Folder icon
-import { ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys'; // Import ApiKey and AiKeyGroup interfaces
+import { KeyRound, Folder } from 'lucide-react';
+import { ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys';
 
 export const AI_PROVIDERS = [
   {
@@ -37,18 +37,18 @@ export const AI_PROVIDERS = [
     ],
   },
   {
-    company: 'Endpoint Personalizado', // New provider
-    logo: KeyRound, // Generic icon
+    company: 'Endpoint Personalizado',
+    logo: KeyRound,
     source: 'user_key',
     value: 'custom_endpoint',
-    models: [], // User defines model_name
+    models: [],
   },
 ];
 
 export const getModelLabel = (
   modelValue?: string, 
   userApiKeys: ApiKey[] = [], 
-  aiKeyGroups: AiKeyGroup[] = [] // NEW: Pass aiKeyGroups
+  aiKeyGroups: AiKeyGroup[] = []
 ): string => {
     if (!modelValue) return '';
 
@@ -57,7 +57,7 @@ export const getModelLabel = (
         const groupId = modelValue.substring(6);
         const group = aiKeyGroups.find(g => g.id === groupId);
         if (group) {
-            return `Grupo: ${group.name} (${group.api_keys?.filter(k => k.status === 'active').length || 0} activas)`;
+            return group.name; // Return only the group name
         }
         return `Grupo Desconocido (${groupId.substring(0, 8)}...)`;
     }

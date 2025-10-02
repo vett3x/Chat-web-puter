@@ -11,24 +11,24 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Check, KeyRound, Search, Folder, AlertCircle, Ban } from 'lucide-react'; // Import Folder, AlertCircle, Ban
+import { Check, KeyRound, Search, Folder, AlertCircle, Ban } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AI_PROVIDERS, getModelLabel } from '@/lib/ai-models';
 import { useSession } from '@/components/session-context-provider';
-import { ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys'; // Import AiKeyGroup
+import { ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"; // NEW: Import Tooltip components
+} from "@/components/ui/tooltip";
 
 interface ModelSelectorDropdownProps {
   selectedModel: string;
   onModelChange: (model: string) => void;
   isLoading: boolean;
   userApiKeys: ApiKey[];
-  aiKeyGroups: AiKeyGroup[]; // NEW: Pass aiKeyGroups
+  aiKeyGroups: AiKeyGroup[];
   isAppChat?: boolean;
   SelectedModelIcon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 }
@@ -38,7 +38,7 @@ export function ModelSelectorDropdown({
   onModelChange,
   isLoading,
   userApiKeys,
-  aiKeyGroups, // NEW: Destructure aiKeyGroups
+  aiKeyGroups,
   isAppChat = false,
   SelectedModelIcon,
 }: ModelSelectorDropdownProps) {
@@ -55,7 +55,6 @@ export function ModelSelectorDropdown({
       if (providerGroup.source === 'puter' && providerGroup.models.some(model => model.label.toLowerCase().includes(matchesSearch))) return true;
 
       if (providerGroup.source === 'user_key') {
-        // Check groups
         const groupsForProvider = aiKeyGroups.filter(group => group.provider === providerGroup.value);
         if (groupsForProvider.some(group => 
           group.name.toLowerCase().includes(matchesSearch) ||
@@ -63,7 +62,6 @@ export function ModelSelectorDropdown({
           group.api_keys?.some(key => (key.nickname && key.nickname.toLowerCase().includes(matchesSearch)))
         )) return true;
 
-        // Check standalone keys
         const standaloneKeysForProvider = userApiKeys.filter(key => key.provider === providerGroup.value && !key.group_id);
         if (standaloneKeysForProvider.some(key => 
           (key.nickname && key.nickname.toLowerCase().includes(matchesSearch)) ||
@@ -153,8 +151,7 @@ export function ModelSelectorDropdown({
 
               const filteredGroups = groupsForProvider.filter(group => 
                 group.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (group.model_name && getModelLabel(group.model_name, userApiKeys, aiKeyGroups).toLowerCase().includes(searchTerm.toLowerCase())) ||
-                group.api_keys?.some(key => (key.nickname && key.nickname.toLowerCase().includes(searchTerm.toLowerCase())))
+                (group.model_name && getModelLabel(group.model_name, userApiKeys, aiKeyGroups).toLowerCase().includes(searchTerm.toLowerCase()))
               );
 
               const filteredStandaloneKeys = standaloneKeysForProvider.filter(key => 
@@ -176,63 +173,67 @@ export function ModelSelectorDropdown({
                   </DropdownMenuLabel>
                   {hasAnyContent ? (
                     <>
-                      {filteredGroups.map(group => {
+                      {/* Special rendering for Google Gemini: Only show groups */}
+                      {providerGroup.value === 'google_gemini' && filteredGroups.map(group => {
                         const activeKeysCount = group.api_keys?.filter(k => k.status === 'active').length || 0;
                         const isDisabled = isLoading || activeKeysCount === 0;
                         return (
-                          <React.Fragment key={group.id}>
-                            <DropdownMenuItem
-                              onClick={() => onModelChange(`group:${group.id}`)}
-                              className={cn("flex items-center justify-between cursor-pointer pl-8", selectedModel === `group:${group.id}` && "bg-accent text-accent-foreground", isDisabled && "opacity-50 cursor-not-allowed")}
-                              disabled={isDisabled}
-                            >
-                              <span className="flex items-center gap-2">
-                                <Folder className="h-4 w-4" />
-                                {group.name} ({activeKeysCount} activas)
-                              </span>
-                              {selectedModel === `group:${group.id}` && <Check className="h-4 w-4 text-green-500" />}
-                            </DropdownMenuItem>
-                            {group.api_keys?.map(key => {
-                              const itemValue = `user_key:${key.id}`;
-                              const isDisabledKey = isLoading || key.status !== 'active';
-                              return (
-                                <DropdownMenuItem
-                                  key={key.id}
-                                  onClick={() => onModelChange(itemValue)}
-                                  className={cn("flex items-center justify-between cursor-pointer pl-12 text-xs", selectedModel === itemValue && "bg-accent text-accent-foreground", isDisabledKey && "opacity-50 cursor-not-allowed")}
-                                  disabled={isDisabledKey}
-                                >
-                                  <span className="flex items-center gap-1">
-                                    {renderStatusIcon(key.status)}
-                                    {key.nickname || getModelLabel(key.model_name ?? undefined, userApiKeys, aiKeyGroups)}
-                                    {key.is_global && ' (Global)'}
-                                  </span>
-                                  {selectedModel === itemValue && <Check className="h-4 w-4 text-green-500" />}
-                                </DropdownMenuItem>
-                              );
-                            })}
-                          </React.Fragment>
-                        );
-                      })}
-                      {filteredStandaloneKeys.map(key => {
-                        const itemValue = `user_key:${key.id}`;
-                        const isDisabledKey = isLoading || key.status !== 'active';
-                        return (
                           <DropdownMenuItem
-                            key={key.id}
-                            onClick={() => onModelChange(itemValue)}
-                            className={cn("flex items-center justify-between cursor-pointer pl-8", selectedModel === itemValue && "bg-accent text-accent-foreground", isDisabledKey && "opacity-50 cursor-not-allowed")}
-                            disabled={isDisabledKey}
+                            key={group.id}
+                            onClick={() => onModelChange(`group:${group.id}`)}
+                            className={cn("flex items-center justify-between cursor-pointer pl-8", selectedModel === `group:${group.id}` && "bg-accent text-accent-foreground", isDisabled && "opacity-50 cursor-not-allowed")}
+                            disabled={isDisabled}
                           >
-                            <span className="flex items-center gap-1">
-                              {renderStatusIcon(key.status)}
-                              {key.nickname || getModelLabel(key.model_name ?? undefined, userApiKeys, aiKeyGroups)}
-                              {key.is_global && ' (Global)'}
+                            <span className="flex items-center gap-2">
+                              {group.name}
                             </span>
-                            {selectedModel === itemValue && <Check className="h-4 w-4 text-green-500" />}
+                            {selectedModel === `group:${group.id}` && <Check className="h-4 w-4 text-green-500" />}
                           </DropdownMenuItem>
                         );
                       })}
+
+                      {/* Default rendering for other providers like custom_endpoint */}
+                      {providerGroup.value !== 'google_gemini' && (
+                        <>
+                          {filteredGroups.map(group => {
+                            const activeKeysCount = group.api_keys?.filter(k => k.status === 'active').length || 0;
+                            const isDisabled = isLoading || activeKeysCount === 0;
+                            return (
+                              <DropdownMenuItem
+                                key={group.id}
+                                onClick={() => onModelChange(`group:${group.id}`)}
+                                className={cn("flex items-center justify-between cursor-pointer pl-8", selectedModel === `group:${group.id}` && "bg-accent text-accent-foreground", isDisabled && "opacity-50 cursor-not-allowed")}
+                                disabled={isDisabled}
+                              >
+                                <span className="flex items-center gap-2">
+                                  <Folder className="h-4 w-4" />
+                                  {group.name} ({activeKeysCount} activas)
+                                </span>
+                                {selectedModel === `group:${group.id}` && <Check className="h-4 w-4 text-green-500" />}
+                              </DropdownMenuItem>
+                            );
+                          })}
+                          {filteredStandaloneKeys.map(key => {
+                            const itemValue = `user_key:${key.id}`;
+                            const isDisabledKey = isLoading || key.status !== 'active';
+                            return (
+                              <DropdownMenuItem
+                                key={key.id}
+                                onClick={() => onModelChange(itemValue)}
+                                className={cn("flex items-center justify-between cursor-pointer pl-8", selectedModel === itemValue && "bg-accent text-accent-foreground", isDisabledKey && "opacity-50 cursor-not-allowed")}
+                                disabled={isDisabledKey}
+                              >
+                                <span className="flex items-center gap-1">
+                                  {renderStatusIcon(key.status)}
+                                  {key.nickname || getModelLabel(key.model_name ?? undefined, userApiKeys, aiKeyGroups)}
+                                  {key.is_global && ' (Global)'}
+                                </span>
+                                {selectedModel === itemValue && <Check className="h-4 w-4 text-green-500" />}
+                              </DropdownMenuItem>
+                            );
+                          })}
+                        </>
+                      )}
                     </>
                   ) : (
                     <DropdownMenuItem disabled className="pl-8 cursor-not-allowed text-muted-foreground">
