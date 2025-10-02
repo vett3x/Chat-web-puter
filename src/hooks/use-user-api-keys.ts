@@ -18,9 +18,10 @@ export interface ApiKey {
   json_key_content: string | null;
   is_global: boolean;
   user_id: string | null;
-  group_id: string | null; // NEW: Add group_id
-  status: 'active' | 'failed' | 'blocked'; // NEW: Add status
-  status_message: string | null; // NEW: Add status_message
+  group_id: string | null;
+  status: 'active' | 'failed' | 'blocked';
+  status_message: string | null;
+  is_active: boolean;
 }
 
 // NEW: Define AiKeyGroup interface

@@ -54,6 +54,7 @@ const apiKeySchema = z.object({
   json_key_content: z.string().optional(),
   api_endpoint: z.string().trim().url({ message: 'URL de endpoint inválida.' }).optional().or(z.literal('')),
   is_global: z.boolean().optional(),
+  is_active: z.boolean().optional(), // NEW: Add is_active
   status: z.enum(['active', 'failed', 'blocked']).optional(),
   status_message: z.string().optional().nullable(),
 }).superRefine((data, ctx) => {
@@ -138,6 +139,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       json_key_content: undefined,
       api_endpoint: '',
       is_global: false,
+      is_active: true, // NEW: Default to active
       group_id: null,
       status: 'active',
       status_message: null,
@@ -191,7 +193,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
     if (open) {
       fetchKeysAndGroups();
       apiKeyForm.reset({
-        provider: '', api_key: '', nickname: '', project_id: '', location_id: '', use_vertex_ai: false, model_name: '', json_key_file: undefined, json_key_content: undefined, api_endpoint: '', is_global: false, group_id: null, status: 'active', status_message: null,
+        provider: '', api_key: '', nickname: '', project_id: '', location_id: '', use_vertex_ai: false, model_name: '', json_key_file: undefined, json_key_content: undefined, api_endpoint: '', is_global: false, is_active: true, group_id: null, status: 'active', status_message: null,
       });
       aiKeyGroupForm.reset({ name: '', provider: '', model_name: '', is_global: false });
       setEditingKeyId(null);
@@ -218,6 +220,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       json_key_content: undefined,
       api_endpoint: key.api_endpoint || '',
       is_global: key.is_global,
+      is_active: key.is_active, // NEW: Set is_active
       group_id: key.group_id,
       status: key.status,
       status_message: key.status_message,
@@ -244,7 +247,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
     setEditingKeyId(null);
     setEditingGroupId(null);
     apiKeyForm.reset({
-      provider: '', api_key: '', nickname: '', project_id: '', location_id: '', use_vertex_ai: false, model_name: '', json_key_file: undefined, json_key_content: undefined, api_endpoint: '', is_global: false, group_id: null, status: 'active', status_message: null,
+      provider: '', api_key: '', nickname: '', project_id: '', location_id: '', use_vertex_ai: false, model_name: '', json_key_file: undefined, json_key_content: undefined, api_endpoint: '', is_global: false, is_active: true, group_id: null, status: 'active', status_message: null,
     });
     aiKeyGroupForm.reset({ name: '', provider: '', model_name: '', is_global: false });
     setSelectedJsonKeyFile(null);
@@ -435,22 +438,29 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
     );
   });
 
-  const renderStatusBadge = (status: ApiKey['status'], statusMessage: string | null) => {
-    switch (status) {
-      case 'active': return <Badge className="bg-green-500 text-white">Activa</Badge>;
-      case 'failed': return (
-        <Badge variant="destructive" className="flex items-center gap-1">
-          <AlertCircle className="h-3 w-3" /> Fallida
-          {statusMessage && <span className="ml-1 text-xs opacity-80" title={statusMessage}>({statusMessage.substring(0, 20)}...)</span>}
-        </Badge>
-      );
-      case 'blocked': return (
-        <Badge variant="destructive" className="flex items-center gap-1">
-          <Ban className="h-3 w-3" /> Bloqueada
-          {statusMessage && <span className="ml-1 text-xs opacity-80" title={statusMessage}>({statusMessage.substring(0, 20)}...)</span>}
-        </Badge>
-      );
-      default: return <Badge variant="secondary">{status}</Badge>;
+  const renderStatusBadge = (key: ApiKey) => {
+    if (!key.is_active) {
+      return <Badge variant="secondary">Inactiva</Badge>;
+    }
+    switch (key.status) {
+      case 'active':
+        return <Badge className="bg-green-500 text-white">Activa</Badge>;
+      case 'failed':
+        return (
+          <Badge variant="destructive" className="flex items-center gap-1">
+            <AlertCircle className="h-3 w-3" /> Fallida
+            {key.status_message && <span className="ml-1 text-xs opacity-80" title={key.status_message}>({key.status_message.substring(0, 20)}...)</span>}
+          </Badge>
+        );
+      case 'blocked':
+        return (
+          <Badge variant="destructive" className="flex items-center gap-1">
+            <Ban className="h-3 w-3" /> Bloqueada
+            {key.status_message && <span className="ml-1 text-xs opacity-80" title={key.status_message}>({key.status_message.substring(0, 20)}...)</span>}
+          </Badge>
+        );
+      default:
+        return <Badge variant="secondary">{key.status}</Badge>;
     }
   };
 
@@ -721,6 +731,24 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                         )} />
                       )}
 
+                      <FormField control={apiKeyForm.control} name="is_active" render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                          <div className="space-y-0.5">
+                            <FormLabel>Clave Activa</FormLabel>
+                            <FormDescription>
+                              Desactiva esta opción para deshabilitar temporalmente la clave sin eliminarla.
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              disabled={isSubmitting}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )} />
+
                       <FormField control={apiKeyForm.control} name="group_id" render={({ field }) => (
                         <FormItem>
                           <FormLabel>Asignar a Grupo (Opcional)</FormLabel>
@@ -866,6 +894,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                     <>
                       {filteredGroups.map(group => {
                         const canManageGroup = isSuperAdmin || (group.user_id === currentUserId && !group.is_global);
+                        const activeKeysCount = group.api_keys?.filter(k => k.status === 'active' && k.is_active).length || 0;
                         return (
                           <React.Fragment key={group.id}>
                             <TableRow className="bg-muted/50 hover:bg-muted/70">
@@ -878,7 +907,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                               </TableCell>
                               {isSuperAdmin && <TableCell>{group.is_global ? 'Sí' : 'No'}</TableCell>}
                               <TableCell>
-                                <Badge variant="secondary">{group.api_keys && group.api_keys.length > 0 ? `${group.api_keys.filter(k => k.status === 'active').length} activas` : 'Sin claves'}</Badge>
+                                <Badge variant="secondary">{group.api_keys && group.api_keys.length > 0 ? `${activeKeysCount} activas` : 'Sin claves'}</Badge>
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex justify-end gap-2">
@@ -894,7 +923,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                             {group.api_keys?.map(key => {
                               const canManageKey = isSuperAdmin || (key.user_id === currentUserId && !key.is_global);
                               return (
-                                <TableRow key={key.id} className={cn(key.status === 'failed' && 'bg-destructive/10', key.status === 'blocked' && 'bg-red-900/20')}>
+                                <TableRow key={key.id} className={cn(key.status === 'failed' && 'bg-destructive/10', key.status === 'blocked' && 'bg-red-900/20', !key.is_active && 'opacity-50')}>
                                   <TableCell className="pl-8"><div className="flex items-center gap-2"><KeyRound className="h-4 w-4 text-muted-foreground" /> {key.nickname || 'N/A'}</div></TableCell>
                                   <TableCell>{providerOptions.find(p => p.value === key.provider)?.label || key.provider}</TableCell>
                                   <TableCell className="font-mono text-xs">
@@ -920,7 +949,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                                     )}
                                   </TableCell>
                                   {isSuperAdmin && <TableCell>{key.is_global ? 'Sí' : 'No'}</TableCell>}
-                                  <TableCell>{renderStatusBadge(key.status, key.status_message)}</TableCell>
+                                  <TableCell>{renderStatusBadge(key)}</TableCell>
                                   <TableCell className="text-right">
                                     <div className="flex justify-end gap-2">
                                       <Button variant="outline" size="icon" onClick={() => handleEditKey(key)} disabled={!canManageKey} title={!canManageKey ? "No tienes permiso para editar esta clave" : "Editar clave"}>
@@ -949,8 +978,8 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                       {filteredStandaloneKeys.map(key => {
                         const canManageKey = isSuperAdmin || (key.user_id === currentUserId && !key.is_global);
                         return (
-                          <TableRow key={key.id} className={cn(key.status === 'failed' && 'bg-destructive/10', key.status === 'blocked' && 'bg-red-900/20')}>
-                            <TableCell><div className="flex items-center gap-2">{key.nickname || 'N/A'}</div></TableCell>
+                          <TableRow key={key.id} className={cn(key.status === 'failed' && 'bg-destructive/10', key.status === 'blocked' && 'bg-red-900/20', !key.is_active && 'opacity-50')}>
+                            <TableCell><div className="flex items-center gap-2"><KeyRound className="h-4 w-4" /> {key.nickname || 'N/A'}</div></TableCell>
                             <TableCell>{providerOptions.find(p => p.value === key.provider)?.label || key.provider}</TableCell>
                             <TableCell className="font-mono text-xs">
                               {key.provider === 'custom_endpoint' ? (
@@ -975,7 +1004,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                               )}
                             </TableCell>
                             {isSuperAdmin && <TableCell>{key.is_global ? 'Sí' : 'No'}</TableCell>}
-                            <TableCell>{renderStatusBadge(key.status, key.status_message)}</TableCell>
+                            <TableCell>{renderStatusBadge(key)}</TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
                                 <Button variant="outline" size="icon" onClick={() => handleEditKey(key)} disabled={!canManageKey} title={!canManageKey ? "No tienes permiso para editar esta clave" : "Editar clave"}>
