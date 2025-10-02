@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { KeyRound, PlusCircle, Trash2, Loader2, RefreshCw, Edit, Upload, XCircle, Search, Folder, CheckCircle2, AlertCircle, Ban } from 'lucide-react';
+import { KeyRound, PlusCircle, Trash2, Loader2, RefreshCw, Edit, Upload, XCircle, Search, Folder, CheckCircle2, AlertCircle, Ban, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -124,6 +124,19 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
   const [selectedJsonKeyFile, setSelectedJsonKeyFile] = useState<File | null>(null);
   const [jsonKeyFileName, setJsonKeyFileName] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  const toggleGroupExpansion = (groupId: string) => {
+    setExpandedGroups(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(groupId)) {
+        newSet.delete(groupId);
+      } else {
+        newSet.add(groupId);
+      }
+      return newSet;
+    });
+  };
 
   const apiKeyForm = useForm<ApiKeyFormValues>({
     resolver: zodResolver(apiKeySchema),
@@ -139,7 +152,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       json_key_content: undefined,
       api_endpoint: '',
       is_global: false,
-      is_active: true, // NEW: Default to active
+      is_active: true,
       group_id: null,
       status: 'active',
       status_message: null,
@@ -220,7 +233,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       json_key_content: undefined,
       api_endpoint: key.api_endpoint || '',
       is_global: key.is_global,
-      is_active: key.is_active, // NEW: Set is_active
+      is_active: key.is_active,
       group_id: key.group_id,
       status: key.status,
       status_message: key.status_message,
@@ -894,11 +907,13 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                     <>
                       {filteredGroups.map(group => {
                         const canManageGroup = isSuperAdmin || (group.user_id === currentUserId && !group.is_global);
+                        const isExpanded = expandedGroups.has(group.id);
                         const activeKeysCount = group.api_keys?.filter(k => k.status === 'active' && k.is_active).length || 0;
                         return (
                           <React.Fragment key={group.id}>
-                            <TableRow className="bg-muted/50 hover:bg-muted/70">
-                              <TableCell className="font-semibold flex items-center gap-2">
+                            <TableRow className="bg-muted/50 hover:bg-muted/70" onClick={() => toggleGroupExpansion(group.id)}>
+                              <TableCell className="font-semibold flex items-center gap-2 cursor-pointer">
+                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                                 <Folder className="h-4 w-4" /> {group.name}
                               </TableCell>
                               <TableCell>{providerOptions.find(p => p.value === group.provider)?.label || group.provider}</TableCell>
@@ -910,7 +925,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                                 <Badge variant="secondary">{group.api_keys && group.api_keys.length > 0 ? `${activeKeysCount} activas` : 'Sin claves'}</Badge>
                               </TableCell>
                               <TableCell className="text-right">
-                                <div className="flex justify-end gap-2">
+                                <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                                   <Button variant="outline" size="icon" onClick={() => handleEditGroup(group)} disabled={!canManageGroup} title={!canManageGroup ? "No tienes permiso para editar este grupo" : "Editar grupo"}>
                                     <Edit className="h-4 w-4" />
                                   </Button>
@@ -920,7 +935,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                                 </div>
                               </TableCell>
                             </TableRow>
-                            {group.api_keys?.map(key => {
+                            {isExpanded && group.api_keys?.map(key => {
                               const canManageKey = isSuperAdmin || (key.user_id === currentUserId && !key.is_global);
                               return (
                                 <TableRow key={key.id} className={cn(key.status === 'failed' && 'bg-destructive/10', key.status === 'blocked' && 'bg-red-900/20', !key.is_active && 'opacity-50')}>
