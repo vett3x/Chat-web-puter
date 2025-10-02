@@ -9,11 +9,11 @@ import {
   DialogDescription,
   DialogFooter,
   DialogClose,
-  DialogTrigger, // Corrected import
+  DialogTrigger,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { KeyRound, PlusCircle, Trash2, Loader2, RefreshCw, Edit, Upload, XCircle, Search, Folder, CheckCircle2, AlertCircle, Ban } from 'lucide-react'; // Import new icons
+import { KeyRound, PlusCircle, Trash2, Loader2, RefreshCw, Edit, Upload, XCircle, Search, Folder, CheckCircle2, AlertCircle, Ban } from 'lucide-react';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -26,16 +26,16 @@ import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { AI_PROVIDERS, getModelLabel } from '@/lib/ai-models'; // Import AI_PROVIDERS
-import { useSession } from '@/components/session-context-provider'; // NEW: Import useSession
-import { ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys'; // Import ApiKey and AiKeyGroup interfaces
+import { AI_PROVIDERS, getModelLabel } from '@/lib/ai-models';
+import { useSession } from '@/components/session-context-provider';
+import { ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import {
-  Tabs, // Corrected import
-  TabsList, // Corrected import
-  TabsTrigger, // Corrected import
-  TabsContent, // Corrected import
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
 } from '@/components/ui/tabs';
 
 
@@ -118,7 +118,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingKeyId, setEditingKeyId] = useState<string | null>(null);
-  const [editingGroupId, setEditingGroupId] = useState<string | null>(null); // NEW: State for editing group
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const jsonKeyFileInputRef = useRef<HTMLInputElement>(null);
   const [selectedJsonKeyFile, setSelectedJsonKeyFile] = useState<File | null>(null);
   const [jsonKeyFileName, setJsonKeyFileName] = useState<string | null>(null);
@@ -144,7 +144,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
     },
   });
 
-  const aiKeyGroupForm = useForm<AiKeyGroupFormValues>({ // NEW: Form for AI Key Groups
+  const aiKeyGroupForm = useForm<AiKeyGroupFormValues>({
     resolver: zodResolver(aiKeyGroupSchema),
     defaultValues: {
       name: '',
@@ -159,6 +159,19 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
   const currentProviderModels = providerOptions.find(p => p.value === selectedProvider)?.models || [];
   const isGoogleGemini = selectedProvider === 'google_gemini';
   const isCustomEndpoint = selectedProvider === 'custom_endpoint';
+
+  // Helper to get unique models for a provider (used in group form)
+  const getUniqueModelsForProvider = useCallback((providerValue: string) => {
+    const provider = AI_PROVIDERS.find(p => p.value === providerValue);
+    if (!provider) return [];
+    const uniqueModelsMap = new Map<string, { value: string; label: string; apiType?: string }>();
+    provider.models.forEach(model => {
+      if (!uniqueModelsMap.has(model.value)) {
+        uniqueModelsMap.set(model.value, model);
+      }
+    });
+    return Array.from(uniqueModelsMap.values());
+  }, []);
 
   const fetchKeysAndGroups = useCallback(async () => {
     setIsLoading(true);
@@ -192,12 +205,12 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
 
   const handleEditKey = (key: ApiKey) => {
     setEditingKeyId(key.id);
-    setEditingGroupId(null); // Ensure group editing is off
+    setEditingGroupId(null);
     apiKeyForm.reset({
       id: key.id,
       provider: key.provider,
       nickname: key.nickname || '',
-      api_key: '', // API key is masked, so don't pre-fill
+      api_key: '',
       project_id: key.project_id || '',
       location_id: key.location_id || '',
       use_vertex_ai: key.use_vertex_ai || false,
@@ -215,9 +228,9 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
     setIsAddEditDialogOpen(true);
   };
 
-  const handleEditGroup = (group: AiKeyGroup) => { // NEW: Handle editing a group
+  const handleEditGroup = (group: AiKeyGroup) => {
     setEditingGroupId(group.id);
-    setEditingKeyId(null); // Ensure key editing is off
+    setEditingKeyId(null);
     aiKeyGroupForm.reset({
       id: group.id,
       name: group.name,
@@ -360,11 +373,11 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
     }
   };
 
-  const onAiKeyGroupSubmit = async (values: AiKeyGroupFormValues) => { // NEW: Submit handler for groups
+  const onAiKeyGroupSubmit = async (values: AiKeyGroupFormValues) => {
     setIsSubmitting(true);
     try {
       const method = editingGroupId ? 'PUT' : 'POST';
-      const response = await fetch('/api/ai-key-groups', { // NEW: API endpoint for groups
+      const response = await fetch('/api/ai-key-groups', {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editingGroupId ? { ...values, id: editingGroupId } : values),
@@ -442,7 +455,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
     }
   };
 
-  const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false); // State to control the add/edit dialog
+  const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -772,7 +785,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                           <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
                             <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
                             <SelectContent>
-                              {providerOptions.find(p => p.value === aiKeyGroupForm.watch('provider'))?.models.map(model => (
+                              {getUniqueModelsForProvider(aiKeyGroupForm.watch('provider')).map(model => (
                                 <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>
                               ))}
                             </SelectContent>
