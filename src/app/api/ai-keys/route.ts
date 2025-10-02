@@ -4,159 +4,99 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
-import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
+import { SUPERUSER_EMAILS, PERMISSION_KEYS, UserPermissions } from '@/lib/constants'; // Importación actualizada
 import { createClient } from '@supabase/supabase-js';
 
+// Define unified part types for internal API handling
+interface TextPart { type: 'text'; text: string; }
+interface ImagePart { type: 'image_url'; image_url: { url: string }; }
+interface CodePart { type: 'code'; language?: string; filename?: string; code?: string; }
+type MessageContentPart = TextPart | ImagePart | CodePart;
+
+// Esquema para la creación/actualización de una API Key individual
 const apiKeySchema = z.object({
   id: z.string().optional(), // Optional for POST, required for PUT
+  group_id: z.string().uuid().optional().nullable(), // NEW: Optional group_id
   provider: z.string().min(1),
-  api_key: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional API key
-  nickname: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional nickname
-  project_id: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional project_id
-  location_id: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional location_id
+  api_key: z.string().trim().optional().or(z.literal('')),
+  nickname: z.string().trim().optional().or(z.literal('')),
+  project_id: z.string().trim().optional().or(z.literal('')),
+  location_id: z.string().trim().optional().or(z.literal('')),
   use_vertex_ai: z.boolean().optional(),
-  model_name: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional model_name
-  json_key_content: z.string().optional(), // New: for Vertex AI JSON key content
-  api_endpoint: z.string().trim().url({ message: 'URL de endpoint inválida.' }).optional().or(z.literal('')), // Changed: Allow empty string for optional api_endpoint
-  is_global: z.boolean().optional(), // NEW: Add is_global to schema
+  model_name: z.string().trim().optional().or(z.literal('')),
+  json_key_content: z.string().optional(),
+  api_endpoint: z.string().trim().url({ message: 'URL de endpoint inválida.' }).optional().or(z.literal('')),
+  is_global: z.boolean().optional(),
+  status: z.enum(['active', 'failed', 'blocked']).optional(), // NEW: Allow status update
+  status_message: z.string().optional().nullable(), // NEW: Allow status message update
 }).superRefine((data, ctx) => {
   if (data.provider === 'google_gemini') {
     if (data.use_vertex_ai) {
       if (!data.model_name || data.model_name === '') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Debes seleccionar un modelo para usar Vertex AI.',
-          path: ['model_name'],
-        });
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Debes seleccionar un modelo para usar Vertex AI.', path: ['model_name'] });
       }
       if (!data.project_id) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Project ID es requerido para usar Vertex AI.',
-          path: ['project_id'],
-        });
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Project ID es requerido para usar Vertex AI.', path: ['project_id'] });
       }
       if (!data.location_id) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Location ID es requerido para usar Vertex AI.',
-          path: ['location_id'],
-        });
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Location ID es requerido para usar Vertex AI.', path: ['location_id'] });
       }
-    } else { // Public API
+    } else {
       if (!data.model_name || data.model_name === '') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Debes seleccionar un modelo para la API pública de Gemini.',
-          path: ['model_name'],
-        });
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Debes seleccionar un modelo para la API pública de Gemini.', path: ['model_name'] });
       }
-      // API key validation for adding new keys is now handled in the frontend onSubmit.
     }
-  } else if (data.provider === 'custom_endpoint') { // New validation for custom_endpoint
+  } else if (data.provider === 'custom_endpoint') {
     if (!data.api_endpoint || data.api_endpoint === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'El link del endpoint es requerido para un endpoint personalizado.',
-        path: ['api_endpoint'],
-      });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'El link del endpoint es requerido para un endpoint personalizado.', path: ['api_endpoint'] });
     }
     if (!data.model_name || data.model_name === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'El ID del modelo es requerido para un endpoint personalizado.',
-        path: ['model_name'],
-      });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'El ID del modelo es requerido para un endpoint personalizado.', path: ['model_name'] });
     }
     if (!data.nickname || data.nickname === '') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'El apodo es obligatorio para un endpoint personalizado.',
-        path: ['nickname'],
-      });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'El apodo es obligatorio para un endpoint personalizado.', path: ['nickname'] });
     }
   }
 });
 
-// The updateApiKeySchema should also be more flexible.
-const updateApiKeySchema = z.object({
-  id: z.string().min(1, { message: 'ID de clave es requerido para actualizar.' }),
-  provider: z.string().min(1), // Provider should not be changed on update, but keep for validation
-  api_key: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional API key
-  nickname: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional nickname
-  project_id: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional project_id
-  location_id: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional location_id
-  use_vertex_ai: z.boolean().optional(),
-  model_name: z.string().trim().optional().or(z.literal('')), // Changed: Allow empty string for optional model_name
-  json_key_file: z.any().optional(), // This field is not actually used in the backend, can be removed or ignored
-  json_key_content: z.string().optional(),
-  api_endpoint: z.string().trim().url({ message: 'URL de endpoint inválida.' }).optional().or(z.literal('')), // Changed: Allow empty string for optional api_endpoint
-  is_global: z.boolean().optional(), // NEW: Add is_global to schema
+// Esquema para la creación/actualización de un grupo de API Keys
+const aiKeyGroupSchema = z.object({
+  id: z.string().uuid().optional(), // Optional for POST, required for PUT
+  name: z.string().min(1, { message: 'El nombre del grupo es requerido.' }),
+  provider: z.string().min(1),
+  model_name: z.string().trim().optional().or(z.literal('')),
+  is_global: z.boolean().optional(),
 });
 
 // Helper function to get the session and user role
-async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null; userPermissions: UserPermissions }> {
+async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null }> {
   const cookieStore = cookies() as any;
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
+        get(name: string) { return cookieStore.get(name)?.value; },
         set(name: string, value: string, options: CookieOptions) {},
         remove(name: string, options: CookieOptions) {},
       },
     }
   );
   const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { session: null, userRole: null };
 
-  let userRole: 'user' | 'admin' | 'super_admin' | null = null;
-  let userPermissions: UserPermissions = {};
-
-  if (session?.user?.id) {
-    // First, determine the role, prioritizing SUPERUSER_EMAILS
-    if (session.user.email && SUPERUSER_EMAILS.includes(session.user.email)) {
-      userRole = 'super_admin';
-    } else {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('role') // Only need role for initial determination
-        .eq('id', session.user.id)
-        .single();
-      if (profile) {
-        userRole = profile.role as 'user' | 'admin' | 'super_admin';
-      } else {
-        userRole = 'user'; // Default to user if no profile found and not superuser email
-      }
-    }
-
-    // Then, fetch permissions from profile, or set all if super_admin
-    if (userRole === 'super_admin') {
-      for (const key of Object.values(PERMISSION_KEYS)) {
-        userPermissions[key] = true;
-      }
-    } else {
-      const { data: profilePermissions, error: permissionsError } = await supabase
-        .from('profiles')
-        .select('permissions')
-        .eq('id', session.user.id)
-        .single();
-      if (profilePermissions) {
-        userPermissions = profilePermissions.permissions || {};
-      } else {
-        // Default permissions for non-super-admin if profile fetch failed
-        userPermissions = {
-          [PERMISSION_KEYS.CAN_CREATE_SERVER]: false,
-          [PERMISSION_KEYS.CAN_MANAGE_DOCKER_CONTAINERS]: false,
-          [PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_DOMAINS]: false,
-          [PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_TUNNELS]: false,
-        };
-      }
-    }
+  if (session.user.email && SUPERUSER_EMAILS.includes(session.user.email)) {
+    return { session, userRole: 'super_admin' };
   }
-  return { session, userRole, userPermissions };
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
+
+  const userRole = profile?.role as 'user' | 'admin' | 'super_admin' | null;
+  return { session, userRole };
 }
 
 export async function GET(req: NextRequest) {
@@ -170,32 +110,60 @@ export async function GET(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  let query = supabaseAdmin
-    .from('user_api_keys')
-    .select('id, provider, api_key, is_active, created_at, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint, is_global, user_id')
-    .order('created_at', { ascending: false });
+  try {
+    // Fetch AI Key Groups
+    let groupsQuery = supabaseAdmin
+      .from('ai_key_groups')
+      .select('id, user_id, name, provider, model_name, is_global, created_at, updated_at')
+      .order('created_at', { ascending: false });
 
-  // All roles (user, admin, super_admin) should see their own keys OR global keys
-  if (userRole === 'user' || userRole === 'admin') {
-    query = query.or(`user_id.eq.${session.user.id},is_global.eq.true`);
-  }
-  // If userRole is 'super_admin', no additional filter is applied, so they see all.
+    if (userRole !== 'super_admin') {
+      groupsQuery = groupsQuery.or(`user_id.eq.${session.user.id},is_global.eq.true`);
+    }
+    const { data: aiKeyGroups, error: groupsError } = await groupsQuery;
+    if (groupsError) {
+      console.error("[API /ai-keys GET] Error fetching AI key groups:", groupsError);
+      throw new Error(groupsError.message);
+    }
 
-  const { data, error } = await query;
+    // Fetch individual API Keys
+    let keysQuery = supabaseAdmin
+      .from('user_api_keys')
+      .select('id, user_id, nickname, api_key, is_active, created_at, last_used_at, usage_count, api_endpoint, model_name, provider, project_id, location_id, use_vertex_ai, json_key_content, is_global, group_id, status, status_message')
+      .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error("[API /ai-keys GET] Error fetching keys:", error);
+    if (userRole !== 'super_admin') {
+      // Filter keys to include only those owned by the user, or global keys, or keys belonging to groups the user can see
+      const accessibleGroupIds = aiKeyGroups.map(g => g.id);
+      keysQuery = keysQuery.or(`user_id.eq.${session.user.id},is_global.eq.true,group_id.in.(${accessibleGroupIds.join(',')})`);
+    }
+    const { data: apiKeys, error: keysError } = await keysQuery;
+    if (keysError) {
+      console.error("[API /ai-keys GET] Error fetching API keys:", keysError);
+      throw new Error(keysError.message);
+    }
+
+    // Mask sensitive data
+    const maskedApiKeys = apiKeys.map(key => ({
+      ...key,
+      api_key: key.api_key ? `${key.api_key.substring(0, 4)}...${key.api_key.substring(key.api_key.length - 4)}` : null,
+      json_key_content: key.json_key_content ? 'Subido' : null, // Indicate if content exists
+    }));
+
+    // Attach keys to their respective groups
+    const groupsWithKeys = aiKeyGroups.map(group => ({
+      ...group,
+      api_keys: maskedApiKeys.filter(key => key.group_id === group.id),
+    }));
+
+    // Return both groups (with their keys) and any standalone keys (those without a group_id)
+    const standaloneApiKeys = maskedApiKeys.filter(key => !key.group_id);
+
+    return NextResponse.json({ aiKeyGroups: groupsWithKeys, apiKeys: standaloneApiKeys });
+  } catch (error: any) {
+    console.error("[API /ai-keys GET] Unhandled error:", error);
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
-
-  // Mask the API keys and json_key_content before sending them to the client
-  const maskedData = data.map(key => ({
-    ...key,
-    api_key: key.api_key ? `${key.api_key.substring(0, 4)}...${key.api_key.substring(key.api_key.length - 4)}` : null,
-    json_key_content: key.json_key_content ? 'Subido' : null, // Indicate if content exists
-  }));
-
-  return NextResponse.json(maskedData);
 }
 
 export async function POST(req: NextRequest) {
@@ -211,38 +179,88 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { provider, api_key, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint, is_global } = apiKeySchema.parse(body); // NEW: Parse is_global
+    const { group_id, is_global: isKeyGlobal, ...keyData } = apiKeySchema.parse(body); // Extract group_id and is_global for key
 
-    if (is_global && userRole !== 'super_admin') {
+    // Determine if the key itself is global (overrides group's global status if set)
+    const finalIsKeyGlobal = isKeyGlobal !== undefined ? isKeyGlobal : false;
+
+    if (finalIsKeyGlobal && userRole !== 'super_admin') {
       return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden crear claves globales.' }, { status: 403 });
     }
 
+    let targetGroupId = group_id;
+    let groupIsGlobal = finalIsKeyGlobal; // Default group global status to key's global status
+
+    // If a group_id is provided, verify it and get its global status
+    if (targetGroupId) {
+      const { data: existingGroup, error: groupError } = await supabaseAdmin
+        .from('ai_key_groups')
+        .select('id, is_global, user_id')
+        .eq('id', targetGroupId)
+        .single();
+
+      if (groupError || !existingGroup) {
+        throw new Error('Grupo de claves no encontrado o acceso denegado.');
+      }
+
+      // Check if user has permission to add to this group
+      const isGroupOwner = existingGroup.user_id === session.user.id;
+      if (!existingGroup.is_global && !isGroupOwner && userRole !== 'super_admin') {
+        throw new Error('Acceso denegado. No tienes permiso para añadir claves a este grupo.');
+      }
+      if (existingGroup.is_global && userRole !== 'super_admin') {
+        throw new Error('Acceso denegado. Solo los Super Admins pueden añadir claves a grupos globales.');
+      }
+
+      groupIsGlobal = existingGroup.is_global; // Inherit global status from group
+    } else if (keyData.provider === 'google_gemini') { // If no group_id, but it's a Google Gemini key, create a new group
+      const newGroupName = keyData.nickname || `${keyData.model_name || 'Google Gemini'} Group`;
+      const { data: newGroup, error: newGroupError } = await supabaseAdmin
+        .from('ai_key_groups')
+        .insert({
+          user_id: finalIsKeyGlobal ? null : session.user.id,
+          name: newGroupName,
+          provider: keyData.provider,
+          model_name: keyData.model_name,
+          is_global: finalIsKeyGlobal,
+        })
+        .select('id, is_global')
+        .single();
+
+      if (newGroupError) throw new Error(`Error al crear el grupo de claves: ${newGroupError.message}`);
+      targetGroupId = newGroup.id;
+      groupIsGlobal = newGroup.is_global;
+    }
+
     const insertData: any = {
-      user_id: is_global ? null : session.user.id, // NEW: Set user_id to null if global
-      provider,
-      nickname: nickname || null,
-      model_name: model_name || null,
-      is_active: true, // Default to active
-      is_global: is_global || false, // NEW: Set is_global
+      user_id: finalIsKeyGlobal || groupIsGlobal ? null : session.user.id, // User ID is null if key or its group is global
+      group_id: targetGroupId,
+      provider: keyData.provider,
+      nickname: keyData.nickname || null,
+      model_name: keyData.model_name || null,
+      is_active: true,
+      is_global: finalIsKeyGlobal || groupIsGlobal, // Key is global if itself or its group is global
+      status: 'active', // Default status
+      status_message: null,
     };
 
-    if (provider === 'google_gemini') {
-      insertData.use_vertex_ai = use_vertex_ai || false;
-      if (use_vertex_ai) {
-        insertData.project_id = project_id || null;
-        insertData.location_id = location_id || null;
-        insertData.json_key_content = json_key_content || null;
-        insertData.api_key = null; // API key is not used for Vertex AI
+    if (keyData.provider === 'google_gemini') {
+      insertData.use_vertex_ai = keyData.use_vertex_ai || false;
+      if (keyData.use_vertex_ai) {
+        insertData.project_id = keyData.project_id || null;
+        insertData.location_id = keyData.location_id || null;
+        insertData.json_key_content = keyData.json_key_content || null;
+        insertData.api_key = null;
       } else {
-        insertData.api_key = api_key || null;
+        insertData.api_key = keyData.api_key || null;
       }
-    } else if (provider === 'custom_endpoint') {
-      insertData.api_endpoint = api_endpoint || null;
-      insertData.api_key = api_key || null;
-      insertData.use_vertex_ai = false; // Ensure false for custom endpoint
-    } else { // Other providers (e.g., Anthropic if we add direct API key support)
-      insertData.api_key = api_key || null;
-      insertData.use_vertex_ai = false; // Ensure false
+    } else if (keyData.provider === 'custom_endpoint') {
+      insertData.api_endpoint = keyData.api_endpoint || null;
+      insertData.api_key = keyData.api_key || null;
+      insertData.use_vertex_ai = false;
+    } else {
+      insertData.api_key = keyData.api_key || null;
+      insertData.use_vertex_ai = false;
     }
 
     const { data, error } = await supabaseAdmin
@@ -279,63 +297,81 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { id, provider, api_key, nickname, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint, is_global } = updateApiKeySchema.parse(body); // NEW: Parse is_global
+    const { id, group_id, is_global: isKeyGlobal, status, status_message, ...keyData } = apiKeySchema.parse(body);
 
-    // Fetch current key details to determine existing provider, use_vertex_ai status, user_id, and is_global
+    if (!id) {
+      return NextResponse.json({ message: 'ID de clave es requerido para actualizar.' }, { status: 400 });
+    }
+
+    // Fetch current key details to determine existing provider, use_vertex_ai status, user_id, is_global, and group_id
     const { data: currentKey, error: currentKeyError } = await supabaseAdmin
       .from('user_api_keys')
-      .select('provider, use_vertex_ai, user_id, is_global') // NEW: Select user_id and is_global
+      .select('provider, use_vertex_ai, user_id, is_global, group_id')
       .eq('id', id)
       .single();
 
     if (currentKeyError || !currentKey) throw new Error('Clave no encontrada para verificar el estado.');
 
     // Authorization checks
+    const isOwner = currentKey.user_id === session.user.id;
+    const isGroupOwner = currentKey.group_id ? (await supabaseAdmin.from('ai_key_groups').select('user_id').eq('id', currentKey.group_id).single())?.data?.user_id === session.user.id : false;
+
     if (currentKey.is_global && userRole !== 'super_admin') {
       return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden modificar claves globales.' }, { status: 403 });
     }
-    if (!currentKey.is_global && currentKey.user_id !== session.user.id && userRole !== 'super_admin') {
+    if (!currentKey.is_global && !isOwner && !isGroupOwner && userRole !== 'super_admin') {
       return NextResponse.json({ message: 'Acceso denegado. No tienes permiso para modificar esta clave.' }, { status: 403 });
     }
-    if (is_global !== undefined && is_global !== currentKey.is_global && userRole !== 'super_admin') {
+    // Prevent non-super-admins from changing global status
+    if (isKeyGlobal !== undefined && isKeyGlobal !== currentKey.is_global && userRole !== 'super_admin') {
       return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden cambiar el estado global de una clave.' }, { status: 403 });
     }
-
-    const updateData: any = {
-      nickname: nickname || null,
-      model_name: model_name || null,
-      is_global: is_global !== undefined ? is_global : currentKey.is_global, // NEW: Update is_global if provided, else keep current
-      user_id: is_global ? null : currentKey.user_id, // NEW: Set user_id to null if becoming global, otherwise keep current
-    };
-    
-    // Handle API Key update: only if provided and not empty
-    if (api_key !== undefined && api_key !== '') {
-      updateData.api_key = api_key;
+    // Prevent non-super-admins from changing group_id
+    if (group_id !== undefined && group_id !== currentKey.group_id && userRole !== 'super_admin') {
+      return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden cambiar el grupo de una clave.' }, { status: 403 });
+    }
+    // Prevent non-super-admins from changing status/status_message to 'blocked' or 'failed'
+    if (status && (status === 'blocked' || status === 'failed') && userRole !== 'super_admin') {
+      return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden establecer el estado de una clave como fallida o bloqueada.' }, { status: 403 });
     }
 
-    // Logic based on provider and use_vertex_ai flag
+
+    const updateData: any = {
+      nickname: keyData.nickname || null,
+      model_name: keyData.model_name || null,
+      is_global: isKeyGlobal !== undefined ? isKeyGlobal : currentKey.is_global,
+      user_id: (isKeyGlobal || currentKey.is_global) ? null : session.user.id, // If key becomes global, user_id is null
+      group_id: group_id !== undefined ? group_id : currentKey.group_id, // Update group_id if provided
+      status: status !== undefined ? status : 'active', // Update status if provided, default to active
+      status_message: status_message !== undefined ? status_message : null, // Update status_message if provided
+    };
+    
+    if (keyData.api_key !== undefined && keyData.api_key !== '') {
+      updateData.api_key = keyData.api_key;
+    }
+
     if (currentKey.provider === 'google_gemini') {
-      updateData.use_vertex_ai = use_vertex_ai; // Always update this flag if present in payload
-      if (use_vertex_ai) { // If switching to or already using Vertex AI
-        updateData.api_key = null; // Clear public API key
-        updateData.project_id = project_id || null;
-        updateData.location_id = location_id || null;
-        if (json_key_content !== undefined) { // Only update if new content is provided
-          updateData.json_key_content = json_key_content || null;
+      updateData.use_vertex_ai = keyData.use_vertex_ai;
+      if (keyData.use_vertex_ai) {
+        updateData.api_key = null;
+        updateData.project_id = keyData.project_id || null;
+        updateData.location_id = keyData.location_id || null;
+        if (keyData.json_key_content !== undefined) {
+          updateData.json_key_content = keyData.json_key_content || null;
         }
-      } else { // If switching from or already using public API
+      } else {
         updateData.project_id = null;
         updateData.location_id = null;
         updateData.json_key_content = null;
       }
-      updateData.api_endpoint = null; // Clear custom endpoint for Gemini
+      updateData.api_endpoint = null;
     } else if (currentKey.provider === 'custom_endpoint') {
-      updateData.api_endpoint = api_endpoint || null;
+      updateData.api_endpoint = keyData.api_endpoint || null;
       updateData.project_id = null;
       updateData.location_id = null;
       updateData.json_key_content = null;
       updateData.use_vertex_ai = false;
-    } else { // Other providers
+    } else {
       updateData.project_id = null;
       updateData.location_id = null;
       updateData.json_key_content = null;
@@ -378,37 +414,77 @@ export async function DELETE(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
+  const type = searchParams.get('type'); // 'key' or 'group'
 
   if (!id) {
-    return NextResponse.json({ message: 'ID de la clave no proporcionado.' }, { status: 400 });
+    return NextResponse.json({ message: 'ID no proporcionado.' }, { status: 400 });
   }
 
-  // Fetch current key details to check its is_global status and user_id
-  const { data: currentKey, error: currentKeyError } = await supabaseAdmin
-    .from('user_api_keys')
-    .select('user_id, is_global')
-    .eq('id', id)
-    .single();
+  try {
+    if (type === 'group') {
+      // Fetch group details for authorization
+      const { data: currentGroup, error: groupError } = await supabaseAdmin
+        .from('ai_key_groups')
+        .select('user_id, is_global')
+        .eq('id', id)
+        .single();
 
-  if (currentKeyError || !currentKey) throw new Error('Clave no encontrada para verificar el estado.');
+      if (groupError || !currentGroup) throw new Error('Grupo no encontrado para verificar el estado.');
 
-  // Authorization checks
-  if (currentKey.is_global && userRole !== 'super_admin') {
-    return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden eliminar claves globales.' }, { status: 403 });
-  }
-  if (!currentKey.is_global && currentKey.user_id !== session.user.id && userRole !== 'super_admin') {
-    return NextResponse.json({ message: 'Acceso denegado. No tienes permiso para eliminar esta clave.' }, { status: 403 });
-  }
+      // Authorization checks for group deletion
+      const isGroupOwner = currentGroup.user_id === session.user.id;
+      if (currentGroup.is_global && userRole !== 'super_admin') {
+        return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden eliminar grupos globales.' }, { status: 403 });
+      }
+      if (!currentGroup.is_global && !isGroupOwner && userRole !== 'super_admin') {
+        return NextResponse.json({ message: 'Acceso denegado. No tienes permiso para eliminar este grupo.' }, { status: 403 });
+      }
 
-  const { error } = await supabaseAdmin
-    .from('user_api_keys')
-    .delete()
-    .eq('id', id); // Removed user_id filter here, as admin can delete global keys
+      const { error } = await supabaseAdmin
+        .from('ai_key_groups')
+        .delete()
+        .eq('id', id);
 
-  if (error) {
-    console.error("[API /ai-keys DELETE] Error deleting key:", error);
+      if (error) {
+        console.error("[API /ai-keys DELETE] Error deleting group:", error);
+        throw error;
+      }
+      return NextResponse.json({ message: 'Grupo de API Keys eliminado correctamente.' });
+
+    } else { // Default to deleting an individual key
+      // Fetch current key details for authorization
+      const { data: currentKey, error: keyError } = await supabaseAdmin
+        .from('user_api_keys')
+        .select('user_id, is_global, group_id')
+        .eq('id', id)
+        .single();
+
+      if (keyError || !currentKey) throw new Error('Clave no encontrada para verificar el estado.');
+
+      // Authorization checks for key deletion
+      const isOwner = currentKey.user_id === session.user.id;
+      const isGroupOwner = currentKey.group_id ? (await supabaseAdmin.from('ai_key_groups').select('user_id').eq('id', currentKey.group_id).single())?.data?.user_id === session.user.id : false;
+
+      if (currentKey.is_global && userRole !== 'super_admin') {
+        return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden eliminar claves globales.' }, { status: 403 });
+      }
+      if (!currentKey.is_global && !isOwner && !isGroupOwner && userRole !== 'super_admin') {
+        return NextResponse.json({ message: 'Acceso denegado. No tienes permiso para eliminar esta clave.' }, { status: 403 });
+      }
+
+      const { error } = await supabaseAdmin
+        .from('user_api_keys')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error("[API /ai-keys DELETE] Error deleting key:", error);
+        throw error;
+      }
+      return NextResponse.json({ message: 'API Key eliminada correctamente.' });
+    }
+  } catch (error: any) {
+    console.error("[API /ai-keys DELETE] Unhandled error:", error);
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
-
-  return NextResponse.json({ message: 'API Key eliminada correctamente.' });
 }
