@@ -1,10 +1,16 @@
 export const runtime = 'nodejs';
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { getAppAndServerWithStateCheck } from '@/lib/app-state-manager';
-import { executeSshCommand } from '@/lib/ssh-utils';
+import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import fs from 'fs/promises';
+import path from 'path';
+import os from 'os';
+import tar from 'tar';
+import crypto from 'crypto';
+
+const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
 async function getUserId() {
   const cookieStore = cookies() as any;
@@ -16,41 +22,88 @@ async function getUserId() {
 
 export async function GET(req: NextRequest, context: any) {
   const appId = context.params.id;
+  const tempDir = path.join(os.tmpdir(), `dyad-download-${crypto.randomBytes(16).toString('hex')}`);
+  const archivePath = `${tempDir}.tar.gz`;
 
   try {
     const userId = await getUserId();
-    const { app, server } = await getAppAndServerWithStateCheck(appId, userId);
 
-    if (!app.container_id) {
-      throw new Error('La aplicación no tiene un contenedor asociado para descargar.');
+    // 1. Get app name for the final filename
+    const { data: app, error: appError } = await supabaseAdmin
+      .from('user_apps')
+      .select('name')
+      .eq('id', appId)
+      .eq('user_id', userId)
+      .single();
+
+    if (appError || !app) {
+      throw new Error('Aplicación no encontrada o acceso denegado.');
     }
 
-    // 1. Create a gzipped tar archive of the /app directory inside the container and stream it to stdout
-    const command = `docker exec ${app.container_id} tar -cz -C /app .`;
-    // Call with buffer encoding
-    const { stdout, stderr, code } = await executeSshCommand(server, command, { encoding: 'buffer' });
+    // 2. Find the most recent version of the app
+    const { data: latestVersion, error: versionError } = await supabaseAdmin
+      .from('app_versions')
+      .select('id')
+      .eq('app_id', appId)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
 
-    if (code !== 0) {
-      // stderr is a Buffer, so we need to convert it to a string to show the error
-      throw new Error(`Error al crear el archivo del proyecto: ${stderr.toString()}`);
+    if (versionError || !latestVersion) {
+      throw new Error('No se encontraron versiones para esta aplicación.');
     }
 
-    // stdout is a Node.js Buffer.
-    const fileBuffer = stdout;
+    // 3. Fetch all file backups for that latest version
+    const { data: files, error: filesError } = await supabaseAdmin
+      .from('app_file_backups')
+      .select('file_path, file_content')
+      .eq('version_id', latestVersion.id);
 
-    // 2. Create the response with appropriate headers
+    if (filesError) {
+      throw new Error(`Error al obtener los archivos del proyecto: ${filesError.message}`);
+    }
+    if (!files || files.length === 0) {
+      throw new Error('Esta versión de la aplicación no tiene archivos para descargar.');
+    }
+
+    // 4. Recreate the project structure in a temporary local directory
+    await fs.mkdir(tempDir, { recursive: true });
+    for (const file of files) {
+      const localFilePath = path.join(tempDir, file.file_path);
+      // Ensure the directory for the file exists
+      await fs.mkdir(path.dirname(localFilePath), { recursive: true });
+      // Write the file content
+      await fs.writeFile(localFilePath, file.file_content || '');
+    }
+
+    // 5. Create a gzipped tar archive from the temporary directory
+    await tar.c(
+      {
+        gzip: true,
+        file: archivePath,
+        cwd: tempDir, // Change working directory to the temp dir
+      },
+      ['.'] // Archive everything in the current directory (which is tempDir)
+    );
+
+    // 6. Read the created archive into a buffer
+    const fileBuffer = await fs.readFile(archivePath);
+
+    // 7. Create and return the response
     const headers = new Headers();
     headers.append('Content-Disposition', `attachment; filename="${app.name || 'project'}.tar.gz"`);
     headers.append('Content-Type', 'application/gzip');
     headers.append('Content-Length', fileBuffer.length.toString());
 
-    // 3. Return a standard Response object with a Uint8Array created from the Buffer.
-    // This explicitly converts the Node.js-specific Buffer into a standard format
-    // that the Web API Response constructor understands, resolving the TypeScript error.
-    return new Response(new Uint8Array(fileBuffer), { headers });
+    return new Response(fileBuffer, { headers });
 
   } catch (error: any) {
     console.error(`[API /apps/${appId}/download] Error:`, error);
     return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
+  } finally {
+    // 8. Clean up the temporary directory and archive file
+    await fs.rm(tempDir, { recursive: true, force: true }).catch(e => console.warn(`Cleanup failed for dir ${tempDir}: ${e.message}`));
+    await fs.unlink(archivePath).catch(e => console.warn(`Cleanup failed for file ${archivePath}: ${e.message}`));
   }
 }
