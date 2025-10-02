@@ -7,9 +7,9 @@ import crypto from 'crypto';
 
 const execAsync = promisify(exec);
 
-interface SshCommandResult {
-  stdout: string;
-  stderr: string;
+interface SshCommandResult<T extends 'utf8' | 'buffer'> {
+  stdout: T extends 'utf8' ? string : Buffer;
+  stderr: T extends 'utf8' ? string : Buffer;
   code: number;
 }
 
@@ -20,40 +20,43 @@ interface ServerDetails {
   ssh_password?: string;
 }
 
-// Common SSH options to avoid interactive prompts and add a connection timeout
-const SSH_OPTIONS = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=300"; // Increased timeout to 5 minutes (300 seconds)
+const SSH_OPTIONS = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=300";
 
-/**
- * Executes an SSH command on a remote server using the native ssh client.
- * @param serverDetails Details for connecting to the SSH server.
- * @param command The command string to execute.
- * @returns A promise that resolves with the stdout, stderr, and exit code of the command.
- */
+// Overloaded function signature for better TypeScript type inference
+export async function executeSshCommand(serverDetails: ServerDetails, command: string, options: { encoding: 'buffer' }): Promise<SshCommandResult<'buffer'>>;
+export async function executeSshCommand(serverDetails: ServerDetails, command: string, options?: { encoding?: 'utf8' }): Promise<SshCommandResult<'utf8'>>;
 export async function executeSshCommand(
   serverDetails: ServerDetails,
-  command: string
-): Promise<SshCommandResult> {
+  command: string,
+  options: { encoding?: 'utf8' | 'buffer' } = { encoding: 'utf8' }
+): Promise<SshCommandResult<'utf8' | 'buffer'>> {
   const sshCommand = `sshpass -p '${serverDetails.ssh_password}' ssh ${SSH_OPTIONS} -p ${serverDetails.ssh_port || 22} ${serverDetails.ssh_username}@${serverDetails.ip_address} "${command.replace(/"/g, '\\"')}"`;
 
+  const execOptions = {
+    timeout: 300000,
+    encoding: options.encoding,
+    maxBuffer: 10 * 1024 * 1024, // 10 MB buffer for stdout
+  };
+
   try {
-    // Add a timeout to execAsync as a fallback for the entire operation
-    const { stdout, stderr } = await execAsync(sshCommand, { timeout: 300000 }); // 5 minute timeout (was 15 seconds)
+    // The type assertion is safe because of the function overloads
+    const { stdout, stderr } = await execAsync(sshCommand, execOptions as any);
     return { stdout, stderr, code: 0 };
   } catch (error: any) {
-    // If the error is a timeout error, provide a more specific message
+    const isBuffer = options.encoding === 'buffer';
     if (error.killed && error.signal === 'SIGTERM') {
+      const stderrMessage = `Comando SSH excedió el tiempo de espera de 5 minutos. El servidor puede estar inaccesible o sobrecargado.`;
       return {
-        stdout: '',
-        stderr: `Comando SSH excedió el tiempo de espera de 5 minutos. El servidor puede estar inaccesible o sobrecargado.`,
+        stdout: isBuffer ? Buffer.from('') : '',
+        stderr: isBuffer ? Buffer.from(stderrMessage) : stderrMessage,
         code: 1,
-      };
+      } as SshCommandResult<'utf8' | 'buffer'>;
     }
-    // execAsync rejects with an object that contains stdout and stderr
     return {
-      stdout: error.stdout || '',
-      stderr: error.stderr || error.message,
+      stdout: error.stdout || (isBuffer ? Buffer.from('') : ''),
+      stderr: error.stderr || (isBuffer ? Buffer.from(error.message) : error.message),
       code: error.code || 1,
-    };
+    } as SshCommandResult<'utf8' | 'buffer'>;
   }
 }
 

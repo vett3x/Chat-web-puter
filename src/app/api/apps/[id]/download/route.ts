@@ -27,14 +27,16 @@ export async function GET(req: NextRequest, context: any) {
 
     // 1. Create a gzipped tar archive of the /app directory inside the container and stream it to stdout
     const command = `docker exec ${app.container_id} tar -cz -C /app .`;
-    const { stdout, stderr, code } = await executeSshCommand(server, command);
+    // Call with buffer encoding
+    const { stdout, stderr, code } = await executeSshCommand(server, command, { encoding: 'buffer' });
 
     if (code !== 0) {
-      throw new Error(`Error al crear el archivo del proyecto: ${stderr}`);
+      // stderr is a Buffer, so we need to convert it to a string to show the error
+      throw new Error(`Error al crear el archivo del proyecto: ${stderr.toString()}`);
     }
 
-    // 2. Convert the binary stdout string to a Buffer
-    const fileBuffer = Buffer.from(stdout, 'binary');
+    // stdout is already a Buffer, no need to convert
+    const fileBuffer = stdout;
 
     // 3. Create the response with appropriate headers
     const headers = new Headers();
