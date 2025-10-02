@@ -35,22 +35,20 @@ export async function GET(req: NextRequest, context: any) {
       throw new Error(`Error al crear el archivo del proyecto: ${stderr.toString()}`);
     }
 
-    // stdout is already a Buffer, no need to convert
+    // stdout is a Buffer. Create a Blob from it to ensure Web API compatibility.
     const fileBuffer = stdout;
+    const blob = new Blob([fileBuffer], { type: 'application/gzip' });
 
     // 3. Create the response with appropriate headers
     const headers = new Headers();
     headers.append('Content-Disposition', `attachment; filename="${app.name || 'project'}.tar.gz"`);
     headers.append('Content-Type', 'application/gzip');
-    headers.append('Content-Length', fileBuffer.length.toString());
 
-    // 4. Return a standard Response object, which is compatible with Next.js Route Handlers
-    // This also resolves the TypeScript build error.
-    return new Response(fileBuffer, { headers });
+    // 4. Return a standard Response object with the Blob, which resolves the TypeScript error.
+    return new Response(blob, { headers });
 
   } catch (error: any) {
     console.error(`[API /apps/${appId}/download] Error:`, error);
     return NextResponse.json({ message: error.message || 'Error interno del servidor.' }, { status: 500 });
   }
-  // No finally block needed as we are not creating temporary files anymore.
 }
