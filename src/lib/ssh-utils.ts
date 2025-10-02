@@ -20,7 +20,7 @@ interface ServerDetails {
   ssh_password?: string;
 }
 
-const SSH_OPTIONS = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=300";
+const SSH_OPTIONS = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=300";
 
 // Overloaded function signature for better TypeScript type inference
 export async function executeSshCommand(serverDetails: ServerDetails, command: string, options: { encoding: 'buffer' }): Promise<SshCommandResult<'buffer'>>;
