@@ -160,7 +160,6 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
   const isGoogleGemini = selectedProvider === 'google_gemini';
   const isCustomEndpoint = selectedProvider === 'custom_endpoint';
 
-  // Helper to get unique models for a provider (used in group form)
   const getUniqueModelsForProvider = useCallback((providerValue: string) => {
     const provider = AI_PROVIDERS.find(p => p.value === providerValue);
     if (!provider) return [];
@@ -725,7 +724,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                       <FormField control={apiKeyForm.control} name="group_id" render={({ field }) => (
                         <FormItem>
                           <FormLabel>Asignar a Grupo (Opcional)</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting || editingKeyId !== null}>
+                          <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
                             <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un grupo" /></SelectTrigger></FormControl>
                             <SelectContent>
                               <SelectItem value="null">Sin Grupo</SelectItem>
