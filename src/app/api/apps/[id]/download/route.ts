@@ -96,7 +96,7 @@ export async function GET(req: NextRequest, context: any) {
     headers.append('Content-Type', 'application/gzip');
     headers.append('Content-Length', fileBuffer.length.toString());
 
-    return new Response(fileBuffer, { headers });
+    return new Response(fileBuffer as any, { headers });
 
   } catch (error: any) {
     console.error(`[API /apps/${appId}/download] Error:`, error);
