@@ -50,7 +50,7 @@ interface SelectedFile {
 export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage, isAppChat = false, onClearChat, chatMode, onChatModeChange }: ChatInputProps) {
   const [inputMessage, setInputMessage] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
-  const { userApiKeys } = useUserApiKeys();
+  const { userApiKeys, aiKeyGroups } = useUserApiKeys(); // NEW: Get aiKeyGroups
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const SelectedModelIcon = React.useMemo(() => {
@@ -207,6 +207,7 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
             onModelChange={onModelChange}
             isLoading={isLoading}
             userApiKeys={userApiKeys}
+            aiKeyGroups={aiKeyGroups} // NEW: Pass aiKeyGroups
             isAppChat={isAppChat}
             SelectedModelIcon={SelectedModelIcon}
           />

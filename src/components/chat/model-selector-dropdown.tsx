@@ -16,6 +16,12 @@ import { cn } from '@/lib/utils';
 import { AI_PROVIDERS, getModelLabel } from '@/lib/ai-models';
 import { useSession } from '@/components/session-context-provider';
 import { ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys'; // Import AiKeyGroup
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"; // NEW: Import Tooltip components
 
 interface ModelSelectorDropdownProps {
   selectedModel: string;
@@ -70,11 +76,22 @@ export function ModelSelectorDropdown({
   });
 
   const renderStatusIcon = (status: ApiKey['status']) => {
-    switch (status) {
-      case 'failed': return <AlertCircle className="h-3 w-3 text-destructive" title="Clave fallida" />;
-      case 'blocked': return <Ban className="h-3 w-3 text-destructive" title="Clave bloqueada" />;
-      default: return null;
-    }
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            {status === 'failed' ? (
+              <AlertCircle className="h-3 w-3 text-destructive" />
+            ) : status === 'blocked' ? (
+              <Ban className="h-3 w-3 text-destructive" />
+            ) : null}
+          </TooltipTrigger>
+          <TooltipContent>
+            {status === 'failed' ? 'Clave fallida' : status === 'blocked' ? 'Clave bloqueada' : ''}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
   };
 
   return (

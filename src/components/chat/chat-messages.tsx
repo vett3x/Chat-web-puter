@@ -81,7 +81,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
       await loadMoreMessages();
       // After loading, adjust scroll to keep the view stable
       if (viewportRef.current) {
-        viewport.current.scrollTop = viewportRef.current.scrollHeight - currentScrollHeight;
+        viewportRef.current.scrollTop = viewportRef.current.scrollHeight - currentScrollHeight;
       }
       setIsLoadingMore(false);
     }
