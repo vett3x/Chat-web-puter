@@ -71,7 +71,7 @@ function HomePageContent() {
   const { session, isLoading: isSessionLoading, userRole, userLanguage, isUserTemporarilyDisabled } = useSession();
   const userId = session?.user?.id;
   
-  const { userApiKeys, isLoadingApiKeys, refreshApiKeys } = useUserApiKeys();
+  const { userApiKeys, aiKeyGroups, isLoadingApiKeys, refreshApiKeys } = useUserApiKeys(); // NEW: Get aiKeyGroups
 
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   const [selectedAppDetails, setSelectedAppDetails] = useState<UserApp | null>(null);
@@ -304,18 +304,18 @@ function HomePageContent() {
   };
 
   const handleTriggerFixBuildError = () => {
-    if (chatInterfaceRef.current?.triggerFixBuildError) {
-      chatInterfaceRef.current.triggerFixBuildError();
+    if (chatInterfaceRef.current?.autoFixStatus === 'idle' || chatInterfaceRef.current?.autoFixStatus === 'failed') {
+      chatInterfaceRef.current?.triggerFixBuildError();
     } else {
-      toast.error("El chat no está listo para corregir errores de compilación.");
+      toast.info("Ya hay un proceso de auto-corrección en curso.");
     }
   };
 
   const handleTriggerReportWebError = () => {
-    if (chatInterfaceRef.current?.triggerReportWebError) {
-      chatInterfaceRef.current.triggerReportWebError();
+    if (chatInterfaceRef.current?.autoFixStatus === 'idle') {
+      chatInterfaceRef.current?.triggerReportWebError();
     } else {
-      toast.error("El chat no está listo para reportar errores web.");
+      toast.info("Ya hay un proceso de auto-corrección en curso. Por favor, espera a que termine.");
     }
   };
 
@@ -374,7 +374,13 @@ function HomePageContent() {
 
   const renderRightPanelContent = () => {
     if (isAppDeleting) {
-      return <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-4"><Loader2 className="h-12 w-12 animate-spin text-destructive mb-4" /><h3>Eliminando Proyecto</h3><p>Por favor, espera...</p></div>;
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-4">
+          <Loader2 className="h-12 w-12 animate-spin text-destructive mb-4" />
+          <h3>Eliminando Proyecto</h3>
+          <p>Por favor, espera...</p>
+        </div>
+      );
     }
     if (isFileLoading) {
       return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
@@ -445,6 +451,7 @@ function HomePageContent() {
             noteId={selectedItem.id}
             onNoteUpdated={() => {}} // Local updates are handled by the sidebar's realtime hook
             userApiKeys={userApiKeys}
+            aiKeyGroups={aiKeyGroups} // NEW: Pass aiKeyGroups
             isLoadingApiKeys={isLoadingApiKeys}
             userLanguage={userLanguage || 'es'}
           />
@@ -470,6 +477,7 @@ function HomePageContent() {
                   isAppChat={selectedItem?.type === 'app'}
                   onSidebarDataRefresh={() => {}} // Sidebar refreshes itself
                   userApiKeys={userApiKeys}
+                  aiKeyGroups={aiKeyGroups} // NEW: Pass aiKeyGroups
                   isLoadingApiKeys={isLoadingApiKeys}
                 />
               )}
@@ -492,6 +500,7 @@ function HomePageContent() {
         aiResponseSpeed={aiResponseSpeed}
         onAiResponseSpeedChange={handleAiResponseSpeedChange}
         userApiKeys={userApiKeys}
+        aiKeyGroups={aiKeyGroups} // NEW: Pass aiKeyGroups
         isLoadingApiKeys={isLoadingApiKeys}
         currentUserRole={userRole}
       />

@@ -5,7 +5,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { X, Send, Loader2, Bot, User, Trash2, KeyRound } from 'lucide-react'; // Import KeyRound
+import { X, Send, Loader2, Bot, User, Trash2, KeyRound, Folder } from 'lucide-react'; // Import KeyRound, Folder
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils';
 import ClaudeAILogo from '@/components/claude-ai-logo';
 import GoogleGeminiLogo from '@/components/google-gemini-logo'; // Import GoogleGeminiLogo
 import { AI_PROVIDERS } from '@/lib/ai-models';
-import { ApiKey } from '@/hooks/use-user-api-keys';
+import { ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys'; // NEW: Import AiKeyGroup
 import { ModelSelectorDropdown } from '@/components/chat/model-selector-dropdown'; // NEW: Import ModelSelectorDropdown
 import { useNoteAssistantChat, ChatMessage } from '@/hooks/use-note-assistant-chat'; // NEW: Import useNoteAssistantChat
 import { MessageContent } from '@/components/message-content'; // NEW: Import MessageContent
@@ -39,10 +39,11 @@ interface NoteAiChatProps {
   initialChatHistory: ChatMessage[] | null;
   onSaveHistory: (history: ChatMessage[]) => void;
   userApiKeys: ApiKey[];
+  aiKeyGroups: AiKeyGroup[]; // NEW: Pass aiKeyGroups
   isLoadingApiKeys: boolean;
 }
 
-export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialChatHistory, onSaveHistory, userApiKeys, isLoadingApiKeys }: NoteAiChatProps) {
+export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialChatHistory, onSaveHistory, userApiKeys, aiKeyGroups, isLoadingApiKeys }: NoteAiChatProps) {
   const [userInput, setUserInput] = useState('');
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
@@ -60,6 +61,7 @@ export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialCha
     initialChatHistory,
     onSaveHistory,
     userApiKeys,
+    aiKeyGroups, // NEW: Pass aiKeyGroups
     isLoadingApiKeys,
   });
 
@@ -100,9 +102,17 @@ export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialCha
         if (provider) return provider.logo;
       }
       return KeyRound;
+    } else if (selectedModel.startsWith('group:')) { // NEW: Handle group selection icon
+      const groupId = selectedModel.substring(6);
+      const group = aiKeyGroups.find(g => g.id === groupId);
+      if (group) {
+        const provider = AI_PROVIDERS.find(p => p.value === group.provider);
+        if (provider) return provider.logo;
+      }
+      return Folder; // Default icon for a group
     }
     return Bot;
-  }, [selectedModel, userApiKeys]);
+  }, [selectedModel, userApiKeys, aiKeyGroups]); // NEW: Add aiKeyGroups to dependencies
 
   if (!isOpen) return null;
 
@@ -116,6 +126,7 @@ export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialCha
             onModelChange={handleModelChange}
             isLoading={isLoading}
             userApiKeys={userApiKeys}
+            aiKeyGroups={aiKeyGroups} // NEW: Pass aiKeyGroups
             isAppChat={false}
             SelectedModelIcon={SelectedModelIcon}
           />

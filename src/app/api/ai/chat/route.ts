@@ -30,7 +30,7 @@ const messageSchema = z.object({
 
 const chatRequestSchema = z.object({
   messages: z.array(messageSchema),
-  selectedKeyId: z.string().uuid(),
+  selectedKeyId: z.string(), // Can be a key ID or a group ID
   stream: z.boolean().optional().default(true), // New field to control streaming
 });
 
@@ -162,148 +162,211 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 401 });
   }
 
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
   try {
     const body = await req.json();
     const { messages: rawMessages, selectedKeyId, stream } = chatRequestSchema.parse(body);
 
     console.log("[API /ai/chat] Received rawMessages:", JSON.stringify(rawMessages, null, 2));
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    let keysToTry: any[] = [];
+    let selectedKeyIsGroup = false;
 
-    // Fetch key details by ID first
-    const { data: keyDetails, error: keyError } = await supabase
-      .from('user_api_keys')
-      .select('provider, api_key, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint, is_global, user_id')
+    // Check if selectedKeyId is a group ID
+    const { data: group, error: groupError } = await supabase
+      .from('ai_key_groups')
+      .select('*, api_keys(*)')
       .eq('id', selectedKeyId)
-      .eq('is_active', true)
       .single();
 
-    if (keyError || !keyDetails) {
-      console.error("[API /ai/chat] Key details fetch error:", keyError);
-      throw new Error('No se encontró una API key activa con el ID proporcionado. Por favor, verifica la Gestión de API Keys.');
+    if (groupError && groupError.code !== 'PGRST116') { // PGRST116 means "no rows found"
+      console.error("[API /ai/chat] Error fetching AI key group:", groupError);
+      throw new Error('Error al verificar el grupo de claves.');
     }
 
-    // Authorization check for the fetched key
-    const isOwner = keyDetails.user_id === session.user.id;
-    if (!keyDetails.is_global && !isOwner && userRole !== 'super_admin') {
-      console.warn(`[API /ai/chat] Access denied for key ${selectedKeyId}: not global, not owner, and user is not super_admin.`);
-      throw new Error('Acceso denegado. No tienes permiso para usar esta clave.');
-    }
-
-    let finalModel = keyDetails.model_name;
-    
-    // Determine token limit based on provider
-    const tokenLimit = keyDetails.provider === 'google_gemini' ? 1000000 : 200000;
-
-    // Extract system prompt and filter it out from conversation messages
-    const systemPromptMessage = rawMessages.find(m => m.role === 'system');
-    const systemPrompt = systemPromptMessage ? messageContentToString(systemPromptMessage.content) : '';
-    const conversationMessages = rawMessages.filter(m => m.role !== 'system');
-
-    // Truncate conversation history
-    const truncatedMessages = truncateMessagesByTokenLimit(conversationMessages, tokenLimit, systemPrompt);
-
-    if (keyDetails.provider === 'google_gemini') {
-      const geminiFormattedMessages: { role: 'user' | 'model'; parts: Part[] }[] = [];
-      // Add system prompt as a text part in the first user message
-      if (systemPrompt) {
-        geminiFormattedMessages.push({ role: 'user', parts: [{ text: systemPrompt }] });
+    if (group) {
+      selectedKeyIsGroup = true;
+      // Filter for active keys within the group
+      keysToTry = group.api_keys.filter((key: any) => key.status === 'active');
+      if (keysToTry.length === 0) {
+        throw new Error(`No hay claves activas en el grupo '${group.name}'.`);
       }
-
-      for (let i = 0; i < truncatedMessages.length; i++) {
-        const msg = truncatedMessages[i];
-        if (msg.role === 'user') {
-          geminiFormattedMessages.push({ role: 'user', parts: convertToGeminiParts(msg.content) });
-        } else if (msg.role === 'assistant') {
-          geminiFormattedMessages.push({ role: 'model', parts: convertToGeminiParts(msg.content) });
-        }
-      }
-      
-      if (keyDetails.use_vertex_ai) {
-        return NextResponse.json({ message: { content: "Vertex AI streaming not implemented yet." } });
-
-      } else { // Public Gemini API
-        const apiKey = keyDetails.api_key;
-        if (!apiKey) throw new Error('API Key no encontrada para Google Gemini.');
-        const genAI = new GoogleGenerativeAI(apiKey);
-        if (!finalModel) finalModel = 'gemini-1.5-flash-latest';
-
-        const result = await genAI.getGenerativeModel({ model: finalModel }).generateContentStream({ contents: geminiFormattedMessages });
-        
-        const streamResponse = new ReadableStream({
-          async start(controller) {
-            for await (const chunk of result.stream) {
-              const chunkText = chunk.text();
-              controller.enqueue(new TextEncoder().encode(chunkText));
-            }
-            controller.close();
-          },
-        });
-
-        return new Response(streamResponse, {
-          headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-        });
-      }
-    } else if (keyDetails.provider === 'custom_endpoint') {
-      const customApiKey = keyDetails.api_key;
-      const customEndpointUrl = keyDetails.api_endpoint;
-      const customModelId = keyDetails.model_name;
-
-      if (!customEndpointUrl || !customModelId) { // Removed customApiKey from this check
-        console.error("[API /ai/chat] Custom endpoint configuration incomplete:", { customEndpointUrl, customModelId });
-        throw new Error('Configuración incompleta para el endpoint personalizado (URL o ID de modelo faltante).');
-      }
-
-      const customApiMessages = [
-        { role: 'system', content: systemPrompt },
-        ...truncatedMessages.map((msg: any) => ({
-          role: msg.role === 'assistant' ? 'assistant' : 'user',
-          content: messageContentToString(msg.content),
-        })),
-      ];
-
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      };
-
-      if (customApiKey) { // Conditionally add Authorization header
-        headers['Authorization'] = `Bearer ${customApiKey}`;
-      }
-
-      console.log(`[API /ai/chat] Calling custom endpoint: ${customEndpointUrl} with model: ${customModelId}`);
-      const customEndpointResponse = await fetch(customEndpointUrl, {
-        method: 'POST',
-        headers: headers, // Use the conditionally built headers
-        body: JSON.stringify({
-          model: customModelId,
-          messages: customApiMessages,
-          stream: false, // Force non-streaming for custom endpoints
-        }),
-        signal: AbortSignal.timeout(120000) // 2 minutes timeout for external API call
-      });
-
-      console.log(`[API /ai/chat] Custom endpoint response status: ${customEndpointResponse.status}`);
-
-      if (!customEndpointResponse.ok) {
-        const errorText = await customEndpointResponse.text();
-        console.error(`[API /ai/chat] Custom Endpoint API returned an error: ${customEndpointResponse.status} - ${errorText.substring(0, 500)}...`);
-        throw new Error(`Custom Endpoint API returned an error: ${customEndpointResponse.status} - ${errorText.substring(0, 200)}...`);
-      }
-
-      const result = await customEndpointResponse.json();
-      console.log("[API /ai/chat] Custom endpoint response body:", JSON.stringify(result, null, 2));
-
-      const content = result.choices[0]?.message?.content || '';
-      
-      return NextResponse.json({ message: { content } });
-
+      // Implement simple round-robin by sorting by last_used_at (oldest first)
+      keysToTry.sort((a: any, b: any) => new Date(a.last_used_at || 0).getTime() - new Date(b.last_used_at || 0).getTime());
     } else {
-      console.error(`[API /ai/chat] Invalid AI provider selected: ${keyDetails.provider}`);
-      throw new Error('Proveedor de IA no válido seleccionado.');
+      // If not a group, assume it's an individual key ID
+      const { data: individualKey, error: keyError } = await supabase
+        .from('user_api_keys')
+        .select('provider, api_key, project_id, location_id, use_vertex_ai, model_name, json_key_content, api_endpoint, is_global, user_id, status, status_message')
+        .eq('id', selectedKeyId)
+        .eq('is_active', true)
+        .single();
+
+      if (keyError || !individualKey) {
+        console.error("[API /ai/chat] Individual key fetch error:", keyError);
+        throw new Error('No se encontró una API key activa con el ID proporcionado.');
+      }
+      if (individualKey.status !== 'active') {
+        throw new Error(`La API key seleccionada está en estado '${individualKey.status}'.`);
+      }
+      keysToTry.push(individualKey);
     }
+
+    let finalResponse: any = null;
+    let lastError: any = null;
+    let keyUsedForResponse: any = null;
+
+    for (const keyDetails of keysToTry) {
+      try {
+        // Authorization check for the fetched key
+        const isOwner = keyDetails.user_id === session.user.id;
+        if (!keyDetails.is_global && !isOwner && userRole !== 'super_admin') {
+          console.warn(`[AI Chat] Access denied for key ${keyDetails.id}: not global, not owner, and user is not super_admin.`);
+          throw new Error('Acceso denegado. No tienes permiso para usar esta clave.');
+        }
+
+        keyUsedForResponse = keyDetails;
+        let finalModel = keyDetails.model_name;
+        
+        // Determine token limit based on provider
+        const tokenLimit = keyDetails.provider === 'google_gemini' ? 1000000 : 200000;
+
+        // Extract system prompt and filter it out from conversation messages
+        const systemPromptMessage = rawMessages.find(m => m.role === 'system');
+        const systemPrompt = systemPromptMessage ? messageContentToString(systemPromptMessage.content) : '';
+        const conversationMessages = rawMessages.filter(m => m.role !== 'system');
+
+        // Truncate conversation history
+        const truncatedMessages = truncateMessagesByTokenLimit(conversationMessages, tokenLimit, systemPrompt);
+
+        if (keyDetails.provider === 'google_gemini') {
+          const geminiFormattedMessages: { role: 'user' | 'model'; parts: Part[] }[] = [];
+          // Add system prompt as a text part in the first user message
+          if (systemPrompt) {
+            geminiFormattedMessages.push({ role: 'user', parts: [{ text: systemPrompt }] });
+          }
+
+          for (let i = 0; i < truncatedMessages.length; i++) {
+            const msg = truncatedMessages[i];
+            if (msg.role === 'user') {
+              geminiFormattedMessages.push({ role: 'user', parts: convertToGeminiParts(msg.content) });
+            } else if (msg.role === 'assistant') {
+              geminiFormattedMessages.push({ role: 'model', parts: convertToGeminiParts(msg.content) });
+            }
+          }
+          
+          if (keyDetails.use_vertex_ai) {
+            // Vertex AI streaming not implemented yet, return a placeholder or handle as non-streaming
+            // For now, we'll just return a non-streaming response.
+            return NextResponse.json({ message: { content: "Vertex AI streaming not implemented yet." } });
+
+          } else { // Public Gemini API
+            const apiKey = keyDetails.api_key;
+            if (!apiKey) throw new Error('API Key no encontrada para Google Gemini.');
+            const genAI = new GoogleGenerativeAI(apiKey);
+            if (!finalModel) finalModel = 'gemini-1.5-flash-latest';
+
+            const result = await genAI.getGenerativeModel({ model: finalModel }).generateContentStream({ contents: geminiFormattedMessages });
+            
+            const streamResponse = new ReadableStream({
+              async start(controller) {
+                for await (const chunk of result.stream) {
+                  const chunkText = chunk.text();
+                  controller.enqueue(new TextEncoder().encode(chunkText));
+                }
+                controller.close();
+              },
+            });
+
+            finalResponse = new Response(streamResponse, {
+              headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+            });
+          }
+        } else if (keyDetails.provider === 'custom_endpoint') {
+          const customApiKey = keyDetails.api_key;
+          const customEndpointUrl = keyDetails.api_endpoint;
+          const customModelId = keyDetails.model_name;
+
+          if (!customEndpointUrl || !customModelId) { // Removed customApiKey from this check
+            console.error("[AI Chat] Custom endpoint configuration incomplete:", { customEndpointUrl, customModelId });
+            throw new Error('Configuración incompleta para el endpoint personalizado (URL o ID de modelo faltante).');
+          }
+
+          const customApiMessages = [
+            { role: 'system', content: systemPrompt },
+            ...truncatedMessages.map((msg: any) => ({
+              role: msg.role === 'assistant' ? 'assistant' : 'user',
+              content: messageContentToString(msg.content),
+            })),
+          ];
+
+          const headers: HeadersInit = {
+            'Content-Type': 'application/json',
+          };
+
+          if (customApiKey) { // Conditionally add Authorization header
+            headers['Authorization'] = `Bearer ${customApiKey}`;
+          }
+
+          console.log(`[AI Chat] Calling custom endpoint: ${customEndpointUrl} with model: ${customModelId}`);
+          const customEndpointResponse = await fetch(customEndpointUrl, {
+            method: 'POST',
+            headers: headers, // Use the conditionally built headers
+            body: JSON.stringify({
+              model: customModelId,
+              messages: customApiMessages,
+              stream: false, // Force non-streaming for custom endpoints
+            }),
+            signal: AbortSignal.timeout(120000) // 2 minutes timeout for external API call
+          });
+
+          console.log(`[AI Chat] Custom endpoint response status: ${customEndpointResponse.status}`);
+
+          if (!customEndpointResponse.ok) {
+            const errorText = await customEndpointResponse.text();
+            console.error(`[AI Chat] Custom Endpoint API returned an error: ${customEndpointResponse.status} - ${errorText.substring(0, 500)}...`);
+            throw new Error(`Custom Endpoint API returned an error: ${customEndpointResponse.status} - ${errorText.substring(0, 200)}...`);
+          }
+
+          const result = await customEndpointResponse.json();
+          console.log("[AI Chat] Custom endpoint response body:", JSON.stringify(result, null, 2));
+
+          const content = result.choices[0]?.message?.content || '';
+          
+          finalResponse = NextResponse.json({ message: { content } });
+
+        } else {
+          console.error(`[AI Chat] Invalid AI provider selected: ${keyDetails.provider}`);
+          throw new Error('Proveedor de IA no válido seleccionado.');
+        }
+
+        // If successful, update last_used_at and break
+        await supabase.from('user_api_keys').update({ last_used_at: new Date().toISOString(), status: 'active', status_message: null }).eq('id', keyDetails.id);
+        break; // Exit loop on first successful key
+      } catch (error: any) {
+        lastError = error;
+        console.error(`[AI Chat] Key ${keyDetails.id} failed: ${error.message}. Trying next key...`);
+        // Mark key as failed in DB
+        await supabase.from('user_api_keys').update({ status: 'failed', status_message: error.message }).eq('id', keyDetails.id);
+        // Log critical alert for Super Admins
+        await supabase.from('server_events_log').insert({
+          user_id: session.user.id,
+          event_type: 'api_key_failed',
+          description: `La API Key '${keyDetails.nickname || keyDetails.id}' (${keyDetails.provider}) falló. Mensaje: ${error.message}`,
+          command_details: `Key ID: ${keyDetails.id}, Group ID: ${keyDetails.group_id || 'N/A'}`,
+        });
+      }
+    }
+
+    if (!finalResponse) {
+      throw lastError || new Error('Todas las API Keys intentadas fallaron.');
+    }
+
+    return finalResponse;
 
   } catch (error: any) {
     console.error('[API /ai/chat] Unhandled error:', error);

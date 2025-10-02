@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ApiKey } from '@/hooks/use-user-api-keys';
+import { ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys'; // NEW: Import AiKeyGroup
 import { AI_PROVIDERS } from '@/lib/ai-models';
 import { parseAiResponseToRenderableParts, RenderablePart } from '@/lib/utils';
 import { Message } from '../hooks/use-general-chat'; // Import Message type
@@ -34,29 +34,61 @@ declare global {
 export type ChatMessage = Message; // ChatMessage is now an alias for Message
 
 // Function to determine the default model based on user preferences and available keys
-const determineDefaultModel = (userApiKeys: ApiKey[]): string => {
+const determineDefaultModel = (userApiKeys: ApiKey[], aiKeyGroups: AiKeyGroup[]): string => {
   if (typeof window !== 'undefined') {
     const storedDefaultModel = localStorage.getItem('default_ai_model');
-    if (storedDefaultModel && (userApiKeys.some(key => `user_key:${key.id}` === storedDefaultModel) || AI_PROVIDERS.some(p => p.models.some(m => `puter:${m.value}` === storedDefaultModel)))) {
-      return storedDefaultModel;
+    if (storedDefaultModel) {
+      // Check if it's a group
+      if (storedDefaultModel.startsWith('group:')) {
+        const groupId = storedDefaultModel.substring(6);
+        const group = aiKeyGroups.find(g => g.id === groupId);
+        if (group && group.api_keys?.some(k => k.status === 'active')) {
+          return storedDefaultModel;
+        }
+      }
+      // Check if it's an individual key
+      if (storedDefaultModel.startsWith('user_key:')) {
+        const keyId = storedDefaultModel.substring(9);
+        const key = userApiKeys.find(k => k.id === keyId);
+        if (key && key.status === 'active') {
+          return storedDefaultModel;
+        }
+      }
+      // Check if it's a puter model
+      if (storedDefaultModel.startsWith('puter:') && AI_PROVIDERS.some(p => p.models.some(m => `puter:${m.value}` === storedDefaultModel))) {
+        return storedDefaultModel;
+      }
     }
   }
 
-  // Prioritize global keys
-  const globalKey = userApiKeys.find(key => key.is_global);
+  // Prioritize global groups with active keys
+  const globalGroup = aiKeyGroups.find(g => g.is_global && g.api_keys?.some(k => k.status === 'active'));
+  if (globalGroup) {
+    return `group:${globalGroup.id}`;
+  }
+
+  // Prioritize global individual keys
+  const globalKey = userApiKeys.find(key => key.is_global && key.status === 'active');
   if (globalKey) {
     return `user_key:${globalKey.id}`;
+  }
+
+  // Then prioritize user's own groups with active keys
+  const userGroup = aiKeyGroups.find(g => !g.is_global && g.api_keys?.some(k => k.status === 'active'));
+  if (userGroup) {
+    return `group:${userGroup.id}`;
+  }
+
+  // Then prioritize user's own individual keys
+  const userKey = userApiKeys.find(key => !key.is_global && key.status === 'active');
+  if (userKey) {
+    return `user_key:${userKey.id}`;
   }
 
   // Then prioritize Claude models
   const claudeModel = AI_PROVIDERS.find(p => p.value === 'anthropic_claude')?.models[0];
   if (claudeModel) {
     return `puter:${claudeModel.value}`;
-  }
-
-  // Fallback to any available user key
-  if (userApiKeys.length > 0) {
-    return `user_key:${userApiKeys[0].id}`;
   }
 
   // Final fallback if no keys or Puter models are available
@@ -69,6 +101,7 @@ interface UseNoteAssistantChatProps {
   initialChatHistory: ChatMessage[] | null;
   onSaveHistory: (history: ChatMessage[]) => void;
   userApiKeys: ApiKey[];
+  aiKeyGroups: AiKeyGroup[]; // NEW: Pass aiKeyGroups
   isLoadingApiKeys: boolean;
 }
 
@@ -102,6 +135,7 @@ export function useNoteAssistantChat({
   initialChatHistory,
   onSaveHistory,
   userApiKeys,
+  aiKeyGroups, // NEW: Destructure aiKeyGroups
   isLoadingApiKeys,
 }: UseNoteAssistantChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -145,12 +179,12 @@ export function useNoteAssistantChat({
   useEffect(() => {
     if (isLoadingApiKeys) return;
 
-    const newDefaultModel = determineDefaultModel(userApiKeys);
+    const newDefaultModel = determineDefaultModel(userApiKeys, aiKeyGroups); // NEW: Pass aiKeyGroups
     setSelectedModel(newDefaultModel);
     if (typeof window !== 'undefined') {
       localStorage.setItem('selected_ai_model_note_chat', newDefaultModel);
     }
-  }, [isLoadingApiKeys, userApiKeys]);
+  }, [isLoadingApiKeys, userApiKeys, aiKeyGroups]); // NEW: Add aiKeyGroups to dependencies
 
   useEffect(() => {
     setMessages(initialChatHistory && initialChatHistory.length > 0 ? initialChatHistory : [defaultWelcomeMessage]);
@@ -209,34 +243,29 @@ ${noteContent}
 
       let fullResponseText = '';
 
-      if (selectedModel.startsWith('puter:')) {
-        const actualModelForPuter = selectedModel.substring(6);
-        const response = await window.puter.ai.chat(messagesForApi, { model: actualModelForPuter });
+      if (selectedModel.startsWith('puter:') || selectedModel.startsWith('user_key:') || selectedModel.startsWith('group:')) { // NEW: Check for group selection
+        let response;
+        if (selectedModel.startsWith('group:') || selectedModel.startsWith('user_key:')) { // NEW: If group or individual key, use API route
+          const apiResponse = await fetch('/api/ai/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messages: messagesForApi,
+              selectedKeyId: selectedModel.substring(selectedModel.indexOf(':') + 1), // Pass key ID or group ID
+              stream: false,
+            }),
+          });
+          if (!apiResponse.ok || !apiResponse.body) {
+            const errorData = await apiResponse.json();
+            throw new Error(errorData.message || 'Error en la API de IA.');
+          }
+          response = await apiResponse.json();
+        } else {
+          const actualModelForPuter = selectedModel.substring(6);
+          response = await window.puter.ai.chat(messagesForApi, { model: actualModelForPuter });
+        }
         if (!response || response.error) throw new Error(response?.error?.message || JSON.stringify(response?.error) || 'Error de la IA.');
         fullResponseText = response?.message?.content || 'Sin contenido.';
-      } else if (selectedModel.startsWith('user_key:')) {
-        const apiResponse = await fetch('/api/ai/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: messagesForApi,
-            selectedKeyId: selectedModel.substring(9),
-          }),
-        });
-        if (!apiResponse.ok || !apiResponse.body) {
-          const errorData = await apiResponse.json();
-          throw new Error(errorData.message || 'Error en la API de IA.');
-        }
-        const responseStream = apiResponse.body;
-        const reader = responseStream.getReader();
-        const decoder = new TextDecoder();
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          const chunk = decoder.decode(value, { stream: true });
-          fullResponseText += chunk;
-          setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: parseAiResponseToRenderableParts(fullResponseText, false), isTyping: false, isNew: true } : m));
-        }
       } else {
         throw new Error('Modelo de IA no válido seleccionado.');
       }
@@ -267,7 +296,7 @@ ${noteContent}
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, messages, selectedModel, noteTitle, noteContent, onSaveHistory, userApiKeys]);
+  }, [isLoading, messages, selectedModel, noteTitle, noteContent, onSaveHistory, userApiKeys, aiKeyGroups]); // NEW: Add aiKeyGroups to dependencies
 
   const handleModelChange = (modelValue: string) => {
     setSelectedModel(modelValue);

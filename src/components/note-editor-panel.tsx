@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Save, Loader2, Wand2, X, Check } from 'lucide-react'; // Import KeyRound
 import { NoteAiChat } from './note-ai-chat'; // Corrected import path for NoteAiChat component
 import { ChatMessage } from '@/hooks/use-note-assistant-chat'; // ChatMessage is still from the hook
-import { ApiKey } from '@/hooks/use-user-api-keys';
+import { ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys'; // NEW: Import AiKeyGroup
 
 // BlockNote imports
 import { useCreateBlockNote } from "@blocknote/react";
@@ -52,6 +52,7 @@ interface NoteEditorPanelProps {
   noteId: string;
   onNoteUpdated: (id: string, updatedData: Partial<Note>) => void;
   userApiKeys: ApiKey[];
+  aiKeyGroups: AiKeyGroup[]; // NEW: Pass aiKeyGroups
   isLoadingApiKeys: boolean;
   userLanguage: string; // New prop for user language
 }
@@ -60,7 +61,7 @@ export interface NoteEditorPanelRef {
   refreshNoteContent: () => void;
 }
 
-export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelProps>(({ noteId, onNoteUpdated, userApiKeys, isLoadingApiKeys, userLanguage }, ref) => {
+export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelProps>(({ noteId, onNoteUpdated, userApiKeys, aiKeyGroups, isLoadingApiKeys, userLanguage }, ref) => {
   const { session } = useSession();
   const { theme, resolvedTheme } = useTheme(); // Get resolvedTheme
   const [note, setNote] = useState<Note | null>(null);
@@ -212,6 +213,7 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
         initialChatHistory={note.chat_history}
         onSaveHistory={handleSaveChatHistory}
         userApiKeys={userApiKeys}
+        aiKeyGroups={aiKeyGroups} // NEW: Pass aiKeyGroups
         isLoadingApiKeys={isLoadingApiKeys}
       />
     </div>

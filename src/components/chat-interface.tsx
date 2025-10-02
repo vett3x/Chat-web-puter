@@ -6,7 +6,7 @@ import { useChat } from '@/hooks/use-chat'; // Import useChat dispatcher
 import { AutoFixStatus, Message } from '@/hooks/use-general-chat'; // Import types from use-general-chat
 import { ChatMessages } from '@/components/chat/chat-messages';
 import { ChatInput, ChatMode } from '@/components/chat/chat-input';
-import { ApiKey } from '@/hooks/use-user-api-keys';
+import { ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys'; // NEW: Import AiKeyGroup
 import { useSession } from './session-context-provider';
 import { AutoFixStatus as AutoFixStatusComponent } from './chat/auto-fix-status';
 
@@ -24,6 +24,7 @@ interface ChatInterfaceProps {
   isAppChat?: boolean;
   onSidebarDataRefresh: () => void;
   userApiKeys: ApiKey[];
+  aiKeyGroups: AiKeyGroup[]; // NEW: Pass aiKeyGroups
   isLoadingApiKeys: boolean;
 }
 
@@ -48,6 +49,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
   isAppChat = false,
   onSidebarDataRefresh,
   userApiKeys,
+  aiKeyGroups, // NEW: Destructure aiKeyGroups
   isLoadingApiKeys,
 }, ref) => {
   const { userAvatarUrl } = useSession();
@@ -81,6 +83,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
     onWriteFiles,
     onSidebarDataRefresh,
     userApiKeys,
+    aiKeyGroups, // NEW: Pass aiKeyGroups
     isLoadingApiKeys,
     chatMode,
     isAppChat,
@@ -144,6 +147,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
           onSuggestionClick={(prompt: string) => sendMessage([{ type: 'text', text: prompt }], prompt)}
           loadMoreMessages={loadMoreMessages}
           hasMoreMessages={hasMoreMessages}
+          aiKeyGroups={aiKeyGroups} // NEW: Pass aiKeyGroups
         />
         <AutoFixStatusComponent status={autoFixStatus} />
         <ChatInput

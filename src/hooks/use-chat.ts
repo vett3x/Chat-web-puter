@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useGeneralChat } from './use-general-chat';
 import { useDeepAICoderChat } from './use-deepai-coder-chat';
 import { useNoteAssistantChat } from './use-note-assistant-chat'; // Not directly used here, but for context
-import { ApiKey } from './use-user-api-keys';
+import { ApiKey, AiKeyGroup } from './use-user-api-keys'; // NEW: Import AiKeyGroup
 import { Message, AutoFixStatus } from './use-general-chat'; // Re-export types from general chat
 import { RenderablePart } from '@/lib/utils'; // Import RenderablePart directly
 
@@ -24,6 +24,7 @@ interface UseChatProps {
   isAppChat?: boolean;
   onSidebarDataRefresh: () => void;
   userApiKeys: ApiKey[];
+  aiKeyGroups: AiKeyGroup[]; // NEW: Pass aiKeyGroups
   isLoadingApiKeys: boolean;
   chatMode: 'build' | 'chat';
   noteId?: string; // For note assistant context
@@ -45,6 +46,7 @@ export function useChat({
   isAppChat,
   onSidebarDataRefresh,
   userApiKeys,
+  aiKeyGroups, // NEW: Destructure aiKeyGroups
   isLoadingApiKeys,
   chatMode,
   noteId,
@@ -65,6 +67,7 @@ export function useChat({
     onConversationTitleUpdate,
     onSidebarDataRefresh,
     userApiKeys,
+    aiKeyGroups, // NEW: Pass aiKeyGroups
     isLoadingApiKeys,
   });
 
@@ -78,6 +81,7 @@ export function useChat({
     onWriteFiles,
     onSidebarDataRefresh,
     userApiKeys,
+    aiKeyGroups, // NEW: Pass aiKeyGroups
     isLoadingApiKeys,
     chatMode,
     isAppChat,

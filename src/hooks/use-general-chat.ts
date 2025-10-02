@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useSession } from '@/components/session-context-provider';
-import { ApiKey } from '@/hooks/use-user-api-keys';
+import { ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys'; // Import AiKeyGroup
 import { parseAiResponseToRenderableParts, RenderablePart } from '@/lib/utils';
 import { AI_PROVIDERS } from '@/lib/ai-models'; // Import AI_PROVIDERS
 
@@ -54,29 +54,61 @@ export type AutoFixStatus = 'idle' | 'analyzing' | 'plan_ready' | 'fixing' | 'fa
 const MESSAGES_PER_PAGE = 30;
 
 // Function to determine the default model based on user preferences and available keys
-const determineDefaultModel = (userApiKeys: ApiKey[]): string => {
+const determineDefaultModel = (userApiKeys: ApiKey[], aiKeyGroups: AiKeyGroup[]): string => {
   if (typeof window !== 'undefined') {
     const storedDefaultModel = localStorage.getItem('default_ai_model');
-    if (storedDefaultModel && (userApiKeys.some(key => `user_key:${key.id}` === storedDefaultModel) || AI_PROVIDERS.some(p => p.models.some(m => `puter:${m.value}` === storedDefaultModel)))) {
-      return storedDefaultModel;
+    if (storedDefaultModel) {
+      // Check if it's a group
+      if (storedDefaultModel.startsWith('group:')) {
+        const groupId = storedDefaultModel.substring(6);
+        const group = aiKeyGroups.find(g => g.id === groupId);
+        if (group && group.api_keys?.some(k => k.status === 'active')) {
+          return storedDefaultModel;
+        }
+      }
+      // Check if it's an individual key
+      if (storedDefaultModel.startsWith('user_key:')) {
+        const keyId = storedDefaultModel.substring(9);
+        const key = userApiKeys.find(k => k.id === keyId);
+        if (key && key.status === 'active') {
+          return storedDefaultModel;
+        }
+      }
+      // Check if it's a puter model
+      if (storedDefaultModel.startsWith('puter:') && AI_PROVIDERS.some(p => p.models.some(m => `puter:${m.value}` === storedDefaultModel))) {
+        return storedDefaultModel;
+      }
     }
   }
 
-  // Prioritize global keys
-  const globalKey = userApiKeys.find(key => key.is_global);
+  // Prioritize global groups with active keys
+  const globalGroup = aiKeyGroups.find(g => g.is_global && g.api_keys?.some(k => k.status === 'active'));
+  if (globalGroup) {
+    return `group:${globalGroup.id}`;
+  }
+
+  // Prioritize global individual keys
+  const globalKey = userApiKeys.find(key => key.is_global && key.status === 'active');
   if (globalKey) {
     return `user_key:${globalKey.id}`;
+  }
+
+  // Then prioritize user's own groups with active keys
+  const userGroup = aiKeyGroups.find(g => !g.is_global && g.api_keys?.some(k => k.status === 'active'));
+  if (userGroup) {
+    return `group:${userGroup.id}`;
+  }
+
+  // Then prioritize user's own individual keys
+  const userKey = userApiKeys.find(key => !key.is_global && key.status === 'active');
+  if (userKey) {
+    return `user_key:${userKey.id}`;
   }
 
   // Then prioritize Claude models
   const claudeModel = AI_PROVIDERS.find(p => p.value === 'anthropic_claude')?.models[0];
   if (claudeModel) {
     return `puter:${claudeModel.value}`;
-  }
-
-  // Fallback to any available user key
-  if (userApiKeys.length > 0) {
-    return `user_key:${userApiKeys[0].id}`;
   }
 
   // Final fallback if no keys or Puter models are available
@@ -90,6 +122,7 @@ interface UseGeneralChatProps {
   onConversationTitleUpdate: (conversationId: string, newTitle: string) => void;
   onSidebarDataRefresh: () => void;
   userApiKeys: ApiKey[];
+  aiKeyGroups: AiKeyGroup[]; // NEW: Pass aiKeyGroups
   isLoadingApiKeys: boolean;
 }
 
@@ -124,6 +157,7 @@ export function useGeneralChat({
   onConversationTitleUpdate,
   onSidebarDataRefresh,
   userApiKeys,
+  aiKeyGroups, // NEW: Destructure aiKeyGroups
   isLoadingApiKeys,
 }: UseGeneralChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -161,12 +195,12 @@ export function useGeneralChat({
   useEffect(() => {
     if (isLoadingApiKeys) return;
 
-    const newDefaultModel = determineDefaultModel(userApiKeys);
+    const newDefaultModel = determineDefaultModel(userApiKeys, aiKeyGroups); // NEW: Pass aiKeyGroups
     setSelectedModel(newDefaultModel);
     if (typeof window !== 'undefined') {
       localStorage.setItem('selected_ai_model', newDefaultModel);
     }
-  }, [isLoadingApiKeys, userApiKeys]);
+  }, [isLoadingApiKeys, userApiKeys, aiKeyGroups]); // NEW: Add aiKeyGroups to dependencies
 
 
   const getConversationDetails = useCallback(async (convId: string) => {
@@ -275,16 +309,16 @@ export function useGeneralChat({
       const selectedKey = userApiKeys.find(k => `user_key:${k.id}` === selectedModelRef.current); // Use ref here
       const isCustomEndpoint = selectedKey?.provider === 'custom_endpoint';
 
-      if (selectedModelRef.current.startsWith('puter:') || isCustomEndpoint) { // Use ref here
+      if (selectedModelRef.current.startsWith('puter:') || isCustomEndpoint || selectedModelRef.current.startsWith('group:')) { // NEW: Check for group selection
         let response;
-        if (isCustomEndpoint) {
+        if (isCustomEndpoint || selectedModelRef.current.startsWith('group:')) { // NEW: If group or custom endpoint, use API route
           const apiResponse = await Promise.race([
             fetch('/api/ai/chat', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 messages: finalMessagesForApi,
-                selectedKeyId: selectedModelRef.current.substring(9), // Use ref here
+                selectedKeyId: selectedModelRef.current.substring(selectedModelRef.current.indexOf(':') + 1), // Pass key ID or group ID
                 stream: false,
               }),
               signal: controller.signal,
@@ -371,7 +405,7 @@ export function useGeneralChat({
       clearTimeout(timeoutId);
       setIsLoading(false);
     }
-  }, [userId, saveMessageToDB, userApiKeys]); // Removed selectedModel and autoFixStatus from dependencies
+  }, [userId, saveMessageToDB, userApiKeys, aiKeyGroups]); // NEW: Add aiKeyGroups to dependencies
 
   const loadConversationData = useCallback(async () => {
     if (debounceTimeoutRef.current) {
@@ -386,10 +420,10 @@ export function useGeneralChat({
         
         const details = await getConversationDetails(conversationId);
         
-        if (details?.model && (details.model.startsWith('puter:') || details.model.startsWith('user_key:'))) {
+        if (details?.model && (details.model.startsWith('puter:') || details.model.startsWith('user_key:') || details.model.startsWith('group:'))) { // NEW: Check for group model
           setSelectedModel(details.model);
         } else {
-          setSelectedModel(determineDefaultModel(userApiKeys));
+          setSelectedModel(determineDefaultModel(userApiKeys, aiKeyGroups)); // NEW: Pass aiKeyGroups
         }
 
         const fetchedMsgs = await getMessagesFromDB(conversationId, 0);
@@ -402,7 +436,7 @@ export function useGeneralChat({
         setMessages([]);
       }
     }, 100);
-  }, [conversationId, userId, getMessagesFromDB, getConversationDetails, userApiKeys]); // Removed getAndStreamAIResponse from dependencies
+  }, [conversationId, userId, getMessagesFromDB, getConversationDetails, userApiKeys, aiKeyGroups]); // NEW: Add aiKeyGroups to dependencies
 
   const loadMoreMessages = useCallback(async () => {
     if (!conversationId || !hasMoreMessages || isLoading) return;

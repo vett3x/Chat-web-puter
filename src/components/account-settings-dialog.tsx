@@ -44,7 +44,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AI_PROVIDERS, getModelLabel } from '@/lib/ai-models';
-import { ApiKey } from '@/hooks/use-user-api-keys';
+import { ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys'; // NEW: Import AiKeyGroup
 
 // Schemas para los formularios
 const changePasswordSchema = z.object({
@@ -65,6 +65,7 @@ interface AccountSettingsDialogProps {
   aiResponseSpeed: 'slow' | 'normal' | 'fast';
   onAiResponseSpeedChange: (speed: 'slow' | 'normal' | 'fast') => void;
   userApiKeys: ApiKey[];
+  aiKeyGroups: AiKeyGroup[]; // NEW: Pass aiKeyGroups
   isLoadingApiKeys: boolean;
   currentUserRole: 'user' | 'admin' | 'super_admin' | null;
 }
@@ -75,6 +76,7 @@ export function AccountSettingsDialog({
   aiResponseSpeed,
   onAiResponseSpeedChange,
   userApiKeys,
+  aiKeyGroups, // NEW: Destructure aiKeyGroups
   isLoadingApiKeys,
   currentUserRole,
 }: AccountSettingsDialogProps) {
@@ -109,8 +111,18 @@ export function AccountSettingsDialog({
       });
     });
 
-    // Add user API keys
-    userApiKeys.forEach(key => {
+    // Add user API key groups
+    aiKeyGroups.forEach(group => {
+      const activeKeysCount = group.api_keys?.filter(k => k.status === 'active').length || 0;
+      if (activeKeysCount > 0) {
+        let label = `Grupo: ${group.name} (${activeKeysCount} activas)`;
+        if (group.is_global) label += ' (Global)';
+        models.push({ value: `group:${group.id}`, label, isGlobal: group.is_global });
+      }
+    });
+
+    // Add individual user API keys (not part of a group)
+    userApiKeys.filter(key => !key.group_id && key.status === 'active').forEach(key => {
       let label = '';
       if (key.provider === 'custom_endpoint') {
         label = key.nickname || `Endpoint Personalizado (${key.id.substring(0, 8)}...)`;
@@ -118,7 +130,7 @@ export function AccountSettingsDialog({
         label = key.nickname;
       } else {
         const providerName = AI_PROVIDERS.find(p => p.value === key.provider)?.company || key.provider;
-        const modelLabel = key.model_name ? getModelLabel(key.model_name, userApiKeys) : 'Modelo no seleccionado';
+        const modelLabel = key.model_name ? getModelLabel(key.model_name, userApiKeys, aiKeyGroups) : 'Modelo no seleccionado';
         if (key.use_vertex_ai) {
           label = `${providerName} (Vertex AI): ${modelLabel}`;
         } else {
@@ -132,7 +144,7 @@ export function AccountSettingsDialog({
     });
 
     return models;
-  }, [userApiKeys]);
+  }, [userApiKeys, aiKeyGroups]); // NEW: Add aiKeyGroups to dependencies
 
   // Determine initial default model value
   useEffect(() => {
@@ -143,18 +155,24 @@ export function AccountSettingsDialog({
       if (storedDefaultModel && availableModels.some(m => m.value === storedDefaultModel)) {
         initialDefault = storedDefaultModel;
       } else {
-        // Prioritize global keys
-        const globalKey = availableModels.find(m => m.isGlobal);
-        if (globalKey) {
-          initialDefault = globalKey.value;
+        // Prioritize global groups with active keys
+        const globalGroup = availableModels.find(m => m.isGlobal && m.value.startsWith('group:'));
+        if (globalGroup) {
+          initialDefault = globalGroup.value;
         } else {
-          // Then prioritize Claude models
-          const claudeModel = availableModels.find(m => m.value.startsWith('puter:claude'));
-          if (claudeModel) {
-            initialDefault = claudeModel.value;
-          } else if (availableModels.length > 0) {
-            // Fallback to the first available model
-            initialDefault = availableModels[0].value;
+          // Then prioritize global individual keys
+          const globalKey = availableModels.find(m => m.isGlobal && m.value.startsWith('user_key:'));
+          if (globalKey) {
+            initialDefault = globalKey.value;
+          } else {
+            // Then prioritize Claude models
+            const claudeModel = availableModels.find(m => m.value.startsWith('puter:claude'));
+            if (claudeModel) {
+              initialDefault = claudeModel.value;
+            } else if (availableModels.length > 0) {
+              // Fallback to the first available model
+              initialDefault = availableModels[0].value;
+            }
           }
         }
       }

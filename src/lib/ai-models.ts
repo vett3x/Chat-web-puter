@@ -2,7 +2,8 @@
 
 import ClaudeAILogo from '@/components/claude-ai-logo';
 import GoogleGeminiLogo from '@/components/google-gemini-logo';
-import { KeyRound } from 'lucide-react'; // Import a generic icon for custom endpoint
+import { KeyRound, Folder } from 'lucide-react'; // Import a generic icon for custom endpoint and Folder icon
+import { ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys'; // Import ApiKey and AiKeyGroup interfaces
 
 export const AI_PROVIDERS = [
   {
@@ -44,31 +45,48 @@ export const AI_PROVIDERS = [
   },
 ];
 
-export const getModelLabel = (modelValue?: string, userApiKeys: { id: string; provider: string; model_name: string | null; nickname: string | null }[] = []): string => {
+export const getModelLabel = (
+  modelValue?: string, 
+  userApiKeys: ApiKey[] = [], 
+  aiKeyGroups: AiKeyGroup[] = [] // NEW: Pass aiKeyGroups
+): string => {
     if (!modelValue) return '';
 
+    // Handle group selection
+    if (modelValue.startsWith('group:')) {
+        const groupId = modelValue.substring(6);
+        const group = aiKeyGroups.find(g => g.id === groupId);
+        if (group) {
+            return `Grupo: ${group.name} (${group.api_keys?.filter(k => k.status === 'active').length || 0} activas)`;
+        }
+        return `Grupo Desconocido (${groupId.substring(0, 8)}...)`;
+    }
+
+    // Handle individual user_key selection
     if (modelValue.startsWith('user_key:')) {
         const keyId = modelValue.substring(9);
         const key = userApiKeys.find(k => k.id === keyId);
         if (key) {
+            let label = key.nickname || '';
             if (key.provider === 'custom_endpoint') {
-                return key.nickname || `Endpoint Personalizado (${keyId.substring(0, 8)}...)`;
-            }
-            // For other user_key providers, use model_name if available, else nickname
-            if (key.model_name) {
+                label = key.nickname || `Endpoint Personalizado (${keyId.substring(0, 8)}...)`;
+            } else if (key.model_name) {
                 for (const provider of AI_PROVIDERS) {
                     if (provider.value === key.provider) {
                         const model = provider.models.find(m => m.value === key.model_name);
-                        if (model) return model.label;
+                        if (model) label = model.label;
                     }
                 }
-                return key.model_name; // Fallback to raw model name
+                if (!label) label = key.model_name; // Fallback to raw model name
             }
-            return key.nickname || `Clave de Usuario (${keyId.substring(0, 8)}...)`;
+            if (key.is_global) label += ' (Global)';
+            if (key.status !== 'active') label += ` (${key.status})`;
+            return label || `Clave de Usuario (${keyId.substring(0, 8)}...)`;
         }
         return `Clave de Usuario (${keyId.substring(0, 8)}...)`;
     }
 
+    // Handle Puter.js models
     const actualModelValue = modelValue.startsWith('puter:') ? modelValue.substring(6) : modelValue;
 
     for (const provider of AI_PROVIDERS) {

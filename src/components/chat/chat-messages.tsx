@@ -6,7 +6,7 @@ import { Bot, User, Loader2, RefreshCw, LayoutDashboard, ClipboardList, Database
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getModelLabel } from '@/lib/ai-models';
-import { useUserApiKeys } from '@/hooks/use-user-api-keys';
+import { useUserApiKeys, AiKeyGroup } from '@/hooks/use-user-api-keys'; // Import AiKeyGroup
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +36,7 @@ interface ChatMessagesProps {
   onSuggestionClick: (prompt: string) => void;
   loadMoreMessages: () => void;
   hasMoreMessages: boolean;
+  aiKeyGroups: AiKeyGroup[]; // NEW: Pass aiKeyGroups
 }
 
 const SuggestionCard = ({ icon, title, description, onClick }: { icon: React.ReactNode, title: string, description: string, onClick: () => void }) => (
@@ -50,7 +51,7 @@ const SuggestionCard = ({ icon, title, description, onClick }: { icon: React.Rea
   </Card>
 );
 
-export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerate, onReapplyFiles, appPrompt, userAvatarUrl, onClearChat, onApprovePlan, isAppChat, onSuggestionClick, loadMoreMessages, hasMoreMessages }: ChatMessagesProps) {
+export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerate, onReapplyFiles, appPrompt, userAvatarUrl, onClearChat, onApprovePlan, isAppChat, onSuggestionClick, loadMoreMessages, hasMoreMessages, aiKeyGroups }: ChatMessagesProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const { userApiKeys } = useUserApiKeys();
@@ -80,7 +81,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
       await loadMoreMessages();
       // After loading, adjust scroll to keep the view stable
       if (viewportRef.current) {
-        viewportRef.current.scrollTop = viewportRef.current.scrollHeight - currentScrollHeight;
+        viewport.current.scrollTop = viewportRef.current.scrollHeight - currentScrollHeight;
       }
       setIsLoadingMore(false);
     }
@@ -167,6 +168,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
                 isAppChat={isAppChat}
                 isLoading={isLoading}
                 userApiKeys={userApiKeys}
+                aiKeyGroups={aiKeyGroups} // NEW: Pass aiKeyGroups
               />
             );
           })

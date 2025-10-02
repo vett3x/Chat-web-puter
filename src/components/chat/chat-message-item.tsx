@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { getModelLabel } from '@/lib/ai-models';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Message } from '@/hooks/use-general-chat';
-import { ApiKey } from '@/hooks/use-user-api-keys';
+import { ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys'; // Import AiKeyGroup
 import { RenderablePart } from '@/lib/utils';
 
 interface ChatMessageItemProps {
@@ -22,6 +22,7 @@ interface ChatMessageItemProps {
   isAppChat?: boolean;
   isLoading: boolean;
   userApiKeys: ApiKey[];
+  aiKeyGroups: AiKeyGroup[]; // NEW: Pass aiKeyGroups
 }
 
 const ChatMessageItemComponent: React.FC<ChatMessageItemProps> = ({
@@ -35,6 +36,7 @@ const ChatMessageItemComponent: React.FC<ChatMessageItemProps> = ({
   isAppChat,
   isLoading,
   userApiKeys,
+  aiKeyGroups, // NEW: Destructure aiKeyGroups
 }) => {
   const [isCopied, setIsCopied] = useState(false); // Corrected useState syntax
 
@@ -127,7 +129,7 @@ const ChatMessageItemComponent: React.FC<ChatMessageItemProps> = ({
       </div>
       {message.role === 'assistant' && !message.isTyping && message.model && (
         <p className="text-xs text-muted-foreground px-12">
-          ✓ Generado con {getModelLabel(message.model, userApiKeys)}
+          ✓ Generado con {getModelLabel(message.model, userApiKeys, aiKeyGroups)} {/* NEW: Pass aiKeyGroups */}
         </p>
       )}
     </div>
