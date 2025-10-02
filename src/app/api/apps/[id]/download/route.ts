@@ -7,7 +7,7 @@ import { cookies } from 'next/headers';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
-import tar from 'tar';
+import * as tar from 'tar';
 import crypto from 'crypto';
 
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
