@@ -10,7 +10,7 @@ import { Save, Loader2, Wand2, X, Check } from 'lucide-react';
 import { NoteAiChat } from './note-ai-chat';
 import { ChatMessage } from '@/hooks/use-note-assistant-chat';
 import { ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys';
-import { TipTapEditor } from './tiptap-editor'; // Import TipTapEditor
+import { DynamicTipTapEditor } from './dynamic-tiptap-editor'; // Importar el editor dinámico
 import { useTheme } from 'next-themes';
 
 interface Note {
@@ -155,7 +155,7 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
     refreshNoteContent: fetchNote,
   }));
 
-  if (isLoading || isLoadingApiKeys || content === null) {
+  if (isLoading || isLoadingApiKeys) {
     return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /><p className="ml-2 text-muted-foreground">Cargando nota...</p></div>;
   }
   if (!note) {
@@ -174,13 +174,15 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
         </div>
       </div>
       <div className="flex-1 overflow-y-auto">
-        <TipTapEditor
-          key={noteId}
-          initialContent={content}
-          onChange={setContent}
-          isEditable={true}
-          onImageUpload={handleImageUpload}
-        />
+        {content !== null && (
+          <DynamicTipTapEditor
+            key={noteId}
+            initialContent={content}
+            onChange={setContent}
+            isEditable={true}
+            onImageUpload={handleImageUpload}
+          />
+        )}
       </div>
       {showAiHint && (<div className="absolute bottom-20 right-4 bg-info text-info-foreground p-2 rounded-md shadow-lg text-sm animate-in fade-in slide-in-from-bottom-2 flex items-center gap-2 z-10"><span>¡Usa la IA para chatear con tu nota!</span><Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setShowAiHint(false)}><X className="h-3 w-3" /></Button></div>)}
       <Button variant="destructive" size="icon" onClick={() => setIsAiChatOpen(prev => !prev)} className="absolute bottom-4 right-4 rounded-full h-12 w-12 animate-pulse-red z-10" title="Asistente de Nota"><Wand2 className="h-6 w-6" /></Button>
@@ -188,7 +190,7 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
         isOpen={isAiChatOpen}
         onClose={() => setIsAiChatOpen(false)}
         noteTitle={title}
-        noteContent={content} // Pass HTML content to AI chat
+        noteContent={content || ''} // Pass HTML content to AI chat
         initialChatHistory={note.chat_history}
         onSaveHistory={handleSaveChatHistory}
         userApiKeys={userApiKeys}
