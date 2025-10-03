@@ -3,7 +3,7 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { TextGenerateEffect } from './ui/text-generate-effect';
+import { cn } from '@/lib/utils';
 
 interface TextAnimatorProps {
   text: string;
@@ -14,21 +14,10 @@ interface TextAnimatorProps {
   disableAnimation?: boolean;
 }
 
-export function TextAnimator({ text, className, isNew, onAnimationComplete, animationSpeed, disableAnimation }: TextAnimatorProps) {
+export function TextAnimator({ text, className, isNew, onAnimationComplete }: TextAnimatorProps) {
   const containsMarkdown = /(^#{1,6}\s)|(^\s*[\*\-]\s)|(\*\*|__)|(`[^`]+`)|(\[.*\]\(.*\))|(\n.*\n)/m.test(text);
 
-  if (isNew && !containsMarkdown && !disableAnimation) {
-    return (
-      <TextGenerateEffect
-        words={text}
-        className={className}
-        onAnimationComplete={onAnimationComplete}
-      />
-    );
-  }
-
-  // Fallback for old messages or messages with complex markdown
-  // Also call onAnimationComplete immediately if it's a new message but not animated
+  // Llama a onAnimationComplete inmediatamente ya que no hay animación
   React.useEffect(() => {
     if (isNew) {
       onAnimationComplete?.();
@@ -43,5 +32,5 @@ export function TextAnimator({ text, className, isNew, onAnimationComplete, anim
     );
   }
 
-  return <span className={className}>{text}</span>;
+  return <span className={cn("whitespace-pre-wrap", className)}>{text}</span>;
 }
