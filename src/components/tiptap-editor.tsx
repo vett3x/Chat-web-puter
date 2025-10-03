@@ -265,9 +265,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        codeBlock: false, // Disable default codeBlock to use custom one
-        blockquote: false, // Disable default blockquote to use custom one
-        hardBreak: false, // Disable default hardBreak to use custom one
+        codeBlock: false,
+        blockquote: false,
+        hardBreak: false,
         heading: { levels: [1, 2, 3] },
       }),
       Link.configure({
@@ -328,7 +328,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         ),
       },
     },
-  }, [initialContent]);
+  });
 
   return (
     <div className="flex flex-col h-full border border-input rounded-md">

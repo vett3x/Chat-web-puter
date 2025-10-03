@@ -39,7 +39,7 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
   const { resolvedTheme } = useTheme();
   const [note, setNote] = useState<Note | null>(null);
   const [title, setTitle] = useState('');
-  const [content, setContent] = useState<string>(''); // Content will be HTML
+  const [content, setContent] = useState<string | null>(null); // Start as null
   const [isLoading, setIsLoading] = useState(true);
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [showAiHint, setShowAiHint] = useState(false);
@@ -90,7 +90,7 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
   }, [note, onNoteUpdated, saveStatus]);
 
   useEffect(() => {
-    if (isLoading || !note || content === note.content) return;
+    if (isLoading || !note || content === null || content === note.content) return;
     setSaveStatus('idle');
     const handler = setTimeout(() => {
       handleSave(title, content);
@@ -102,7 +102,9 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
     if (isLoading || !note || title === note.title) return;
     setSaveStatus('idle');
     const handler = setTimeout(() => {
-      handleSave(title, content);
+      if (content !== null) {
+        handleSave(title, content);
+      }
     }, 2000);
     return () => clearTimeout(handler);
   }, [title, note, isLoading, content, handleSave]);
@@ -110,6 +112,7 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
   const fetchNote = useCallback(async () => {
     if (!session?.user?.id || !noteId) return;
     setIsLoading(true);
+    setContent(null); // Reset content before fetching
     const { data, error } = await supabase.from('notes').select('id, title, content, updated_at, chat_history').eq('id', noteId).eq('user_id', session.user.id).single();
     if (error) {
       toast.error('No se pudo cargar la nota.');
@@ -152,8 +155,8 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
     refreshNoteContent: fetchNote,
   }));
 
-  if (isLoading || isLoadingApiKeys) {
-    return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /><p className="ml-2 text-muted-foreground">Cargando nota y claves...</p></div>;
+  if (isLoading || isLoadingApiKeys || content === null) {
+    return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /><p className="ml-2 text-muted-foreground">Cargando nota...</p></div>;
   }
   if (!note) {
     return <div className="flex items-center justify-center h-full"><p>Nota no encontrada.</p></div>;
