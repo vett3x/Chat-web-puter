@@ -2,7 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-@import '@mantine/core/styles.css'; /* NEW: Import global Mantine styles */
+@import '@mantine/core/styles.css';
+@import '@mantine/core/styles/ScrollArea.css'; /* NEW: Explicitly import ScrollArea styles */
 
 @layer base {
   :root {
