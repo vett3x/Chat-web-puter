@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from 'motion/react';
-import { useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 
 const buildKeyframes = (from: any, steps: any[]) => {
   const keys = new Set([...Object.keys(from), ...steps.flatMap(s => Object.keys(s))]);
@@ -19,6 +19,8 @@ const BlurText = ({
   className = '',
   animateBy = 'words',
   direction = 'top',
+  threshold = 0.1,
+  rootMargin = '0px',
   animationFrom,
   animationTo,
   easing = (t: any) => t,
@@ -26,6 +28,25 @@ const BlurText = ({
   stepDuration = 0.35
 }: any) => {
   const elements = animateBy === 'words' ? text.split(' ') : text.split('');
+  const [inView, setInView] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!ref.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setInView(true);
+          if (ref.current) {
+            observer.unobserve(ref.current);
+          }
+        }
+      },
+      { threshold, rootMargin }
+    );
+    observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [ref, threshold, rootMargin]);
 
   const defaultFrom = useMemo(
     () =>
@@ -53,7 +74,7 @@ const BlurText = ({
   const times = Array.from({ length: stepCount }, (_, i) => (stepCount === 1 ? 0 : i / (stepCount - 1)));
 
   return (
-    <p className={className} style={{ display: 'flex', flexWrap: 'wrap' }}>
+    <p ref={ref} className={className} style={{ display: 'flex', flexWrap: 'wrap' }}>
       {elements.map((segment: string, index: number) => {
         const animateKeyframes = buildKeyframes(fromSnapshot, toSnapshots);
 
@@ -69,7 +90,7 @@ const BlurText = ({
             className="inline-block will-change-[transform,filter,opacity]"
             key={index}
             initial={fromSnapshot}
-            animate={animateKeyframes}
+            animate={inView ? animateKeyframes : fromSnapshot}
             transition={spanTransition}
             onAnimationComplete={index === elements.length - 1 ? onAnimationComplete : undefined}
           >
