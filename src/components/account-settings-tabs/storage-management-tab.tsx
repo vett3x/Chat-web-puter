@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Trash2, RefreshCw, Image as ImageIcon, File, AlertCircle } from 'lucide-react';
+import { Loader2, Trash2, RefreshCw, Image as ImageIcon, File, AlertCircle, Upload, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -20,6 +20,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useSession } from '../session-context-provider';
+import { supabase } from '@/integrations/supabase/client';
 
 interface StoredFile {
   id: string;
@@ -46,6 +47,8 @@ export function StorageManagementTab() {
   const [files, setFiles] = useState<StoredFile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const fetchFiles = useCallback(async () => {
     setIsLoading(true);
@@ -63,6 +66,60 @@ export function StorageManagementTab() {
   useEffect(() => {
     fetchFiles();
   }, [fetchFiles]);
+
+  const handleFileSelectAndUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!session?.user?.id) {
+      toast.error("No se puede subir el archivo en este momento.");
+      return;
+    }
+
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    const toastId = toast.loading(`Subiendo ${files.length} archivo(s)...`);
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'text/plain', 'text/markdown', 'application/pdf'];
+    const maxSize = 5 * 1024 * 1024; // 5MB
+
+    let filesUploaded = 0;
+
+    for (const file of Array.from(files)) {
+      if (!allowedTypes.includes(file.type)) {
+        toast.error(`El tipo de archivo '${file.type}' no está permitido.`);
+        continue;
+      }
+      if (file.size > maxSize) {
+        toast.error(`El archivo "${file.name}" supera el límite de 5MB.`);
+        continue;
+      }
+
+      const filePath = `${session.user.id}/${Date.now()}-${file.name}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('notes-images')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.error("Error uploading image:", uploadError);
+        toast.error(`Error al subir ${file.name}: ${uploadError.message}`);
+      } else {
+        filesUploaded++;
+      }
+    }
+
+    if (filesUploaded > 0) {
+      toast.success(`${filesUploaded} archivo(s) subido(s) correctamente.`, { id: toastId });
+      fetchFiles(); // Refresh the list
+    } else {
+      toast.dismiss(toastId);
+    }
+
+    if (event.target) {
+      event.target.value = '';
+    }
+    setIsUploading(false);
+  };
 
   const handleDelete = async (filePath: string) => {
     setIsDeleting(filePath);
@@ -90,9 +147,22 @@ export function StorageManagementTab() {
               Visualiza y elimina los archivos subidos en tus notas. Uso total: {formatBytes(totalSize)}.
             </CardDescription>
           </div>
-          <Button variant="ghost" size="icon" onClick={fetchFiles} disabled={isLoading}>
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          </Button>
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelectAndUpload}
+              multiple
+              hidden
+            />
+            <Button size="sm" onClick={() => fileInputRef.current?.click()} disabled={isLoading || isUploading}>
+              {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+              Subir Archivos
+            </Button>
+            <Button variant="ghost" size="icon" onClick={fetchFiles} disabled={isLoading}>
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -128,25 +198,32 @@ export function StorageManagementTab() {
                     <TableCell>{formatBytes(file.metadata.size)}</TableCell>
                     <TableCell>{format(new Date(file.created_at), 'dd/MM/yyyy HH:mm', { locale: es })}</TableCell>
                     <TableCell className="text-right">
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="destructive" size="icon" className="h-8 w-8" disabled={isDeleting === `${session?.user?.id}/${file.name}`}>
-                            {isDeleting === `${session?.user?.id}/${file.name}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                      <div className="flex items-center justify-end gap-2">
+                        <a href={file.publicUrl} download={file.name} target="_blank" rel="noopener noreferrer">
+                          <Button variant="outline" size="icon" className="h-8 w-8">
+                            <Download className="h-4 w-4" />
                           </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta acción eliminará permanentemente el archivo "{file.name}".
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDelete(`${session?.user?.id}/${file.name}`)} className="bg-destructive">Eliminar</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                        </a>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="icon" className="h-8 w-8" disabled={isDeleting === `${session?.user?.id}/${file.name}`}>
+                              {isDeleting === `${session?.user?.id}/${file.name}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta acción eliminará permanentemente el archivo "{file.name}".
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDelete(`${session?.user?.id}/${file.name}`)} className="bg-destructive">Eliminar</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
