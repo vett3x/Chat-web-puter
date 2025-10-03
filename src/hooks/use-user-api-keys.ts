@@ -44,6 +44,7 @@ export function useUserApiKeys() {
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [groups, setGroups] = useState<AiKeyGroup[]>([]); // NEW: State for groups
   const [isLoading, setIsLoading] = useState(true);
+  const isInitialFetch = useRef(true); // Track initial fetch
 
   const fetchKeysAndGroups = useCallback(async () => { // Renamed fetchKeys to fetchKeysAndGroups
     if (!userId) {
@@ -79,9 +80,12 @@ export function useUserApiKeys() {
       });
 
     } catch (error: any) {
-      toast.error(`Error al refrescar las claves de API: ${error.message}`);
+      if (!isInitialFetch.current) {
+        toast.error(`Error al refrescar las claves de API: ${error.message}`);
+      }
     } finally {
       setIsLoading(false);
+      isInitialFetch.current = false;
     }
   }, [userId]);
 

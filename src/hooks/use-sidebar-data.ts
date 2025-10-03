@@ -46,6 +46,7 @@ export function useSidebarData() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const isInitialFetch = useRef(true); // Track initial fetch
 
   const fetchData = useCallback(async () => {
     if (!userId) {
@@ -79,9 +80,12 @@ export function useSidebarData() {
 
     } catch (error: any) {
       console.error("Error fetching sidebar data:", error);
-      toast.error("Error al cargar los datos de la barra lateral.");
+      if (!isInitialFetch.current) {
+        toast.error("Error al cargar los datos de la barra lateral.");
+      }
     } finally {
       setIsLoading(false);
+      isInitialFetch.current = false;
     }
   }, [userId]);
 

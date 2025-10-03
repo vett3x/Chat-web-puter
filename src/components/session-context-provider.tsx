@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/integrations/supabase/client';
 import { Session } from '@supabase/supabase-js';
@@ -37,6 +37,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
   const [userStatus, setUserStatus] = useState<UserStatus | null>(null);
   const router = useRouter();
   const pathname = usePathname();
+  const isInitialProfileFetch = useRef(true); // Track initial fetch
 
   const isUserTemporarilyDisabled = userStatus === 'banned' || userStatus === 'kicked';
 
@@ -53,6 +54,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
       setUserAvatarUrl(null);
       setUserLanguage('es');
       setUserStatus(null);
+      isInitialProfileFetch.current = false;
       return;
     }
 
@@ -88,6 +90,9 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
 
         if (error) {
           console.error('[SessionContext] Error fetching user profile:', error);
+          if (!isInitialProfileFetch.current) {
+            toast.error('Error al cargar el perfil del usuario.');
+          }
           determinedRole = 'user'; // Fallback to 'user'
         } else if (profile) {
           determinedRole = profile.role as UserRole;
@@ -118,7 +123,12 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
 
     } catch (fetchError: any) {
       console.error('[SessionContext] Critical error during profile fetch:', fetchError);
+      if (!isInitialProfileFetch.current) {
+        toast.error('Error al cargar el perfil del usuario.');
+      }
       setUserRole(SUPERUSER_EMAILS.includes(currentSession.user.email || '') ? 'super_admin' : 'user');
+    } finally {
+      isInitialProfileFetch.current = false;
     }
   }, []);
 
