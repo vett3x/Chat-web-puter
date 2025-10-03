@@ -28,7 +28,9 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const path = searchParams.get('path') || '';
 
-    const { data, error } = await supabaseAdmin.storage.from('notes-images').list(`${userId}/${path}`, {
+    const listPath = path ? `${userId}/${path}` : userId;
+
+    const { data, error } = await supabaseAdmin.storage.from('notes-images').list(listPath, {
       limit: 1000,
       sortBy: { column: 'name', order: 'asc' },
     });
@@ -39,7 +41,7 @@ export async function GET(req: NextRequest) {
       .filter(item => item.name !== '.placeholder') // Filter out placeholder files
       .map(item => {
         const isFolder = !item.id; // In Supabase list, folders don't have an ID
-        const fullPath = `${userId}/${path ? `${path}/` : ''}${item.name}`;
+        const fullPath = `${listPath}/${item.name}`;
         const { data: { publicUrl } } = supabaseAdmin.storage.from('notes-images').getPublicUrl(fullPath);
         return { ...item, publicUrl, type: isFolder ? 'folder' : 'file', path: fullPath };
       });

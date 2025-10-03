@@ -169,7 +169,7 @@ export function StorageManagementDialog({ open, onOpenChange }: StorageManagemen
           <div className="flex justify-between items-center mb-2 gap-2">
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <Button variant="link" className="p-0 h-auto" onClick={() => setCurrentPath('')}>Raíz</Button>
-              {currentPath.split('/').map((part, index) => (
+              {currentPath.split('/').filter(Boolean).map((part, index) => (
                 <React.Fragment key={index}>
                   <ChevronRight className="h-4 w-4" />
                   <Button variant="link" className="p-0 h-auto" onClick={() => handleBreadcrumbClick(index)}>{part}</Button>
@@ -205,7 +205,7 @@ export function StorageManagementDialog({ open, onOpenChange }: StorageManagemen
                         </TableCell>
                         <TableCell className="font-medium break-all">{item.name}</TableCell>
                         <TableCell>{item.type === 'file' ? formatBytes(item.metadata?.size || 0) : '--'}</TableCell>
-                        <TableCell>{format(new Date(item.created_at), 'dd/MM/yyyy HH:mm', { locale: es })}</TableCell>
+                        <TableCell>{item.type === 'file' && item.created_at ? format(new Date(item.created_at), 'dd/MM/yyyy HH:mm', { locale: es }) : '--'}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
                             {item.type === 'file' && <a href={item.publicUrl} download={item.name} target="_blank" rel="noopener noreferrer"><Button variant="outline" size="icon" className="h-8 w-8"><Download className="h-4 w-4" /></Button></a>}
