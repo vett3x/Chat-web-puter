@@ -110,8 +110,7 @@ export function AccountSettingsDialog({
     aiKeyGroups.forEach(group => {
       const activeKeysCount = group.api_keys?.filter(k => k.status === 'active').length || 0;
       if (activeKeysCount > 0) {
-        let label = `Grupo: ${group.name} (${activeKeysCount} activas)`;
-        if (group.is_global) label += ' (Global)';
+        let label = group.name; // Simplified label
         models.push({ value: `group:${group.id}`, label, isGlobal: group.is_global });
       }
     });
@@ -123,15 +122,14 @@ export function AccountSettingsDialog({
         label = key.nickname;
       } else {
         const providerName = AI_PROVIDERS.find(p => p.value === key.provider)?.company || key.provider;
-        const modelLabel = key.model_name ? getModelLabel(key.model_name, userApiKeys, aiKeyGroups) : 'Modelo no seleccionado';
+        const modelInfo = AI_PROVIDERS.flatMap(p => p.models).find(m => m.value === key.model_name);
+        const modelLabel = modelInfo ? modelInfo.label : key.model_name;
+        
         if (key.use_vertex_ai) {
           label = `${providerName} (Vertex AI): ${modelLabel}`;
         } else {
           label = `${providerName}: ${modelLabel}`;
         }
-      }
-      if (key.is_global) {
-        label += ' (Global)';
       }
       models.push({ value: `user_key:${key.id}`, label, isGlobal: key.is_global });
     });
@@ -272,7 +270,16 @@ export function AccountSettingsDialog({
             <h3 className="text-lg font-semibold flex items-center gap-2 mb-3 text-destructive"><Trash2 className="h-5 w-5" /> Eliminar Cuenta</h3>
             <p className="text-sm text-muted-foreground mb-4">Esta acción es irreversible. Todos tus datos de usuario y conversaciones serán eliminados permanentemente.</p>
             <AlertDialog>
-              <AlertDialogTrigger asChild><Button variant="destructive" disabled={isDeletingAccount}>{isDeletingAccount ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />} Eliminar mi cuenta</Button></AlertDialogTrigger>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="destructive"
+                  disabled={isDeletingAccount || currentUserRole === 'super_admin'}
+                  title={currentUserRole === 'super_admin' ? 'La cuenta de Super Admin no se puede eliminar desde la interfaz.' : ''}
+                >
+                  {isDeletingAccount ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                  Eliminar mi cuenta
+                </Button>
+              </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader><AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. Esto eliminará permanentemente tu cuenta y todos tus datos.</AlertDialogDescription></AlertDialogHeader>
                 <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Sí, eliminar mi cuenta</AlertDialogAction></AlertDialogFooter>
