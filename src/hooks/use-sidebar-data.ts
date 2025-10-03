@@ -101,35 +101,69 @@ export function useSidebarData() {
     if (!userId) return;
 
     const handleInserts = <T extends { id: string }>(payload: any, setter: React.Dispatch<React.SetStateAction<T[]>>) => {
-      setter(prev => [payload.new as T, ...prev]);
+      setter(prev => {
+        // Prevent adding a duplicate if it already exists (e.g., from local optimistic update)
+        if (prev.some(item => item.id === payload.new.id)) {
+          return prev;
+        }
+        return [payload.new as T, ...prev];
+      });
     };
     const handleUpdates = <T extends { id: string }>(payload: any, setter: React.Dispatch<React.SetStateAction<T[]>>) => {
       setter(prev => prev.map(item => item.id === payload.new.id ? { ...item, ...payload.new } : item));
     };
     const handleDeletes = <T extends { id: string }>(payload: any, setter: React.Dispatch<React.SetStateAction<T[]>>) => {
-      setter(prev => prev.filter(item => item.id !== payload.old.id));
+      const oldId = payload.old?.id;
+      if (oldId) {
+        setter(prev => prev.filter(item => item.id !== oldId));
+      } else {
+        // Fallback to a full refresh if we can't identify the deleted item
+        fetchData();
+      }
     };
 
-    const channels = [
+    const channel = supabase.channel(`sidebar-updates-for-user-${userId}`);
+
+    const tablesToSubscribe = [
       { table: 'user_apps', setter: setApps },
       { table: 'conversations', setter: setConversations },
       { table: 'folders', setter: setFolders },
       { table: 'notes', setter: setNotes },
     ];
 
-    const subscriptions = channels.map(({ table, setter }) => {
-      return supabase
-        .channel(`public:${table}:user_id=eq.${userId}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table, filter: `user_id=eq.${userId}` }, (payload) => handleInserts(payload, setter as any))
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table, filter: `user_id=eq.${userId}` }, (payload) => handleUpdates(payload, setter as any))
-        .on('postgres_changes', { event: 'DELETE', schema: 'public', table, filter: `user_id=eq.${userId}` }, (payload) => handleDeletes(payload, setter as any))
-        .subscribe();
+    tablesToSubscribe.forEach(({ table, setter }) => {
+      channel
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table, filter: `user_id=eq.${userId}` },
+          (payload) => handleInserts(payload, setter as any)
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table, filter: `user_id=eq.${userId}` },
+          (payload) => handleUpdates(payload, setter as any)
+        )
+        .on(
+          'postgres_changes',
+          { event: 'DELETE', schema: 'public', table, filter: `user_id=eq.${userId}` },
+          (payload) => handleDeletes(payload, setter as any)
+        );
+    });
+
+    channel.subscribe((status, err) => {
+      if (status === 'SUBSCRIBED') {
+        console.log('Subscribed to sidebar updates channel!');
+      }
+      if (status === 'CHANNEL_ERROR') {
+        console.error('Sidebar updates channel error:', err);
+        toast.error('Error de conexión en tiempo real. La barra lateral puede no actualizarse.');
+      }
     });
 
     return () => {
-      subscriptions.forEach(sub => supabase.removeChannel(sub));
+      supabase.removeChannel(channel);
     };
-  }, [userId]);
+  }, [userId, fetchData]);
 
   const createConversation = async (onSuccess: (newConversation: Conversation) => void): Promise<string | null> => {
     if (!userId) {
@@ -142,6 +176,7 @@ export function useSidebarData() {
       throw new Error(error.message);
     }
     toast.success('Nueva conversación creada.');
+    setConversations(prev => [data, ...prev]);
     onSuccess(data);
     return data.id;
   };
@@ -158,6 +193,7 @@ export function useSidebarData() {
       throw new Error(error.message);
     }
     toast.success(`${newFolderName} creada.`);
+    setFolders(prev => [data, ...prev]);
     return data.id;
   };
 
@@ -172,6 +208,7 @@ export function useSidebarData() {
       throw new Error(error.message);
     }
     toast.success('Nueva nota creada.');
+    setNotes(prev => [data, ...prev]);
     onSuccess(data);
     return data.id;
   };

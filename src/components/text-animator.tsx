@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import BlurText from './blur-text';
 
 interface TextAnimatorProps {
   text: string;
@@ -12,17 +13,35 @@ interface TextAnimatorProps {
   animationSpeed: 'slow' | 'normal' | 'fast';
 }
 
-export function TextAnimator({ text, className, isNew, onAnimationComplete }: TextAnimatorProps) {
+export function TextAnimator({ text, className, isNew, onAnimationComplete, animationSpeed }: TextAnimatorProps) {
+  const containsMarkdown = /(^#{1,6}\s)|(^\s*[\*\-]\s)|(\*\*|__)|(`[^`]+`)|(\[.*\]\(.*\))|(\n.*\n)/m.test(text);
+
+  if (isNew && !containsMarkdown) {
+    const delayMap = {
+      slow: 150,
+      normal: 100,
+      fast: 50,
+    };
+    const delay = delayMap[animationSpeed] || 100;
+
+    return (
+      <BlurText
+        text={text}
+        delay={delay}
+        animateBy="words"
+        direction="top"
+        onAnimationComplete={onAnimationComplete}
+        className={className}
+      />
+    );
+  }
+
+  // Fallback for old messages or messages with complex markdown
   useEffect(() => {
     if (isNew) {
       onAnimationComplete?.();
     }
   }, [isNew, onAnimationComplete]);
-
-  // Heurística para detectar si el texto contiene elementos de Markdown que necesitan estilo.
-  // Esto evita aplicar estilos de 'prose' a texto simple de una sola línea.
-  // Busca: Títulos (###), listas (* o -), negrita/cursiva (** o __), código en línea (`), enlaces, o múltiples saltos de línea.
-  const containsMarkdown = /(^#{1,6}\s)|(^\s*[\*\-]\s)|(\*\*|__)|(`[^`]+`)|(\[.*\]\(.*\))|(\n.*\n)/m.test(text);
 
   if (containsMarkdown) {
     return (
