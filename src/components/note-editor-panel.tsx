@@ -172,6 +172,7 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
       </div>
       <div className="flex-1 overflow-y-auto">
         <TipTapEditor
+          key={noteId}
           initialContent={content}
           onChange={setContent}
           isEditable={true}
