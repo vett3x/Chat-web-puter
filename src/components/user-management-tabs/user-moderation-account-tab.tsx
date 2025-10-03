@@ -218,7 +218,17 @@ function UserPermissionsSection({ userId, targetUserRole, currentUserRole, onPer
 
 function UserQuotasSection({ userId, userName, currentUserRole, targetUserRole, onQuotasUpdated }: any) {
   const [isSaving, setIsSaving] = useState(false);
-  const form = useForm({ resolver: zodResolver(quotasSchema) });
+  const form = useForm<z.infer<typeof quotasSchema>>({
+    resolver: zodResolver(quotasSchema),
+    defaultValues: {
+      max_servers: 0,
+      max_containers: 0,
+      max_tunnels: 0,
+      cpu_limit: 0.1,
+      memory_limit_mb: 128,
+      storage_limit_mb: 0,
+    },
+  });
 
   const canEdit = currentUserRole === 'super_admin' && targetUserRole !== 'super_admin';
 
