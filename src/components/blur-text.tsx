@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { useEffect, useRef, useState, useMemo } from 'react';
 
 const buildKeyframes = (from: any, steps: any[]) => {
@@ -23,26 +23,13 @@ const BlurText = ({
   rootMargin = '0px',
   animationFrom,
   animationTo,
-  easing = (t: number) => t,
+  easing = (t: any) => t,
   onAnimationComplete,
   stepDuration = 0.35
-}: {
-  text?: string;
-  delay?: number;
-  className?: string;
-  animateBy?: 'words' | 'chars';
-  direction?: 'top' | 'bottom';
-  threshold?: number;
-  rootMargin?: string;
-  animationFrom?: any;
-  animationTo?: any[];
-  easing?: (t: number) => number;
-  onAnimationComplete?: () => void;
-  stepDuration?: number;
-}) => {
+}: any) => {
   const elements = animateBy === 'words' ? text.split(' ') : text.split('');
   const [inView, setInView] = useState(false);
-  const ref = useRef<HTMLParagraphElement>(null);
+  const ref = useRef(null);
 
   useEffect(() => {
     if (!ref.current) return;
@@ -57,7 +44,9 @@ const BlurText = ({
       },
       { threshold, rootMargin }
     );
-    observer.observe(ref.current);
+    if (ref.current) {
+      observer.observe(ref.current);
+    }
     return () => observer.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threshold, rootMargin]);
@@ -88,8 +77,8 @@ const BlurText = ({
   const times = Array.from({ length: stepCount }, (_, i) => (stepCount === 1 ? 0 : i / (stepCount - 1)));
 
   return (
-    <p ref={ref} className={`blur-text ${className} flex flex-wrap`}>
-      {elements.map((segment, index) => {
+    <p ref={ref} className={className} style={{ display: 'flex', flexWrap: 'wrap' }}>
+      {elements.map((segment: string, index: number) => {
         const animateKeyframes = buildKeyframes(fromSnapshot, toSnapshots);
 
         const spanTransition: any = {

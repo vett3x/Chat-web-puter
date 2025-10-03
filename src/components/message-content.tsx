@@ -26,7 +26,6 @@ interface MessageContentProps {
   isCorrectionPlan?: boolean; // NEW: Prop para indicar si el contenido es un plan de corrección
   correctionApproved?: boolean; // NEW: Prop para indicar si el plan de corrección ha sido aprobado
   isLoading: boolean; // NEW: Prop to pass loading state down
-  disableAnimation?: boolean;
 }
 
 export function MessageContent({ 
@@ -45,7 +44,6 @@ export function MessageContent({
   isCorrectionPlan, // NEW: Destructure new prop
   correctionApproved, // NEW: Destructure new prop
   isLoading, // NEW: Destructure new prop
-  disableAnimation,
 }: MessageContentProps) {
   const [animatedPartsCount, setAnimatedPartsCount] = useState(0);
 
@@ -60,7 +58,6 @@ export function MessageContent({
           isNew={isAnimating}
           onAnimationComplete={onComplete}
           animationSpeed={aiResponseSpeed}
-          disableAnimation={disableAnimation}
         />
       );
     } else if (part.type === 'image_url') {

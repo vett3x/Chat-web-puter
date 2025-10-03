@@ -16,8 +16,7 @@ import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView, darkDefaultTheme, type Theme } from "@blocknote/mantine";
 import { type Block, type BlockNoteEditor } from "@blocknote/core";
 import * as locales from "@blocknote/core/locales"; // Import all locales
-import "@blocknote/core/style.css";
-import "@blocknote/react/style.css"; // NEW: Import React component styles
+import "@blocknote/mantine/style.css";
 import { useTheme } from 'next-themes';
 
 // Create a custom dark theme that uses the app's CSS variables

@@ -1,10 +1,9 @@
 "use client";
 
-import React from 'react';
+import { useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { cn } from '@/lib/utils';
-import BlurText from './ui/BlurText';
+import BlurText from './blur-text';
 
 interface TextAnimatorProps {
   text: string;
@@ -12,23 +11,23 @@ interface TextAnimatorProps {
   isNew?: boolean;
   onAnimationComplete?: () => void;
   animationSpeed: 'slow' | 'normal' | 'fast';
-  disableAnimation?: boolean;
 }
 
-export function TextAnimator({ text, className, isNew, onAnimationComplete, animationSpeed, disableAnimation }: TextAnimatorProps) {
+export function TextAnimator({ text, className, isNew, onAnimationComplete, animationSpeed }: TextAnimatorProps) {
   const containsMarkdown = /(^#{1,6}\s)|(^\s*[\*\-]\s)|(\*\*|__)|(`[^`]+`)|(\[.*\]\(.*\))|(\n.*\n)/m.test(text);
 
-  const delayMap = {
-    slow: 200,
-    normal: 150,
-    fast: 100,
-  };
+  if (isNew && !containsMarkdown) {
+    const delayMap = {
+      slow: 150,
+      normal: 100,
+      fast: 50,
+    };
+    const delay = delayMap[animationSpeed] || 100;
 
-  if (isNew && !containsMarkdown && !disableAnimation) {
     return (
       <BlurText
         text={text}
-        delay={delayMap[animationSpeed]}
+        delay={delay}
         animateBy="words"
         direction="top"
         onAnimationComplete={onAnimationComplete}
@@ -38,8 +37,7 @@ export function TextAnimator({ text, className, isNew, onAnimationComplete, anim
   }
 
   // Fallback for old messages or messages with complex markdown
-  // Also call onAnimationComplete immediately if it's a new message but not animated
-  React.useEffect(() => {
+  useEffect(() => {
     if (isNew) {
       onAnimationComplete?.();
     }
@@ -53,5 +51,5 @@ export function TextAnimator({ text, className, isNew, onAnimationComplete, anim
     );
   }
 
-  return <span className={cn("whitespace-pre-wrap", className)}>{text}</span>;
+  return <span className={className}>{text}</span>;
 }
