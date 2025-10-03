@@ -4,6 +4,7 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
+import { TextGenerateEffect } from './ui/text-generate-effect';
 
 interface TextAnimatorProps {
   text: string;
@@ -14,10 +15,21 @@ interface TextAnimatorProps {
   disableAnimation?: boolean;
 }
 
-export function TextAnimator({ text, className, isNew, onAnimationComplete }: TextAnimatorProps) {
+export function TextAnimator({ text, className, isNew, onAnimationComplete, animationSpeed, disableAnimation }: TextAnimatorProps) {
   const containsMarkdown = /(^#{1,6}\s)|(^\s*[\*\-]\s)|(\*\*|__)|(`[^`]+`)|(\[.*\]\(.*\))|(\n.*\n)/m.test(text);
 
-  // Llama a onAnimationComplete inmediatamente ya que no hay animación
+  if (isNew && !containsMarkdown && !disableAnimation) {
+    return (
+      <TextGenerateEffect
+        words={text}
+        className={className}
+        onAnimationComplete={onAnimationComplete}
+      />
+    );
+  }
+
+  // Fallback for old messages or messages with complex markdown
+  // Also call onAnimationComplete immediately if it's a new message but not animated
   React.useEffect(() => {
     if (isNew) {
       onAnimationComplete?.();
