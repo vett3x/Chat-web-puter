@@ -2,13 +2,12 @@ import { createClient } from '@supabase/supabase-js';
 import { executeSshCommand } from '@/lib/ssh-utils';
 import { provisionApp } from '@/lib/app-provisioning';
 
-const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-
 /**
  * Se asegura de que los servicios clave (Next.js dev server, cloudflared) estén corriendo dentro del contenedor.
  * Si no lo están, los reinicia.
  */
 async function ensureServicesAreRunning(server: any, app: any) {
+  const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   if (!app.container_id) return;
 
   // 1. Health Check: See if the npm run dev process is running.
@@ -73,6 +72,7 @@ async function ensureServicesAreRunning(server: any, app: any) {
 }
 
 export async function getAppAndServerWithStateCheck(appId: string, userId: string) {
+    const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
     const { data: app, error: appError } = await supabaseAdmin
         .from('user_apps')
         .update({ last_activity_at: new Date().toISOString() })
@@ -129,6 +129,7 @@ async function restoreAppFromArchive(
   mainPurpose: string, // NEW: Accept mainPurpose
   keyFeatures?: string // NEW: Accept keyFeatures
 ) {
+    const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
     await provisionApp({ 
       appId, 
       userId, 

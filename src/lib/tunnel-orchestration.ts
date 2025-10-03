@@ -13,13 +13,6 @@ import {
 } from '@/lib/cloudflare-utils';
 import { executeSshCommand } from './ssh-utils'; // Import SSH utilities
 
-// Initialize Supabase client with the service role key
-// This allows us to bypass RLS and update the server status from the backend.
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 interface ServerDetails {
   ip_address: string;
   ssh_port: number;
@@ -56,6 +49,10 @@ export async function createAndProvisionCloudflareTunnel({
   serverDetails: ServerDetails;
   cloudflareDomainDetails: CloudflareDomainDetails;
 }) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
   let tunnelId: string | undefined;
   let dnsRecordId: string | undefined;
   let newTunnelRecordId: string | undefined;
@@ -224,6 +221,10 @@ export async function deleteCloudflareTunnelAndCleanup({
   serverDetails: ServerDetails;
   cloudflareDomainDetails: CloudflareDomainDetails;
 }) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
   try {
     await supabaseAdmin.rpc('append_to_provisioning_log', { server_id: serverId, log_content: `[Tunnel Deletion] Fetching tunnel details from DB for record ${tunnelRecordId}...\n` });
     const { data: tunnel, error: tunnelError } = await supabaseAdmin

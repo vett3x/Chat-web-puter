@@ -10,8 +10,6 @@ import os from 'os';
 import * as tar from 'tar';
 import crypto from 'crypto';
 
-const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-
 async function getUserId() {
   const cookieStore = cookies() as any;
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { cookies: { get: (name: string) => cookieStore.get(name)?.value } });
@@ -24,6 +22,8 @@ export async function GET(req: NextRequest, context: any) {
   const appId = context.params.id;
   const tempDir = path.join(os.tmpdir(), `dyad-download-${crypto.randomBytes(16).toString('hex')}`);
   const archivePath = `${tempDir}.tar.gz`;
+
+  const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
   try {
     const userId = await getUserId();

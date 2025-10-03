@@ -5,7 +5,6 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 
-const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 const MAX_VERSIONS_TO_SHOW = 20;
 
 async function getUserId() {
@@ -20,6 +19,8 @@ export async function GET(req: NextRequest, context: any) {
   const appId = context.params.id;
   const { searchParams } = new URL(req.url);
   const timestamp = searchParams.get('timestamp'); // Optional timestamp for fetching specific version files
+
+  const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
   try {
     const userId = await getUserId();

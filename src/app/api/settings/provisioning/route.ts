@@ -23,13 +23,13 @@ async function getIsSuperAdmin(): Promise<boolean> {
   return profile?.role === 'super_admin';
 }
 
-const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-
 export async function GET(req: NextRequest) {
   const isSuperAdmin = await getIsSuperAdmin();
   if (!isSuperAdmin) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
   }
+
+  const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
   try {
     const { data, error } = await supabaseAdmin
@@ -49,6 +49,8 @@ export async function PUT(req: NextRequest) {
   if (!isSuperAdmin) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
   }
+
+  const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
   try {
     const body = await req.json();

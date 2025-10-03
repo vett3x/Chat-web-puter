@@ -3,20 +3,16 @@ import { randomBytes } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import { executeSshCommand, writeRemoteFile } from './ssh-utils'; // Import SSH utilities
 
-// Initialize Supabase client with the service role key for logging
-const supabaseAdmin = process.env.SUPABASE_SERVICE_ROLE_KEY
-  ? createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  : null;
-
 // Helper para registrar eventos en la base de datos
 async function logApiCall(userId: string | undefined, eventType: string, description: string) {
-  if (!supabaseAdmin || !userId) {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !userId) {
     console.log(`[API Log - User: ${userId || 'N/A'}] ${eventType}: ${description}`);
     return;
   }
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
   try {
     await supabaseAdmin.from('server_events_log').insert({
       user_id: userId,
