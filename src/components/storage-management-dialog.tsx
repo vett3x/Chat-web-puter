@@ -197,7 +197,7 @@ export function StorageManagementDialog({ open, onOpenChange }: StorageManagemen
                   <TableHeader><TableRow><TableHead className="w-[80px]">Tipo</TableHead><TableHead>Nombre</TableHead><TableHead>Tamaño</TableHead><TableHead>Fecha de Subida</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
                   <TableBody>
                     {items.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground h-24">Esta carpeta está vacía.</TableCell></TableRow> : items.map(item => (
-                      <TableRow key={item.path} onDoubleClick={() => item.type === 'folder' && handleNavigate(item.name)} className={item.type === 'folder' ? 'cursor-pointer' : ''}>
+                      <TableRow key={item.path} onClick={() => item.type === 'folder' && handleNavigate(item.name)} className={item.type === 'folder' ? 'cursor-pointer' : ''}>
                         <TableCell>
                           <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md">
                             {item.type === 'folder' ? <Folder className="h-6 w-6 text-yellow-500" /> : (item.metadata?.mimetype.startsWith('image/') ? <img src={item.publicUrl} alt={item.name} className="h-full w-full object-cover rounded-md" /> : <File className="h-6 w-6 text-muted-foreground" />)}
