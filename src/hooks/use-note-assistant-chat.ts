@@ -97,7 +97,7 @@ const determineDefaultModel = (userApiKeys: ApiKey[], aiKeyGroups: AiKeyGroup[])
 
 interface UseNoteAssistantChatProps {
   noteTitle: string;
-  noteContent: string;
+  noteContent: string; // This is now HTML content
   initialChatHistory: ChatMessage[] | null;
   onSaveHistory: (history: ChatMessage[]) => void;
   userApiKeys: ApiKey[];
@@ -228,10 +228,10 @@ export function useNoteAssistantChat({
     }]);
 
     try {
-      const systemPromptContent = `Eres un asistente de notas. Tu tarea es responder preguntas sobre la nota proporcionada. Sé conciso y directo.
+      const systemPromptContent = `Eres un asistente de notas. Tu tarea es responder preguntas sobre la nota proporcionada. La nota está en formato HTML. Sé conciso y directo.
 ---
 Título: ${noteTitle}
-Contenido:
+Contenido (HTML):
 ${noteContent}
 ---`;
 

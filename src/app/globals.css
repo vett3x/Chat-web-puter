@@ -199,4 +199,112 @@
     animation: lightsaber-on 0.3s ease-out forwards, lightsaber-pulse 2s ease-in-out infinite alternate;
     animation-delay: 0s, 0.3s; /* Start pulsing after the 'on' animation finishes */
   }
+
+  /* TipTap Editor Styles */
+  .tiptap {
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .tiptap .ProseMirror {
+    flex-grow: 1;
+    padding: 1rem;
+    outline: none;
+    line-height: 1.6;
+  }
+
+  .tiptap .ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    color: hsl(var(--muted-foreground));
+    pointer-events: none;
+    height: 0;
+  }
+
+  .tiptap .ProseMirror h1,
+  .tiptap .ProseMirror h2,
+  .tiptap .ProseMirror h3,
+  .tiptap .ProseMirror h4,
+  .tiptap .ProseMirror h5,
+  .tiptap .ProseMirror h6 {
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    line-height: 1.2;
+  }
+
+  .tiptap .ProseMirror h1 {
+    font-size: 2.25rem; /* text-4xl */
+    font-weight: 700; /* font-bold */
+  }
+
+  .tiptap .ProseMirror h2 {
+    font-size: 1.875rem; /* text-3xl */
+    font-weight: 600; /* font-semibold */
+  }
+
+  .tiptap .ProseMirror h3 {
+    font-size: 1.5rem; /* text-2xl */
+    font-weight: 500; /* font-medium */
+  }
+
+  .tiptap .ProseMirror ul,
+  .tiptap .ProseMirror ol {
+    padding-left: 1.5rem;
+  }
+
+  .tiptap .ProseMirror ul li {
+    list-style-type: disc;
+  }
+
+  .tiptap .ProseMirror ol li {
+    list-style-type: decimal;
+  }
+
+  .tiptap .ProseMirror blockquote {
+    border-left: 4px solid hsl(var(--border));
+    padding-left: 1rem;
+    margin-left: 0;
+    font-style: italic;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .tiptap .ProseMirror code {
+    background-color: hsl(var(--muted));
+    padding: 0.2em 0.4em;
+    border-radius: 0.25rem;
+    font-family: 'var(--font-geist-mono)', monospace;
+    font-size: 0.875em;
+  }
+
+  .tiptap .ProseMirror pre {
+    background: hsl(var(--secondary));
+    color: hsl(var(--secondary-foreground));
+    font-family: 'var(--font-geist-mono)', monospace;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+  }
+
+  .tiptap .ProseMirror img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .tiptap .ProseMirror a {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+  }
+
+  .tiptap .ProseMirror hr {
+    border: none;
+    border-top: 1px solid hsl(var(--border));
+    margin: 1rem 0;
+  }
+
+  .tiptap .ProseMirror .ProseMirror-selectednode {
+    outline: 2px solid hsl(var(--ring));
+  }
 }
