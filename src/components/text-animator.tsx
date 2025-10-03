@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { BlurText } from './blur-text'; // Import the new CSS-based animation component
+import BlurText from './blur-text';
 
 interface TextAnimatorProps {
   text: string;
@@ -17,22 +17,31 @@ export function TextAnimator({ text, className, isNew, onAnimationComplete, anim
   const containsMarkdown = /(^#{1,6}\s)|(^\s*[\*\-]\s)|(\*\*|__)|(`[^`]+`)|(\[.*\]\(.*\))|(\n.*\n)/m.test(text);
 
   if (isNew && !containsMarkdown) {
+    const delayMap = {
+      slow: 150,
+      normal: 100,
+      fast: 50,
+    };
+    const delay = delayMap[animationSpeed] || 100;
+
     return (
       <BlurText
         text={text}
-        className={className}
-        isNew={isNew}
+        delay={delay}
+        animateBy="words"
+        direction="top"
         onAnimationComplete={onAnimationComplete}
+        className={className}
       />
     );
   }
 
-  // For existing messages or markdown content, render immediately without animation.
+  // Fallback for old messages or messages with complex markdown
   useEffect(() => {
-    if (isNew && containsMarkdown) {
+    if (isNew) {
       onAnimationComplete?.();
     }
-  }, [isNew, containsMarkdown, onAnimationComplete]);
+  }, [isNew, onAnimationComplete]);
 
   if (containsMarkdown) {
     return (
