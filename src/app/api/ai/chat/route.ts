@@ -179,7 +179,7 @@ export async function POST(req: NextRequest) {
     // Check if selectedKeyId is a group ID
     const { data: group, error: groupError } = await supabase
       .from('ai_key_groups')
-      .select('*, api_keys(*)')
+      .select('*, user_api_keys(*)')
       .eq('id', selectedKeyId)
       .single();
 
@@ -191,7 +191,7 @@ export async function POST(req: NextRequest) {
     if (group) {
       selectedKeyIsGroup = true;
       // Filter for active keys within the group
-      keysToTry = group.api_keys.filter((key: any) => key.status === 'active');
+      keysToTry = group.user_api_keys.filter((key: any) => key.status === 'active');
       if (keysToTry.length === 0) {
         throw new Error(`No hay claves activas en el grupo '${group.name}'.`);
       }
