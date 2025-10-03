@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSession } from './session-context-provider';
-import { HardDrive, Loader2 } from 'lucide-react';
+import { HardDrive, Loader2, FolderOpen } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import {
   Tooltip,
@@ -11,6 +11,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { toast } from 'sonner';
+import { Button } from './ui/button';
 
 function formatBytes(bytes: number, decimals = 2) {
   if (bytes === 0) return '0 Bytes';
@@ -21,13 +22,17 @@ function formatBytes(bytes: number, decimals = 2) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
-export function StorageUsageIndicator() {
+interface StorageUsageIndicatorProps {
+  onOpenStorageManagement: () => void;
+}
+
+export function StorageUsageIndicator({ onOpenStorageManagement }: StorageUsageIndicatorProps) {
   const { session } = useSession();
   const [usage, setUsage] = useState({ usage_bytes: 0, limit_mb: 100 });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    let isMounted = true; // Flag to prevent state updates on unmounted component
+    let isMounted = true;
 
     if (!session?.user?.id) {
       if (isMounted) setIsLoading(false);
@@ -38,7 +43,6 @@ export function StorageUsageIndicator() {
       try {
         const response = await fetch(`/api/users/${session.user.id}/storage`);
         if (!response.ok) {
-          // Only show toast on the initial fetch, not on subsequent polls
           if (isInitialFetch && isMounted) {
             toast.error('No se pudo cargar el uso de almacenamiento.');
           }
@@ -67,8 +71,8 @@ export function StorageUsageIndicator() {
       }
     };
 
-    fetchUsage(true); // Initial fetch
-    const interval = setInterval(() => fetchUsage(false), 30000); // Subsequent polls
+    fetchUsage(true);
+    const interval = setInterval(() => fetchUsage(false), 30000);
 
     return () => {
       isMounted = false;
@@ -89,24 +93,30 @@ export function StorageUsageIndicator() {
   const percentage = usage.limit_mb > 0 ? (usageMb / usage.limit_mb) * 100 : 0;
 
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="px-4 py-2 space-y-1.5">
-            <div className="flex justify-between items-center text-xs text-sidebar-foreground/80">
-              <span className="flex items-center gap-1.5 font-medium">
-                <HardDrive className="h-3.5 w-3.5" />
-                Almacenamiento
-              </span>
-              <span>{percentage.toFixed(1)}%</span>
+    <div className="px-4 py-2 space-y-2">
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center text-xs text-sidebar-foreground/80">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <HardDrive className="h-3.5 w-3.5" />
+                  Almacenamiento
+                </span>
+                <span>{percentage.toFixed(1)}%</span>
+              </div>
+              <Progress value={percentage} className="h-1.5" />
             </div>
-            <Progress value={percentage} className="h-1.5" />
-          </div>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>{formatBytes(usage.usage_bytes)} / {usage.limit_mb} MB</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{formatBytes(usage.usage_bytes)} / {usage.limit_mb} MB</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <Button variant="outline" size="sm" className="w-full" onClick={onOpenStorageManagement}>
+        <FolderOpen className="mr-2 h-4 w-4" />
+        Ver mis archivos
+      </Button>
+    </div>
   );
 }

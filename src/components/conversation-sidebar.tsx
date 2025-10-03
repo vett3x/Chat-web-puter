@@ -62,6 +62,7 @@ interface ConversationSidebarProps {
   onDeleteApp: (appId: string) => void;
   isDeletingAppId: string | null;
   fileTreeRefreshKey: number;
+  onOpenStorageManagement: () => void;
 }
 
 export const ConversationSidebar = React.memo(({
@@ -79,6 +80,7 @@ export const ConversationSidebar = React.memo(({
   onDeleteApp,
   isDeletingAppId,
   fileTreeRefreshKey,
+  onOpenStorageManagement,
 }: ConversationSidebarProps) => {
   const {
     apps,
@@ -255,7 +257,7 @@ export const ConversationSidebar = React.memo(({
         </div>
       </ScrollArea>
       <Separator className="my-2 bg-sidebar-border" />
-      <StorageUsageIndicator />
+      <StorageUsageIndicator onOpenStorageManagement={onOpenStorageManagement} />
       <VersionDisplay />
     </div>
   );

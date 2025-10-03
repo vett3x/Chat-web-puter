@@ -30,6 +30,7 @@ import { useUserApiKeys } from "@/hooks/use-user-api-keys";
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
+import { StorageManagementDialog } from "@/components/storage-management-dialog";
 
 interface UserApp {
   id: string;
@@ -84,6 +85,7 @@ function HomePageContent() {
   const [isUpdateManagerOpen, setIsUpdateManagerOpen] = useState(false);
   const [isApiManagementOpen, setIsApiManagementOpen] = useState(false);
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
+  const [isStorageManagementOpen, setIsStorageManagementOpen] = useState(false);
   
   const [aiResponseSpeed, setAiResponseSpeed] = useState<'slow' | 'normal' | 'fast'>(() => {
     if (typeof window !== 'undefined') {
@@ -354,6 +356,7 @@ function HomePageContent() {
   const handleOpenUpdateManager = () => setIsUpdateManagerOpen(true);
   const handleOpenApiManagement = () => setIsApiManagementOpen(true);
   const handleOpenAlerts = () => setIsAlertsOpen(true);
+  const handleOpenStorageManagement = () => setIsStorageManagementOpen(true);
   
   const handleAiResponseSpeedChange = (speed: 'slow' | 'normal' | 'fast') => {
     setAiResponseSpeed(speed);
@@ -431,6 +434,7 @@ function HomePageContent() {
           onDeleteApp={handleDeleteApp}
           isDeletingAppId={isDeletingAppId}
           fileTreeRefreshKey={fileTreeRefreshKey}
+          onOpenStorageManagement={handleOpenStorageManagement}
         />
       </div>
       <div className="flex-1 min-w-0 flex flex-col">
@@ -516,6 +520,7 @@ function HomePageContent() {
         fileCount={retryState.files?.length || 0}
       />
       {userRole === 'super_admin' && <UpdateManagerDialog open={isUpdateManagerOpen} onOpenChange={setIsUpdateManagerOpen} />}
+      <StorageManagementDialog open={isStorageManagementOpen} onOpenChange={setIsStorageManagementOpen} />
     </div>
   );
 }

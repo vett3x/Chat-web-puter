@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader2, Save, KeyRound, Trash2, Gauge, BrainCircuit, HardDrive } from 'lucide-react';
+import { Loader2, Save, KeyRound, Trash2, Gauge, BrainCircuit } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -45,8 +45,6 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AI_PROVIDERS, getModelLabel } from '@/lib/ai-models';
 import { ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { StorageManagementTab } from './account-settings-tabs/storage-management-tab';
 
 // Schemas para los formularios
 const changePasswordSchema = z.object({
@@ -231,57 +229,48 @@ export function AccountSettingsDialog({
           <DialogTitle>Configuración de Cuenta</DialogTitle>
           <DialogDescription>Gestiona las opciones generales de tu cuenta y preferencias de IA.</DialogDescription>
         </DialogHeader>
-        <Tabs defaultValue="general" className="py-4">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="storage">Almacenamiento</TabsTrigger>
-          </TabsList>
-          <TabsContent value="general" className="space-y-6 pt-4">
-            <div>
-              <h3 className="text-lg font-semibold flex items-center gap-2 mb-3"><KeyRound className="h-5 w-5 text-muted-foreground" /> Cambiar Contraseña</h3>
-              <Form {...passwordForm}>
-                <form onSubmit={passwordForm.handleSubmit(handleChangePassword)} className="space-y-4">
-                  <FormField control={passwordForm.control} name="new_password" render={({ field }) => (<FormItem><FormLabel>Nueva Contraseña</FormLabel><FormControl><Input type="password" placeholder="••••••••" {...field} disabled={isChangingPassword} /></FormControl><FormMessage /></FormItem>)} />
-                  <Button type="submit" disabled={isChangingPassword}>{isChangingPassword ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Actualizar Contraseña</Button>
-                </form>
-              </Form>
-            </div>
-            <Separator />
-            <div>
-              <h3 className="text-lg font-semibold flex items-center gap-2 mb-3"><Gauge className="h-5 w-5 text-muted-foreground" /> Velocidad de Respuesta de la IA</h3>
-              <RadioGroup value={aiResponseSpeed} onValueChange={(value: 'slow' | 'normal' | 'fast') => onAiResponseSpeedChange(value)} className="flex flex-col space-y-2">
-                <div className="flex items-center space-x-2"><RadioGroupItem value="slow" id="speed-slow" /><Label htmlFor="speed-slow">Lenta</Label></div>
-                <div className="flex items-center space-x-2"><RadioGroupItem value="normal" id="speed-normal" /><Label htmlFor="speed-normal">Normal</Label></div>
-                <div className="flex items-center space-x-2"><RadioGroupItem value="fast" id="speed-fast" /><Label htmlFor="speed-fast">Rápida</Label></div>
-              </RadioGroup>
-            </div>
-            <Separator />
-            <div>
-              <h3 className="text-lg font-semibold flex items-center gap-2 mb-3"><BrainCircuit className="h-5 w-5 text-muted-foreground" /> Modelo de IA por Defecto</h3>
-              <Form {...defaultModelForm}>
-                <form onSubmit={defaultModelForm.handleSubmit(handleSaveDefaultModel)} className="space-y-4">
-                  <FormField control={defaultModelForm.control} name="default_ai_model" render={({ field }) => (<FormItem><FormLabel>Seleccionar Modelo</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSavingDefaultModel || isLoadingApiKeys || availableModels.length === 0}><FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo de IA por defecto" /></SelectTrigger></FormControl><SelectContent>{availableModels.map((model) => (<SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)} />
-                  <Button type="submit" disabled={isSavingDefaultModel || isLoadingApiKeys || availableModels.length === 0}>{isSavingDefaultModel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Guardar Modelo por Defecto</Button>
-                </form>
-              </Form>
-            </div>
-            <Separator />
-            <div>
-              <h3 className="text-lg font-semibold flex items-center gap-2 mb-3 text-destructive"><Trash2 className="h-5 w-5" /> Eliminar Cuenta</h3>
-              <p className="text-sm text-muted-foreground mb-4">Esta acción es irreversible. Todos tus datos de usuario y conversaciones serán eliminados permanentemente.</p>
-              <AlertDialog>
-                <AlertDialogTrigger asChild><Button variant="destructive" disabled={isDeletingAccount}>{isDeletingAccount ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />} Eliminar mi cuenta</Button></AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader><AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. Esto eliminará permanentemente tu cuenta y todos tus datos.</AlertDialogDescription></AlertDialogHeader>
-                  <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Sí, eliminar mi cuenta</AlertDialogAction></AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-          </TabsContent>
-          <TabsContent value="storage">
-            <StorageManagementTab />
-          </TabsContent>
-        </Tabs>
+        <div className="py-4 space-y-6">
+          <div>
+            <h3 className="text-lg font-semibold flex items-center gap-2 mb-3"><KeyRound className="h-5 w-5 text-muted-foreground" /> Cambiar Contraseña</h3>
+            <Form {...passwordForm}>
+              <form onSubmit={passwordForm.handleSubmit(handleChangePassword)} className="space-y-4">
+                <FormField control={passwordForm.control} name="new_password" render={({ field }) => (<FormItem><FormLabel>Nueva Contraseña</FormLabel><FormControl><Input type="password" placeholder="••••••••" {...field} disabled={isChangingPassword} /></FormControl><FormMessage /></FormItem>)} />
+                <Button type="submit" disabled={isChangingPassword}>{isChangingPassword ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Actualizar Contraseña</Button>
+              </form>
+            </Form>
+          </div>
+          <Separator />
+          <div>
+            <h3 className="text-lg font-semibold flex items-center gap-2 mb-3"><Gauge className="h-5 w-5 text-muted-foreground" /> Velocidad de Respuesta de la IA</h3>
+            <RadioGroup value={aiResponseSpeed} onValueChange={(value: 'slow' | 'normal' | 'fast') => onAiResponseSpeedChange(value)} className="flex flex-col space-y-2">
+              <div className="flex items-center space-x-2"><RadioGroupItem value="slow" id="speed-slow" /><Label htmlFor="speed-slow">Lenta</Label></div>
+              <div className="flex items-center space-x-2"><RadioGroupItem value="normal" id="speed-normal" /><Label htmlFor="speed-normal">Normal</Label></div>
+              <div className="flex items-center space-x-2"><RadioGroupItem value="fast" id="speed-fast" /><Label htmlFor="speed-fast">Rápida</Label></div>
+            </RadioGroup>
+          </div>
+          <Separator />
+          <div>
+            <h3 className="text-lg font-semibold flex items-center gap-2 mb-3"><BrainCircuit className="h-5 w-5 text-muted-foreground" /> Modelo de IA por Defecto</h3>
+            <Form {...defaultModelForm}>
+              <form onSubmit={defaultModelForm.handleSubmit(handleSaveDefaultModel)} className="space-y-4">
+                <FormField control={defaultModelForm.control} name="default_ai_model" render={({ field }) => (<FormItem><FormLabel>Seleccionar Modelo</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSavingDefaultModel || isLoadingApiKeys || availableModels.length === 0}><FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo de IA por defecto" /></SelectTrigger></FormControl><SelectContent>{availableModels.map((model) => (<SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)} />
+                <Button type="submit" disabled={isSavingDefaultModel || isLoadingApiKeys || availableModels.length === 0}>{isSavingDefaultModel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Guardar Modelo por Defecto</Button>
+              </form>
+            </Form>
+          </div>
+          <Separator />
+          <div>
+            <h3 className="text-lg font-semibold flex items-center gap-2 mb-3 text-destructive"><Trash2 className="h-5 w-5" /> Eliminar Cuenta</h3>
+            <p className="text-sm text-muted-foreground mb-4">Esta acción es irreversible. Todos tus datos de usuario y conversaciones serán eliminados permanentemente.</p>
+            <AlertDialog>
+              <AlertDialogTrigger asChild><Button variant="destructive" disabled={isDeletingAccount}>{isDeletingAccount ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />} Eliminar mi cuenta</Button></AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader><AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. Esto eliminará permanentemente tu cuenta y todos tus datos.</AlertDialogDescription></AlertDialogHeader>
+                <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Sí, eliminar mi cuenta</AlertDialogAction></AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
         <DialogFooter>
           <DialogClose asChild><Button variant="outline">Cerrar</Button></DialogClose>
         </DialogFooter>
