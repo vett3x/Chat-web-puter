@@ -10,6 +10,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { toast } from 'sonner';
 
 function formatBytes(bytes: number, decimals = 2) {
   if (bytes === 0) return '0 Bytes';
@@ -26,14 +27,28 @@ export function StorageUsageIndicator() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!session?.user?.id) return;
+    if (!session?.user?.id) {
+      setIsLoading(false); // If no user, stop loading
+      return;
+    }
 
     const fetchUsage = async () => {
+      // Don't set isLoading to true here to avoid flicker on interval
       try {
         const response = await fetch(`/api/users/${session.user.id}/storage`);
-        if (!response.ok) throw new Error('Error al cargar el uso de almacenamiento.');
+        if (!response.ok) {
+          // Don't throw, just log it, so the component doesn't crash
+          console.error('Error al cargar el uso de almacenamiento.');
+          toast.error('No se pudo actualizar el uso de almacenamiento.');
+          return;
+        }
         const data = await response.json();
-        setUsage(data);
+        // Add defensive check for data shape
+        if (data && typeof data.usage_bytes === 'number' && typeof data.limit_mb === 'number') {
+          setUsage(data);
+        } else {
+          console.error('Received invalid data shape for storage usage:', data);
+        }
       } catch (error) {
         console.error(error);
       } finally {
@@ -56,7 +71,8 @@ export function StorageUsageIndicator() {
   }
 
   const usageMb = usage.usage_bytes / (1024 * 1024);
-  const percentage = (usageMb / usage.limit_mb) * 100;
+  // Defensive check for limit_mb to avoid division by zero
+  const percentage = usage.limit_mb > 0 ? (usageMb / usage.limit_mb) * 100 : 0;
 
   return (
     <TooltipProvider>
