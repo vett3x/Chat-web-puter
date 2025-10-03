@@ -25,9 +25,9 @@ import { Progress } from '@/components/ui/progress';
 const emailSchema = z.object({ email: z.string().email('Correo electrónico inválido.') });
 const passwordSchema = z.object({ password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres.') });
 const quotasSchema = z.object({
-  max_servers: z.number().int().min(0),
-  max_containers: z.number().int().min(0),
-  max_tunnels: z.number().int().min(0),
+  max_servers: z.coerce.number().int().min(0),
+  max_containers: z.coerce.number().int().min(0),
+  max_tunnels: z.coerce.number().int().min(0),
   cpu_limit: z.coerce.number().min(0.1).max(16),
   memory_limit_mb: z.coerce.number().int().min(128),
   storage_limit_mb: z.coerce.number().int().min(0),
@@ -262,9 +262,9 @@ function UserQuotasSection({ userId, userName, currentUserRole, targetUserRole, 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField control={form.control} name="max_servers" render={({ field }) => (<FormItem><FormLabel>Max Servidores</FormLabel><FormControl><Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="max_containers" render={({ field }) => (<FormItem><FormLabel>Max Contenedores</FormLabel><FormControl><Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="max_tunnels" render={({ field }) => (<FormItem><FormLabel>Max Túneles</FormLabel><FormControl><Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={form.control} name="max_servers" render={({ field }) => (<FormItem><FormLabel>Max Servidores</FormLabel><FormControl><Input type="number" {...field} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={form.control} name="max_containers" render={({ field }) => (<FormItem><FormLabel>Max Contenedores</FormLabel><FormControl><Input type="number" {...field} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={form.control} name="max_tunnels" render={({ field }) => (<FormItem><FormLabel>Max Túneles</FormLabel><FormControl><Input type="number" {...field} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="cpu_limit" render={({ field }) => (<FormItem><FormLabel>Límite de CPU (cores)</FormLabel><FormControl><Input type="number" step="0.1" {...field} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="memory_limit_mb" render={({ field }) => (<FormItem><FormLabel>Límite de Memoria (MB)</FormLabel><FormControl><Input type="number" {...field} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="storage_limit_mb" render={({ field }) => (<FormItem><FormLabel>Límite de Almacenamiento (MB)</FormLabel><FormControl><Input type="number" {...field} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
