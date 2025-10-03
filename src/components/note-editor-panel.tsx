@@ -6,7 +6,7 @@ import { useSession } from '@/components/session-context-provider';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Save, Loader2, Wand2, X, Check, Bold, Italic, Strikethrough, Heading1, Heading2, Heading3, List, ListOrdered, Quote, Code, Link, Image as ImageIcon, Table, Eye, EyeOff, ListTodo } from 'lucide-react';
+import { Save, Loader2, Wand2, X, Check, Bold, Italic, Strikethrough, Heading1, Heading2, Heading3, List, ListOrdered, Quote, Code, Link, Image as ImageIcon, Table, ListTodo } from 'lucide-react';
 import { NoteAiChat } from './note-ai-chat';
 import { ChatMessage } from '@/hooks/use-note-assistant-chat';
 import { ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys';
@@ -44,7 +44,9 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [showAiHint, setShowAiHint] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('saved');
-  const [previewMode, setPreviewMode] = useState<'edit' | 'preview'>('edit'); // Changed to previewMode, toggles between 'edit' and 'preview'
+  // El estado previewMode se mantiene para que el MDEditor lo use internamente,
+  // pero el botón de alternancia se gestiona directamente por el componente MDEditor.
+  const [previewMode, setPreviewMode] = useState<'edit' | 'preview'>('edit'); 
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const editorApiRef = useRef<TextAreaTextApi | null>(null);
@@ -164,16 +166,7 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
     { ...commands.unorderedListCommand, icon: <List size={16} /> },
     { ...commands.orderedListCommand, icon: <ListOrdered size={16} /> },
     { ...commands.checkedListCommand, icon: <ListTodo size={16} /> },
-    commands.divider,
-    {
-      name: 'toggle-preview',
-      keyCommand: 'toggle-preview',
-      icon: previewMode === 'edit' ? <Eye size={16} /> : <EyeOff size={16} />,
-      buttonProps: { 'aria-label': 'Toggle preview' },
-      execute: () => {
-        setPreviewMode(prev => (prev === 'edit' ? 'preview' : 'edit'));
-      },
-    },
+    // El botón de toggle-preview se ha eliminado porque MDEditor ya tiene uno integrado.
   ];
 
   const handleSave = useCallback(async (currentTitle: string, currentContent: string) => {
@@ -288,7 +281,7 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
           onChange={(val) => setContent(val || '')}
           height="100%"
           commands={customCommands}
-          preview={previewMode} // Use the new previewMode state
+          preview={previewMode} // MDEditor usa este estado para su botón de vista previa integrado
           className="[&>div]:!border-none"
         />
       </div>
