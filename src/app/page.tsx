@@ -1,15 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import dynamic from 'next/dynamic';
 import { useSession, SessionContextProvider } from "@/components/session-context-provider";
 import { ConversationSidebar } from "@/components/conversation-sidebar";
-import { ChatInterface, ChatInterfaceRef } from "@/components/chat-interface";
-import { AppBrowserPanel } from "@/components/app-browser-panel";
 import { CodeEditorPanel } from "@/components/code-editor-panel";
-import { NoteEditorPanel, NoteEditorPanelRef } from "@/components/note-editor-panel";
 import { ProfileSettingsDialog } from "@/components/profile-settings-dialog";
 import { AccountSettingsDialog } from "@/components/account-settings-dialog";
-import { AdminPanelDialog } from "@/components/admin-panel-dialog"; // Renamed import
+import { AdminPanelDialog } from "@/components/admin-panel-dialog";
 import { UserManagementDialog } from "@/components/user-management-dialog";
 import { DeepAiCoderDialog } from "@/components/deep-ai-coder-dialog";
 import { RetryUploadDialog } from "@/components/retry-upload-dialog";
@@ -17,7 +15,6 @@ import { UpdateManagerDialog } from "@/components/update-manager-dialog";
 import { ApiManagementDialog } from "@/components/api-management-dialog";
 import { AlertsDialog } from "@/components/alerts-dialog";
 import { AppVersionsBar } from "@/components/app-versions-bar";
-import { AppProvisioningChatPanel } from "@/components/app-provisioning-chat-panel"; // NEW IMPORT
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -30,6 +27,36 @@ import { useUserApiKeys } from "@/hooks/use-user-api-keys";
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
+import type { ChatInterfaceRef } from "@/components/chat-interface";
+import type { NoteEditorPanelRef } from "@/components/note-editor-panel";
+
+// --- Dynamic Imports ---
+const LoadingSpinner = () => (
+  <div className="flex items-center justify-center h-full">
+    <Loader2 className="h-8 w-8 animate-spin" />
+  </div>
+);
+
+const DynamicChatInterface = dynamic(() => 
+  import('@/components/chat-interface').then(mod => mod.ChatInterface), 
+  { ssr: false, loading: () => <LoadingSpinner /> }
+);
+
+const DynamicNoteEditorPanel = dynamic(() => 
+  import('@/components/note-editor-panel').then(mod => mod.NoteEditorPanel), 
+  { ssr: false, loading: () => <LoadingSpinner /> }
+);
+
+const DynamicAppBrowserPanel = dynamic(() => 
+  import('@/components/app-browser-panel').then(mod => mod.AppBrowserPanel), 
+  { ssr: false, loading: () => <LoadingSpinner /> }
+);
+
+const DynamicAppProvisioningChatPanel = dynamic(() => 
+  import('@/components/app-provisioning-chat-panel').then(mod => mod.AppProvisioningChatPanel), 
+  { ssr: false, loading: () => <LoadingSpinner /> }
+);
+// --- End Dynamic Imports ---
 
 interface UserApp {
   id: string;
@@ -38,9 +65,9 @@ interface UserApp {
   url: string | null;
   conversation_id: string | null;
   prompt: string | null;
-  main_purpose: string | null; // NEW
-  key_features: string | null; // NEW
-  preferred_technologies: string | null; // NEW
+  main_purpose: string | null;
+  key_features: string | null;
+  preferred_technologies: string | null;
 }
 
 interface SelectedItem {
@@ -63,22 +90,18 @@ interface RetryState {
 
 const HEALTH_CHECK_INTERVAL = 15000;
 
-// Memoized components
-const MemoizedChatInterface = React.memo(ChatInterface);
-const MemoizedNoteEditorPanel = React.memo(NoteEditorPanel);
-
 function HomePageContent() {
   const { session, isLoading: isSessionLoading, userRole, userLanguage, isUserTemporarilyDisabled } = useSession();
   const userId = session?.user?.id;
   
-  const { userApiKeys, aiKeyGroups, isLoadingApiKeys, refreshApiKeys } = useUserApiKeys(); // NEW: Get aiKeyGroups
+  const { userApiKeys, aiKeyGroups, isLoadingApiKeys, refreshApiKeys } = useUserApiKeys();
 
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   const [selectedAppDetails, setSelectedAppDetails] = useState<UserApp | null>(null);
   
   const [isProfileSettingsOpen, setIsProfileSettingsOpen] = useState(false);
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
-  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false); // Renamed state
+  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
   const [isDeepAiCoderOpen, setIsDeepAiCoderOpen] = useState(false);
   const [isUpdateManagerOpen, setIsUpdateManagerOpen] = useState(false);
@@ -348,7 +371,7 @@ function HomePageContent() {
 
   const handleOpenProfileSettings = () => setIsProfileSettingsOpen(true);
   const handleOpenAccountSettings = () => setIsAccountSettingsOpen(true);
-  const handleOpenAdminPanel = () => setIsAdminPanelOpen(true); // Renamed handler
+  const handleOpenAdminPanel = () => setIsAdminPanelOpen(true);
   const handleOpenUserManagement = () => setIsUserManagementOpen(true);
   const handleOpenDeepAiCoder = () => setIsDeepAiCoderOpen(true);
   const handleOpenUpdateManager = () => setIsUpdateManagerOpen(true);
@@ -363,7 +386,6 @@ function HomePageContent() {
   const isAppDeleting = selectedItem?.type === 'app' && selectedItem.id === isDeletingAppId;
   const appId = selectedAppDetails?.id || undefined;
   
-  // Construct appPrompt from new structured fields
   const appPrompt = selectedAppDetails?.main_purpose 
     ? `Propósito Principal: ${selectedAppDetails.main_purpose}` +
       (selectedAppDetails.key_features ? `\nCaracterísticas Clave: ${selectedAppDetails.key_features}` : '') +
@@ -388,7 +410,7 @@ function HomePageContent() {
     if (rightPanelView === 'editor' && activeFile && selectedItem?.type === 'app') {
       return <CodeEditorPanel appId={selectedItem.id} file={activeFile} onClose={() => { setActiveFile(null); setRightPanelView('preview'); }} onSwitchToPreview={() => setRightPanelView('preview')} />;
     }
-    return <AppBrowserPanel ref={appBrowserRef} appId={selectedAppDetails?.id || null} appUrl={selectedAppDetails?.url || null} appStatus={selectedAppDetails?.status || null} onRefreshAppDetails={refreshAppDetails} />;
+    return <DynamicAppBrowserPanel ref={appBrowserRef} appId={selectedAppDetails?.id || null} appUrl={selectedAppDetails?.url || null} appStatus={selectedAppDetails?.status || null} onRefreshAppDetails={refreshAppDetails} />;
   };
 
   return (
@@ -446,12 +468,12 @@ function HomePageContent() {
           />
         )}
         {selectedItem?.type === 'note' ? (
-          <MemoizedNoteEditorPanel
+          <DynamicNoteEditorPanel
             ref={noteEditorRef}
             noteId={selectedItem.id}
             onNoteUpdated={() => {}} // Local updates are handled by the sidebar's realtime hook
             userApiKeys={userApiKeys}
-            aiKeyGroups={aiKeyGroups} // NEW: Pass aiKeyGroups
+            aiKeyGroups={aiKeyGroups}
             isLoadingApiKeys={isLoadingApiKeys}
             userLanguage={userLanguage || 'es'}
           />
@@ -459,9 +481,9 @@ function HomePageContent() {
           <ResizablePanelGroup direction="horizontal" className="flex-1">
             <ResizablePanel defaultSize={50} minSize={30}>
               {isAppProvisioning ? (
-                <AppProvisioningChatPanel />
+                <DynamicAppProvisioningChatPanel />
               ) : (
-                <MemoizedChatInterface
+                <DynamicChatInterface
                   ref={chatInterfaceRef}
                   key={selectedItem?.conversationId || 'no-conversation'}
                   userId={userId}
@@ -471,13 +493,13 @@ function HomePageContent() {
                   aiResponseSpeed={aiResponseSpeed}
                   isAppProvisioning={isAppProvisioning}
                   isAppDeleting={isAppDeleting}
-                  appPrompt={appPrompt} // Pass the constructed appPrompt
+                  appPrompt={appPrompt}
                   appId={appId}
                   onWriteFiles={writeFilesToApp}
                   isAppChat={selectedItem?.type === 'app'}
                   onSidebarDataRefresh={() => {}} // Sidebar refreshes itself
                   userApiKeys={userApiKeys}
-                  aiKeyGroups={aiKeyGroups} // NEW: Pass aiKeyGroups
+                  aiKeyGroups={aiKeyGroups}
                   isLoadingApiKeys={isLoadingApiKeys}
                 />
               )}
@@ -500,7 +522,7 @@ function HomePageContent() {
         aiResponseSpeed={aiResponseSpeed}
         onAiResponseSpeedChange={handleAiResponseSpeedChange}
         userApiKeys={userApiKeys}
-        aiKeyGroups={aiKeyGroups} // NEW: Pass aiKeyGroups
+        aiKeyGroups={aiKeyGroups}
         isLoadingApiKeys={isLoadingApiKeys}
         currentUserRole={userRole}
       />
