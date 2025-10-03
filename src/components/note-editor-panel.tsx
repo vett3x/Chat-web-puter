@@ -44,7 +44,7 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [showAiHint, setShowAiHint] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('saved');
-  const [preview, setPreview] = useState<'live' | 'edit' | 'preview'>('live');
+  const [previewMode, setPreviewMode] = useState<'edit' | 'preview'>('edit'); // Changed to previewMode, toggles between 'edit' and 'preview'
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const editorApiRef = useRef<TextAreaTextApi | null>(null);
@@ -166,12 +166,12 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
     { ...commands.checkedListCommand, icon: <ListTodo size={16} /> },
     commands.divider,
     {
-      name: 'preview',
-      keyCommand: 'preview',
-      icon: preview === 'edit' ? <Eye size={16} /> : <EyeOff size={16} />,
+      name: 'toggle-preview',
+      keyCommand: 'toggle-preview',
+      icon: previewMode === 'edit' ? <Eye size={16} /> : <EyeOff size={16} />,
       buttonProps: { 'aria-label': 'Toggle preview' },
       execute: () => {
-        setPreview(prev => (prev === 'edit' ? 'live' : 'edit'));
+        setPreviewMode(prev => (prev === 'edit' ? 'preview' : 'edit'));
       },
     },
   ];
@@ -288,7 +288,7 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
           onChange={(val) => setContent(val || '')}
           height="100%"
           commands={customCommands}
-          preview={preview}
+          preview={previewMode} // Use the new previewMode state
           className="[&>div]:!border-none"
         />
       </div>
