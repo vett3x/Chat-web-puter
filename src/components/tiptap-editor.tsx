@@ -306,11 +306,12 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         emptyNodeClass: 'is-empty',
       }),
     ],
-    content: '', // Initialize with empty content
+    content: initialContent,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
     editable: isEditable,
+    immediatelyRender: true, // The key change from the user's research
     editorProps: {
       attributes: {
         class: cn(
@@ -328,18 +329,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         ),
       },
     },
-  });
-
-  // Set content via useEffect after the editor is initialized
-  useEffect(() => {
-    if (editor && !editor.isDestroyed && initialContent !== editor.getHTML()) {
-      // Use a timeout to ensure the editor is fully mounted and ready
-      const timer = setTimeout(() => {
-        editor.commands.setContent(initialContent, { emitUpdate: false });
-      }, 0);
-      return () => clearTimeout(timer);
-    }
-  }, [initialContent, editor]);
+  }, [initialContent]); // Keep the dependency array to re-create the editor when the note changes
 
   return (
     <div className="flex flex-col h-full border border-input rounded-md">
