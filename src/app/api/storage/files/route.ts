@@ -25,19 +25,33 @@ const supabaseAdmin = createClient(
 export async function GET(req: NextRequest) {
   try {
     const userId = await getUserId();
-    const { data, error } = await supabaseAdmin.storage.from('notes-images').list(userId, {
-      limit: 1000, // Adjust as needed
-      sortBy: { column: 'created_at', order: 'desc' },
+    const { searchParams } = new URL(req.url);
+    const path = searchParams.get('path') || '';
+
+    const { data, error } = await supabaseAdmin.storage.from('notes-images').list(`${userId}/${path}`, {
+      limit: 1000,
+      sortBy: { column: 'name', order: 'asc' },
     });
 
     if (error) throw error;
 
-    const filesWithUrls = data.map(file => {
-      const { data: { publicUrl } } = supabaseAdmin.storage.from('notes-images').getPublicUrl(`${userId}/${file.name}`);
-      return { ...file, publicUrl };
+    const items = data
+      .filter(item => item.name !== '.placeholder') // Filter out placeholder files
+      .map(item => {
+        const isFolder = !item.id; // In Supabase list, folders don't have an ID
+        const fullPath = `${userId}/${path ? `${path}/` : ''}${item.name}`;
+        const { data: { publicUrl } } = supabaseAdmin.storage.from('notes-images').getPublicUrl(fullPath);
+        return { ...item, publicUrl, type: isFolder ? 'folder' : 'file', path: fullPath };
+      });
+
+    // Sort folders before files
+    items.sort((a, b) => {
+      if (a.type === 'folder' && b.type === 'file') return -1;
+      if (a.type === 'file' && b.type === 'folder') return 1;
+      return a.name.localeCompare(b.name);
     });
 
-    return NextResponse.json(filesWithUrls);
+    return NextResponse.json(items);
   } catch (error: any) {
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
@@ -47,22 +61,32 @@ export async function DELETE(req: NextRequest) {
   try {
     const userId = await getUserId();
     const { searchParams } = new URL(req.url);
-    const filePath = searchParams.get('path');
+    const path = searchParams.get('path');
+    const type = searchParams.get('type');
 
-    if (!filePath) {
-      return NextResponse.json({ message: 'Ruta del archivo no proporcionada.' }, { status: 400 });
+    if (!path) {
+      return NextResponse.json({ message: 'Ruta del archivo o carpeta no proporcionada.' }, { status: 400 });
     }
 
-    // Security check: ensure the user is deleting a file within their own folder
-    if (!filePath.startsWith(userId + '/')) {
-      return NextResponse.json({ message: 'Acceso denegado para eliminar este archivo.' }, { status: 403 });
+    if (!path.startsWith(userId + '/')) {
+      return NextResponse.json({ message: 'Acceso denegado para eliminar este recurso.' }, { status: 403 });
     }
 
-    const { error } = await supabaseAdmin.storage.from('notes-images').remove([filePath]);
+    if (type === 'folder') {
+      const { data: filesInFolder, error: listError } = await supabaseAdmin.storage.from('notes-images').list(path);
+      if (listError) throw listError;
 
-    if (error) throw error;
+      const filePaths = filesInFolder.map(file => `${path}/${file.name}`);
+      if (filePaths.length > 0) {
+        const { error: removeError } = await supabaseAdmin.storage.from('notes-images').remove(filePaths);
+        if (removeError) throw removeError;
+      }
+    } else {
+      const { error } = await supabaseAdmin.storage.from('notes-images').remove([path]);
+      if (error) throw error;
+    }
 
-    return NextResponse.json({ message: 'Archivo eliminado correctamente.' });
+    return NextResponse.json({ message: 'Recurso eliminado correctamente.' });
   } catch (error: any) {
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
