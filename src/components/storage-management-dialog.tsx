@@ -218,7 +218,7 @@ export function StorageManagementDialog({ open, onOpenChange }: StorageManagemen
                           <TableCell>{item.type === 'file' ? formatBytes(item.metadata?.size || 0) : '--'}</TableCell>
                           <TableCell>{item.created_at ? format(new Date(item.created_at), 'dd/MM/yyyy HH:mm', { locale: es }) : '--'}</TableCell>
                           <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
+                            <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                               {item.type === 'file' && !isVirtual && <a href={item.publicUrl} download={item.name} target="_blank" rel="noopener noreferrer"><Button variant="outline" size="icon" className="h-8 w-8"><Download className="h-4 w-4" /></Button></a>}
                               <AlertDialog>
                                 <AlertDialogTrigger asChild><Button variant="destructive" size="icon" className="h-8 w-8" disabled={isDeleting === item.path || isVirtual}>{isDeleting === item.path ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</Button></AlertDialogTrigger>
