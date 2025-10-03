@@ -19,6 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Progress } from '@/components/ui/progress';
 
 // Schemas
 const emailSchema = z.object({ email: z.string().email('Correo electrónico inválido.') });
@@ -29,6 +30,7 @@ const quotasSchema = z.object({
   max_tunnels: z.number().int().min(0),
   cpu_limit: z.coerce.number().min(0.1).max(16),
   memory_limit_mb: z.coerce.number().int().min(128),
+  storage_limit_mb: z.coerce.number().int().min(0),
 });
 
 // Types
@@ -44,6 +46,58 @@ interface UserModerationAccountTabProps {
 }
 
 // --- Sub-components for each section ---
+
+function UserStorageUsage({ userId }: { userId: string }) {
+  const [usage, setUsage] = useState<{ usage_bytes: number; limit_mb: number } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchUsage = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/users/${userId}/storage`);
+      if (!response.ok) throw new Error('No se pudo cargar el uso de almacenamiento');
+      const data = await response.json();
+      setUsage(data);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    fetchUsage();
+  }, [fetchUsage]);
+
+  if (isLoading) {
+    return <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Cargando uso de almacenamiento...</div>;
+  }
+
+  if (!usage) {
+    return <div className="text-sm text-destructive">No se pudo cargar el uso de almacenamiento.</div>;
+  }
+
+  const usageMb = usage.usage_bytes / (1024 * 1024);
+  const percentage = usage.limit_mb > 0 ? (usageMb / usage.limit_mb) * 100 : 0;
+
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex justify-between text-sm font-medium">
+        <span>Uso de Almacenamiento</span>
+        <span>{formatBytes(usage.usage_bytes)} / {usage.limit_mb} MB</span>
+      </div>
+      <Progress value={percentage} />
+    </div>
+  );
+}
 
 function UserAccountSection({ userId, userEmail, currentUserRole, targetUserRole, onAccountUpdated }: any) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -213,6 +267,7 @@ function UserQuotasSection({ userId, userName, currentUserRole, targetUserRole, 
               <FormField control={form.control} name="max_tunnels" render={({ field }) => (<FormItem><FormLabel>Max Túneles</FormLabel><FormControl><Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="cpu_limit" render={({ field }) => (<FormItem><FormLabel>Límite de CPU (cores)</FormLabel><FormControl><Input type="number" step="0.1" {...field} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="memory_limit_mb" render={({ field }) => (<FormItem><FormLabel>Límite de Memoria (MB)</FormLabel><FormControl><Input type="number" {...field} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={form.control} name="storage_limit_mb" render={({ field }) => (<FormItem><FormLabel>Límite de Almacenamiento (MB)</FormLabel><FormControl><Input type="number" {...field} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
             </div>
             <Button type="submit" disabled={!canEdit || isSaving}>
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Guardar Cuotas
@@ -307,12 +362,12 @@ export function UserModerationAccountTab({ user, currentUserRole, onAccountUpdat
           onAccountUpdated={onAccountUpdated}
         />
         <Separator />
-        <UserPermissionsSection
-          userId={user.id}
-          targetUserRole={user.role}
-          currentUserRole={currentUserRole}
-          onPermissionsUpdated={onAccountUpdated}
-        />
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2"><HardDrive className="h-5 w-5" /> Almacenamiento</CardTitle></CardHeader>
+          <CardContent>
+            <UserStorageUsage userId={user.id} />
+          </CardContent>
+        </Card>
         <Separator />
         <UserQuotasSection
           userId={user.id}
@@ -320,6 +375,13 @@ export function UserModerationAccountTab({ user, currentUserRole, onAccountUpdat
           currentUserRole={currentUserRole}
           targetUserRole={user.role}
           onQuotasUpdated={onAccountUpdated}
+        />
+        <Separator />
+        <UserPermissionsSection
+          userId={user.id}
+          targetUserRole={user.role}
+          currentUserRole={currentUserRole}
+          onPermissionsUpdated={onAccountUpdated}
         />
         <Separator />
         <UserModerationHistorySection

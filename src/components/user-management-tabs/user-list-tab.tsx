@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useImperativeHandle } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Users, Trash2, RefreshCw, AlertCircle, Eye, Search, Crown, Shield, Bot, LogOut, Ban, CheckCircle, UserCog, Server, Dock, Globe } from 'lucide-react';
+import { Loader2, Users, Trash2, RefreshCw, AlertCircle, Eye, Search, Crown, Shield, Bot, LogOut, Ban, CheckCircle, UserCog, Server, Dock, Globe, HardDrive } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSession } from '@/components/session-context-provider';
 import { SUPERUSER_EMAILS } from '@/lib/constants';
@@ -50,6 +50,7 @@ interface User {
   max_servers: number;
   max_containers: number;
   max_tunnels: number;
+  storage_limit_mb: number;
 }
 
 export interface UserListTabRef {
@@ -263,10 +264,11 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
                             <span className="flex items-center gap-1"><Server className="h-3 w-3" /> {user.role === 'super_admin' ? '∞' : user.max_servers}</span>
                             <span className="flex items-center gap-1"><Dock className="h-3 w-3" /> {user.role === 'super_admin' ? '∞' : user.max_containers}</span>
                             <span className="flex items-center gap-1"><Globe className="h-3 w-3" /> {user.role === 'super_admin' ? '∞' : user.max_tunnels}</span>
+                            <span className="flex items-center gap-1"><HardDrive className="h-3 w-3" /> {user.role === 'super_admin' ? '∞' : `${user.storage_limit_mb}MB`}</span>
                           </div>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>Límites (Servidores / Contenedores / Túneles)</p>
+                          <p>Límites (Servidores / Contenedores / Túneles / Almacenamiento)</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>

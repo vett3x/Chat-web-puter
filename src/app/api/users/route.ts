@@ -80,6 +80,7 @@ interface SupabaseProfile {
   max_servers: number;
   max_containers: number;
   max_tunnels: number;
+  storage_limit_mb: number;
 }
 
 export async function GET(req: NextRequest) {
@@ -106,7 +107,7 @@ export async function GET(req: NextRequest) {
     // 1. Fetch all profiles
     const { data: profiles, error: profilesError } = await supabaseAdmin
       .from('profiles')
-      .select(`id, first_name, last_name, avatar_url, role, status, kicked_at, max_servers, max_containers, max_tunnels`);
+      .select(`id, first_name, last_name, avatar_url, role, status, kicked_at, max_servers, max_containers, max_tunnels, storage_limit_mb`);
 
     if (profilesError) {
       console.error('Supabase query error fetching profiles in GET /api/users:', profilesError);
@@ -131,6 +132,7 @@ export async function GET(req: NextRequest) {
           max_servers: profile.max_servers,
           max_containers: profile.max_containers,
           max_tunnels: profile.max_tunnels,
+          storage_limit_mb: profile.storage_limit_mb,
         };
       }
 
@@ -146,6 +148,7 @@ export async function GET(req: NextRequest) {
         max_servers: profile.max_servers,
         max_containers: profile.max_containers,
         max_tunnels: profile.max_tunnels,
+        storage_limit_mb: profile.storage_limit_mb,
       };
     }));
 
