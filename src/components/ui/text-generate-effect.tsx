@@ -1,15 +1,19 @@
 "use client";
+import { useEffect } from "react";
 import { motion, stagger, useAnimate } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { useEffect } from "react";
 
 export const TextGenerateEffect = ({
   words,
   className,
+  filter = true,
+  duration = 0.5,
   onAnimationComplete,
 }: {
   words: string;
   className?: string;
+  filter?: boolean;
+  duration?: number;
   onAnimationComplete?: () => void;
 }) => {
   const [scope, animate] = useAnimate();
@@ -19,9 +23,10 @@ export const TextGenerateEffect = ({
       "span",
       {
         opacity: 1,
+        filter: filter ? "blur(0px)" : "none",
       },
       {
-        duration: 2,
+        duration: duration ? duration : 1,
         delay: stagger(0.2),
         onComplete: onAnimationComplete,
       }
@@ -36,6 +41,9 @@ export const TextGenerateEffect = ({
             <motion.span
               key={word + idx}
               className="dark:text-white text-black opacity-0"
+              style={{
+                filter: filter ? "blur(10px)" : "none",
+              }}
             >
               {word}{" "}
             </motion.span>
