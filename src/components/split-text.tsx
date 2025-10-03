@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState, useMemo } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { SplitText as GSAPSplitText } from 'gsap/SplitText';
@@ -148,7 +148,7 @@ const SplitText = ({
       whiteSpace: 'normal',
       wordWrap: 'break-word',
       willChange: 'transform, opacity'
-    };
+    } as React.CSSProperties;
     const classes = `split-parent ${className}`;
     switch (tag) {
       case 'h1':
