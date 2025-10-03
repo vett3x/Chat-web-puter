@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from 'motion/react';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const buildKeyframes = (from: any, steps: any[]) => {
   const keys = new Set([...Object.keys(from), ...steps.flatMap(s => Object.keys(s))]);
@@ -25,6 +25,11 @@ const BlurText = ({
   onAnimationComplete,
   stepDuration = 0.35
 }: any) => {
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const elements = animateBy === 'words' ? text.split(' ') : text.split('');
 
   const defaultFrom = useMemo(
@@ -51,6 +56,10 @@ const BlurText = ({
   const stepCount = toSnapshots.length + 1;
   const totalDuration = stepDuration * (stepCount - 1);
   const times = Array.from({ length: stepCount }, (_, i) => (stepCount === 1 ? 0 : i / (stepCount - 1)));
+
+  if (!isMounted) {
+    return <p className={className}>{text}</p>;
+  }
 
   return (
     <p className={className} style={{ display: 'flex', flexWrap: 'wrap' }}>
