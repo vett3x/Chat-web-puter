@@ -511,7 +511,7 @@ export function useGeneralChat({
       isCorrectionPlan: false,
       correctionApproved: false,
       isErrorAnalysisRequest: false,
-      isAnimated: true,
+      isAnimated: false,
     };
 
     setMessages(prev => [...prev, newUserMessage]);

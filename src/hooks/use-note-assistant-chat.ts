@@ -198,7 +198,7 @@ export function useNoteAssistantChat({
       role: 'user', 
       content: userInput, 
       isNew: true, 
-      isAnimated: true,
+      isAnimated: false,
       timestamp: new Date(),
       isTyping: false,
       isConstructionPlan: false,
