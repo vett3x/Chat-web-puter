@@ -100,19 +100,32 @@ export function StorageManagementDialog({ open, onOpenChange }: StorageManagemen
     if (!files || files.length === 0) return;
 
     setIsUploading(true);
-    const toastId = toast.loading(`Subiendo ${files.length} archivo(s)...`);
     let filesUploaded = 0;
 
-    for (const file of Array.from(files)) {
-      const filePath = `${session.user.id}/${currentPath ? `${currentPath}/` : ''}${Date.now()}-${file.name}`;
-      const { error } = await supabase.storage.from('notes-images').upload(filePath, file);
-      if (error) toast.error(`Error al subir ${file.name}: ${error.message}`);
-      else filesUploaded++;
+    const uploadPromises = Array.from(files).map(async (file) => {
+      const toastId = toast.loading(`Subiendo "${file.name}"...`);
+      try {
+        const filePath = `${session.user.id}/${currentPath ? `${currentPath}/` : ''}${Date.now()}-${file.name}`;
+        const { error } = await supabase.storage.from('notes-images').upload(filePath, file);
+        if (error) {
+          throw new Error(error.message);
+        }
+        toast.success(`"${file.name}" subido correctamente.`, { id: toastId });
+        filesUploaded++;
+      } catch (uploadError: any) {
+        toast.error(`Error al subir "${file.name}": ${uploadError.message}`, { id: toastId });
+      }
+    });
+
+    await Promise.all(uploadPromises);
+
+    if (filesUploaded > 0) {
+      fetchItems(currentPath); // Refresh the list only if something was uploaded
     }
 
-    toast.success(`${filesUploaded} archivo(s) subido(s).`, { id: toastId });
-    fetchItems(currentPath);
-    if (event.target) event.target.value = '';
+    if (event.target) {
+      event.target.value = '';
+    }
     setIsUploading(false);
   };
 
@@ -208,7 +221,7 @@ export function StorageManagementDialog({ open, onOpenChange }: StorageManagemen
                     {items.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground h-24">Esta carpeta está vacía.</TableCell></TableRow> : items.map(item => {
                       const isVirtual = item.path.startsWith(VIRTUAL_PROJECTS_FOLDER);
                       return (
-                        <TableRow key={item.path} onClick={() => handleNavigate(item)} className={item.type === 'folder' ? 'cursor-pointer' : ''}>
+                        <TableRow key={item.path} onClick={() => item.type === 'folder' && handleNavigate(item)} className={item.type === 'folder' ? 'cursor-pointer' : ''}>
                           <TableCell>
                             <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md">
                               {item.name === VIRTUAL_PROJECTS_FOLDER ? <Wand2 className="h-6 w-6 text-primary-light-purple" /> : (item.type === 'folder' ? <Folder className="h-6 w-6 text-yellow-500" /> : (item.metadata?.mimetype.startsWith('image/') ? <img src={item.publicUrl} alt={item.name} className="h-full w-full object-cover rounded-md" /> : <File className="h-6 w-6 text-muted-foreground" />))}
