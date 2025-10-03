@@ -46,6 +46,42 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('saved');
   const [preview, setPreview] = useState<'live' | 'edit' | 'preview'>('live');
 
+  const handleImageUpload = async function* (data: DataTransfer, setMarkdown: (markdown: string) => void) {
+    if (!session?.user?.id || !note?.id) {
+      toast.error("Debes iniciar sesión para subir imágenes.");
+      return;
+    }
+
+    const files = Array.from(data.items).map(item => item.getAsFile()).filter(Boolean) as File[];
+    if (files.length === 0) return;
+
+    const toastId = toast.loading(`Subiendo ${files.length} imagen(es)...`);
+
+    for (const file of files) {
+      const filePath = `${session.user.id}/${note.id}/${Date.now()}-${file.name}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('notes-images')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.error("Error uploading image:", uploadError);
+        toast.error(`Error al subir ${file.name}: ${uploadError.message}`, { id: toastId });
+        continue; // Skip to the next file
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('notes-images')
+        .getPublicUrl(filePath);
+
+      if (publicUrl) {
+        const markdownImage = `![${file.name}](${publicUrl})`;
+        setMarkdown(markdownImage);
+      }
+    }
+    toast.success("Imágenes subidas correctamente.", { id: toastId });
+  };
+
   const customCommands = [
     { ...commands.bold, icon: <Bold size={16} /> },
     { ...commands.italic, icon: <Italic size={16} /> },
@@ -68,7 +104,7 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
     { ...commands.quote, icon: <Quote size={16} /> },
     { ...commands.code, icon: <Code size={16} /> },
     { ...commands.codeBlock, icon: <Code size={16} /> },
-    { ...commands.image, icon: <ImageIcon size={16} /> },
+    { ...commands.image, icon: <ImageIcon size={16} />, onImageUpload: handleImageUpload },
     { ...commands.table, icon: <Table size={16} /> },
     commands.divider,
     { ...commands.unorderedListCommand, icon: <List size={16} /> },
