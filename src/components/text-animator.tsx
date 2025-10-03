@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import SplitText from "./split-text"; // Cambiado de BlurText a SplitText
@@ -16,8 +16,15 @@ interface TextAnimatorProps {
 
 export function TextAnimator({ text, className, isNew, onAnimationComplete, animationSpeed, disableAnimation }: TextAnimatorProps) {
   const containsMarkdown = /(^#{1,6}\s)|(^\s*[\*\-]\s)|(\*\*|__)|(`[^`]+`)|(\[.*\]\(.*\))|(\n.*\n)/m.test(text);
+  const shouldUseSplitText = isNew && !containsMarkdown && !disableAnimation;
 
-  if (isNew && !containsMarkdown && !disableAnimation) {
+  useEffect(() => {
+    if (isNew && !shouldUseSplitText) {
+      onAnimationComplete?.();
+    }
+  }, [isNew, shouldUseSplitText, onAnimationComplete]);
+
+  if (shouldUseSplitText) {
     const delayMap = {
       slow: 150,
       normal: 100,
@@ -40,13 +47,6 @@ export function TextAnimator({ text, className, isNew, onAnimationComplete, anim
       />
     );
   }
-
-  // Fallback for old messages or messages with complex markdown
-  React.useEffect(() => {
-    if (isNew) {
-      onAnimationComplete?.();
-    }
-  }, [isNew, onAnimationComplete]);
 
   if (containsMarkdown) {
     return (
