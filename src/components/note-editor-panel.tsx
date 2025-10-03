@@ -6,7 +6,7 @@ import { useSession } from '@/components/session-context-provider';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Save, Loader2, Wand2, X, Check, Bold, Italic, Strikethrough, Heading1, Heading2, Heading3, List, ListOrdered, Quote, Code, Link, Image as ImageIcon, Table, Eye, EyeOff, ListTodo } from 'lucide-react';
+import { Save, Loader2, Wand2, X, Check, Bold, Italic, Strikethrough, Heading1, Heading2, Heading3, List, ListOrdered, Quote, Code, Link, Image as ImageIcon, Table, ListTodo } from 'lucide-react';
 import { NoteAiChat } from './note-ai-chat';
 import { ChatMessage } from '@/hooks/use-note-assistant-chat';
 import { ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys';
@@ -44,7 +44,9 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [showAiHint, setShowAiHint] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('saved');
-  const [preview, setPreview] = useState<'live' | 'edit' | 'preview'>('live');
+  // `preview` se establece en "live" para mostrar el editor y la vista previa simultáneamente.
+  // El MDEditor gestiona el layout automáticamente en este modo.
+  const [previewMode, setPreviewMode] = useState<'live'>('live'); 
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const editorApiRef = useRef<TextAreaTextApi | null>(null);
@@ -164,16 +166,7 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
     { ...commands.unorderedListCommand, icon: <List size={16} /> },
     { ...commands.orderedListCommand, icon: <ListOrdered size={16} /> },
     { ...commands.checkedListCommand, icon: <ListTodo size={16} /> },
-    commands.divider,
-    {
-      name: 'preview',
-      keyCommand: 'preview',
-      icon: preview === 'edit' ? <Eye size={16} /> : <EyeOff size={16} />,
-      buttonProps: { 'aria-label': 'Toggle preview' },
-      execute: () => {
-        setPreview(prev => (prev === 'edit' ? 'live' : 'edit'));
-      },
-    },
+    // El botón de toggle-preview se ha eliminado porque el modo "live" lo hace innecesario.
   ];
 
   const handleSave = useCallback(async (currentTitle: string, currentContent: string) => {
@@ -288,7 +281,7 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
           onChange={(val) => setContent(val || '')}
           height="100%"
           commands={customCommands}
-          preview={preview}
+          preview={previewMode} // Usamos el modo 'live'
           className="[&>div]:!border-none"
         />
       </div>
