@@ -6,12 +6,12 @@ import { useSession } from '@/components/session-context-provider';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Save, Loader2, Wand2, X, Check, Bold, Italic, Strikethrough, Heading1, Heading2, Heading3, List, ListOrdered, Quote, Code, Link, Image as ImageIcon, Table, Eye, EyeOff, ListTodo } from 'lucide-react';
+import { Save, Loader2, Wand2, X, Check } from 'lucide-react';
 import { NoteAiChat } from './note-ai-chat';
 import { ChatMessage } from '@/hooks/use-note-assistant-chat';
 import { ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys';
-import MDEditor, { commands, TextAreaTextApi, TextState } from '@uiw/react-md-editor';
 import { useTheme } from 'next-themes';
+import { WysiwygEditor } from './wysiwyg-editor';
 
 interface Note {
   id: string;
@@ -44,137 +44,6 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [showAiHint, setShowAiHint] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('saved');
-  const [preview, setPreview] = useState<'live' | 'edit' | 'preview'>('live');
-
-  const imageInputRef = useRef<HTMLInputElement>(null);
-  const editorApiRef = useRef<TextAreaTextApi | null>(null);
-
-  const handleImageUpload = async function* (data: DataTransfer, setMarkdown: (markdown: string) => void) {
-    if (!session?.user?.id || !note?.id) {
-      toast.error("Debes iniciar sesión para subir imágenes.");
-      return;
-    }
-
-    const files = Array.from(data.items).map(item => item.getAsFile()).filter(Boolean) as File[];
-    if (files.length === 0) return;
-
-    const toastId = toast.loading(`Subiendo ${files.length} imagen(es)...`);
-
-    for (const file of files) {
-      const filePath = `${session.user.id}/${note.id}/${Date.now()}-${file.name}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('notes-images')
-        .upload(filePath, file);
-
-      if (uploadError) {
-        console.error("Error uploading image:", uploadError);
-        toast.error(`Error al subir ${file.name}: ${uploadError.message}`, { id: toastId });
-        continue;
-      }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('notes-images')
-        .getPublicUrl(filePath);
-
-      if (publicUrl) {
-        const markdownImage = `![${file.name}](${publicUrl})`;
-        setMarkdown(markdownImage);
-      }
-    }
-    toast.success("Imágenes subidas correctamente.", { id: toastId });
-  };
-
-  const handleFileSelectAndUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!session?.user?.id || !note?.id || !editorApiRef.current) {
-      toast.error("No se puede subir la imagen en este momento.");
-      return;
-    }
-
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-
-    const toastId = toast.loading(`Subiendo ${files.length} imagen(es)...`);
-
-    for (const file of Array.from(files)) {
-      const filePath = `${session.user.id}/${note.id}/${Date.now()}-${file.name}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('notes-images')
-        .upload(filePath, file);
-
-      if (uploadError) {
-        console.error("Error uploading image:", uploadError);
-        toast.error(`Error al subir ${file.name}: ${uploadError.message}`, { id: toastId });
-        continue;
-      }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('notes-images')
-        .getPublicUrl(filePath);
-
-      if (publicUrl) {
-        const markdownImage = `![${file.name}](${publicUrl})`;
-        editorApiRef.current.replaceSelection(markdownImage);
-      }
-    }
-    toast.success("Imágenes subidas correctamente.", { id: toastId });
-
-    if (event.target) {
-      event.target.value = '';
-    }
-  };
-
-  const customImageCommand: commands.ICommand = {
-    name: 'image',
-    keyCommand: 'image',
-    icon: <ImageIcon size={16} />,
-    buttonProps: { 'aria-label': 'Insert image' },
-    execute: (state: TextState, api: TextAreaTextApi) => {
-      editorApiRef.current = api;
-      imageInputRef.current?.click();
-    },
-  };
-
-  const customCommands = [
-    { ...commands.bold, icon: <Bold size={16} /> },
-    { ...commands.italic, icon: <Italic size={16} /> },
-    { ...commands.strikethrough, icon: <Strikethrough size={16} /> },
-    commands.divider,
-    commands.group(
-      [
-        { ...commands.title1, icon: <Heading1 size={16} /> },
-        { ...commands.title2, icon: <Heading2 size={16} /> },
-        { ...commands.title3, icon: <Heading3 size={16} /> },
-      ],
-      {
-        name: 'title',
-        groupName: 'title',
-        buttonProps: { 'aria-label': 'Insert title' },
-      }
-    ),
-    commands.divider,
-    { ...commands.link, icon: <Link size={16} /> },
-    { ...commands.quote, icon: <Quote size={16} /> },
-    { ...commands.code, icon: <Code size={16} /> },
-    { ...commands.codeBlock, icon: <Code size={16} /> },
-    customImageCommand,
-    { ...commands.table, icon: <Table size={16} /> },
-    commands.divider,
-    { ...commands.unorderedListCommand, icon: <List size={16} /> },
-    { ...commands.orderedListCommand, icon: <ListOrdered size={16} /> },
-    { ...commands.checkedListCommand, icon: <ListTodo size={16} /> },
-    commands.divider,
-    {
-      name: 'preview',
-      keyCommand: 'preview',
-      icon: preview === 'edit' ? <Eye size={16} /> : <EyeOff size={16} />,
-      buttonProps: { 'aria-label': 'Toggle preview' },
-      execute: () => {
-        setPreview(prev => (prev === 'edit' ? 'live' : 'edit'));
-      },
-    },
-  ];
 
   const handleSave = useCallback(async (currentTitle: string, currentContent: string) => {
     if (!note || saveStatus === 'saving') return;
@@ -265,14 +134,6 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
 
   return (
     <div className="h-full w-full flex flex-col bg-background relative" data-color-mode={resolvedTheme}>
-      <input
-        type="file"
-        ref={imageInputRef}
-        onChange={handleFileSelectAndUpload}
-        accept="image/*"
-        multiple
-        hidden
-      />
       <div className="flex items-center justify-between p-2 border-b bg-muted">
         <Input value={title} onChange={(e) => setTitle(e.target.value)} className="text-lg font-semibold border-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent" disabled={saveStatus === 'saving'} />
         <div className="flex items-center gap-2">
@@ -282,15 +143,8 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
           </div>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto">
-        <MDEditor
-          value={content}
-          onChange={(val) => setContent(val || '')}
-          height="100%"
-          commands={customCommands}
-          preview={preview}
-          className="[&>div]:!border-none"
-        />
+      <div className="flex-1 overflow-y-auto p-4 prose dark:prose-invert max-w-none">
+        <WysiwygEditor value={content} onChange={setContent} />
       </div>
       {showAiHint && (<div className="absolute bottom-20 right-4 bg-info text-info-foreground p-2 rounded-md shadow-lg text-sm animate-in fade-in slide-in-from-bottom-2 flex items-center gap-2 z-10"><span>¡Usa la IA para chatear con tu nota!</span><Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setShowAiHint(false)}><X className="h-3 w-3" /></Button></div>)}
       <Button variant="destructive" size="icon" onClick={() => setIsAiChatOpen(prev => !prev)} className="absolute bottom-4 right-4 rounded-full h-12 w-12 animate-pulse-red z-10" title="Asistente de Nota"><Wand2 className="h-6 w-6" /></Button>
