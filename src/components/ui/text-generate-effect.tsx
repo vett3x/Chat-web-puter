@@ -1,6 +1,5 @@
 "use client";
-import { useEffect } from "react";
-import { motion, stagger, useAnimate } from "framer-motion";
+import { motion, Variants } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 export const TextGenerateEffect = ({
@@ -12,36 +11,47 @@ export const TextGenerateEffect = ({
   className?: string;
   onAnimationComplete?: () => void;
 }) => {
-  const [scope, animate] = useAnimate();
-  let wordsArray = words.split(" ");
-  useEffect(() => {
-    const animation = animate(
-      "span",
-      {
-        opacity: 1,
+  const wordsArray = words.split(" ");
+
+  const containerVariants: Variants = {
+    hidden: { opacity: 1 }, // El contenedor en sí es visible
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.04, // El retraso entre la animación de cada palabra
       },
-      {
-        duration: 0.5,
-        delay: stagger(0.05),
-      }
-    );
-    animation.then(() => {
-      onAnimationComplete?.();
-    });
-  }, [animate, words, onAnimationComplete]);
+    },
+  };
+
+  const childVariants: Variants = {
+    hidden: { opacity: 0, y: 20 }, // Estado inicial de cada palabra: invisible y ligeramente desplazada
+    visible: {
+      opacity: 1,
+      y: 0, // Estado final: visible y en su posición original
+      transition: {
+        duration: 0.4,
+        ease: "easeOut",
+      },
+    },
+  };
 
   return (
-    <motion.div ref={scope} className={cn(className)}>
-      {wordsArray.map((word, idx) => {
-        return (
-          <motion.span
-            key={word + idx}
-            className="opacity-0"
-          >
-            {word}{" "}
-          </motion.span>
-        );
-      })}
+    <motion.div
+      className={cn("whitespace-pre-wrap", className)}
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      onAnimationComplete={onAnimationComplete}
+    >
+      {wordsArray.map((word, idx) => (
+        <motion.span
+          key={word + idx}
+          variants={childVariants}
+          className="inline-block" // Necesario para que la transformación 'y' funcione
+        >
+          {word}{" "}
+        </motion.span>
+      ))}
     </motion.div>
   );
 };
