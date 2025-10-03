@@ -332,7 +332,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
 
   useEffect(() => {
     if (editor && initialContent !== editor.getHTML()) {
-      editor.commands.setContent(initialContent, false);
+      editor.commands.setContent(initialContent, { emitUpdate: false }); // Corrected line
     }
   }, [editor, initialContent]);
 
