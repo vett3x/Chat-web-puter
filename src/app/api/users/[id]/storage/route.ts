@@ -36,15 +36,18 @@ export async function GET(req: NextRequest, context: any) {
   try {
     const [usageRes, limitRes] = await Promise.all([
       supabaseAdmin.rpc('get_user_storage_usage', { p_user_id: userIdToFetch }),
-      supabaseAdmin.from('profiles').select('storage_limit_mb').eq('id', userIdToFetch).single()
+      supabaseAdmin.from('profiles').select('storage_limit_mb').eq('id', userIdToFetch).maybeSingle() // Use maybeSingle to prevent error if profile not found
     ]);
 
     if (usageRes.error) throw usageRes.error;
     if (limitRes.error) throw limitRes.error;
 
+    // Handle case where profile might not exist, provide a default limit
+    const storageLimitMb = limitRes.data?.storage_limit_mb ?? 100;
+
     return NextResponse.json({
       usage_bytes: usageRes.data,
-      limit_mb: limitRes.data.storage_limit_mb,
+      limit_mb: storageLimitMb,
     });
   } catch (error: any) {
     console.error(`[API /storage] Error:`, error);
