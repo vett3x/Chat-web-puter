@@ -805,7 +805,7 @@ export function useDeepAICoderChat({
       isCorrectionPlan: false,
       correctionApproved: false,
       isErrorAnalysisRequest: false,
-      isAnimated: false,
+      isAnimated: true,
     };
 
     setMessages(prev => [...prev, newUserMessage]);
