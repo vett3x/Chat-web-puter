@@ -4,6 +4,19 @@ import { createClient } from '@supabase/supabase-js';
 import { Client as PgClient } from 'pg';
 import crypto from 'crypto';
 
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+interface AppDatabaseCredentials {
+  db_host: string;
+  db_port: number;
+  db_name: string; // This will be the schema name
+  db_user: string;
+  db_password: string;
+}
+
 /**
  * Generates a random string for database names/users/passwords.
  * @param length The desired length of the random string.
@@ -22,10 +35,6 @@ function generateRandomString(length: number): string {
  * @returns The credentials for the newly created database schema.
  */
 export async function createAppDatabaseSchema(appId: string): Promise<AppDatabaseCredentials> {
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
   let pgClient: PgClient | null = null;
   try {
     // 1. Find the active database configuration
@@ -96,12 +105,4 @@ export async function createAppDatabaseSchema(appId: string): Promise<AppDatabas
       await pgClient.end().catch(e => console.error("Error closing PG client:", e));
     }
   }
-}
-
-interface AppDatabaseCredentials {
-  db_host: string;
-  db_port: number;
-  db_name: string; // This will be the schema name
-  db_user: string;
-  db_password: string;
 }

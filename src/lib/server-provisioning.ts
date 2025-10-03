@@ -3,6 +3,13 @@
 import { createClient } from '@supabase/supabase-js';
 import { executeSshCommand } from './ssh-utils'; // Import SSH utilities
 
+// Initialize Supabase client with the service role key
+// This allows us to bypass RLS and update the server status from the backend.
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
 const DOCKER_INSTALL_SCRIPT = `
 export DEBIAN_FRONTEND=noninteractive
 echo "--- Starting Docker Installation ---"
@@ -45,10 +52,6 @@ echo "--- Host Provisioning Complete ---"
 `;
 
 async function updateServerLog(serverId: string, logChunk: string) {
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
   const { error } = await supabaseAdmin.rpc('append_to_provisioning_log', {
     server_id: serverId,
     log_content: logChunk,
@@ -66,10 +69,6 @@ export async function provisionServer(server: {
   ssh_password?: string;
 }) {
   const { id, ip_address, ssh_port, ssh_username, ssh_password } = server;
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
 
   // 1. Set status to 'provisioning'
   await supabaseAdmin

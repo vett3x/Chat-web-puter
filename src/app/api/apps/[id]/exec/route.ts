@@ -13,6 +13,8 @@ const execSchema = z.object({
   command: z.string().min(1, { message: 'El comando es requerido.' }),
 });
 
+const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!); // REMOVED: .schema('public')
+
 async function getUserId() {
   const cookieStore = cookies() as any;
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { cookies: { get: (name: string) => cookieStore.get(name)?.value } }); // REMOVED: .schema('public')
@@ -165,8 +167,6 @@ function isCommandSafe(command: string, allowedCommands: string[]): boolean {
 
 export async function POST(req: NextRequest, context: any) {
   const appId = context.params.id;
-
-  const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
   try {
     const userId = await getUserId();

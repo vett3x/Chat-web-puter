@@ -47,6 +47,8 @@ async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | '
   return { session, userRole };
 }
 
+const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+
 // Function to sanitize command details
 function sanitizeCommandDetails(command: string | null): string | null {
   if (!command) return null;
@@ -59,8 +61,6 @@ export async function GET(req: NextRequest) {
   if (!session || (userRole !== 'admin' && userRole !== 'super_admin')) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
   }
-
-  const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
   // Fetch all users to create a map of ID to email
   const { data: { users }, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
@@ -140,8 +140,6 @@ export async function DELETE(req: NextRequest) {
   if (!session || userRole !== 'super_admin') {
     return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden limpiar el historial de alertas.' }, { status: 403 });
   }
-
-  const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
   try {
     // Log the action before clearing the table

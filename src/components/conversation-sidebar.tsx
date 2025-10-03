@@ -13,8 +13,7 @@ import { DraggableAppItem } from './draggable-app-item';
 import { toast } from 'sonner';
 import { FileTree } from './file-tree';
 import { VersionDisplay } from './version-display';
-import { useSidebarData } from '@/hooks/use-sidebar-data';
-import { StorageUsageIndicator } from './storage-usage-indicator'; // Import the new component
+import { useSidebarData } from '@/hooks/use-sidebar-data'; // Import the hook here
 
 interface Conversation {
   id: string;
@@ -254,8 +253,6 @@ export const ConversationSidebar = React.memo(({
           )}
         </div>
       </ScrollArea>
-      <Separator className="my-2 bg-sidebar-border" />
-      <StorageUsageIndicator />
       <VersionDisplay />
     </div>
   );

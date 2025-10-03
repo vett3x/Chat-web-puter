@@ -7,6 +7,11 @@ import { generateRandomPort } from '@/lib/utils';
 import { DEFAULT_INSTALL_DEPS_SCRIPT } from '@/components/server-detail-tabs/docker/create-container-constants';
 import { createAppDatabaseSchema } from './database-provisioning';
 
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
 interface AppProvisioningData {
   appId: string;
   userId: string;
@@ -17,10 +22,6 @@ interface AppProvisioningData {
 }
 
 async function updateAppStatus(appId: string, status: 'ready' | 'failed', details: object = {}) {
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
   const { error } = await supabaseAdmin
     .from('user_apps')
     .update({ status, ...details })
@@ -35,10 +36,6 @@ async function appendToServerProvisioningLog(serverId: string | null, logContent
     console.warn(`[App Provisioning] No serverId available for logging: ${logContent}`);
     return;
   }
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
   const { error } = await supabaseAdmin.rpc('append_to_provisioning_log', {
     server_id: serverId,
     log_content: logContent,
@@ -55,11 +52,6 @@ export async function provisionApp(data: AppProvisioningData) {
   let containerName: string | undefined;
   let serverIdForLog: string | null = null;
   let appDbCredentials: any = null;
-
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
 
   try {
     await supabaseAdmin.from('server_events_log').insert({
