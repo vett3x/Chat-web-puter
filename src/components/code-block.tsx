@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { useState, useEffect } from 'react';
+import CodeEditor from '@uiw/react-textarea-code-editor';
 import { Button } from '@/components/ui/button';
 import { Check, Clipboard, Download, ChevronsUpDown, Loader2, CheckCircle2, Terminal } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -15,24 +14,24 @@ interface CodeBlockProps {
   filename?: string;
   isNew?: boolean;
   onAnimationComplete?: () => void;
-  animationSpeed: 'slow' | 'normal' | 'fast'; // Not directly used for text animation, but kept for consistency
+  animationSpeed: 'slow' | 'normal' | 'fast';
 }
 
 export function CodeBlock({ language, code, filename, isNew, onAnimationComplete }: CodeBlockProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const [isTyping, setIsTyping] = useState(false); // Control local de la animación de 'typing'
+  const [isTyping, setIsTyping] = useState(false);
 
   useEffect(() => {
     if (isNew) {
       setIsTyping(true);
       const timer = setTimeout(() => {
         setIsTyping(false);
-        onAnimationComplete?.(); // Notificar al padre que la animación ha terminado
-      }, 1000); // Duración de la animación de 'typing' (1 segundo)
+        onAnimationComplete?.();
+      }, 1000);
       return () => clearTimeout(timer);
     } else {
-      setIsTyping(false); // Si no es nuevo, no está 'typing'
+      setIsTyping(false);
     }
   }, [isNew, onAnimationComplete]);
 
@@ -69,7 +68,6 @@ export function CodeBlock({ language, code, filename, isNew, onAnimationComplete
   };
 
   if (language === 'bash' && filename === 'exec') {
-    // Render a simplified block for bash:exec commands, hiding the actual code
     return (
       <div className="rounded-lg border bg-muted/50 my-2 p-3 flex items-center gap-2 text-sm text-muted-foreground">
         <Terminal className="h-5 w-5 flex-shrink-0" />
@@ -112,15 +110,18 @@ export function CodeBlock({ language, code, filename, isNew, onAnimationComplete
         </div>
       </div>
       <CollapsibleContent>
-        <SyntaxHighlighter
+        <CodeEditor
+          value={code}
           language={language}
-          style={vscDarkPlus}
-          customStyle={{ margin: 0, borderRadius: '0 0 0.5rem 0.5rem', background: '#1E1E1E' }}
-          codeTagProps={{ style: { fontFamily: 'var(--font-geist-mono)' } }}
-          wrapLongLines={true}
-        >
-          {code}
-        </SyntaxHighlighter>
+          padding={15}
+          readOnly
+          style={{
+            fontSize: 14,
+            backgroundColor: '#1E1E1E',
+            fontFamily: 'var(--font-geist-mono)',
+            borderRadius: '0 0 0.5rem 0.5rem',
+          }}
+        />
       </CollapsibleContent>
     </Collapsible>
   );
