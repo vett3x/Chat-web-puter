@@ -28,6 +28,12 @@ export async function GET(req: NextRequest, context: any) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
   }
 
+  // NEW: Check for Supabase environment variables
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('[API /users/[id]/storage] ERROR: Supabase URL or Service Role Key is not set.');
+    return NextResponse.json({ message: 'Error de configuración del servidor: Faltan variables de entorno de Supabase.' }, { status: 500 });
+  }
+
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -36,13 +42,18 @@ export async function GET(req: NextRequest, context: any) {
   try {
     const [usageRes, limitRes] = await Promise.all([
       supabaseAdmin.rpc('get_user_storage_usage', { p_user_id: userIdToFetch }),
-      supabaseAdmin.from('profiles').select('storage_limit_mb').eq('id', userIdToFetch).maybeSingle() // Use maybeSingle to prevent error if profile not found
+      supabaseAdmin.from('profiles').select('storage_limit_mb').eq('id', userIdToFetch).maybeSingle()
     ]);
 
-    if (usageRes.error) throw usageRes.error;
-    if (limitRes.error) throw limitRes.error;
+    if (usageRes.error) {
+      console.error(`[API /users/[id]/storage] Error calling get_user_storage_usage for user ${userIdToFetch}:`, usageRes.error);
+      throw new Error(`Error al obtener el uso de almacenamiento: ${usageRes.error.message}`);
+    }
+    if (limitRes.error) {
+      console.error(`[API /users/[id]/storage] Error fetching storage_limit_mb for user ${userIdToFetch}:`, limitRes.error);
+      throw new Error(`Error al obtener el límite de almacenamiento: ${limitRes.error.message}`);
+    }
 
-    // Handle case where profile might not exist, provide a default limit
     const storageLimitMb = limitRes.data?.storage_limit_mb ?? 100;
 
     return NextResponse.json({
@@ -50,7 +61,7 @@ export async function GET(req: NextRequest, context: any) {
       limit_mb: storageLimitMb,
     });
   } catch (error: any) {
-    console.error(`[API /storage] Error:`, error);
-    return NextResponse.json({ message: error.message }, { status: 500 });
+    console.error(`[API /users/[id]/storage] Unhandled error for user ${userIdToFetch}:`, error);
+    return NextResponse.json({ message: error.message || 'Error interno del servidor al obtener el uso de almacenamiento.' }, { status: 500 });
   }
 }
