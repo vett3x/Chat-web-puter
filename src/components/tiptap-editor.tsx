@@ -311,7 +311,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       onChange(editor.getHTML());
     },
     editable: isEditable,
-    immediatelyRender: true, // The key change from the user's research
+    immediatelyRender: true,
+    shouldRerenderOnTransaction: false,
     editorProps: {
       attributes: {
         class: cn(
@@ -329,7 +330,14 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         ),
       },
     },
-  }, [initialContent]); // Keep the dependency array to re-create the editor when the note changes
+  }, []); // Empty dependency array to create the editor instance only once
+
+  // Effect to update content when initialContent changes (e.g., switching notes)
+  useEffect(() => {
+    if (editor && !editor.isDestroyed && initialContent !== editor.getHTML()) {
+      editor.commands.setContent(initialContent, { emitUpdate: false });
+    }
+  }, [initialContent, editor]);
 
   return (
     <div className="flex flex-col h-full border border-input rounded-md">
