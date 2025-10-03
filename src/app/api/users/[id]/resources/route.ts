@@ -4,9 +4,9 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
-import { parseMemoryString } from '@/lib/utils'; // Import the utility function
-import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants'; // Importación actualizada
-import { executeSshCommand } from '@/lib/ssh-utils'; // Import SSH utilities
+import { parseMemoryString } from '@/lib/utils';
+import { SUPERUSER_EMAILS, UserPermissions, PERMISSION_KEYS } from '@/lib/constants';
+import { executeSshCommand } from '@/lib/ssh-utils';
 
 // Helper function to get the session and user role
 async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | 'admin' | 'super_admin' | null; userPermissions: UserPermissions }> {
@@ -16,9 +16,7 @@ async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | '
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
+        get(name: string) { return cookieStore.get(name)?.value; },
         set(name: string, value: string, options: CookieOptions) {},
         remove(name: string, options: CookieOptions) {},
       },
@@ -30,44 +28,20 @@ async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | '
   let userPermissions: UserPermissions = {};
 
   if (session?.user?.id) {
-    // First, determine the role, prioritizing SUPERUSER_EMAILS
     if (session.user.email && SUPERUSER_EMAILS.includes(session.user.email)) {
       userRole = 'super_admin';
     } else {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('role') // Only need role for initial determination
-        .eq('id', session.user.id)
-        .single();
-      if (profile) {
-        userRole = profile.role as 'user' | 'admin' | 'super_admin';
-      } else {
-        userRole = 'user'; // Default to user if no profile found and not superuser email
-      }
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+      userRole = profile ? profile.role as 'user' | 'admin' | 'super_admin' : 'user';
     }
 
-    // Then, fetch permissions from profile, or set all if super_admin
     if (userRole === 'super_admin') {
       for (const key of Object.values(PERMISSION_KEYS)) {
         userPermissions[key] = true;
       }
     } else {
-      const { data: profilePermissions, error: permissionsError } = await supabase
-        .from('profiles')
-        .select('permissions')
-        .eq('id', session.user.id)
-        .single();
-      if (profilePermissions) {
-        userPermissions = profilePermissions.permissions || {};
-      } else {
-        // Default permissions for non-super-admin if profile fetch failed
-        userPermissions = {
-          [PERMISSION_KEYS.CAN_CREATE_SERVER]: false,
-          [PERMISSION_KEYS.CAN_MANAGE_DOCKER_CONTAINERS]: false,
-          [PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_DOMAINS]: false,
-          [PERMISSION_KEYS.CAN_MANAGE_CLOUDFLARE_TUNNELS]: false,
-        };
-      }
+      const { data: profilePermissions } = await supabase.from('profiles').select('permissions').eq('id', session.user.id).single();
+      userPermissions = profilePermissions ? profilePermissions.permissions || {} : {};
     }
   }
   return { session, userRole, userPermissions };
@@ -75,26 +49,17 @@ async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | '
 
 export async function GET(
   req: NextRequest,
-  context: any // Usamos 'any' para resolver el error de compilación de TypeScript
+  context: any
 ) {
-  const serverId = context.params.id;
+  const userIdToFetch = context.params.id;
 
-  if (!serverId) {
-    return NextResponse.json({ message: 'ID de servidor no proporcionado.' }, { status: 400 });
+  if (!userIdToFetch) {
+    return NextResponse.json({ message: 'ID de usuario no proporcionado.' }, { status: 400 });
   }
 
   const { session, userRole } = await getSessionAndRole();
-  if (!session || !userRole) {
-    return NextResponse.json({ message: 'Acceso denegado. No autenticado.' }, { status: 401 });
-  }
-  // Allow Admins and Super Admins to view resources
-  if (userRole !== 'admin' && userRole !== 'super_admin') {
-    return NextResponse.json({ message: 'Acceso denegado. Se requiere rol de Admin o Super Admin.' }, { status: 403 });
-  }
-
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    console.error('SUPABASE_SERVICE_ROLE_KEY is not set in environment variables.');
-    return NextResponse.json({ message: 'Error de configuración del servidor.' }, { status: 500 });
+  if (!session || (userRole !== 'admin' && userRole !== 'super_admin')) {
+    return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
   }
 
   const supabaseAdmin = createClient(
@@ -102,54 +67,86 @@ export async function GET(
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const { data: server, error: fetchError } = await supabaseAdmin
-    .from('user_servers')
-    .select('ip_address, ssh_port, ssh_username, ssh_password')
-    .eq('id', serverId)
-    // .eq('user_id', session.user.id) // <-- REMOVED THIS LINE
-    .single();
-
-  if (fetchError || !server) {
-    console.error(`Error fetching server ${serverId} for user ${session.user.id}:`, fetchError);
-    return NextResponse.json({ message: 'Servidor no encontrado o acceso denegado.' }, { status: 404 });
-  }
-
   try {
-    // More robust, locale-independent commands
-    const cpuCommand = `LC_ALL=C top -bn1 | grep "Cpu(s)" | sed "s/.*, *\\([0-9.]*\\)%* id.*/\\1/" | awk '{print 100 - $1}'`;
-    const memCommand = `LC_ALL=C free -m | awk '/^Mem:/{print $3, $2}'`;
-    const diskCommand = `LC_ALL=C df -h / | awk 'NR==2{print $5}'`;
-    const networkCommand = `LC_ALL=C cat /proc/net/dev | awk 'NR>2 && $1 !~ /lo/ {rx+=$2; tx+=$10} END {print rx, tx}'`;
+    const { data: servers, error: fetchError } = await supabaseAdmin
+      .from('user_servers')
+      .select('id, name, ip_address, ssh_port, ssh_username, ssh_password')
+      .eq('user_id', userIdToFetch)
+      .eq('status', 'ready');
 
-    const [cpuOutput, memOutput, diskOutput, networkOutput] = await Promise.all([
-      executeSshCommand(server, cpuCommand),
-      executeSshCommand(server, memCommand),
-      executeSshCommand(server, diskCommand),
-      executeSshCommand(server, networkCommand),
-    ]);
+    if (fetchError) {
+      throw new Error(`Error al buscar servidores: ${fetchError.message}`);
+    }
 
-    const cpu_usage_percent = parseFloat(cpuOutput.stdout);
-    const [raw_memory_used_str, raw_memory_total_str] = memOutput.stdout.split(/\s+/);
-    const disk_usage_percent = parseFloat(diskOutput.stdout.replace('%', ''));
-    const [rxBytes, txBytes] = networkOutput.stdout.split(/\s+/).map(Number);
+    if (!servers || servers.length === 0) {
+      return NextResponse.json({
+        cpu_usage_percent: 0,
+        memory_used_mib: 0,
+        memory_total_mib: 0,
+        disk_usage_percent: 0,
+        timestamp: new Date().toISOString(),
+        server_details: [],
+      });
+    }
 
-    const memory_used_mib = parseMemoryString(raw_memory_used_str || '0B');
-    const memory_total_mib = parseMemoryString(raw_memory_total_str || '0B');
+    const resourcePromises = servers.map(async (server) => {
+      try {
+        const cpuCommand = `LC_ALL=C top -bn1 | grep "Cpu(s)" | sed "s/.*, *\\([0-9.]*\\)%* id.*/\\1/" | awk '{print 100 - $1}'`;
+        const memCommand = `LC_ALL=C free -m | awk '/^Mem:/{print $3, $2}'`;
+        const diskCommand = `LC_ALL=C df -h / | awk 'NR==2{print $5}'`;
+
+        const [cpuOutput, memOutput, diskOutput] = await Promise.all([
+          executeSshCommand(server, cpuCommand),
+          executeSshCommand(server, memCommand),
+          executeSshCommand(server, diskCommand),
+        ]);
+
+        const cpu_usage_percent = parseFloat(cpuOutput.stdout);
+        const [raw_memory_used_str, raw_memory_total_str] = memOutput.stdout.split(/\s+/);
+        const disk_usage_percent = parseFloat(diskOutput.stdout.replace('%', ''));
+
+        return {
+          id: server.id,
+          name: server.name || server.ip_address,
+          cpu_usage_percent: isNaN(cpu_usage_percent) ? 0 : cpu_usage_percent,
+          memory_used_mib: parseMemoryString(raw_memory_used_str || '0B'),
+          memory_total_mib: parseMemoryString(raw_memory_total_str || '0B'),
+          disk_usage_percent: isNaN(disk_usage_percent) ? 0 : disk_usage_percent,
+        };
+      } catch (error: any) {
+        console.error(`Error fetching resources for server ${server.id}:`, error.message);
+        return null; // Return null for failed servers
+      }
+    });
+
+    const serverDetails = (await Promise.all(resourcePromises)).filter(Boolean) as any[];
+
+    let totalCpu = 0;
+    let totalMemUsed = 0;
+    let totalMemTotal = 0;
+    let totalDisk = 0;
+
+    serverDetails.forEach(detail => {
+      totalCpu += detail.cpu_usage_percent;
+      totalMemUsed += detail.memory_used_mib;
+      totalMemTotal += detail.memory_total_mib;
+      totalDisk += detail.disk_usage_percent;
+    });
+
+    const avgCpu = serverDetails.length > 0 ? totalCpu / serverDetails.length : 0;
+    const avgDisk = serverDetails.length > 0 ? totalDisk / serverDetails.length : 0;
 
     return NextResponse.json({
-      cpu_usage_percent: isNaN(cpu_usage_percent) ? 0 : cpu_usage_percent,
-      memory_used: raw_memory_used_str || 'N/A',
-      memory_total: raw_memory_total_str || 'N/A',
-      memory_used_mib: memory_used_mib,
-      memory_total_mib: memory_total_mib,
-      disk_usage_percent: isNaN(disk_usage_percent) ? 0 : disk_usage_percent,
-      network_rx_bytes: rxBytes || 0,
-      network_tx_bytes: txBytes || 0,
+      cpu_usage_percent: avgCpu,
+      memory_used_mib: totalMemUsed,
+      memory_total_mib: totalMemTotal,
+      disk_usage_percent: avgDisk,
       timestamp: new Date().toISOString(),
-    }, { status: 200 });
+      server_details: serverDetails,
+    });
 
   } catch (error: any) {
-    console.error(`Error fetching server resources for server ${serverId}:`, error.message);
-    return NextResponse.json({ message: `Error al obtener recursos del servidor: ${error.message}` }, { status: 500 });
+    console.error(`[API /users/${userIdToFetch}/resources] Error:`, error);
+    return NextResponse.json({ message: error.message }, { status: 500 });
   }
 }
