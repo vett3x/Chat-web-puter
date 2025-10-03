@@ -282,7 +282,7 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
           height="100%"
           commands={customCommands}
           preview={previewMode} // Usamos el modo 'live'
-          className="[&>div]:!border-none"
+          className="[&>div]:!border-none [&>div]:!bg-background"
         />
       </div>
       {showAiHint && (<div className="absolute bottom-20 right-4 bg-info text-info-foreground p-2 rounded-md shadow-lg text-sm animate-in fade-in slide-in-from-bottom-2 flex items-center gap-2 z-10"><span>¡Usa la IA para chatear con tu nota!</span><Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setShowAiHint(false)}><X className="h-3 w-3" /></Button></div>)}
