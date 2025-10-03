@@ -101,7 +101,7 @@ export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialCha
         const provider = AI_PROVIDERS.find(p => p.value === key.provider);
         if (provider) return provider.logo;
       }
-      return KeyRound;
+      return KeyRound; // Default for user_key if provider not found, or for custom_endpoint
     } else if (selectedModel.startsWith('group:')) { // NEW: Handle group selection icon
       const groupId = selectedModel.substring(6);
       const group = aiKeyGroups.find(g => g.id === groupId);
@@ -111,7 +111,7 @@ export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialCha
       }
       return Folder; // Default icon for a group
     }
-    return Bot;
+    return Bot; // Fallback
   }, [selectedModel, userApiKeys, aiKeyGroups]); // NEW: Add aiKeyGroups to dependencies
 
   if (!isOpen) return null;
@@ -173,6 +173,7 @@ export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialCha
                         correctionApproved={false}
                         isErrorAnalysisRequest={false}
                         isLoading={isLoading}
+                        disableAnimation={true}
                       />
                     )}
                   </div>

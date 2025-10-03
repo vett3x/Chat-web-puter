@@ -11,12 +11,13 @@ interface TextAnimatorProps {
   isNew?: boolean;
   onAnimationComplete?: () => void;
   animationSpeed: 'slow' | 'normal' | 'fast';
+  disableAnimation?: boolean;
 }
 
-export function TextAnimator({ text, className, isNew, onAnimationComplete, animationSpeed }: TextAnimatorProps) {
+export function TextAnimator({ text, className, isNew, onAnimationComplete, animationSpeed, disableAnimation }: TextAnimatorProps) {
   const containsMarkdown = /(^#{1,6}\s)|(^\s*[\*\-]\s)|(\*\*|__)|(`[^`]+`)|(\[.*\]\(.*\))|(\n.*\n)/m.test(text);
 
-  if (isNew && !containsMarkdown) {
+  if (isNew && !containsMarkdown && !disableAnimation) {
     const delayMap = {
       slow: 150,
       normal: 100,
