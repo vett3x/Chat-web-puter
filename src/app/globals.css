@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-
+@import '@mantine/core/styles.css'; /* NEW: Import global Mantine styles */
 
 @layer base {
   :root {
