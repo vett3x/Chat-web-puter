@@ -4,7 +4,7 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
-import { TextGenerateEffect } from './ui/text-generate-effect';
+import BlurText from './ui/BlurText';
 
 interface TextAnimatorProps {
   text: string;
@@ -18,12 +18,21 @@ interface TextAnimatorProps {
 export function TextAnimator({ text, className, isNew, onAnimationComplete, animationSpeed, disableAnimation }: TextAnimatorProps) {
   const containsMarkdown = /(^#{1,6}\s)|(^\s*[\*\-]\s)|(\*\*|__)|(`[^`]+`)|(\[.*\]\(.*\))|(\n.*\n)/m.test(text);
 
+  const delayMap = {
+    slow: 200,
+    normal: 150,
+    fast: 100,
+  };
+
   if (isNew && !containsMarkdown && !disableAnimation) {
     return (
-      <TextGenerateEffect
-        words={text}
-        className={className}
+      <BlurText
+        text={text}
+        delay={delayMap[animationSpeed]}
+        animateBy="words"
+        direction="top"
         onAnimationComplete={onAnimationComplete}
+        className={className}
       />
     );
   }
