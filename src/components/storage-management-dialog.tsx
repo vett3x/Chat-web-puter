@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Trash2, RefreshCw, Image as ImageIcon, File, Upload, Download, HardDrive, Folder, PlusCircle, ChevronRight } from 'lucide-react';
+import { Loader2, Trash2, RefreshCw, Image as ImageIcon, File, Upload, Download, HardDrive, Folder, PlusCircle, ChevronRight, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -33,8 +33,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { ScrollArea } from './ui/scroll-area';
 import { Input } from './ui/input';
 
+const VIRTUAL_PROJECTS_FOLDER = 'Proyectos DeepAI Coder';
+
 interface StoredItem {
-  id: string | null; // Folders have null ID from Supabase list
+  id: string | null;
   name: string;
   created_at: string;
   metadata?: {
@@ -70,6 +72,8 @@ export function StorageManagementDialog({ open, onOpenChange }: StorageManagemen
   const [currentPath, setCurrentPath] = useState('');
   const [isNewFolderDialogOpen, setIsNewFolderDialogOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
+
+  const isInsideProjectFolder = currentPath.startsWith(VIRTUAL_PROJECTS_FOLDER);
 
   const fetchItems = useCallback(async (path: string) => {
     setIsLoading(true);
@@ -147,16 +151,21 @@ export function StorageManagementDialog({ open, onOpenChange }: StorageManagemen
     }
   };
 
-  const handleNavigate = (folderName: string) => {
-    setCurrentPath(prev => (prev ? `${prev}/${folderName}` : folderName));
+  const handleNavigate = (item: StoredItem) => {
+    if (item.type !== 'folder') return;
+    // For virtual project folders, the path is already correctly formatted
+    if (item.path.startsWith(VIRTUAL_PROJECTS_FOLDER)) {
+      setCurrentPath(item.path);
+    } else {
+      // For regular folders, construct the path
+      setCurrentPath(prev => (prev ? `${prev}/${item.name}` : item.name));
+    }
   };
 
   const handleBreadcrumbClick = (index: number) => {
     const pathParts = currentPath.split('/');
     setCurrentPath(pathParts.slice(0, index + 1).join('/'));
   };
-
-  const totalSize = items.filter(i => i.type === 'file').reduce((acc, file) => acc + (file.metadata?.size || 0), 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -169,18 +178,18 @@ export function StorageManagementDialog({ open, onOpenChange }: StorageManagemen
           <div className="flex justify-between items-center mb-2 gap-2">
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <Button variant="link" className="p-0 h-auto" onClick={() => setCurrentPath('')}>Raíz</Button>
-              {currentPath.split('/').filter(Boolean).map((part, index) => (
+              {currentPath.split('/').map((part, index) => (
                 <React.Fragment key={index}>
                   <ChevronRight className="h-4 w-4" />
-                  <Button variant="link" className="p-0 h-auto" onClick={() => handleBreadcrumbClick(index)}>{part}</Button>
+                  <Button variant="link" className="p-0 h-auto" onClick={() => handleBreadcrumbClick(index)}>{part === VIRTUAL_PROJECTS_FOLDER ? part : items.find(item => item.path.endsWith(part))?.name || part}</Button>
                 </React.Fragment>
               ))}
             </div>
             <div className="flex items-center gap-2">
               <input type="file" ref={fileInputRef} onChange={handleFileSelectAndUpload} multiple hidden />
-              <Button size="sm" onClick={() => fileInputRef.current?.click()} disabled={isLoading || isUploading}>{isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />} Subir</Button>
+              <Button size="sm" onClick={() => fileInputRef.current?.click()} disabled={isLoading || isUploading || isInsideProjectFolder}>{isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />} Subir</Button>
               <Dialog open={isNewFolderDialogOpen} onOpenChange={setIsNewFolderDialogOpen}>
-                <DialogTrigger asChild><Button size="sm" variant="outline"><PlusCircle className="mr-2 h-4 w-4" /> Nueva Carpeta</Button></DialogTrigger>
+                <DialogTrigger asChild><Button size="sm" variant="outline" disabled={isInsideProjectFolder}><PlusCircle className="mr-2 h-4 w-4" /> Nueva Carpeta</Button></DialogTrigger>
                 <DialogContent className="sm:max-w-sm">
                   <DialogHeader><DialogTitle>Crear Nueva Carpeta</DialogTitle></DialogHeader>
                   <div className="py-4"><Input placeholder="Nombre de la carpeta..." value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleCreateFolder()} /></div>
@@ -194,32 +203,35 @@ export function StorageManagementDialog({ open, onOpenChange }: StorageManagemen
             <ScrollArea className="h-full">
               {isLoading ? <div className="flex justify-center py-4"><Loader2 className="h-6 w-6 animate-spin" /></div> : (
                 <Table>
-                  <TableHeader><TableRow><TableHead className="w-[80px]">Tipo</TableHead><TableHead>Nombre</TableHead><TableHead>Tamaño</TableHead><TableHead>Fecha de Subida</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
+                  <TableHeader><TableRow><TableHead className="w-[80px]">Tipo</TableHead><TableHead>Nombre</TableHead><TableHead>Tamaño</TableHead><TableHead>Fecha</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
                   <TableBody>
-                    {items.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground h-24">Esta carpeta está vacía.</TableCell></TableRow> : items.map(item => (
-                      <TableRow key={item.path} onClick={() => item.type === 'folder' && handleNavigate(item.name)} className={item.type === 'folder' ? 'cursor-pointer' : ''}>
-                        <TableCell>
-                          <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md">
-                            {item.type === 'folder' ? <Folder className="h-6 w-6 text-yellow-500" /> : (item.metadata?.mimetype.startsWith('image/') ? <img src={item.publicUrl} alt={item.name} className="h-full w-full object-cover rounded-md" /> : <File className="h-6 w-6 text-muted-foreground" />)}
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-medium break-all">{item.name}</TableCell>
-                        <TableCell>{item.type === 'file' ? formatBytes(item.metadata?.size || 0) : '--'}</TableCell>
-                        <TableCell>{item.type === 'file' && item.created_at ? format(new Date(item.created_at), 'dd/MM/yyyy HH:mm', { locale: es }) : '--'}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {item.type === 'file' && <a href={item.publicUrl} download={item.name} target="_blank" rel="noopener noreferrer"><Button variant="outline" size="icon" className="h-8 w-8"><Download className="h-4 w-4" /></Button></a>}
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild><Button variant="destructive" size="icon" className="h-8 w-8" disabled={isDeleting === item.path}>{isDeleting === item.path ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</Button></AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará permanentemente "{item.name}". {item.type === 'folder' && 'Todo su contenido también será eliminado.'}</AlertDialogDescription></AlertDialogHeader>
-                                <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(item)} className="bg-destructive">Eliminar</AlertDialogAction></AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {items.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground h-24">Esta carpeta está vacía.</TableCell></TableRow> : items.map(item => {
+                      const isVirtual = item.path.startsWith(VIRTUAL_PROJECTS_FOLDER);
+                      return (
+                        <TableRow key={item.path} onClick={() => handleNavigate(item)} className={item.type === 'folder' ? 'cursor-pointer' : ''}>
+                          <TableCell>
+                            <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md">
+                              {item.name === VIRTUAL_PROJECTS_FOLDER ? <Wand2 className="h-6 w-6 text-primary-light-purple" /> : (item.type === 'folder' ? <Folder className="h-6 w-6 text-yellow-500" /> : (item.metadata?.mimetype.startsWith('image/') ? <img src={item.publicUrl} alt={item.name} className="h-full w-full object-cover rounded-md" /> : <File className="h-6 w-6 text-muted-foreground" />))}
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-medium break-all">{item.name}</TableCell>
+                          <TableCell>{item.type === 'file' ? formatBytes(item.metadata?.size || 0) : '--'}</TableCell>
+                          <TableCell>{item.created_at ? format(new Date(item.created_at), 'dd/MM/yyyy HH:mm', { locale: es }) : '--'}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {item.type === 'file' && !isVirtual && <a href={item.publicUrl} download={item.name} target="_blank" rel="noopener noreferrer"><Button variant="outline" size="icon" className="h-8 w-8"><Download className="h-4 w-4" /></Button></a>}
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild><Button variant="destructive" size="icon" className="h-8 w-8" disabled={isDeleting === item.path || isVirtual}>{isDeleting === item.path ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</Button></AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará permanentemente "{item.name}". {item.type === 'folder' && 'Todo su contenido también será eliminado.'}</AlertDialogDescription></AlertDialogHeader>
+                                  <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(item)} className="bg-destructive">Eliminar</AlertDialogAction></AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}
