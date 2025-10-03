@@ -306,7 +306,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         emptyNodeClass: 'is-empty',
       }),
     ],
-    content: initialContent,
+    content: '', // Initialize with empty content
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
@@ -329,6 +329,17 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       },
     },
   });
+
+  // Set content via useEffect after the editor is initialized
+  useEffect(() => {
+    if (editor && !editor.isDestroyed && initialContent !== editor.getHTML()) {
+      // Use a timeout to ensure the editor is fully mounted and ready
+      const timer = setTimeout(() => {
+        editor.commands.setContent(initialContent, { emitUpdate: false });
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [initialContent, editor]);
 
   return (
     <div className="flex flex-col h-full border border-input rounded-md">
