@@ -23,6 +23,7 @@ interface SessionContextType {
   userStatus: UserStatus | null;
   isUserTemporarilyDisabled: boolean;
   triggerGlobalRefresh: () => void;
+  userDefaultModel: string | null; // New field
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -35,6 +36,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
   const [userLanguage, setUserLanguage] = useState<string | null>('es');
   const [userStatus, setUserStatus] = useState<UserStatus | null>(null);
+  const [userDefaultModel, setUserDefaultModel] = useState<string | null>(null); // New state
   const router = useRouter();
   const pathname = usePathname();
   const isInitialProfileFetch = useRef(true); // Track initial fetch
@@ -54,6 +56,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
       setUserAvatarUrl(null);
       setUserLanguage('es');
       setUserStatus(null);
+      setUserDefaultModel(null); // Reset default model
       isInitialProfileFetch.current = false;
       return;
     }
@@ -65,26 +68,25 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
       let determinedLanguage: string | null = 'es';
       let determinedStatus: UserStatus = 'active';
       let determinedKickedAt: string | null = null;
+      let determinedDefaultModel: string | null = null; // New variable
 
       if (SUPERUSER_EMAILS.includes(currentSession.user.email || '')) {
         determinedRole = 'super_admin';
-        // Super Admins get all permissions programmatically
         for (const key of Object.values(PERMISSION_KEYS)) {
           determinedPermissions[key] = true;
         }
-        // Fetch profile for avatar/language but role is already set
-        const { data: profile } = await supabase.from('profiles').select('avatar_url, language, status, kicked_at').eq('id', currentSession.user.id).single();
+        const { data: profile } = await supabase.from('profiles').select('avatar_url, language, status, kicked_at, default_ai_model').eq('id', currentSession.user.id).single();
         if (profile) {
           determinedAvatarUrl = profile.avatar_url;
           determinedLanguage = profile.language || 'es';
           determinedStatus = profile.status as UserStatus;
           determinedKickedAt = profile.kicked_at;
+          determinedDefaultModel = profile.default_ai_model; // Fetch default model
         }
       } else {
-        // For regular users and admins, fetch everything from the profile
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('role, permissions, avatar_url, language, status, kicked_at')
+          .select('role, permissions, avatar_url, language, status, kicked_at, default_ai_model')
           .eq('id', currentSession.user.id)
           .single();
 
@@ -93,7 +95,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
           if (!isInitialProfileFetch.current) {
             toast.error('Error al cargar el perfil del usuario.');
           }
-          determinedRole = 'user'; // Fallback to 'user'
+          determinedRole = 'user';
         } else if (profile) {
           determinedRole = profile.role as UserRole;
           determinedPermissions = profile.permissions || {};
@@ -101,8 +103,9 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
           determinedLanguage = profile.language || 'es';
           determinedStatus = profile.status as UserStatus;
           determinedKickedAt = profile.kicked_at;
+          determinedDefaultModel = profile.default_ai_model; // Fetch default model
         } else {
-          determinedRole = 'user'; // Fallback if no profile found
+          determinedRole = 'user';
         }
       }
       
@@ -120,6 +123,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
       setUserAvatarUrl(determinedAvatarUrl);
       setUserLanguage(determinedLanguage);
       setUserStatus(determinedStatus);
+      setUserDefaultModel(determinedDefaultModel); // Set default model state
 
     } catch (fetchError: any) {
       console.error('[SessionContext] Critical error during profile fetch:', fetchError);
@@ -180,6 +184,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
           setUserPermissions(newProfile.permissions || {});
           setUserAvatarUrl(newProfile.avatar_url);
           setUserLanguage(newProfile.language || 'es');
+          setUserDefaultModel(newProfile.default_ai_model); // Update default model on change
 
           if (newStatus === 'banned' || newStatus === 'kicked') {
             toast.error(`Tu cuenta ha sido ${newStatus === 'banned' ? 'baneada' : 'expulsada'}. Se cerrará tu sesión.`);
@@ -207,7 +212,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
   }
   
   return (
-    <SessionContext.Provider value={{ session, isLoading, userRole, userPermissions, userAvatarUrl, userLanguage, userStatus, isUserTemporarilyDisabled, triggerGlobalRefresh }}>
+    <SessionContext.Provider value={{ session, isLoading, userRole, userPermissions, userAvatarUrl, userLanguage, userStatus, isUserTemporarilyDisabled, triggerGlobalRefresh, userDefaultModel }}>
       {children}
     </SessionContext.Provider>
   );

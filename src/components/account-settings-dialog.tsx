@@ -80,7 +80,7 @@ export function AccountSettingsDialog({
   isLoadingApiKeys,
   currentUserRole,
 }: AccountSettingsDialogProps) {
-  const { session, isLoading: isSessionLoading } = useSession();
+  const { session, isLoading: isSessionLoading, userDefaultModel } = useSession();
   const router = useRouter();
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -140,7 +140,7 @@ export function AccountSettingsDialog({
 
   useEffect(() => {
     if (!isLoadingApiKeys && availableModels.length > 0) {
-      const storedDefaultModel = typeof window !== 'undefined' ? localStorage.getItem('default_ai_model') : null;
+      const storedDefaultModel = userDefaultModel || (typeof window !== 'undefined' ? localStorage.getItem('default_ai_model') : null);
       let initialDefault = '';
       if (storedDefaultModel && availableModels.some(m => m.value === storedDefaultModel)) {
         initialDefault = storedDefaultModel;
@@ -164,7 +164,7 @@ export function AccountSettingsDialog({
       }
       defaultModelForm.reset({ default_ai_model: initialDefault });
     }
-  }, [isLoadingApiKeys, availableModels, defaultModelForm]);
+  }, [isLoadingApiKeys, availableModels, defaultModelForm, userDefaultModel]);
 
   useEffect(() => {
     if (open && !isSessionLoading && !session) {
@@ -204,8 +204,17 @@ export function AccountSettingsDialog({
   };
 
   const handleSaveDefaultModel = async (values: DefaultModelFormValues) => {
+    if (!session?.user?.id) return;
     setIsSavingDefaultModel(true);
     try {
+      const response = await fetch(`/api/users/${session.user.id}/preferences`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ default_ai_model: values.default_ai_model }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message);
+      
       if (typeof window !== 'undefined') {
         localStorage.setItem('default_ai_model', values.default_ai_model);
       }

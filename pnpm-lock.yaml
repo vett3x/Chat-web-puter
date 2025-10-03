@@ -216,7 +216,7 @@ importers:
         specifier: ^3.0.2
         version: 3.0.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       react-syntax-highlighter:
-        specifier: ^15.6.6
+        specifier: ^15.5.0
         version: 15.6.6(react@19.1.0)
       recharts:
         specifier: ^2.15.3
