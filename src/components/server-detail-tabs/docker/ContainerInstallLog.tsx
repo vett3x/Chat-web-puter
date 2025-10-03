@@ -4,8 +4,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ScrollText, ChevronDown, ChevronRight } from 'lucide-react';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import CodeEditor from '@uiw/react-textarea-code-editor';
 
 interface ContainerInstallLogProps {
   log: string | null;
@@ -33,16 +32,19 @@ export function ContainerInstallLog({ log, isOpen, onOpenChange }: ContainerInst
       <CollapsibleContent>
         <div className="mt-2 border rounded-md overflow-hidden">
           <div className="max-h-[400px] overflow-auto">
-            <SyntaxHighlighter
+            <CodeEditor
+              value={log}
               language="bash"
-              style={vscDarkPlus}
-              customStyle={{ margin: 0, padding: '1rem', fontSize: '0.875rem', lineHeight: '1.25rem' }}
-              codeTagProps={{ style: { fontFamily: 'var(--font-geist-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'break-word' } }}
-              wrapLines={true}
-              wrapLongLines={true}
-            >
-              {log}
-            </SyntaxHighlighter>
+              readOnly
+              padding={15}
+              style={{
+                fontSize: '0.875rem',
+                lineHeight: '1.25rem',
+                fontFamily: 'var(--font-geist-mono)',
+                backgroundColor: '#1E1E1E',
+                color: '#d4d4d4',
+              }}
+            />
           </div>
         </div>
       </CollapsibleContent>

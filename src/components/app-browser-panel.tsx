@@ -5,8 +5,7 @@ import { Wand2, Loader2, ArrowLeft, ArrowRight, RefreshCw, ExternalLink, Termina
 import { Button } from '@/components/ui/button';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { toast } from 'sonner';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import CodeEditor from '@uiw/react-textarea-code-editor';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -99,9 +98,20 @@ function SystemLogsPanel({ appId }: { appId: string }) {
       {isLoading ? (
         <div className="flex items-center justify-center h-full text-white"><Loader2 className="h-5 w-5 animate-spin" /></div>
       ) : (
-        <SyntaxHighlighter language="bash" style={vscDarkPlus} customStyle={{ margin: 0, height: '100%', overflow: 'auto' }} codeTagProps={{ style: { fontFamily: 'var(--font-geist-mono)' } }}>
-          {logContent}
-        </SyntaxHighlighter>
+        <CodeEditor
+          value={logContent}
+          language="bash"
+          readOnly
+          padding={15}
+          style={{
+            fontSize: '0.875rem',
+            lineHeight: '1.25rem',
+            fontFamily: 'var(--font-geist-mono)',
+            backgroundColor: 'transparent',
+            color: '#d4d4d4',
+            height: '100%',
+          }}
+        />
       )}
     </div>
   );

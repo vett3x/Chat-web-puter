@@ -30,8 +30,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ServerDetailDialog } from '../server-detail-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import CodeEditor from '@uiw/react-textarea-code-editor';
 import { useSession } from '@/components/session-context-provider';
 import { PERMISSION_KEYS } from '@/lib/constants';
 import {
@@ -123,16 +122,19 @@ function ServerListItem({ server, onDeleteServer, onSelectServerForDetails, user
       <CollapsibleContent>
         <div className="mt-2 border rounded-md overflow-hidden">
           <div className="max-h-[400px] overflow-auto">
-            <SyntaxHighlighter 
-              language="bash" 
-              style={vscDarkPlus} 
-              customStyle={{ margin: 0, padding: '1rem', fontSize: '0.875rem', lineHeight: '1.25rem' }} 
-              codeTagProps={{ style: { fontFamily: 'var(--font-geist-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'break-word' } }}
-              wrapLines={true}
-              wrapLongLines={true}
-            >
-              {server.provisioning_log || 'No hay logs disponibles.'}
-            </SyntaxHighlighter>
+            <CodeEditor
+              value={server.provisioning_log || 'No hay logs disponibles.'}
+              language="bash"
+              readOnly
+              padding={15}
+              style={{
+                fontSize: '0.875rem',
+                lineHeight: '1.25rem',
+                fontFamily: 'var(--font-geist-mono)',
+                backgroundColor: '#1E1E1E',
+                color: '#d4d4d4',
+              }}
+            />
           </div>
         </div>
       </CollapsibleContent>

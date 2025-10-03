@@ -15,8 +15,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose, DialogTrigger } from '@/components/ui/dialog';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import CodeEditor from '@uiw/react-textarea-code-editor';
 
 // Schema for connecting to an existing DB
 const configSchema = z.object({
@@ -346,9 +345,20 @@ export function DatabaseConfigTab() {
             <DialogDescription>Mostrando la salida del script de instalación.</DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-auto rounded-md bg-[#1E1E1E]">
-            <SyntaxHighlighter language="bash" style={vscDarkPlus} customStyle={{ margin: 0, height: '100%', background: 'transparent' }} codeTagProps={{ style: { fontFamily: 'var(--font-geist-mono)' } }} wrapLines={true} wrapLongLines={true}>
-              {viewingLogConfig?.provisioning_log || 'No hay logs disponibles.'}
-            </SyntaxHighlighter>
+            <CodeEditor
+              value={viewingLogConfig?.provisioning_log || 'No hay logs disponibles.'}
+              language="bash"
+              readOnly
+              padding={15}
+              style={{
+                fontSize: '0.875rem',
+                lineHeight: '1.25rem',
+                fontFamily: 'var(--font-geist-mono)',
+                backgroundColor: 'transparent',
+                color: '#d4d4d4',
+                height: '100%',
+              }}
+            />
           </div>
           <DialogFooter>
             <DialogClose asChild><Button variant="outline">Cerrar</Button></DialogClose>
