@@ -41,9 +41,10 @@ interface NoteAiChatProps {
   userApiKeys: ApiKey[];
   aiKeyGroups: AiKeyGroup[]; // NEW: Pass aiKeyGroups
   isLoadingApiKeys: boolean;
+  userDefaultModel: string | null;
 }
 
-export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialChatHistory, onSaveHistory, userApiKeys, aiKeyGroups, isLoadingApiKeys }: NoteAiChatProps) {
+export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialChatHistory, onSaveHistory, userApiKeys, aiKeyGroups, isLoadingApiKeys, userDefaultModel }: NoteAiChatProps) {
   const [userInput, setUserInput] = useState('');
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
@@ -63,6 +64,7 @@ export function NoteAiChat({ isOpen, onClose, noteTitle, noteContent, initialCha
     userApiKeys,
     aiKeyGroups, // NEW: Pass aiKeyGroups
     isLoadingApiKeys,
+    userDefaultModel,
   });
 
   useEffect(() => {

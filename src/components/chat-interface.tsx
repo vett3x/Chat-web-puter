@@ -24,15 +24,16 @@ interface ChatInterfaceProps {
   isAppChat?: boolean;
   onSidebarDataRefresh: () => void;
   userApiKeys: ApiKey[];
-  aiKeyGroups: AiKeyGroup[]; // NEW: Pass aiKeyGroups
+  aiKeyGroups: AiKeyGroup[];
   isLoadingApiKeys: boolean;
+  userDefaultModel: string | null; // New prop
 }
 
 export interface ChatInterfaceRef {
   autoFixStatus: AutoFixStatus;
   triggerFixBuildError: () => void;
   triggerReportWebError: () => void;
-  refreshChatMessages: () => void; // NEW: Expose refreshChatMessages
+  refreshChatMessages: () => void;
 }
 
 export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
@@ -49,8 +50,9 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
   isAppChat = false,
   onSidebarDataRefresh,
   userApiKeys,
-  aiKeyGroups, // NEW: Destructure aiKeyGroups
+  aiKeyGroups,
   isLoadingApiKeys,
+  userDefaultModel, // New prop
 }, ref) => {
   const { userAvatarUrl } = useSession();
   const [chatMode, setChatMode] = useState<ChatMode>('build');
@@ -69,7 +71,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
     autoFixStatus,
     triggerFixBuildError,
     triggerReportWebError,
-    loadConversationData, // NEW: Get loadConversationData from useChat
+    loadConversationData,
     loadMoreMessages,
     hasMoreMessages,
   } = useChat({
@@ -77,24 +79,24 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
     conversationId,
     onNewConversationCreated,
     onConversationTitleUpdate,
-    aiResponseSpeed, // Pass aiResponseSpeed
+    aiResponseSpeed,
     appPrompt,
     appId,
     onWriteFiles,
     onSidebarDataRefresh,
     userApiKeys,
-    aiKeyGroups, // NEW: Pass aiKeyGroups
+    aiKeyGroups,
     isLoadingApiKeys,
     chatMode,
     isAppChat,
+    userDefaultModel, // Pass the default model
   });
 
-  // Expose autoFixStatus and trigger functions via ref
   useImperativeHandle(ref, () => ({
     autoFixStatus,
     triggerFixBuildError,
     triggerReportWebError,
-    refreshChatMessages: loadConversationData, // NEW: Expose loadConversationData as refreshChatMessages
+    refreshChatMessages: loadConversationData,
   }));
 
   if (isAppProvisioning) {
@@ -127,7 +129,6 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
     );
   }
 
-  // Show the UI immediately but disable input while keys/puter are loading
   const isChatReady = isPuterReady && !isLoadingApiKeys;
 
   return (
@@ -147,11 +148,11 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
           onSuggestionClick={(prompt: string) => sendMessage([{ type: 'text', text: prompt }], prompt)}
           loadMoreMessages={loadMoreMessages}
           hasMoreMessages={hasMoreMessages}
-          aiKeyGroups={aiKeyGroups} // NEW: Pass aiKeyGroups
+          aiKeyGroups={aiKeyGroups}
         />
         <AutoFixStatusComponent status={autoFixStatus} />
         <ChatInput
-          isLoading={isLoading || !isChatReady} // Disable if AI is thinking OR if keys/puter are not ready
+          isLoading={isLoading || !isChatReady}
           selectedModel={selectedModel}
           onModelChange={handleModelChange}
           sendMessage={sendMessage}

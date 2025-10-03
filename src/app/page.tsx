@@ -69,17 +69,17 @@ const MemoizedChatInterface = React.memo(ChatInterface);
 const MemoizedNoteEditorPanel = React.memo(NoteEditorPanel);
 
 function HomePageContent() {
-  const { session, isLoading: isSessionLoading, userRole, userLanguage, isUserTemporarilyDisabled } = useSession();
+  const { session, isLoading: isSessionLoading, userRole, userLanguage, isUserTemporarilyDisabled, userDefaultModel } = useSession();
   const userId = session?.user?.id;
   
-  const { userApiKeys, aiKeyGroups, isLoadingApiKeys, refreshApiKeys } = useUserApiKeys(); // NEW: Get aiKeyGroups
+  const { userApiKeys, aiKeyGroups, isLoadingApiKeys, refreshApiKeys } = useUserApiKeys();
 
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   const [selectedAppDetails, setSelectedAppDetails] = useState<UserApp | null>(null);
   
   const [isProfileSettingsOpen, setIsProfileSettingsOpen] = useState(false);
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
-  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false); // Renamed state
+  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
   const [isDeepAiCoderOpen, setIsDeepAiCoderOpen] = useState(false);
   const [isUpdateManagerOpen, setIsUpdateManagerOpen] = useState(false);
@@ -228,7 +228,6 @@ function HomePageContent() {
   };
 
   const handleAppCreated = async (newApp: UserApp) => {
-    // The sidebar will update via realtime, just select the new app
     handleSelectItem(newApp.id, 'app');
   };
 
@@ -242,7 +241,6 @@ function HomePageContent() {
       if (selectedItem?.id === appId) {
         handleSelectItem(null, null);
       }
-      // Sidebar will update via realtime
     } catch (error: any) {
       toast.error(`Error al eliminar el proyecto: ${error.message}`);
     } finally {
@@ -350,7 +348,7 @@ function HomePageContent() {
 
   const handleOpenProfileSettings = () => setIsProfileSettingsOpen(true);
   const handleOpenAccountSettings = () => setIsAccountSettingsOpen(true);
-  const handleOpenAdminPanel = () => setIsAdminPanelOpen(true); // Renamed handler
+  const handleOpenAdminPanel = () => setIsAdminPanelOpen(true);
   const handleOpenUserManagement = () => setIsUserManagementOpen(true);
   const handleOpenDeepAiCoder = () => setIsDeepAiCoderOpen(true);
   const handleOpenUpdateManager = () => setIsUpdateManagerOpen(true);
@@ -366,7 +364,6 @@ function HomePageContent() {
   const isAppDeleting = selectedItem?.type === 'app' && selectedItem.id === isDeletingAppId;
   const appId = selectedAppDetails?.id || undefined;
   
-  // Construct appPrompt from new structured fields
   const appPrompt = selectedAppDetails?.main_purpose 
     ? `Propósito Principal: ${selectedAppDetails.main_purpose}` +
       (selectedAppDetails.key_features ? `\nCaracterísticas Clave: ${selectedAppDetails.key_features}` : '') +
@@ -453,11 +450,12 @@ function HomePageContent() {
           <MemoizedNoteEditorPanel
             ref={noteEditorRef}
             noteId={selectedItem.id}
-            onNoteUpdated={() => {}} // Local updates are handled by the sidebar's realtime hook
+            onNoteUpdated={() => {}}
             userApiKeys={userApiKeys}
-            aiKeyGroups={aiKeyGroups} // NEW: Pass aiKeyGroups
+            aiKeyGroups={aiKeyGroups}
             isLoadingApiKeys={isLoadingApiKeys}
             userLanguage={userLanguage || 'es'}
+            userDefaultModel={userDefaultModel}
           />
         ) : (
           <ResizablePanelGroup direction="horizontal" className="flex-1">
@@ -471,18 +469,19 @@ function HomePageContent() {
                   userId={userId}
                   conversationId={selectedItem?.conversationId || null}
                   onNewConversationCreated={handleNewConversationCreated}
-                  onConversationTitleUpdate={() => {}} // Local updates are handled by the sidebar's realtime hook
+                  onConversationTitleUpdate={() => {}}
                   aiResponseSpeed={aiResponseSpeed}
                   isAppProvisioning={isAppProvisioning}
                   isAppDeleting={isAppDeleting}
-                  appPrompt={appPrompt} // Pass the constructed appPrompt
+                  appPrompt={appPrompt}
                   appId={appId}
                   onWriteFiles={writeFilesToApp}
                   isAppChat={selectedItem?.type === 'app'}
-                  onSidebarDataRefresh={() => {}} // Sidebar refreshes itself
+                  onSidebarDataRefresh={() => {}}
                   userApiKeys={userApiKeys}
-                  aiKeyGroups={aiKeyGroups} // NEW: Pass aiKeyGroups
+                  aiKeyGroups={aiKeyGroups}
                   isLoadingApiKeys={isLoadingApiKeys}
+                  userDefaultModel={userDefaultModel} // Pass the default model
                 />
               )}
             </ResizablePanel>
@@ -504,7 +503,7 @@ function HomePageContent() {
         aiResponseSpeed={aiResponseSpeed}
         onAiResponseSpeedChange={handleAiResponseSpeedChange}
         userApiKeys={userApiKeys}
-        aiKeyGroups={aiKeyGroups} // NEW: Pass aiKeyGroups
+        aiKeyGroups={aiKeyGroups}
         isLoadingApiKeys={isLoadingApiKeys}
         currentUserRole={userRole}
       />

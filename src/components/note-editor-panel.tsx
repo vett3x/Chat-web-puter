@@ -28,13 +28,14 @@ interface NoteEditorPanelProps {
   aiKeyGroups: AiKeyGroup[];
   isLoadingApiKeys: boolean;
   userLanguage: string;
+  userDefaultModel: string | null;
 }
 
 export interface NoteEditorPanelRef {
   refreshNoteContent: () => void;
 }
 
-export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelProps>(({ noteId, onNoteUpdated, userApiKeys, aiKeyGroups, isLoadingApiKeys, userLanguage }, ref) => {
+export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelProps>(({ noteId, onNoteUpdated, userApiKeys, aiKeyGroups, isLoadingApiKeys, userLanguage, userDefaultModel }, ref) => {
   const { session } = useSession();
   const { resolvedTheme } = useTheme();
   const [note, setNote] = useState<Note | null>(null);
@@ -297,6 +298,7 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
         userApiKeys={userApiKeys}
         aiKeyGroups={aiKeyGroups}
         isLoadingApiKeys={isLoadingApiKeys}
+        userDefaultModel={userDefaultModel}
       />
     </div>
   );

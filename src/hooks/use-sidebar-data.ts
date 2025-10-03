@@ -38,7 +38,7 @@ interface Note {
 }
 
 export function useSidebarData() {
-  const { session, isLoading: isSessionLoading } = useSession();
+  const { session, isLoading: isSessionLoading, userDefaultModel } = useSession(); // Get userDefaultModel
   const userId = session?.user?.id;
 
   const [apps, setApps] = useState<UserApp[]>([]);
@@ -46,7 +46,7 @@ export function useSidebarData() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const isInitialFetch = useRef(true); // Track initial fetch
+  const isInitialFetch = useRef(true);
 
   const fetchData = useCallback(async () => {
     if (!userId) {
@@ -106,7 +106,6 @@ export function useSidebarData() {
 
     const handleInserts = <T extends { id: string }>(payload: any, setter: React.Dispatch<React.SetStateAction<T[]>>) => {
       setter(prev => {
-        // Prevent adding a duplicate if it already exists (e.g., from local optimistic update)
         if (prev.some(item => item.id === payload.new.id)) {
           return prev;
         }
@@ -121,7 +120,6 @@ export function useSidebarData() {
       if (oldId) {
         setter(prev => prev.filter(item => item.id !== oldId));
       } else {
-        // Fallback to a full refresh if we can't identify the deleted item
         fetchData();
       }
     };
@@ -174,7 +172,7 @@ export function useSidebarData() {
       toast.error('Usuario no autenticado.');
       return null;
     }
-    const { data, error } = await supabase.from('conversations').insert({ title: 'Nueva conversación' }).select().single();
+    const { data, error } = await supabase.from('conversations').insert({ title: 'Nueva conversación', model: userDefaultModel }).select().single();
     if (error) {
       toast.error('Error al crear una nueva conversación.');
       throw new Error(error.message);
@@ -240,7 +238,7 @@ export function useSidebarData() {
       toast.error(`Error al mover el elemento.`);
     } else {
       toast.success(`Elemento movido.`);
-      fetchData(); // Full refresh after move to ensure consistency
+      fetchData();
     }
   };
 

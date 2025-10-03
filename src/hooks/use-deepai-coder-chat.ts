@@ -55,65 +55,55 @@ export type AutoFixStatus = 'idle' | 'analyzing' | 'plan_ready' | 'fixing' | 'fa
 const MESSAGES_PER_PAGE = 30;
 
 // Function to determine the default model based on user preferences and available keys
-const determineDefaultModel = (userApiKeys: ApiKey[], aiKeyGroups: AiKeyGroup[]): string => {
+const determineDefaultModel = (userApiKeys: ApiKey[], aiKeyGroups: AiKeyGroup[], userDefaultModel: string | null): string => {
+  const allAvailableModels = [
+    ...AI_PROVIDERS.flatMap(p => p.models.map(m => `puter:${m.value}`)),
+    ...aiKeyGroups.map(g => `group:${g.id}`),
+    ...userApiKeys.map(k => `user_key:${k.id}`),
+  ];
+
+  const isActive = (modelValue: string) => {
+    if (modelValue.startsWith('group:')) {
+      const group = aiKeyGroups.find(g => `group:${g.id}` === modelValue);
+      return group?.api_keys?.some(k => k.status === 'active') ?? false;
+    }
+    if (modelValue.startsWith('user_key:')) {
+      const key = userApiKeys.find(k => `user_key:${k.id}` === modelValue);
+      return key?.status === 'active';
+    }
+    return allAvailableModels.includes(modelValue);
+  };
+
+  // 1. Prioritize user's profile setting if it's valid and active
+  if (userDefaultModel && isActive(userDefaultModel)) {
+    return userDefaultModel;
+  }
+
+  // 2. Check localStorage as a fallback
   if (typeof window !== 'undefined') {
     const storedDefaultModel = localStorage.getItem('default_ai_model');
-    if (storedDefaultModel) {
-      // Check if it's a group
-      if (storedDefaultModel.startsWith('group:')) {
-        const groupId = storedDefaultModel.substring(6);
-        const group = aiKeyGroups.find(g => g.id === groupId);
-        if (group && group.api_keys?.some(k => k.status === 'active')) {
-          return storedDefaultModel;
-        }
-      }
-      // Check if it's an individual key
-      if (storedDefaultModel.startsWith('user_key:')) {
-        const keyId = storedDefaultModel.substring(9);
-        const key = userApiKeys.find(k => k.id === keyId);
-        if (key && key.status === 'active') {
-          return storedDefaultModel;
-        }
-      }
-      // Check if it's a puter model
-      if (storedDefaultModel.startsWith('puter:') && AI_PROVIDERS.some(p => p.models.some(m => `puter:${m.value}` === storedDefaultModel))) {
-        return storedDefaultModel;
-      }
+    if (storedDefaultModel && isActive(storedDefaultModel)) {
+      return storedDefaultModel;
     }
   }
 
-  // Prioritize global groups with active keys
+  // 3. Fallback logic
   const globalGroup = aiKeyGroups.find(g => g.is_global && g.api_keys?.some(k => k.status === 'active'));
-  if (globalGroup) {
-    return `group:${globalGroup.id}`;
-  }
+  if (globalGroup) return `group:${globalGroup.id}`;
 
-  // Prioritize global individual keys
   const globalKey = userApiKeys.find(key => key.is_global && key.status === 'active');
-  if (globalKey) {
-    return `user_key:${globalKey.id}`;
-  }
+  if (globalKey) return `user_key:${globalKey.id}`;
 
-  // Then prioritize user's own groups with active keys
   const userGroup = aiKeyGroups.find(g => !g.is_global && g.api_keys?.some(k => k.status === 'active'));
-  if (userGroup) {
-    return `group:${userGroup.id}`;
-  }
+  if (userGroup) return `group:${userGroup.id}`;
 
-  // Then prioritize user's own individual keys
   const userKey = userApiKeys.find(key => !key.is_global && key.status === 'active');
-  if (userKey) {
-    return `user_key:${userKey.id}`;
-  }
+  if (userKey) return `user_key:${userKey.id}`;
 
-  // Then prioritize Claude models
   const claudeModel = AI_PROVIDERS.find(p => p.value === 'anthropic_claude')?.models[0];
-  if (claudeModel) {
-    return `puter:${claudeModel.value}`;
-  }
+  if (claudeModel) return `puter:${claudeModel.value}`;
 
-  // Final fallback if no keys or Puter models are available
-  return 'puter:claude-sonnet-4'; // A safe default if nothing else works
+  return 'puter:claude-sonnet-4';
 };
 
 interface UseDeepAICoderChatProps {
@@ -121,15 +111,16 @@ interface UseDeepAICoderChatProps {
   conversationId: string | null;
   onNewConversationCreated: (conversationId: string) => void;
   onConversationTitleUpdate: (conversationId: string, newTitle: string) => void;
-  appPrompt: string; // Required for DeepAI Coder (now combines structured fields)
-  appId: string; // Required for DeepAI Coder
+  appPrompt: string;
+  appId: string;
   onWriteFiles: (files: { path: string; content: string }[]) => Promise<void>;
   onSidebarDataRefresh: () => void;
   userApiKeys: ApiKey[];
-  aiKeyGroups: AiKeyGroup[]; // NEW: Pass aiKeyGroups
+  aiKeyGroups: AiKeyGroup[];
   isLoadingApiKeys: boolean;
   chatMode: ChatMode;
   isAppChat?: boolean;
+  userDefaultModel: string | null; // New prop
 }
 
 function messageContentToApiFormat(content: Message['content']): string | PuterContentPart[] {
@@ -161,35 +152,34 @@ export function useDeepAICoderChat({
   conversationId,
   onNewConversationCreated,
   onConversationTitleUpdate,
-  appPrompt, // Now combines structured fields
+  appPrompt,
   appId,
   onWriteFiles,
   onSidebarDataRefresh,
   userApiKeys,
-  aiKeyGroups, // NEW: Destructure aiKeyGroups
+  aiKeyGroups,
   isLoadingApiKeys,
   chatMode,
   isAppChat,
+  userDefaultModel, // New prop
 }: UseDeepAICoderChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isPuterReady, setIsPuterReady] = useState(false);
   const [isSendingFirstMessage, setIsSendingFirstMessage] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>(''); // Initialize as empty string
+  const [selectedModel, setSelectedModel] = useState<string>('');
   const [autoFixStatus, setAutoFixStatus] = useState<AutoFixStatus>('idle');
   const autoFixAttempts = useRef(0);
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref for debounce
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [page, setPage] = useState(0);
-  const [hasMoreMessages, setHasMoreMessages] = useState(true); // Corrected line
-  const [allowedCommands, setAllowedCommands] = useState<string[]>([]); // 1. Estado para almacenar los comandos permitidos
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [allowedCommands, setAllowedCommands] = useState<string[]>([]);
 
-  // NEW: Refs for selectedModel and autoFixStatus
   const selectedModelRef = useRef(selectedModel);
   useEffect(() => { selectedModelRef.current = selectedModel; }, [selectedModel]);
   const autoFixStatusRef = useRef(autoFixStatus);
   useEffect(() => { autoFixStatusRef.current = autoFixStatus; }, [autoFixStatus]);
 
-  // 2. Cargar los comandos permitidos al montar el componente
   useEffect(() => {
     const fetchAllowedCommands = async () => {
       try {
@@ -200,7 +190,6 @@ export function useDeepAICoderChat({
         }
       } catch (error) {
         console.error("Error fetching allowed commands:", error);
-        // No mostramos un toast para no molestar al usuario, pero el backend seguirá protegiendo.
       }
     };
     fetchAllowedCommands();
@@ -225,14 +214,9 @@ export function useDeepAICoderChat({
 
   useEffect(() => {
     if (isLoadingApiKeys) return;
-
-    const newDefaultModel = determineDefaultModel(userApiKeys, aiKeyGroups); // NEW: Pass aiKeyGroups
+    const newDefaultModel = determineDefaultModel(userApiKeys, aiKeyGroups, userDefaultModel);
     setSelectedModel(newDefaultModel);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('selected_ai_model', newDefaultModel);
-    }
-  }, [isLoadingApiKeys, userApiKeys, aiKeyGroups]); // NEW: Add aiKeyGroups to dependencies
-
+  }, [isLoadingApiKeys, userApiKeys, aiKeyGroups, userDefaultModel]);
 
   const getConversationDetails = useCallback(async (convId: string) => {
     const { data, error } = await supabase.from('conversations').select('id, title, model').eq('id', convId).single();
@@ -262,14 +246,14 @@ export function useDeepAICoderChat({
       model: msg.model || undefined,
       timestamp: new Date(msg.created_at),
       type: msg.type as 'text' | 'multimodal',
-      isConstructionPlan: typeof msg.content === 'string' && msg.content.includes('### 1. Análisis del Requerimiento'), // Detect plan from DB
-      planApproved: msg.plan_approved || false, // NEW: Fetch plan_approved from DB
-      isCorrectionPlan: msg.is_correction_plan || false, // NEW: Fetch is_correction_plan from DB
-      correctionApproved: msg.correction_approved || false, // NEW: Fetch correction_approved from DB
-      isErrorAnalysisRequest: typeof msg.content === 'string' && msg.content.includes('### 💡 Entendido!'), // NEW: Detect error analysis request from DB
-      isNew: false, // Messages from DB are not 'new'
-      isTyping: false, // Messages from DB are not 'typing'
-      isAnimated: true, // Messages from DB are considered animated
+      isConstructionPlan: typeof msg.content === 'string' && msg.content.includes('### 1. Análisis del Requerimiento'),
+      planApproved: msg.plan_approved || false,
+      isCorrectionPlan: msg.is_correction_plan || false,
+      correctionApproved: msg.correction_approved || false,
+      isErrorAnalysisRequest: typeof msg.content === 'string' && msg.content.includes('### 💡 Entendido!'),
+      isNew: false,
+      isTyping: false,
+      isAnimated: true,
     }));
   }, []);
 
@@ -315,13 +299,11 @@ export function useDeepAICoderChat({
       }
       
       toast.success('¡Listo! Actualizando vista previa...', { id: toastId });
-      // The parent component will handle the preview refresh.
     } catch (error: any) {
       toast.error(`Error: ${error.message}`, { id: toastId });
     }
   };
 
-  // NEW: Function to execute SQL commands
   const executeSqlCommands = async (sqlCommands: string[]) => {
     if (!appId || sqlCommands.length === 0) return;
     const toastId = toast.loading(`Ejecutando ${sqlCommands.length} comando(s) SQL...`);
@@ -329,7 +311,7 @@ export function useDeepAICoderChat({
       const response = await fetch(`/api/apps/${appId}/database/schema`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ commands: sqlCommands }), // Send an array of commands
+        body: JSON.stringify({ commands: sqlCommands }),
       });
       const result = await response.json();
       if (!response.ok) {
@@ -341,7 +323,6 @@ export function useDeepAICoderChat({
     }
   };
 
-  // --- Start of functions with circular dependency ---
   const getAndStreamAIResponseRef = useRef<((convId: string, history: Message[]) => Promise<void>) | null>(null);
 
   const approvePlan = useCallback(async (messageId: string, rawContent?: string) => {
@@ -354,11 +335,9 @@ export function useDeepAICoderChat({
     const approvalMessageContent = isCorrection ? '[USER_APPROVED_CORRECTION_PLAN]' : '[USER_APPROVED_PLAN]';
     const successToastMessage = isCorrection ? 'Plan de corrección aprobado.' : 'Plan de construcción aprobado.';
   
-    // Update UI immediately
     setMessages(prev => prev.map(m => m.id === messageId ? (isCorrection ? { ...m, correctionApproved: true } : { ...m, planApproved: true }) : m));
   
-    // Update DB
-    if (messageId && !messageId.startsWith('temp-plan-')) { // Don't update DB for temp ID
+    if (messageId && !messageId.startsWith('temp-plan-')) {
       const { error } = await supabase
         .from('messages')
         .update(dbUpdatePayload)
@@ -367,14 +346,12 @@ export function useDeepAICoderChat({
       if (error) {
         console.error('Error updating plan approval status in DB:', error);
         toast.error('Error al guardar la aprobación del plan.');
-        // Revert UI on error
         setMessages(prev => prev.map(m => m.id === messageId ? (isCorrection ? { ...m, correctionApproved: false } : { ...m, planApproved: false }) : m));
         return;
       }
     }
     toast.success(successToastMessage);
   
-    // Extract and execute commands
     const commandsToExecute: string[] = [];
     const sqlCommandsToExecute: string[] = [];
     const contentToParse = typeof planMessageContent === 'string' ? planMessageContent : '';
@@ -553,14 +530,14 @@ export function useDeepAICoderChat({
       const selectedKey = userApiKeys.find(k => `user_key:${k.id}` === selectedModelRef.current);
       const isCustomEndpoint = selectedKey?.provider === 'custom_endpoint';
 
-      if (selectedModelRef.current.startsWith('puter:') || isCustomEndpoint || selectedModelRef.current.startsWith('group:')) { // NEW: Check for group selection
+      if (selectedModelRef.current.startsWith('puter:') || isCustomEndpoint || selectedModelRef.current.startsWith('group:')) {
         let response;
-        if (isCustomEndpoint || selectedModelRef.current.startsWith('group:')) { // NEW: If group or custom endpoint, use API route
+        if (isCustomEndpoint || selectedModelRef.current.startsWith('group:')) {
           const apiResponse = await Promise.race([
             fetch('/api/ai/chat', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ messages: finalMessagesForApi, selectedKeyId: selectedModelRef.current.substring(selectedModelRef.current.indexOf(':') + 1), stream: false }), // Pass key ID or group ID
+              body: JSON.stringify({ messages: finalMessagesForApi, selectedKeyId: selectedModelRef.current.substring(selectedModelRef.current.indexOf(':') + 1), stream: false }),
               signal: controller.signal,
             }),
             timeoutPromise
@@ -681,11 +658,10 @@ export function useDeepAICoderChat({
   useEffect(() => {
     getAndStreamAIResponseRef.current = getAndStreamAIResponse;
   }, [getAndStreamAIResponse]);
-  // --- End of functions with circular dependency ---
 
   const createNewConversationInDB = async () => {
     if (!userId) return null;
-    const { data, error } = await supabase.from('conversations').insert({ user_id: userId, title: 'Nueva conversación', model: selectedModelRef.current }).select('id, title').single(); // Use ref here
+    const { data, error } = await supabase.from('conversations').insert({ user_id: userId, title: 'Nueva conversación', model: selectedModelRef.current }).select('id, title').single();
     if (error) {
       toast.error('Error al crear una nueva conversación.');
       return null;
@@ -705,7 +681,7 @@ export function useDeepAICoderChat({
   const handleModelChange = useCallback((modelValue: string) => {
     setSelectedModel(modelValue);
     if (conversationId) updateConversationModelInDB(conversationId, modelValue);
-  }, [conversationId, userId]); // Added userId to dependencies
+  }, [conversationId, userId]);
 
   const loadConversationData = useCallback(async () => {
     if (debounceTimeoutRef.current) {
@@ -720,15 +696,14 @@ export function useDeepAICoderChat({
         
         const details = await getConversationDetails(conversationId);
         
-        if (details?.model && (details.model.startsWith('puter:') || details.model.startsWith('user_key:') || details.model.startsWith('group:'))) { // NEW: Check for group model
+        if (details?.model && (details.model.startsWith('puter:') || details.model.startsWith('user_key:') || details.model.startsWith('group:'))) {
           setSelectedModel(details.model);
         } else {
-          setSelectedModel(determineDefaultModel(userApiKeys, aiKeyGroups)); // NEW: Pass aiKeyGroups
+          setSelectedModel(determineDefaultModel(userApiKeys, aiKeyGroups, userDefaultModel));
         }
 
         const fetchedMsgs = await getMessagesFromDB(conversationId, 0);
 
-        // REMOVED THE SPECIAL LOGIC FROM HERE
         setMessages(fetchedMsgs);
         if (fetchedMsgs.length < MESSAGES_PER_PAGE) {
           setHasMoreMessages(false);
@@ -739,23 +714,20 @@ export function useDeepAICoderChat({
         setMessages([]);
       }
     }, 100);
-  }, [conversationId, userId, getMessagesFromDB, getConversationDetails, userApiKeys, aiKeyGroups]);
+  }, [conversationId, userId, getMessagesFromDB, getConversationDetails, userApiKeys, aiKeyGroups, userDefaultModel]);
 
-  // Main effect to load data when conversationId changes
   useEffect(() => {
     loadConversationData();
   }, [loadConversationData]);
 
-  // NEW EFFECT to handle initial AI response for new apps
   useEffect(() => {
     if (
         isAppChat &&
         conversationId &&
-        !isLoading && // Make sure we are not already loading/fetching
-        messages.length === 1 && // Only one message exists
-        messages[0].role === 'user' // And it's the initial user prompt
+        !isLoading &&
+        messages.length === 1 &&
+        messages[0].role === 'user'
     ) {
-        // This is a new app conversation. Trigger the AI response.
         getAndStreamAIResponse(conversationId, messages);
     }
   }, [messages, conversationId, isAppChat, isLoading, getAndStreamAIResponse]);
@@ -907,7 +879,7 @@ export function useDeepAICoderChat({
       toast.error("No se puede corregir el error de compilación. Asegúrate de que haya un proyecto y chat activos.");
       return;
     }
-    if (autoFixStatusRef.current !== 'idle' && autoFixStatusRef.current !== 'failed') { // Use ref here
+    if (autoFixStatusRef.current !== 'idle' && autoFixStatusRef.current !== 'failed') {
       toast.info("Ya hay un proceso de auto-corrección en curso.");
       return;
     }
@@ -946,7 +918,6 @@ export function useDeepAICoderChat({
       console.error("Error fetching build logs for auto-fix:", error);
       toast.error(`Error al obtener los logs de compilación: ${error.message}`);
       setAutoFixStatus('failed');
-      // Define errorMessage here
       const errorMessage: Message = {
         id: `error-fix-build-${Date.now()}`,
         conversation_id: conversationId,
@@ -972,7 +943,7 @@ export function useDeepAICoderChat({
       toast.error("No se puede reportar el error web. Asegúrate de que haya un proyecto y chat activos.");
       return;
     }
-    if (autoFixStatusRef.current !== 'idle') { // Use ref here
+    if (autoFixStatusRef.current !== 'idle') {
       toast.info("Ya hay un proceso de auto-corrección en curso. Por favor, espera a que termine.");
       return;
     }
@@ -1015,7 +986,6 @@ export function useDeepAICoderChat({
       console.error("Error fetching activity logs for web error report:", error);
       toast.error(`Error al obtener los logs de actividad para el reporte web: ${error.message}`);
       setAutoFixStatus('failed');
-      // Define errorMessage here
       const errorMessage: Message = {
         id: `error-report-web-${Date.now()}`,
         conversation_id: conversationId,
@@ -1051,7 +1021,7 @@ export function useDeepAICoderChat({
     autoFixStatus,
     triggerFixBuildError,
     triggerReportWebError,
-    loadConversationData, // NEW: Expose loadConversationData
+    loadConversationData,
     loadMoreMessages,
     hasMoreMessages,
   };

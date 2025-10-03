@@ -34,65 +34,55 @@ declare global {
 export type ChatMessage = Message; // ChatMessage is now an alias for Message
 
 // Function to determine the default model based on user preferences and available keys
-const determineDefaultModel = (userApiKeys: ApiKey[], aiKeyGroups: AiKeyGroup[]): string => {
+const determineDefaultModel = (userApiKeys: ApiKey[], aiKeyGroups: AiKeyGroup[], userDefaultModel: string | null): string => {
+  const allAvailableModels = [
+    ...AI_PROVIDERS.flatMap(p => p.models.map(m => `puter:${m.value}`)),
+    ...aiKeyGroups.map(g => `group:${g.id}`),
+    ...userApiKeys.map(k => `user_key:${k.id}`),
+  ];
+
+  const isActive = (modelValue: string) => {
+    if (modelValue.startsWith('group:')) {
+      const group = aiKeyGroups.find(g => `group:${g.id}` === modelValue);
+      return group?.api_keys?.some(k => k.status === 'active') ?? false;
+    }
+    if (modelValue.startsWith('user_key:')) {
+      const key = userApiKeys.find(k => `user_key:${k.id}` === modelValue);
+      return key?.status === 'active';
+    }
+    return allAvailableModels.includes(modelValue);
+  };
+
+  // 1. Prioritize user's profile setting if it's valid and active
+  if (userDefaultModel && isActive(userDefaultModel)) {
+    return userDefaultModel;
+  }
+
+  // 2. Check localStorage as a fallback
   if (typeof window !== 'undefined') {
     const storedDefaultModel = localStorage.getItem('default_ai_model');
-    if (storedDefaultModel) {
-      // Check if it's a group
-      if (storedDefaultModel.startsWith('group:')) {
-        const groupId = storedDefaultModel.substring(6);
-        const group = aiKeyGroups.find(g => g.id === groupId);
-        if (group && group.api_keys?.some(k => k.status === 'active')) {
-          return storedDefaultModel;
-        }
-      }
-      // Check if it's an individual key
-      if (storedDefaultModel.startsWith('user_key:')) {
-        const keyId = storedDefaultModel.substring(9);
-        const key = userApiKeys.find(k => k.id === keyId);
-        if (key && key.status === 'active') {
-          return storedDefaultModel;
-        }
-      }
-      // Check if it's a puter model
-      if (storedDefaultModel.startsWith('puter:') && AI_PROVIDERS.some(p => p.models.some(m => `puter:${m.value}` === storedDefaultModel))) {
-        return storedDefaultModel;
-      }
+    if (storedDefaultModel && isActive(storedDefaultModel)) {
+      return storedDefaultModel;
     }
   }
 
-  // Prioritize global groups with active keys
+  // 3. Fallback logic
   const globalGroup = aiKeyGroups.find(g => g.is_global && g.api_keys?.some(k => k.status === 'active'));
-  if (globalGroup) {
-    return `group:${globalGroup.id}`;
-  }
+  if (globalGroup) return `group:${globalGroup.id}`;
 
-  // Prioritize global individual keys
   const globalKey = userApiKeys.find(key => key.is_global && key.status === 'active');
-  if (globalKey) {
-    return `user_key:${globalKey.id}`;
-  }
+  if (globalKey) return `user_key:${globalKey.id}`;
 
-  // Then prioritize user's own groups with active keys
   const userGroup = aiKeyGroups.find(g => !g.is_global && g.api_keys?.some(k => k.status === 'active'));
-  if (userGroup) {
-    return `group:${userGroup.id}`;
-  }
+  if (userGroup) return `group:${userGroup.id}`;
 
-  // Then prioritize user's own individual keys
   const userKey = userApiKeys.find(key => !key.is_global && key.status === 'active');
-  if (userKey) {
-    return `user_key:${userKey.id}`;
-  }
+  if (userKey) return `user_key:${userKey.id}`;
 
-  // Then prioritize Claude models
   const claudeModel = AI_PROVIDERS.find(p => p.value === 'anthropic_claude')?.models[0];
-  if (claudeModel) {
-    return `puter:${claudeModel.value}`;
-  }
+  if (claudeModel) return `puter:${claudeModel.value}`;
 
-  // Final fallback if no keys or Puter models are available
-  return 'puter:claude-sonnet-4'; // A safe default if nothing else works
+  return 'puter:claude-sonnet-4';
 };
 
 interface UseNoteAssistantChatProps {
@@ -101,8 +91,9 @@ interface UseNoteAssistantChatProps {
   initialChatHistory: ChatMessage[] | null;
   onSaveHistory: (history: ChatMessage[]) => void;
   userApiKeys: ApiKey[];
-  aiKeyGroups: AiKeyGroup[]; // NEW: Pass aiKeyGroups
+  aiKeyGroups: AiKeyGroup[];
   isLoadingApiKeys: boolean;
+  userDefaultModel: string | null; // New prop
 }
 
 function messageContentToApiFormat(content: string | RenderablePart[]): string | PuterContentPart[] {
@@ -135,14 +126,15 @@ export function useNoteAssistantChat({
   initialChatHistory,
   onSaveHistory,
   userApiKeys,
-  aiKeyGroups, // NEW: Destructure aiKeyGroups
+  aiKeyGroups,
   isLoadingApiKeys,
+  userDefaultModel, // New prop
 }: UseNoteAssistantChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isPuterReady, setIsPuterReady] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>(''); // Initialize as empty string
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref for debounce
+  const [selectedModel, setSelectedModel] = useState<string>('');
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const defaultWelcomeMessage: ChatMessage = { 
     id: 'welcome-message', 
@@ -178,13 +170,9 @@ export function useNoteAssistantChat({
 
   useEffect(() => {
     if (isLoadingApiKeys) return;
-
-    const newDefaultModel = determineDefaultModel(userApiKeys, aiKeyGroups); // NEW: Pass aiKeyGroups
+    const newDefaultModel = determineDefaultModel(userApiKeys, aiKeyGroups, userDefaultModel);
     setSelectedModel(newDefaultModel);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('selected_ai_model_note_chat', newDefaultModel);
-    }
-  }, [isLoadingApiKeys, userApiKeys, aiKeyGroups]); // NEW: Add aiKeyGroups to dependencies
+  }, [isLoadingApiKeys, userApiKeys, aiKeyGroups, userDefaultModel]);
 
   useEffect(() => {
     setMessages(initialChatHistory && initialChatHistory.length > 0 ? initialChatHistory : [defaultWelcomeMessage]);
@@ -243,15 +231,15 @@ ${noteContent}
 
       let fullResponseText = '';
 
-      if (selectedModel.startsWith('puter:') || selectedModel.startsWith('user_key:') || selectedModel.startsWith('group:')) { // NEW: Check for group selection
+      if (selectedModel.startsWith('puter:') || selectedModel.startsWith('user_key:') || selectedModel.startsWith('group:')) {
         let response;
-        if (selectedModel.startsWith('group:') || selectedModel.startsWith('user_key:')) { // NEW: If group or individual key, use API route
+        if (selectedModel.startsWith('group:') || selectedModel.startsWith('user_key:')) {
           const apiResponse = await fetch('/api/ai/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               messages: messagesForApi,
-              selectedKeyId: selectedModel.substring(selectedModel.indexOf(':') + 1), // Pass key ID or group ID
+              selectedKeyId: selectedModel.substring(selectedModel.indexOf(':') + 1),
               stream: false,
             }),
           });
@@ -273,7 +261,7 @@ ${noteContent}
       const finalContentForMessage = parseAiResponseToRenderableParts(fullResponseText, false);
 
       const finalMessages = [...newMessages, { 
-        id: assistantMessageId, // Use the same ID
+        id: assistantMessageId,
         role: 'assistant' as const, 
         content: finalContentForMessage, 
         isNew: true, 
@@ -296,7 +284,7 @@ ${noteContent}
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, messages, selectedModel, noteTitle, noteContent, onSaveHistory, userApiKeys, aiKeyGroups]); // NEW: Add aiKeyGroups to dependencies
+  }, [isLoading, messages, selectedModel, noteTitle, noteContent, onSaveHistory, userApiKeys, aiKeyGroups]);
 
   const handleModelChange = (modelValue: string) => {
     setSelectedModel(modelValue);
@@ -311,7 +299,7 @@ ${noteContent}
   return {
     messages,
     isLoading,
-    isPuterReady: true, // Assuming puter is always ready here for simplicity
+    isPuterReady: true,
     selectedModel,
     handleModelChange,
     sendMessage: handleSendMessage,
