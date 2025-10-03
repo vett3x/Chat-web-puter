@@ -101,7 +101,13 @@ export function useSidebarData() {
     if (!userId) return;
 
     const handleInserts = <T extends { id: string }>(payload: any, setter: React.Dispatch<React.SetStateAction<T[]>>) => {
-      setter(prev => [payload.new as T, ...prev]);
+      setter(prev => {
+        // Prevent adding a duplicate if it already exists (e.g., from local optimistic update)
+        if (prev.some(item => item.id === payload.new.id)) {
+          return prev;
+        }
+        return [payload.new as T, ...prev];
+      });
     };
     const handleUpdates = <T extends { id: string }>(payload: any, setter: React.Dispatch<React.SetStateAction<T[]>>) => {
       setter(prev => prev.map(item => item.id === payload.new.id ? { ...item, ...payload.new } : item));
@@ -170,6 +176,7 @@ export function useSidebarData() {
       throw new Error(error.message);
     }
     toast.success('Nueva conversación creada.');
+    setConversations(prev => [data, ...prev]);
     onSuccess(data);
     return data.id;
   };
@@ -186,6 +193,7 @@ export function useSidebarData() {
       throw new Error(error.message);
     }
     toast.success(`${newFolderName} creada.`);
+    setFolders(prev => [data, ...prev]);
     return data.id;
   };
 
@@ -200,6 +208,7 @@ export function useSidebarData() {
       throw new Error(error.message);
     }
     toast.success('Nueva nota creada.');
+    setNotes(prev => [data, ...prev]);
     onSuccess(data);
     return data.id;
   };
