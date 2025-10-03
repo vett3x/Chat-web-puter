@@ -27,38 +27,53 @@ export function StorageUsageIndicator() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true; // Flag to prevent state updates on unmounted component
+
     if (!session?.user?.id) {
-      setIsLoading(false); // If no user, stop loading
+      if (isMounted) setIsLoading(false);
       return;
     }
 
-    const fetchUsage = async () => {
-      // Don't set isLoading to true here to avoid flicker on interval
+    const fetchUsage = async (isInitialFetch: boolean) => {
       try {
         const response = await fetch(`/api/users/${session.user.id}/storage`);
         if (!response.ok) {
-          // Don't throw, just log it, so the component doesn't crash
+          // Only show toast on the initial fetch, not on subsequent polls
+          if (isInitialFetch && isMounted) {
+            toast.error('No se pudo cargar el uso de almacenamiento.');
+          }
           console.error('Error al cargar el uso de almacenamiento.');
-          toast.error('No se pudo actualizar el uso de almacenamiento.');
           return;
         }
         const data = await response.json();
-        // Add defensive check for data shape
-        if (data && typeof data.usage_bytes === 'number' && typeof data.limit_mb === 'number') {
-          setUsage(data);
-        } else {
-          console.error('Received invalid data shape for storage usage:', data);
+        if (isMounted) {
+          if (data && typeof data.usage_bytes === 'number' && typeof data.limit_mb === 'number') {
+            setUsage(data);
+          } else {
+            console.error('Received invalid data shape for storage usage:', data);
+          }
         }
       } catch (error) {
-        console.error(error);
+        if (isMounted) {
+          console.error(error);
+          if (isInitialFetch) {
+            toast.error('Error de red al cargar el uso de almacenamiento.');
+          }
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
-    fetchUsage();
-    const interval = setInterval(fetchUsage, 30000); // Refresh every 30 seconds
-    return () => clearInterval(interval);
+    fetchUsage(true); // Initial fetch
+    const interval = setInterval(() => fetchUsage(false), 30000); // Subsequent polls
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [session?.user?.id]);
 
   if (isLoading) {
@@ -71,7 +86,6 @@ export function StorageUsageIndicator() {
   }
 
   const usageMb = usage.usage_bytes / (1024 * 1024);
-  // Defensive check for limit_mb to avoid division by zero
   const percentage = usage.limit_mb > 0 ? (usageMb / usage.limit_mb) * 100 : 0;
 
   return (
