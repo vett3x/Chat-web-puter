@@ -3,7 +3,7 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import SplitText from "./split-text"; // Cambiado de BlurText a SplitText
+import { TextGenerateEffect } from './ui/text-generate-effect';
 
 interface TextAnimatorProps {
   text: string;
@@ -18,30 +18,17 @@ export function TextAnimator({ text, className, isNew, onAnimationComplete, anim
   const containsMarkdown = /(^#{1,6}\s)|(^\s*[\*\-]\s)|(\*\*|__)|(`[^`]+`)|(\[.*\]\(.*\))|(\n.*\n)/m.test(text);
 
   if (isNew && !containsMarkdown && !disableAnimation) {
-    const delayMap = {
-      slow: 150,
-      normal: 100,
-      fast: 50,
-    };
-    const delay = delayMap[animationSpeed] || 100;
-
     return (
-      <SplitText
-        text={text}
+      <TextGenerateEffect
+        words={text}
         className={className}
-        onLetterAnimationComplete={onAnimationComplete}
-        delay={delay}
-        duration={0.6}
-        ease="power3.out"
-        splitType="words"
-        from={{ opacity: 0, y: 20 }}
-        to={{ opacity: 1, y: 0 }}
-        textAlign="left"
+        onAnimationComplete={onAnimationComplete}
       />
     );
   }
 
   // Fallback for old messages or messages with complex markdown
+  // Also call onAnimationComplete immediately if it's a new message but not animated
   React.useEffect(() => {
     if (isNew) {
       onAnimationComplete?.();
