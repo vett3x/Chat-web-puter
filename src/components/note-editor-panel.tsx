@@ -10,7 +10,7 @@ import { Save, Loader2, Wand2, X, Check, Bold, Italic, Strikethrough, Heading1, 
 import { NoteAiChat } from './note-ai-chat';
 import { ChatMessage } from '@/hooks/use-note-assistant-chat';
 import { ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys';
-import MDEditor, { commands } from '@uiw/react-md-editor';
+import MDEditor, { commands, TextAreaTextApi, TextState } from '@uiw/react-md-editor';
 import { useTheme } from 'next-themes';
 
 interface Note {
@@ -46,6 +46,9 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('saved');
   const [preview, setPreview] = useState<'live' | 'edit' | 'preview'>('live');
 
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const editorApiRef = useRef<TextAreaTextApi | null>(null);
+
   const handleImageUpload = async function* (data: DataTransfer, setMarkdown: (markdown: string) => void) {
     if (!session?.user?.id || !note?.id) {
       toast.error("Debes iniciar sesión para subir imágenes.");
@@ -67,7 +70,7 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
       if (uploadError) {
         console.error("Error uploading image:", uploadError);
         toast.error(`Error al subir ${file.name}: ${uploadError.message}`, { id: toastId });
-        continue; // Skip to the next file
+        continue;
       }
 
       const { data: { publicUrl } } = supabase.storage
@@ -80,6 +83,57 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
       }
     }
     toast.success("Imágenes subidas correctamente.", { id: toastId });
+  };
+
+  const handleFileSelectAndUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!session?.user?.id || !note?.id || !editorApiRef.current) {
+      toast.error("No se puede subir la imagen en este momento.");
+      return;
+    }
+
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const toastId = toast.loading(`Subiendo ${files.length} imagen(es)...`);
+
+    for (const file of Array.from(files)) {
+      const filePath = `${session.user.id}/${note.id}/${Date.now()}-${file.name}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('notes-images')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.error("Error uploading image:", uploadError);
+        toast.error(`Error al subir ${file.name}: ${uploadError.message}`, { id: toastId });
+        continue;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('notes-images')
+        .getPublicUrl(filePath);
+
+      if (publicUrl) {
+        const markdownImage = `![${file.name}](${publicUrl})`;
+        editorApiRef.current.replaceSelection(markdownImage);
+      }
+    }
+    toast.success("Imágenes subidas correctamente.", { id: toastId });
+
+    if (event.target) {
+      event.target.value = '';
+    }
+  };
+
+  const customImageCommand: commands.ICommand = {
+    name: 'image',
+    keyCommand: 'image',
+    icon: <ImageIcon size={16} />,
+    buttonProps: { 'aria-label': 'Insert image' },
+    execute: (state: TextState, api: TextAreaTextApi) => {
+      editorApiRef.current = api;
+      imageInputRef.current?.click();
+    },
   };
 
   const customCommands = [
@@ -104,7 +158,7 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
     { ...commands.quote, icon: <Quote size={16} /> },
     { ...commands.code, icon: <Code size={16} /> },
     { ...commands.codeBlock, icon: <Code size={16} /> },
-    { ...commands.image, icon: <ImageIcon size={16} />, onImageUpload: handleImageUpload },
+    customImageCommand,
     { ...commands.table, icon: <Table size={16} /> },
     commands.divider,
     { ...commands.unorderedListCommand, icon: <List size={16} /> },
@@ -211,6 +265,14 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
 
   return (
     <div className="h-full w-full flex flex-col bg-background relative" data-color-mode={resolvedTheme}>
+      <input
+        type="file"
+        ref={imageInputRef}
+        onChange={handleFileSelectAndUpload}
+        accept="image/*"
+        multiple
+        hidden
+      />
       <div className="flex items-center justify-between p-2 border-b bg-muted">
         <Input value={title} onChange={(e) => setTitle(e.target.value)} className="text-lg font-semibold border-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent" disabled={saveStatus === 'saving'} />
         <div className="flex items-center gap-2">
