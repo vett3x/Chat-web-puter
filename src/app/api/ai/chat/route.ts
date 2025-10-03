@@ -245,18 +245,31 @@ export async function POST(req: NextRequest) {
 
         if (keyDetails.provider === 'google_gemini') {
           const geminiFormattedMessages: { role: 'user' | 'model'; parts: Part[] }[] = [];
-          // Add system prompt as a text part in the first user message
-          if (systemPrompt) {
-            geminiFormattedMessages.push({ role: 'user', parts: [{ text: systemPrompt }] });
-          }
-
+          
           for (let i = 0; i < truncatedMessages.length; i++) {
             const msg = truncatedMessages[i];
-            if (msg.role === 'user') {
-              geminiFormattedMessages.push({ role: 'user', parts: convertToGeminiParts(msg.content) });
-            } else if (msg.role === 'assistant') {
-              geminiFormattedMessages.push({ role: 'model', parts: convertToGeminiParts(msg.content) });
+            let parts = convertToGeminiParts(msg.content);
+
+            // Prepend system prompt to the very first user message's content
+            if (i === 0 && msg.role === 'user' && systemPrompt) {
+              parts.unshift({ text: systemPrompt + "\n\n" });
             }
+
+            if (msg.role === 'user') {
+              geminiFormattedMessages.push({ role: 'user', parts });
+            } else if (msg.role === 'assistant') {
+              // Ensure we don't have consecutive model roles
+              const lastMessage = geminiFormattedMessages[geminiFormattedMessages.length - 1];
+              if (lastMessage && lastMessage.role === 'model') {
+                console.warn("[AI Chat] Skipping consecutive 'model' role message for Gemini.");
+                continue;
+              }
+              geminiFormattedMessages.push({ role: 'model', parts });
+            }
+          }
+          
+          if (geminiFormattedMessages.length > 0 && geminiFormattedMessages[0].role !== 'user') {
+             throw new Error("Invalid conversation history for Gemini: First message must be from a user.");
           }
           
           if (keyDetails.use_vertex_ai) {
@@ -269,22 +282,27 @@ export async function POST(req: NextRequest) {
             if (!apiKey) throw new Error('API Key no encontrada para Google Gemini.');
             const genAI = new GoogleGenerativeAI(apiKey);
             if (!finalModel) finalModel = 'gemini-1.5-flash-latest';
+            const model = genAI.getGenerativeModel({ model: finalModel });
 
-            const result = await genAI.getGenerativeModel({ model: finalModel }).generateContentStream({ contents: geminiFormattedMessages });
-            
-            const streamResponse = new ReadableStream({
-              async start(controller) {
-                for await (const chunk of result.stream) {
-                  const chunkText = chunk.text();
-                  controller.enqueue(new TextEncoder().encode(chunkText));
-                }
-                controller.close();
-              },
-            });
-
-            finalResponse = new Response(streamResponse, {
-              headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-            });
+            if (stream) {
+              const result = await model.generateContentStream({ contents: geminiFormattedMessages });
+              const streamResponse = new ReadableStream({
+                async start(controller) {
+                  for await (const chunk of result.stream) {
+                    const chunkText = chunk.text();
+                    controller.enqueue(new TextEncoder().encode(chunkText));
+                  }
+                  controller.close();
+                },
+              });
+              finalResponse = new Response(streamResponse, {
+                headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+              });
+            } else { // Non-streaming for Gemini
+              const result = await model.generateContent({ contents: geminiFormattedMessages });
+              const content = result.response.text();
+              finalResponse = NextResponse.json({ message: { content } });
+            }
           }
         } else if (keyDetails.provider === 'custom_endpoint') {
           const customApiKey = keyDetails.api_key;
