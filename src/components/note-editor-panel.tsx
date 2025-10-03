@@ -44,9 +44,9 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [showAiHint, setShowAiHint] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('saved');
-  // El estado previewMode se mantiene para que el MDEditor lo use internamente,
-  // pero el botón de alternancia se gestiona directamente por el componente MDEditor.
-  const [previewMode, setPreviewMode] = useState<'edit' | 'preview'>('edit'); 
+  // `preview` se establece en "live" para mostrar el editor y la vista previa simultáneamente.
+  // El MDEditor gestiona el layout automáticamente en este modo.
+  const [previewMode, setPreviewMode] = useState<'live'>('live'); 
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const editorApiRef = useRef<TextAreaTextApi | null>(null);
@@ -166,7 +166,7 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
     { ...commands.unorderedListCommand, icon: <List size={16} /> },
     { ...commands.orderedListCommand, icon: <ListOrdered size={16} /> },
     { ...commands.checkedListCommand, icon: <ListTodo size={16} /> },
-    // El botón de toggle-preview se ha eliminado porque MDEditor ya tiene uno integrado.
+    // El botón de toggle-preview se ha eliminado porque el modo "live" lo hace innecesario.
   ];
 
   const handleSave = useCallback(async (currentTitle: string, currentContent: string) => {
@@ -281,7 +281,7 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
           onChange={(val) => setContent(val || '')}
           height="100%"
           commands={customCommands}
-          preview={previewMode} // MDEditor usa este estado para su botón de vista previa integrado
+          preview={previewMode} // Usamos el modo 'live'
           className="[&>div]:!border-none"
         />
       </div>
