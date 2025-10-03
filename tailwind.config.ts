@@ -138,8 +138,16 @@ export default {
           to: { opacity: '0', transform: 'translateY(-10px)' },
         },
         'blur-in': {
-          from: { filter: 'blur(5px)', opacity: '0' },
-          to: { filter: 'blur(0px)', opacity: '1' },
+          from: {
+            filter: 'blur(5px)',
+            opacity: '0',
+            transform: 'translateY(10px)'
+          },
+          to: {
+            filter: 'blur(0px)',
+            opacity: '1',
+            transform: 'translateY(0)'
+          },
         },
   		},
   		animation: {
@@ -152,7 +160,7 @@ export default {
         'lightsaber-pulse': 'lightsaber-pulse 2s ease-in-out infinite alternate',
         'fade-in': 'fade-in 0.3s ease-out forwards',
         'fade-out': 'fade-out 0.3s ease-in forwards',
-        'blur-in': 'blur-in 0.1s ease-in-out forwards',
+        'blur-in': 'blur-in 0.4s ease-out forwards',
   		},
       boxShadow: {
         'avatar-user': '0 0 8px 2px hsl(var(--user-avatar-shadow))',
