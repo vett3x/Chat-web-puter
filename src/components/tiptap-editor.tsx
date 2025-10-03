@@ -328,13 +328,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         ),
       },
     },
-  });
-
-  useEffect(() => {
-    if (editor && initialContent !== editor.getHTML()) {
-      editor.commands.setContent(initialContent, { emitUpdate: false });
-    }
-  }, [editor, initialContent]);
+  }, [initialContent]);
 
   return (
     <div className="flex flex-col h-full border border-input rounded-md">
