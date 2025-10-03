@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from 'react';
+import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import BlurText from './blur-text';
+import SplitText from "./split-text"; // Cambiado de BlurText a SplitText
 
 interface TextAnimatorProps {
   text: string;
@@ -26,19 +26,23 @@ export function TextAnimator({ text, className, isNew, onAnimationComplete, anim
     const delay = delayMap[animationSpeed] || 100;
 
     return (
-      <BlurText
+      <SplitText
         text={text}
-        delay={delay}
-        animateBy="words"
-        direction="top"
-        onAnimationComplete={onAnimationComplete}
         className={className}
+        onLetterAnimationComplete={onAnimationComplete}
+        delay={delay}
+        duration={0.6}
+        ease="power3.out"
+        splitType="words"
+        from={{ opacity: 0, y: 20 }}
+        to={{ opacity: 1, y: 0 }}
+        textAlign="left"
       />
     );
   }
 
   // Fallback for old messages or messages with complex markdown
-  useEffect(() => {
+  React.useEffect(() => {
     if (isNew) {
       onAnimationComplete?.();
     }
