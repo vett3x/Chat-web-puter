@@ -40,7 +40,7 @@ export function TextAnimator({ text, className, isNew, onAnimationComplete, anim
         delay={delay}
         duration={0.6}
         ease="power3.out"
-        splitType="words"
+        splitType="chars"
         from={{ opacity: 0, y: 20 }}
         to={{ opacity: 1, y: 0 }}
         textAlign="left"
