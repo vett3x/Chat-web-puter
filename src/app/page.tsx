@@ -413,6 +413,8 @@ function HomePageContent() {
     return <DynamicAppBrowserPanel ref={appBrowserRef} appId={selectedAppDetails?.id || null} appUrl={selectedAppDetails?.url || null} appStatus={selectedAppDetails?.status || null} onRefreshAppDetails={refreshAppDetails} />;
   };
 
+  const isNoteView = selectedItem?.type === 'note';
+
   return (
     <div className="h-screen bg-background flex relative">
       {isUserTemporarilyDisabled && (
@@ -455,7 +457,7 @@ function HomePageContent() {
           fileTreeRefreshKey={fileTreeRefreshKey}
         />
       </div>
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div key={isNoteView ? 'note' : 'chat'} className="flex-1 min-w-0 flex flex-col">
         {selectedItem?.type === 'app' && selectedAppDetails && (
           <AppVersionsBar
             appId={selectedAppDetails.id}
@@ -467,7 +469,7 @@ function HomePageContent() {
             onDownloadProject={handleDownloadProject}
           />
         )}
-        {selectedItem?.type === 'note' ? (
+        {isNoteView ? (
           <DynamicNoteEditorPanel
             ref={noteEditorRef}
             noteId={selectedItem.id}
