@@ -512,12 +512,11 @@ function HomePageContent() {
           </main>
         </div>
       ) : (
-        <ResizablePanelGroup direction="horizontal" className="flex-1">
-          <ResizablePanel defaultSize={20} minSize={15} maxSize={25}>
+        <div className="flex h-full w-full">
+          <div className="w-[320px] flex-shrink-0">
             <ConversationSidebar {...sidebarProps} />
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={80}>
+          </div>
+          <div className="flex-1 min-w-0">
             <div className="flex-1 min-w-0 flex flex-col h-full">
               {selectedItem?.type === 'app' && selectedAppDetails && (
                 <AppVersionsBar
@@ -580,8 +579,8 @@ function HomePageContent() {
                 </ResizablePanelGroup>
               )}
             </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+          </div>
+        </div>
       )}
 
       <ProfileSettingsDialog open={isProfileSettingsOpen} onOpenChange={setIsProfileSettingsOpen} />
