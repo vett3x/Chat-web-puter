@@ -9,7 +9,8 @@ import { useSession } from '@/components/session-context-provider';
 import { cn } from '@/lib/utils';
 import { AdminDashboardTab } from './admin/admin-dashboard';
 import { DatabaseConfigTab } from './admin/database-config-tab';
-import { InfrastructureTab } from './server-tabs/infrastructure-tab'; // New import
+import { InfrastructureTab } from './server-tabs/infrastructure-tab';
+import { S3StorageTab } from './server-tabs/s3-storage-tab'; // New import
 
 interface AdminPanelTabsProps {
   onOpenAlerts: () => void;
@@ -22,7 +23,7 @@ export function AdminPanelTabs({ onOpenAlerts }: AdminPanelTabsProps) {
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col">
-      <TabsList className={cn("grid w-full", isSuperAdmin ? "grid-cols-4" : "grid-cols-1")}>
+      <TabsList className={cn("grid w-full", isSuperAdmin ? "grid-cols-5" : "grid-cols-1")}>
         {isSuperAdmin && (
           <TabsTrigger value="dashboard" className="flex items-center gap-2">
             <LayoutDashboard className="h-4 w-4" /> Panel
@@ -34,6 +35,11 @@ export function AdminPanelTabs({ onOpenAlerts }: AdminPanelTabsProps) {
         {isSuperAdmin && (
           <TabsTrigger value="database" className="flex items-center gap-2">
             <Database className="h-4 w-4" /> Base de Datos
+          </TabsTrigger>
+        )}
+        {isSuperAdmin && (
+          <TabsTrigger value="s3-storage" className="flex items-center gap-2">
+            <Database className="h-4 w-4" /> Almacenamiento S3
           </TabsTrigger>
         )}
         {isSuperAdmin && (
@@ -55,6 +61,11 @@ export function AdminPanelTabs({ onOpenAlerts }: AdminPanelTabsProps) {
           {isSuperAdmin && (
             <TabsContent value="database" className="h-full">
               <DatabaseConfigTab />
+            </TabsContent>
+          )}
+          {isSuperAdmin && (
+            <TabsContent value="s3-storage" className="h-full">
+              <S3StorageTab />
             </TabsContent>
           )}
           {isSuperAdmin && (
