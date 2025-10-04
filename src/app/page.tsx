@@ -9,7 +9,7 @@ import { CodeEditorPanel } from "@/components/code-editor-panel";
 import { NoteEditorPanel, NoteEditorPanelRef } from "@/components/note-editor-panel";
 import { ProfileSettingsDialog } from "@/components/profile-settings-dialog";
 import { AccountSettingsDialog } from "@/components/account-settings-dialog";
-import { AdminPanelDialog } from "@/components/admin-panel-dialog"; // Renamed import
+import { AdminPanelDialog } from "@/components/admin-panel-dialog";
 import { UserManagementDialog } from "@/components/user-management-dialog";
 import { DeepAiCoderDialog } from "@/components/deep-ai-coder-dialog";
 import { RetryUploadDialog } from "@/components/retry-upload-dialog";
@@ -17,7 +17,7 @@ import { UpdateManagerDialog } from "@/components/update-manager-dialog";
 import { ApiManagementDialog } from "@/components/api-management-dialog";
 import { AlertsDialog } from "@/components/alerts-dialog";
 import { AppVersionsBar } from "@/components/app-versions-bar";
-import { AppProvisioningChatPanel } from "@/components/app-provisioning-chat-panel"; // NEW IMPORT
+import { AppProvisioningChatPanel } from "@/components/app-provisioning-chat-panel";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -25,12 +25,15 @@ import {
 } from "@/components/ui/resizable";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, ShieldAlert, WifiOff, AlertCircle, RefreshCw } from "lucide-react";
+import { Loader2, ShieldAlert, WifiOff, AlertCircle, RefreshCw, Menu } from "lucide-react";
 import { useUserApiKeys } from "@/hooks/use-user-api-keys";
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { StorageManagementDialog } from "@/components/storage-management-dialog";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MobileHeader } from "@/components/mobile-header";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 interface UserApp {
   id: string;
@@ -39,9 +42,9 @@ interface UserApp {
   url: string | null;
   conversation_id: string | null;
   prompt: string | null;
-  main_purpose: string | null; // NEW
-  key_features: string | null; // NEW
-  preferred_technologies: string | null; // NEW
+  main_purpose: string | null;
+  key_features: string | null;
+  preferred_technologies: string | null;
 }
 
 interface SelectedItem {
@@ -64,13 +67,13 @@ interface RetryState {
 
 const HEALTH_CHECK_INTERVAL = 15000;
 
-// Memoized components
 const MemoizedChatInterface = React.memo(ChatInterface);
 const MemoizedNoteEditorPanel = React.memo(NoteEditorPanel);
 
 function HomePageContent() {
   const { session, isLoading: isSessionLoading, userRole, userLanguage, isUserTemporarilyDisabled, userDefaultModel } = useSession();
   const userId = session?.user?.id;
+  const isMobile = useIsMobile();
   
   const { userApiKeys, aiKeyGroups, isLoadingApiKeys, refreshApiKeys } = useUserApiKeys();
 
@@ -391,6 +394,32 @@ function HomePageContent() {
     return <AppBrowserPanel ref={appBrowserRef} appId={selectedAppDetails?.id || null} appUrl={selectedAppDetails?.url || null} appStatus={selectedAppDetails?.status || null} onRefreshAppDetails={refreshAppDetails} />;
   };
 
+  const sidebarProps = {
+    selectedItem,
+    onSelectItem: handleSelectItem,
+    onFileSelect: handleFileSelect,
+    onOpenProfileSettings: handleOpenProfileSettings,
+    onOpenAccountSettings: handleOpenAccountSettings,
+    onOpenAdminPanel: handleOpenAdminPanel,
+    onOpenUserManagement: handleOpenUserManagement,
+    onOpenDeepAiCoder: handleOpenDeepAiCoder,
+    onOpenUpdateManager: handleOpenUpdateManager,
+    onOpenApiManagement: handleOpenApiManagement,
+    onOpenAlerts: handleOpenAlerts,
+    onDeleteApp: handleDeleteApp,
+    isDeletingAppId,
+    fileTreeRefreshKey,
+    onOpenStorageManagement: handleOpenStorageManagement,
+  };
+
+  if (isSessionLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen bg-background flex relative">
       {isUserTemporarilyDisabled && (
@@ -415,87 +444,146 @@ function HomePageContent() {
           <Loader2 className="h-4 w-4 animate-spin" />
         </div>
       )}
-      <div className="w-[320px] flex-shrink-0">
-        <ConversationSidebar
-          selectedItem={selectedItem}
-          onSelectItem={handleSelectItem}
-          onFileSelect={handleFileSelect}
-          onOpenProfileSettings={handleOpenProfileSettings}
-          onOpenAccountSettings={handleOpenAccountSettings}
-          onOpenAdminPanel={handleOpenAdminPanel}
-          onOpenUserManagement={handleOpenUserManagement}
-          onOpenDeepAiCoder={handleOpenDeepAiCoder}
-          onOpenUpdateManager={handleOpenUpdateManager}
-          onOpenApiManagement={handleOpenApiManagement}
-          onOpenAlerts={handleOpenAlerts}
-          onDeleteApp={handleDeleteApp}
-          isDeletingAppId={isDeletingAppId}
-          fileTreeRefreshKey={fileTreeRefreshKey}
-          onOpenStorageManagement={handleOpenStorageManagement}
-        />
-      </div>
-      <div className="flex-1 min-w-0 flex flex-col">
-        {selectedItem?.type === 'app' && selectedAppDetails && (
-          <AppVersionsBar
-            appId={selectedAppDetails.id}
-            onRevertToVersion={handleRevertToVersion}
-            isReverting={isRevertingApp}
-            autoFixStatus={chatInterfaceRef.current?.autoFixStatus || 'idle'}
-            onTriggerFixBuildError={handleTriggerFixBuildError}
-            onTriggerReportWebError={handleTriggerReportWebError}
-            onDownloadProject={handleDownloadProject}
-          />
-        )}
-        {selectedItem?.type === 'note' ? (
-          <MemoizedNoteEditorPanel
-            ref={noteEditorRef}
-            noteId={selectedItem.id}
-            onNoteUpdated={() => {}}
-            userApiKeys={userApiKeys}
-            aiKeyGroups={aiKeyGroups}
-            isLoadingApiKeys={isLoadingApiKeys}
-            userLanguage={userLanguage || 'es'}
-            userDefaultModel={userDefaultModel}
-          />
-        ) : (
-          <ResizablePanelGroup direction="horizontal" className="flex-1">
-            <ResizablePanel defaultSize={50} minSize={30}>
-              {isAppProvisioning ? (
-                <AppProvisioningChatPanel />
-              ) : (
-                <MemoizedChatInterface
-                  ref={chatInterfaceRef}
-                  key={selectedItem?.conversationId || 'no-conversation'}
-                  userId={userId}
-                  conversationId={selectedItem?.conversationId || null}
-                  onNewConversationCreated={handleNewConversationCreated}
-                  onConversationTitleUpdate={() => {}}
-                  aiResponseSpeed={aiResponseSpeed}
-                  isAppProvisioning={isAppProvisioning}
-                  isAppDeleting={isAppDeleting}
-                  appPrompt={appPrompt}
-                  appId={appId}
-                  onWriteFiles={writeFilesToApp}
-                  isAppChat={selectedItem?.type === 'app'}
-                  onSidebarDataRefresh={() => {}}
+
+      {isMobile ? (
+        <div className="flex flex-col h-screen w-full">
+          <MobileHeader>
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-6 w-6" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="p-0 w-[320px]">
+                <ConversationSidebar {...sidebarProps} />
+              </SheetContent>
+            </Sheet>
+          </MobileHeader>
+          <main className="flex-1 min-h-0">
+            {selectedItem?.type === 'note' ? (
+              <MemoizedNoteEditorPanel
+                ref={noteEditorRef}
+                noteId={selectedItem.id}
+                onNoteUpdated={() => {}}
+                userApiKeys={userApiKeys}
+                aiKeyGroups={aiKeyGroups}
+                isLoadingApiKeys={isLoadingApiKeys}
+                userLanguage={userLanguage || 'es'}
+                userDefaultModel={userDefaultModel}
+              />
+            ) : (
+              <ResizablePanelGroup direction="vertical">
+                <ResizablePanel defaultSize={50} minSize={30}>
+                  {isAppProvisioning ? (
+                    <AppProvisioningChatPanel />
+                  ) : (
+                    <MemoizedChatInterface
+                      ref={chatInterfaceRef}
+                      key={selectedItem?.conversationId || 'no-conversation'}
+                      userId={userId}
+                      conversationId={selectedItem?.conversationId || null}
+                      onNewConversationCreated={handleNewConversationCreated}
+                      onConversationTitleUpdate={() => {}}
+                      aiResponseSpeed={aiResponseSpeed}
+                      isAppProvisioning={isAppProvisioning}
+                      isAppDeleting={isAppDeleting}
+                      appPrompt={appPrompt}
+                      appId={appId}
+                      onWriteFiles={writeFilesToApp}
+                      isAppChat={selectedItem?.type === 'app'}
+                      onSidebarDataRefresh={() => {}}
+                      userApiKeys={userApiKeys}
+                      aiKeyGroups={aiKeyGroups}
+                      isLoadingApiKeys={isLoadingApiKeys}
+                      userDefaultModel={userDefaultModel}
+                    />
+                  )}
+                </ResizablePanel>
+                {selectedItem?.type === 'app' && (
+                  <>
+                    <ResizableHandle withHandle />
+                    <ResizablePanel defaultSize={50} minSize={20}>
+                      {renderRightPanelContent()}
+                    </ResizablePanel>
+                  </>
+                )}
+              </ResizablePanelGroup>
+            )}
+          </main>
+        </div>
+      ) : (
+        <ResizablePanelGroup direction="horizontal" className="flex-1">
+          <ResizablePanel defaultSize={20} minSize={15} maxSize={25}>
+            <ConversationSidebar {...sidebarProps} />
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel defaultSize={80}>
+            <div className="flex-1 min-w-0 flex flex-col h-full">
+              {selectedItem?.type === 'app' && selectedAppDetails && (
+                <AppVersionsBar
+                  appId={selectedAppDetails.id}
+                  onRevertToVersion={handleRevertToVersion}
+                  isReverting={isRevertingApp}
+                  autoFixStatus={chatInterfaceRef.current?.autoFixStatus || 'idle'}
+                  onTriggerFixBuildError={handleTriggerFixBuildError}
+                  onTriggerReportWebError={handleTriggerReportWebError}
+                  onDownloadProject={handleDownloadProject}
+                />
+              )}
+              {selectedItem?.type === 'note' ? (
+                <MemoizedNoteEditorPanel
+                  ref={noteEditorRef}
+                  noteId={selectedItem.id}
+                  onNoteUpdated={() => {}}
                   userApiKeys={userApiKeys}
                   aiKeyGroups={aiKeyGroups}
                   isLoadingApiKeys={isLoadingApiKeys}
-                  userDefaultModel={userDefaultModel} // Pass the default model
+                  userLanguage={userLanguage || 'es'}
+                  userDefaultModel={userDefaultModel}
                 />
+              ) : (
+                <ResizablePanelGroup direction="horizontal" className="flex-1">
+                  <ResizablePanel defaultSize={50} minSize={30}>
+                    {isAppProvisioning ? (
+                      <AppProvisioningChatPanel />
+                    ) : (
+                      <MemoizedChatInterface
+                        ref={chatInterfaceRef}
+                        key={selectedItem?.conversationId || 'no-conversation'}
+                        userId={userId}
+                        conversationId={selectedItem?.conversationId || null}
+                        onNewConversationCreated={handleNewConversationCreated}
+                        onConversationTitleUpdate={() => {}}
+                        aiResponseSpeed={aiResponseSpeed}
+                        isAppProvisioning={isAppProvisioning}
+                        isAppDeleting={isAppDeleting}
+                        appPrompt={appPrompt}
+                        appId={appId}
+                        onWriteFiles={writeFilesToApp}
+                        isAppChat={selectedItem?.type === 'app'}
+                        onSidebarDataRefresh={() => {}}
+                        userApiKeys={userApiKeys}
+                        aiKeyGroups={aiKeyGroups}
+                        isLoadingApiKeys={isLoadingApiKeys}
+                        userDefaultModel={userDefaultModel}
+                      />
+                    )}
+                  </ResizablePanel>
+                  {selectedItem?.type === 'app' && (
+                    <>
+                      <ResizableHandle withHandle />
+                      <ResizablePanel defaultSize={50} minSize={30}>
+                        {renderRightPanelContent()}
+                      </ResizablePanel>
+                    </>
+                  )}
+                </ResizablePanelGroup>
               )}
-            </ResizablePanel>
-            {selectedItem?.type === 'app' && (
-              <>
-                <ResizableHandle withHandle />
-                <ResizablePanel defaultSize={50} minSize={30}>
-                  {renderRightPanelContent()}
-                </ResizablePanel>
-              </>
-            )}
-          </ResizablePanelGroup>
-        )}
-      </div>
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      )}
+
       <ProfileSettingsDialog open={isProfileSettingsOpen} onOpenChange={setIsProfileSettingsOpen} />
       <AccountSettingsDialog
         open={isAccountSettingsOpen}
