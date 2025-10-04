@@ -421,7 +421,7 @@ function HomePageContent() {
   }
 
   return (
-    <div className="h-screen bg-background flex relative">
+    <div className="h-screen bg-background flex relative overflow-hidden">
       {isUserTemporarilyDisabled && (
         <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-4 pointer-events-auto">
           <ShieldAlert className="h-16 w-16 text-destructive mx-auto mb-4" />
