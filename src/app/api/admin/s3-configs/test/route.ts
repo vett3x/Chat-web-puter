@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     const accessKeyId = CryptoJS.AES.decrypt(config.access_key_id, ENCRYPTION_KEY).toString(CryptoJS.enc.Utf8);
     const secretAccessKey = CryptoJS.AES.decrypt(config.secret_access_key, ENCRYPTION_KEY).toString(CryptoJS.enc.Utf8);
 
-    if (!accessKeyId || !secretAccessKey) throw new Error('No se pudieron desencriptar las credenciales.');
+    if (!accessKeyId || !secretAccessKey) throw new Error('No se pudieron desencriptar las credenciales. Verifica tu ENCRYPTION_KEY.');
 
     const s3Client = new S3Client({
       endpoint: config.endpoint,
