@@ -335,7 +335,7 @@ function HomePageContent() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${selectedAppDetails?.name || 'proyecto'}.tar.gz`;
+      a.download = `${selectedAppDetails?.name || 'project'}.tar.gz`;
       document.body.appendChild(a);
       a.click();
       a.remove();
