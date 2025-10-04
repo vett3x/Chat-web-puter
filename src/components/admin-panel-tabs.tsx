@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Server, Shield, LayoutDashboard, Database, HardDrive } from 'lucide-react'; // Import HardDrive
+import { Server, Shield, LayoutDashboard, Database, HardDrive } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import { SecurityTab } from './server-tabs/security-tab';
 import { useSession } from '@/components/session-context-provider';
@@ -11,7 +11,7 @@ import { AdminDashboardTab } from './admin/admin-dashboard';
 import { DatabaseConfigTab } from './admin/database-config-tab';
 import { InfrastructureTab } from './server-tabs/infrastructure-tab';
 import { S3StorageTab } from './server-tabs/s3-storage-tab';
-import { S3BackupsTab } from './server-tabs/s3-backups-tab'; // New import
+import { S3BackupsTab } from './server-tabs/s3-backups-tab';
 
 interface AdminPanelTabsProps {
   onOpenAlerts: () => void;
@@ -24,7 +24,7 @@ export function AdminPanelTabs({ onOpenAlerts }: AdminPanelTabsProps) {
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col">
-      <TabsList className={cn("grid w-full", isSuperAdmin ? "grid-cols-6" : "grid-cols-1")}>
+      <TabsList className={cn("grid w-full", isSuperAdmin ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6" : "grid-cols-1")}>
         {isSuperAdmin && (
           <TabsTrigger value="dashboard" className="flex items-center gap-2">
             <LayoutDashboard className="h-4 w-4" /> Panel
