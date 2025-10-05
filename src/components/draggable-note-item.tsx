@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from './session-context-provider';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Note {
   id: string;
@@ -49,6 +50,7 @@ export function DraggableNoteItem({ note, selected, onSelect, onDragStart, level
   const [editingTitle, setEditingTitle] = useState(note.title);
   const [isDeleting, setIsDeleting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -135,7 +137,7 @@ export function DraggableNoteItem({ note, selected, onSelect, onDragStart, level
           </div>
         </div>
       )}
-      <div className="flex-shrink-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className={cn("flex-shrink-0 flex gap-0.5 transition-opacity", isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>
         {isEditing ? (
           <>
             <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleSaveEdit(); }} className="h-5 w-5">

@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from './session-context-provider';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Conversation {
   id: string;
@@ -79,6 +80,7 @@ export function DraggableConversationCard({
   const [editingTitle, setEditingTitle] = useState(conversation.title);
   const [isDeleting, setIsDeleting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -155,7 +157,7 @@ export function DraggableConversationCard({
     }
   };
 
-  const paddingLeft = `${level * 1.25 + 0.5}rem`; // Indent based on level
+  const paddingLeft = `${level * 1.25 + 0.5}rem`;
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -234,7 +236,7 @@ export function DraggableConversationCard({
           </div>
         </div>
       )}
-      <div className="flex-shrink-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"> {/* Reduced gap */}
+      <div className={cn("flex-shrink-0 flex gap-0.5 transition-opacity", isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100")}> {/* Reduced gap */}
         {isEditing ? (
           <>
             <Button variant="ghost" size="icon" onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleSaveEdit(); }} className="h-5 w-5"> {/* Smaller buttons */}

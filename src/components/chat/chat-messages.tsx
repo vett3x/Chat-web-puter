@@ -117,7 +117,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
 
   return (
     <ScrollArea className="h-full" ref={scrollAreaRef}>
-      <div className="p-4 space-y-4 pb-48">
+      <div className="p-4 space-y-4 pb-32">
         {isLoadingMore && (
           <div className="flex justify-center py-2">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
