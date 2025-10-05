@@ -74,6 +74,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
     loadConversationData,
     loadMoreMessages,
     hasMoreMessages,
+    markMessageAsAnimated,
   } = useChat({
     userId,
     conversationId,
@@ -148,6 +149,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
         loadMoreMessages={loadMoreMessages}
         hasMoreMessages={hasMoreMessages}
         aiKeyGroups={aiKeyGroups}
+        markMessageAsAnimated={markMessageAsAnimated}
       />
       <AutoFixStatusComponent status={autoFixStatus} />
       <ChatInput

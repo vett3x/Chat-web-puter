@@ -23,6 +23,7 @@ interface ChatMessageItemProps {
   isLoading: boolean;
   userApiKeys: ApiKey[];
   aiKeyGroups: AiKeyGroup[]; // NEW: Pass aiKeyGroups
+  markMessageAsAnimated: (messageId: string) => void;
 }
 
 const ChatMessageItemComponent: React.FC<ChatMessageItemProps> = ({
@@ -37,6 +38,7 @@ const ChatMessageItemComponent: React.FC<ChatMessageItemProps> = ({
   isLoading,
   userApiKeys,
   aiKeyGroups, // NEW: Destructure aiKeyGroups
+  markMessageAsAnimated,
 }) => {
   const [isCopied, setIsCopied] = useState(false); // Corrected useState syntax
 
@@ -101,7 +103,7 @@ const ChatMessageItemComponent: React.FC<ChatMessageItemProps> = ({
               onApprovePlan={onApprovePlan}
               onRequestChanges={handleRequestChanges}
               messageId={message.id}
-              onAnimationComplete={() => {}}
+              onAnimationComplete={() => markMessageAsAnimated(message.id)}
               isErrorAnalysisRequest={message.isErrorAnalysisRequest}
               isCorrectionPlan={message.isCorrectionPlan}
               correctionApproved={message.correctionApproved}

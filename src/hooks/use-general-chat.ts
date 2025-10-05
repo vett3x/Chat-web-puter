@@ -166,6 +166,10 @@ export function useGeneralChat({
   const autoFixStatusRef = useRef<AutoFixStatus>('idle');
   useEffect(() => { autoFixStatusRef.current = 'idle'; }, []);
 
+  const markMessageAsAnimated = useCallback((messageId: string) => {
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isAnimated: true } : m));
+  }, []);
+
   useEffect(() => {
     const checkPuter = () => {
       if (typeof window !== 'undefined' && window.puter) {
@@ -597,5 +601,6 @@ export function useGeneralChat({
     loadConversationData,
     loadMoreMessages,
     hasMoreMessages,
+    markMessageAsAnimated,
   };
 }

@@ -180,6 +180,10 @@ export function useDeepAICoderChat({
   const autoFixStatusRef = useRef(autoFixStatus);
   useEffect(() => { autoFixStatusRef.current = autoFixStatus; }, [autoFixStatus]);
 
+  const markMessageAsAnimated = useCallback((messageId: string) => {
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isAnimated: true } : m));
+  }, []);
+
   useEffect(() => {
     const fetchAllowedCommands = async () => {
       try {
@@ -1024,5 +1028,6 @@ export function useDeepAICoderChat({
     loadConversationData,
     loadMoreMessages,
     hasMoreMessages,
+    markMessageAsAnimated,
   };
 }

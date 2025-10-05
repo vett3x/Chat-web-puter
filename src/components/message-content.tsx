@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { CodeBlock } from './code-block';
 import { TextAnimator } from './text-animator';
 import Image from 'next/image';
@@ -47,6 +47,32 @@ export function MessageContent({
 }: MessageContentProps) {
   const [animatedPartsCount, setAnimatedPartsCount] = useState(0);
 
+  const renderableParts = useMemo(() => {
+    if (Array.isArray(content)) {
+      return content;
+    }
+    if (typeof content === 'string') {
+        return [{ type: 'text', text: content }] as RenderablePart[];
+    }
+    return [];
+  }, [content]);
+
+  const handlePartAnimationComplete = useCallback(() => {
+    setAnimatedPartsCount(prev => prev + 1);
+  }, []);
+
+  useEffect(() => {
+    if (isNew) {
+      setAnimatedPartsCount(0);
+    }
+  }, [isNew, content]);
+
+  useEffect(() => {
+    if (isNew && animatedPartsCount >= renderableParts.length) {
+      onAnimationComplete?.();
+    }
+  }, [isNew, animatedPartsCount, renderableParts.length, onAnimationComplete]);
+
   // Helper to render a single part
   const renderPart = (part: RenderablePart, index: number, isAnimating: boolean, onComplete?: () => void) => {
     if (part.type === 'text') {
@@ -87,30 +113,6 @@ export function MessageContent({
       );
     }
     return null;
-  };
-
-  // El componente ahora espera partes pre-procesadas o una cadena.
-  const renderableParts = React.useMemo(() => {
-    if (Array.isArray(content)) {
-      return content;
-    }
-    // Si es una cadena, la convertimos en una parte de texto simple.
-    if (typeof content === 'string') {
-        return [{ type: 'text', text: content }] as RenderablePart[];
-    }
-    return [];
-  }, [content]);
-
-  useEffect(() => {
-    if (isNew) {
-      setAnimatedPartsCount(0);
-    }
-  }, [isNew, content]);
-
-  const handlePartAnimationComplete = () => {
-    // No hay setTimeout aquí, la siguiente parte se anima inmediatamente
-    // después de que la actual notifica su finalización.
-    setAnimatedPartsCount(prev => prev + 1);
   };
 
   // NEW: More robust detection logic for special message types

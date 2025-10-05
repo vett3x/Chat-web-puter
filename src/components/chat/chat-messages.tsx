@@ -37,6 +37,7 @@ interface ChatMessagesProps {
   loadMoreMessages: () => void;
   hasMoreMessages: boolean;
   aiKeyGroups: AiKeyGroup[]; // NEW: Pass aiKeyGroups
+  markMessageAsAnimated: (messageId: string) => void;
 }
 
 const SuggestionCard = ({ icon, title, description, onClick }: { icon: React.ReactNode, title: string, description: string, onClick: () => void }) => (
@@ -51,7 +52,7 @@ const SuggestionCard = ({ icon, title, description, onClick }: { icon: React.Rea
   </Card>
 );
 
-export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerate, onReapplyFiles, appPrompt, userAvatarUrl, onClearChat, onApprovePlan, isAppChat, onSuggestionClick, loadMoreMessages, hasMoreMessages, aiKeyGroups }: ChatMessagesProps) {
+export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerate, onReapplyFiles, appPrompt, userAvatarUrl, onClearChat, onApprovePlan, isAppChat, onSuggestionClick, loadMoreMessages, hasMoreMessages, aiKeyGroups, markMessageAsAnimated }: ChatMessagesProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const { userApiKeys } = useUserApiKeys();
@@ -169,6 +170,7 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
                 isLoading={isLoading}
                 userApiKeys={userApiKeys}
                 aiKeyGroups={aiKeyGroups} // NEW: Pass aiKeyGroups
+                markMessageAsAnimated={markMessageAsAnimated}
               />
             );
           })
