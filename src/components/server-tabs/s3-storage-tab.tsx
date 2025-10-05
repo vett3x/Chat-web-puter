@@ -13,7 +13,7 @@ import { Loader2, Save, Database, TestTube2, PlusCircle, Trash2, Edit, CheckCirc
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDescriptionComponent, DialogFooter, DialogClose, DialogTrigger } from '@/components/ui/dialog'; // Renamed DialogDescription to avoid conflict
 
 const configSchema = z.object({
   id: z.string().uuid().optional(),
@@ -167,6 +167,9 @@ export function S3StorageTab() {
             <DialogContent className="sm:max-w-[600px]">
               <DialogHeader>
                 <DialogTitle>{editingConfig ? 'Editar' : 'Añadir'} Configuración S3</DialogTitle>
+                <DialogDescriptionComponent>
+                  {editingConfig ? 'Actualiza los detalles de tu configuración S3.' : 'Añade una nueva configuración de almacenamiento S3.'}
+                </DialogDescriptionComponent>
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
