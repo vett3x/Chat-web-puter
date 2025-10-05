@@ -170,7 +170,7 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
   };
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 flex justify-center px-4 pb-4 pt-2">
+    <div className="flex justify-center px-4 pb-4 pt-2">
       <div className="w-full max-w-3xl bg-card rounded-xl border border-input p-2 flex flex-col gap-2 focus-within:ring-2 focus-within:ring-green-500 focus-within:ring-offset-2 focus-within:ring-offset-background transition-all duration-200">
         <FileAttachmentPreview selectedFiles={selectedFiles} onRemoveFile={removeFile} />
         

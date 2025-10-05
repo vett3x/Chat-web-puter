@@ -151,17 +151,17 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
           aiKeyGroups={aiKeyGroups}
         />
         <AutoFixStatusComponent status={autoFixStatus} />
-        <ChatInput
-          isLoading={isLoading || !isChatReady}
-          selectedModel={selectedModel}
-          onModelChange={handleModelChange}
-          sendMessage={sendMessage}
-          isAppChat={isAppChat}
-          onClearChat={clearChat}
-          chatMode={chatMode}
-          onChatModeChange={setChatMode}
-        />
       </div>
+      <ChatInput
+        isLoading={isLoading || !isChatReady}
+        selectedModel={selectedModel}
+        onModelChange={handleModelChange}
+        sendMessage={sendMessage}
+        isAppChat={isAppChat}
+        onClearChat={clearChat}
+        chatMode={chatMode}
+        onChatModeChange={setChatMode}
+      />
     </div>
   );
 });
