@@ -132,26 +132,24 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
   const isChatReady = isPuterReady && !isLoadingApiKeys;
 
   return (
-    <div className="flex flex-col h-full bg-background">
-      <div className="flex-1 min-h-0 relative">
-        <ChatMessages
-          messages={messages}
-          isLoading={isLoading}
-          aiResponseSpeed={aiResponseSpeed}
-          onRegenerate={regenerateLastResponse}
-          onReapplyFiles={reapplyFilesFromMessage}
-          appPrompt={appPrompt}
-          userAvatarUrl={userAvatarUrl}
-          onClearChat={clearChat}
-          onApprovePlan={approvePlan}
-          isAppChat={isAppChat}
-          onSuggestionClick={(prompt: string) => sendMessage([{ type: 'text', text: prompt }], prompt)}
-          loadMoreMessages={loadMoreMessages}
-          hasMoreMessages={hasMoreMessages}
-          aiKeyGroups={aiKeyGroups}
-        />
-        <AutoFixStatusComponent status={autoFixStatus} />
-      </div>
+    <div className="relative h-full bg-background">
+      <ChatMessages
+        messages={messages}
+        isLoading={isLoading}
+        aiResponseSpeed={aiResponseSpeed}
+        onRegenerate={regenerateLastResponse}
+        onReapplyFiles={reapplyFilesFromMessage}
+        appPrompt={appPrompt}
+        userAvatarUrl={userAvatarUrl}
+        onClearChat={clearChat}
+        onApprovePlan={approvePlan}
+        isAppChat={isAppChat}
+        onSuggestionClick={(prompt: string) => sendMessage([{ type: 'text', text: prompt }], prompt)}
+        loadMoreMessages={loadMoreMessages}
+        hasMoreMessages={hasMoreMessages}
+        aiKeyGroups={aiKeyGroups}
+      />
+      <AutoFixStatusComponent status={autoFixStatus} />
       <ChatInput
         isLoading={isLoading || !isChatReady}
         selectedModel={selectedModel}
