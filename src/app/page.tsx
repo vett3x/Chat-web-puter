@@ -421,7 +421,7 @@ function HomePageContent() {
   }
 
   return (
-    <div className="h-screen bg-background flex relative overflow-hidden">
+    <div className="h-dvh bg-background flex relative overflow-hidden">
       {isUserTemporarilyDisabled && (
         <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-4 pointer-events-auto">
           <ShieldAlert className="h-16 w-16 text-destructive mx-auto mb-4" />
@@ -446,7 +446,7 @@ function HomePageContent() {
       )}
 
       {isMobile ? (
-        <div className="flex flex-col h-screen w-full">
+        <div className="flex flex-col h-full w-full">
           <MobileHeader>
             <Sheet>
               <SheetTrigger asChild>
