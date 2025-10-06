@@ -53,7 +53,6 @@ interface AdminDashboardTabProps {
 export function AdminDashboardTab({ onOpenAlerts }: AdminDashboardTabProps) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isToggling, setIsToggling] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -72,25 +71,6 @@ export function AdminDashboardTab({ onOpenAlerts }: AdminDashboardTabProps) {
     fetchData();
   }, [fetchData]);
 
-  const handleToggleSetting = async (setting: keyof NonNullable<DashboardData['systemStatus']>, checked: boolean) => {
-    setIsToggling(setting);
-    try {
-      const response = await fetch('/api/settings/security', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [setting]: checked }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message);
-      toast.success('Configuración actualizada.');
-      fetchData(); // Refresh all data
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setIsToggling(null);
-    }
-  };
-
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
@@ -99,12 +79,6 @@ export function AdminDashboardTab({ onOpenAlerts }: AdminDashboardTabProps) {
     return <div className="text-center text-destructive">No se pudieron cargar los datos del panel de control.</div>;
   }
 
-  const systemStatus = data.systemStatus || {
-    security_enabled: true,
-    maintenance_mode_enabled: false,
-    users_disabled: false,
-    admins_disabled: false,
-  };
   const criticalAlerts = data.criticalAlerts || [];
   const errorTickets = data.errorTickets || [];
 
@@ -114,17 +88,6 @@ export function AdminDashboardTab({ onOpenAlerts }: AdminDashboardTabProps) {
         <h2 className="text-2xl font-bold">Panel de Control de Super Admin</h2>
         <Button variant="ghost" size="icon" onClick={fetchData} disabled={isLoading}><RefreshCw className="h-5 w-5" /></Button>
       </div>
-
-      {/* System Status */}
-      <Card>
-        <CardHeader><CardTitle>Estado del Sistema y Controles Rápidos</CardTitle></CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="security-toggle">Seguridad de Comandos</Label><Switch id="security-toggle" checked={systemStatus.security_enabled} onCheckedChange={(c) => handleToggleSetting('security_enabled', c)} disabled={isToggling === 'security_enabled'} /></div>
-          <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="maintenance-toggle">Modo Mantenimiento</Label><Switch id="maintenance-toggle" checked={systemStatus.maintenance_mode_enabled} onCheckedChange={(c) => handleToggleSetting('maintenance_mode_enabled', c)} disabled={isToggling === 'maintenance_mode_enabled'} /></div>
-          <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="users-disabled-toggle">Desactivar Usuarios</Label><Switch id="users-disabled-toggle" checked={systemStatus.users_disabled} onCheckedChange={(c) => handleToggleSetting('users_disabled', c)} disabled={isToggling === 'users_disabled'} /></div>
-          <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="admins-disabled-toggle">Desactivar Admins</Label><Switch id="admins-disabled-toggle" checked={systemStatus.admins_disabled} onCheckedChange={(c) => handleToggleSetting('admins_disabled', c)} disabled={isToggling === 'admins_disabled'} /></div>
-        </CardContent>
-      </Card>
 
       {/* KPIs */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
