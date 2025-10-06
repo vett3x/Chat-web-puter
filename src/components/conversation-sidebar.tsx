@@ -64,6 +64,7 @@ interface ConversationSidebarProps {
   fileTreeRefreshKey: number;
   onOpenStorageManagement: () => void;
   onOpenSupportTicket: () => void; // New prop
+  hasNewUserSupportTickets: boolean; // New prop
 }
 
 export const ConversationSidebar = React.memo(({
@@ -83,6 +84,7 @@ export const ConversationSidebar = React.memo(({
   fileTreeRefreshKey,
   onOpenStorageManagement,
   onOpenSupportTicket, // New prop
+  hasNewUserSupportTickets, // New prop
 }: ConversationSidebarProps) => {
   const {
     apps,
@@ -265,6 +267,7 @@ export const ConversationSidebar = React.memo(({
       <SidebarFooter 
         onOpenSupportTicket={onOpenSupportTicket}
         onOpenStorageManagement={onOpenStorageManagement}
+        hasNewUserSupportTickets={hasNewUserSupportTickets}
       />
     </div>
   );

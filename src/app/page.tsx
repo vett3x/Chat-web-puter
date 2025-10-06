@@ -72,7 +72,7 @@ const MemoizedChatInterface = React.memo(ChatInterface);
 const MemoizedNoteEditorPanel = React.memo(NoteEditorPanel);
 
 function HomePageContent() {
-  const { session, isLoading: isSessionLoading, userRole, userLanguage, isUserTemporarilyDisabled, userDefaultModel } = useSession();
+  const { session, isLoading: isSessionLoading, userRole, userLanguage, isUserTemporarilyDisabled, userDefaultModel, hasNewUserSupportTickets } = useSession();
   const userId = session?.user?.id;
   const isMobile = useIsMobile();
   
@@ -427,6 +427,7 @@ function HomePageContent() {
     fileTreeRefreshKey,
     onOpenStorageManagement: handleOpenStorageManagement,
     onOpenSupportTicket: handleOpenSupportTicket,
+    hasNewUserSupportTickets, // Pass the new prop
   };
 
   if (isSessionLoading) {

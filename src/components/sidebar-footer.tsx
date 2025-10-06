@@ -15,9 +15,10 @@ import {
 interface SidebarFooterProps {
   onOpenSupportTicket: () => void;
   onOpenStorageManagement: () => void;
+  hasNewUserSupportTickets: boolean; // New prop
 }
 
-export function SidebarFooter({ onOpenSupportTicket, onOpenStorageManagement }: SidebarFooterProps) {
+export function SidebarFooter({ onOpenSupportTicket, onOpenStorageManagement, hasNewUserSupportTickets }: SidebarFooterProps) {
   return (
     <div className="mt-auto flex flex-col">
       <StorageUsageIndicator onOpenStorageManagement={onOpenStorageManagement} />
@@ -37,7 +38,13 @@ export function SidebarFooter({ onOpenSupportTicket, onOpenStorageManagement }: 
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={onOpenSupportTicket}>
+              <Button variant="outline" size="icon" className="h-8 w-8 relative" onClick={onOpenSupportTicket}>
+                {hasNewUserSupportTickets && (
+                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                  </span>
+                )}
                 <LifeBuoy className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
