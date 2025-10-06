@@ -41,6 +41,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // This query joins through the auth.users table to link support_tickets and profiles
     const { data, error } = await supabaseAdmin
       .from('support_tickets')
       .select(`
@@ -50,17 +51,40 @@ export async function GET(req: NextRequest) {
         description,
         status,
         priority,
-        user:profiles!user_id (
-          first_name,
-          last_name,
-          email:auth_users ( email )
+        user_data: auth_users (
+          email,
+          profile: profiles (
+            first_name,
+            last_name
+          )
         )
       `)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return NextResponse.json(data);
+
+    // The query result is nested, so we format it to match the frontend's expectation
+    const formattedData = data.map(ticket => {
+      const userData = ticket.user_data?.[0];
+      const profileData = userData?.profile?.[0];
+      return {
+        id: ticket.id,
+        created_at: ticket.created_at,
+        subject: ticket.subject,
+        description: ticket.description,
+        status: ticket.status,
+        priority: ticket.priority,
+        user: {
+          first_name: profileData?.first_name || null,
+          last_name: profileData?.last_name || null,
+          email: { email: userData?.email || null }
+        }
+      };
+    });
+
+    return NextResponse.json(formattedData);
   } catch (error: any) {
+    console.error('[API /support-tickets GET] Error:', error);
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
 }
