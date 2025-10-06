@@ -41,7 +41,8 @@ export async function GET(req: NextRequest, context: any) { // Usamos 'any' para
   }
 
   try {
-    const { data: ticket, error: ticketError } = await supabaseAdmin
+    // 1. Fetch the main ticket details and its messages
+    const { data: ticketData, error: ticketError } = await supabaseAdmin
       .from('support_tickets')
       .select(`
         id,
@@ -51,44 +52,63 @@ export async function GET(req: NextRequest, context: any) { // Usamos 'any' para
         status,
         priority,
         user_id,
-        user_data: auth_users!user_id (
-          email,
-          profile: profiles (
-            first_name,
-            last_name
-          )
-        ),
         messages: support_ticket_messages (
           id,
           created_at,
           content,
           is_internal_note,
-          sender: auth_users!sender_id (
-            email,
-            profile: profiles (
-              first_name,
-              last_name
-            )
-          )
+          sender_id
         )
       `)
       .eq('id', ticketId)
       .single();
 
-    if (ticketError || !ticket) {
-      console.error('[API /support-tickets/[id] GET] Error fetching ticket:', ticketError);
+    if (ticketError || !ticketData) {
+      console.error('[API /support-tickets/[id] GET] Error fetching ticket or not found:', ticketError);
       return NextResponse.json({ message: 'Ticket no encontrado.' }, { status: 404 });
     }
 
-    // Format ticket data
-    const userData = Array.isArray(ticket.user_data) ? ticket.user_data[0] : ticket.user_data;
-    const userProfileData = userData?.profile;
-    const finalUserProfile = Array.isArray(userProfileData) ? userProfileData[0] : userProfileData;
+    // 2. Collect all unique user IDs involved (ticket creator and message senders)
+    const involvedUserIds = new Set<string>();
+    involvedUserIds.add(ticketData.user_id);
+    (ticketData.messages || []).forEach((msg: any) => involvedUserIds.add(msg.sender_id));
 
-    const formattedMessages = (ticket.messages || []).map((msg: any) => {
-      const senderData = Array.isArray(msg.sender) ? msg.sender[0] : msg.sender;
-      const senderProfileData = senderData?.profile;
-      const finalSenderProfile = Array.isArray(senderProfileData) ? senderProfileData[0] : senderProfileData;
+    const userIdsArray = Array.from(involvedUserIds);
+
+    // 3. Fetch profiles for all involved users
+    const { data: profiles, error: profilesError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, first_name, last_name')
+      .in('id', userIdsArray);
+
+    if (profilesError) {
+      console.error('[API /support-tickets/[id] GET] Error fetching profiles:', profilesError);
+      // Continue, but user names might be missing
+    }
+    const profilesMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+    // 4. Fetch auth.users data (emails) for all involved users
+    const { data: { users: authUsers }, error: authUsersError } = await supabaseAdmin.auth.admin.listUsers();
+    if (authUsersError) {
+      console.error('[API /support-tickets/[id] GET] Error fetching auth users:', authUsersError);
+      // Continue, but emails might be missing
+    }
+    const authUsersMap = new Map(authUsers?.map(u => [u.id, u]) || []);
+
+    // 5. Format the main ticket creator's user data
+    const ticketCreatorProfile = profilesMap.get(ticketData.user_id);
+    const ticketCreatorAuthUser = authUsersMap.get(ticketData.user_id);
+
+    const formattedTicketUser = {
+      first_name: ticketCreatorProfile?.first_name || null,
+      last_name: ticketCreatorProfile?.last_name || null,
+      email: ticketCreatorAuthUser?.email || null,
+    };
+
+    // 6. Format messages, including sender details
+    const formattedMessages = (ticketData.messages || []).map((msg: any) => {
+      const senderProfile = profilesMap.get(msg.sender_id);
+      const senderAuthUser = authUsersMap.get(msg.sender_id);
 
       return {
         id: msg.id,
@@ -96,27 +116,24 @@ export async function GET(req: NextRequest, context: any) { // Usamos 'any' para
         content: msg.content,
         is_internal_note: msg.is_internal_note,
         sender: {
-          email: senderData?.email || null,
-          first_name: finalSenderProfile?.first_name || null,
-          last_name: finalSenderProfile?.last_name || null,
+          first_name: senderProfile?.first_name || null,
+          last_name: senderProfile?.last_name || null,
+          email: senderAuthUser?.email || null,
         }
       };
-    });
+    }).sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
+    // 7. Construct the final formatted ticket object
     const formattedTicket = {
-      id: ticket.id,
-      created_at: ticket.created_at,
-      subject: ticket.subject,
-      description: ticket.description,
-      status: ticket.status,
-      priority: ticket.priority,
-      user_id: ticket.user_id,
-      user: {
-        first_name: finalUserProfile?.first_name || null,
-        last_name: finalUserProfile?.last_name || null,
-        email: userData?.email || null,
-      },
-      messages: formattedMessages.sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
+      id: ticketData.id,
+      created_at: ticketData.created_at,
+      subject: ticketData.subject,
+      description: ticketData.description,
+      status: ticketData.status,
+      priority: ticketData.priority,
+      user_id: ticketData.user_id,
+      user: formattedTicketUser,
+      messages: formattedMessages,
     };
 
     return NextResponse.json(formattedTicket);
