@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { LifeBuoy, GitPullRequest, HardDrive } from 'lucide-react'; // Import HardDrive icon
+import { LifeBuoy, GitPullRequest } from 'lucide-react'; // Removed HardDrive icon
 import { VersionDisplay } from './version-display';
 import { StorageUsageIndicator } from './storage-usage-indicator';
 import {
@@ -14,13 +14,13 @@ import {
 
 interface SidebarFooterProps {
   onOpenSupportTicket: () => void;
-  onOpenStorageManagement: () => void;
+  // onOpenStorageManagement ya no es necesario aquí
 }
 
-export function SidebarFooter({ onOpenSupportTicket, onOpenStorageManagement }: SidebarFooterProps) {
+export function SidebarFooter({ onOpenSupportTicket }: SidebarFooterProps) {
   return (
     <div className="mt-auto flex flex-col">
-      <StorageUsageIndicator onOpenStorageManagement={onOpenStorageManagement} />
+      <StorageUsageIndicator onOpenStorageManagement={() => {}} /> {/* onOpenStorageManagement se pasa pero no se usa para el clic directo */}
       <div className="flex items-center justify-center gap-2 px-4 py-2">
         <TooltipProvider>
           <Tooltip>
@@ -33,16 +33,7 @@ export function SidebarFooter({ onOpenSupportTicket, onOpenStorageManagement }: 
               <p>Soporte Técnico</p>
             </TooltipContent>
           </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={onOpenStorageManagement}>
-                <HardDrive className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Ver Archivos</p>
-            </TooltipContent>
-          </Tooltip>
+          {/* Botón "Ver Archivos" eliminado de aquí */}
           <Tooltip>
             <TooltipTrigger asChild>
               <a href="https://github.com/martinpensa/deep-ai-coder/issues/new/choose" target="_blank" rel="noopener noreferrer">

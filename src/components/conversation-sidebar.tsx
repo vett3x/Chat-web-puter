@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, MessageSquare, ChevronRight, ChevronDown, Wand2, Code, FileText, Folder as FolderIcon } from 'lucide-react';
+import { Loader2, MessageSquare, ChevronRight, ChevronDown, Wand2, Code, FileText, Folder as FolderIcon, HardDrive } from 'lucide-react';
 import { SidebarHeader } from './sidebar-header';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,7 +13,8 @@ import { DraggableAppItem } from './draggable-app-item';
 import { toast } from 'sonner';
 import { FileTree } from './file-tree';
 import { useSidebarData } from '@/hooks/use-sidebar-data';
-import { SidebarFooter } from './sidebar-footer'; // Import the new footer
+import { SidebarFooter } from './sidebar-footer';
+import { Button } from '@/components/ui/button'; // Import Button
 
 interface Conversation {
   id: string;
@@ -211,6 +212,16 @@ export const ConversationSidebar = React.memo(({
         onOpenApiManagement={onOpenApiManagement}
         onOpenAlerts={onOpenAlerts}
       />
+
+      {/* Nuevo botón grande "Ver Archivos" */}
+      <Button
+        variant="outline"
+        className="w-full justify-center py-2 mb-4 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        onClick={onOpenStorageManagement}
+      >
+        <HardDrive className="mr-2 h-4 w-4" /> Ver Archivos
+      </Button>
+
       <ScrollArea className="flex-1" onDrop={(e) => handleDrop(e, null)} onDragOver={(e) => e.preventDefault()} onDragEnter={(e) => handleDragEnter(e, null)} onDragLeave={(e) => handleDragLeave(e, null)}>
         <div className="space-y-2">
           {isLoading ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />) : (
@@ -259,7 +270,7 @@ export const ConversationSidebar = React.memo(({
       </ScrollArea>
       <SidebarFooter 
         onOpenSupportTicket={onOpenSupportTicket}
-        onOpenStorageManagement={onOpenStorageManagement}
+        // onOpenStorageManagement ya no es necesario aquí, se llama directamente desde el botón grande
       />
     </div>
   );
