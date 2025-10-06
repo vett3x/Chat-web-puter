@@ -211,6 +211,7 @@ export const ConversationSidebar = React.memo(({
         onOpenUpdateManager={onOpenUpdateManager}
         onOpenApiManagement={onOpenApiManagement}
         onOpenAlerts={onOpenAlerts}
+        onOpenSupportTicket={onOpenSupportTicket}
       />
 
       {/* El botón grande "Ver Archivos" se ha movido al SidebarFooter */}
@@ -255,7 +256,7 @@ export const ConversationSidebar = React.memo(({
               )))}
               <Separator className="my-4 bg-sidebar-border" />
               {renderSection("Carpetas", <FolderIcon className="h-4 w-4" />, "folders", folders.filter(f => !f.parent_id).map(folder => (
-                <DraggableFolderItem key={folder.id} folder={folder} level={0} selectedItem={selectedItem} onSelectItem={(id, type) => onSelectItem(id, type)} conversations={conversations} notes={notes} subfolders={folders} onFolderUpdated={(id, data) => updateLocalItem(id, 'folder', data)} onFolderDeleted={(id, refresh) => refresh ? refreshData() : removeLocalItem(id, 'folder')} onItemMoved={moveItem} onCreateSubfolder={handleCreateFolder} onDragStart={handleDragStart} onDrop={handleDrop} isDraggingOver={draggedOverFolder === folder.id} onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} draggedItemType={draggedItem?.type || null} onConversationUpdated={(id, data) => updateLocalItem(id, 'conversation', data)} onConversationDeleted={(id) => removeLocalItem(id, 'conversation')} onNoteUpdated={(id, data) => updateLocalItem(id, 'note', data)} onNoteDeleted={(id) => removeLocalItem(id, 'note')} />
+                <DraggableFolderItem key={folder.id} folder={folder} level={0} selectedItem={selectedItem} onSelectItem={(id, type) => onSelectItem(id, type)} conversations={conversaciones} notes={notes} subfolders={folders} onFolderUpdated={(id, data) => updateLocalItem(id, 'folder', data)} onFolderDeleted={(id, refresh) => refresh ? refreshData() : removeLocalItem(id, 'folder')} onItemMoved={moveItem} onCreateSubfolder={handleCreateFolder} onDragStart={handleDragStart} onDrop={handleDrop} isDraggingOver={draggedOverFolder === folder.id} onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} draggedItemType={draggedItem?.type || null} onConversationUpdated={(id, data) => updateLocalItem(id, 'conversation', data)} onConversationDeleted={(id) => removeLocalItem(id, 'conversation')} onNoteUpdated={(id, data) => updateLocalItem(id, 'note', data)} onNoteDeleted={(id) => removeLocalItem(id, 'note')} />
               )))}
             </>
           )}

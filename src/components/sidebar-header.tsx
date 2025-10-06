@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Loader2, Folder, Wand2, FileText, ShieldAlert, Download } from 'lucide-react';
+import { Plus, Loader2, Folder, Wand2, FileText, ShieldAlert, Download, LifeBuoy } from 'lucide-react'; // Import LifeBuoy
 import { ProfileDropdown } from './profile-dropdown';
 import { SettingsMenu } from './settings-menu'; // Import the new menu
 import { useSession } from '@/components/session-context-provider';
@@ -25,6 +25,7 @@ interface SidebarHeaderProps {
   onOpenUpdateManager: () => void;
   onOpenApiManagement: () => void;
   onOpenAlerts: () => void;
+  onOpenSupportTicket: () => void; // New prop
 }
 
 export function SidebarHeader({
@@ -42,11 +43,13 @@ export function SidebarHeader({
   onOpenUpdateManager,
   onOpenApiManagement,
   onOpenAlerts,
+  onOpenSupportTicket, // New prop
 }: SidebarHeaderProps) {
   const { userRole } = useSession();
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
   const [hasNewErrorTickets, setHasNewErrorTickets] = useState(false);
   const [hasNewCriticalAlerts, setHasNewCriticalAlerts] = useState(false);
+  const [hasNewSupportTickets, setHasNewSupportTickets] = useState(false); // New state for support tickets
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -92,9 +95,51 @@ export function SidebarHeader({
       )
       .subscribe();
 
+    // New subscription for support tickets
+    const supportTicketsChannel = supabase
+      .channel('support-tickets-channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'support_tickets' },
+        async (payload) => {
+          // Check if there are any 'new' or 'in_progress' tickets
+          const { count, error } = await supabase
+            .from('support_tickets')
+            .select('id', { count: 'exact', head: true })
+            .in('status', ['new', 'in_progress']);
+
+          if (error) {
+            console.error('Error fetching support ticket count:', error);
+            return;
+          }
+          // Use nullish coalescing to treat null count as 0
+          setHasNewSupportTickets((count ?? 0) > 0);
+          if ((count ?? 0) > 0) {
+            toast.info('¡Nuevo ticket de soporte o actualización!', {
+              description: 'Hay tickets de soporte pendientes de respuesta.',
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    // Initial check for support tickets on mount
+    const initialSupportTicketCheck = async () => {
+      const { count, error } = await supabase
+        .from('support_tickets')
+        .select('id', { count: 'exact', head: true })
+        .in('status', ['new', 'in_progress']);
+      if (!error) {
+        // Use nullish coalescing to treat null count as 0
+        setHasNewSupportTickets((count ?? 0) > 0);
+      }
+    };
+    initialSupportTicketCheck();
+
     return () => {
       supabase.removeChannel(errorTicketsChannel);
       supabase.removeChannel(criticalAlertsChannel);
+      supabase.removeChannel(supportTicketsChannel); // Clean up new channel
     };
   }, [isAdmin]);
 
@@ -164,6 +209,28 @@ export function SidebarHeader({
             )}
           </Button>
           
+          {/* New Support Ticket Button */}
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => {
+                setHasNewSupportTickets(false); // Reset alert when clicked
+                onOpenSupportTicket();
+              }}
+              className="relative text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7"
+              title="Tickets de Soporte"
+            >
+              {hasNewSupportTickets && (
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                </span>
+              )}
+              <LifeBuoy className="h-4 w-4" />
+            </Button>
+          )}
+
           {/* Settings Menu */}
           <SettingsMenu
             onOpenAdminPanel={onOpenAdminPanel}
