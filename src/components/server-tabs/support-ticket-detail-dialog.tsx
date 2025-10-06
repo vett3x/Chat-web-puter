@@ -198,6 +198,9 @@ export function SupportTicketDetailDialog({ open, onOpenChange, ticketId, onTick
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-[800px] h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Cargando Ticket...</DialogTitle>
+          </DialogHeader>
           <div className="flex items-center justify-center h-full">
             <Loader2 className="h-8 w-8 animate-spin" />
             <p className="ml-2 text-muted-foreground">Cargando ticket...</p>
@@ -211,7 +214,9 @@ export function SupportTicketDetailDialog({ open, onOpenChange, ticketId, onTick
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-[800px] h-[90vh] flex flex-col">
-          <DialogHeader><DialogTitle>Ticket no encontrado</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Ticket no encontrado</DialogTitle>
+          </DialogHeader>
           <div className="flex items-center justify-center h-full text-destructive">
             <AlertCircle className="h-6 w-6 mr-2" />
             <p>No se pudo cargar el ticket de soporte.</p>
