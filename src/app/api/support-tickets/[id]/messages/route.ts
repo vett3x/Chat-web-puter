@@ -47,7 +47,7 @@ export async function POST(req: NextRequest, context: any) {
     // Check if the user is an admin or the owner of the ticket
     const { data: ticket, error: ticketError } = await supabaseAdmin
       .from('support_tickets')
-      .select('user_id')
+      .select('user_id, status')
       .eq('id', ticketId)
       .single();
 
@@ -79,6 +79,19 @@ export async function POST(req: NextRequest, context: any) {
       .single();
 
     if (error) throw error;
+
+    // If an admin/super_admin replies to a 'new' ticket, change its status to 'in_progress'
+    if (isAdminOrSuperAdmin && ticket.status === 'new' && !is_internal_note) {
+      const { error: updateError } = await supabaseAdmin
+        .from('support_tickets')
+        .update({ status: 'in_progress' })
+        .eq('id', ticketId);
+      
+      if (updateError) {
+        console.warn(`[API /support-tickets] Failed to auto-update ticket status for ${ticketId}:`, updateError);
+      }
+    }
+
     return NextResponse.json({ message: 'Mensaje añadido al ticket.', newMessage: data }, { status: 201 });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
