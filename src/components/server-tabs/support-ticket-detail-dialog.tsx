@@ -63,7 +63,7 @@ interface Ticket {
 
 const messageSchema = z.object({
   content: z.string().min(1, 'El mensaje no puede estar vacío.'),
-  is_internal_note: z.boolean().default(false), // Eliminado .optional()
+  is_internal_note: z.boolean(), // Eliminado .default(false) de aquí
 });
 
 type MessageFormValues = z.infer<typeof messageSchema>;
@@ -95,7 +95,7 @@ export function SupportTicketDetailDialog({ open, onOpenChange, ticketId, onTick
 
   const messageForm = useForm<MessageFormValues>({
     resolver: zodResolver(messageSchema),
-    defaultValues: { content: '', is_internal_note: false },
+    defaultValues: { content: '', is_internal_note: false }, // Valor por defecto aquí
   });
 
   const updateForm = useForm<UpdateTicketFormValues>({

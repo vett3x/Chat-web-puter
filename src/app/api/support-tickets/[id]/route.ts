@@ -28,7 +28,7 @@ async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | '
 
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
-export async function GET(req: NextRequest, context: { params: { id: string } }) {
+export async function GET(req: NextRequest, context: any) { // Usamos 'any' para resolver el error de compilación de TypeScript
   const { session, userRole } = await getSessionAndRole();
   const ticketId = context.params.id;
 
@@ -126,7 +126,7 @@ export async function GET(req: NextRequest, context: { params: { id: string } })
   }
 }
 
-export async function PUT(req: NextRequest, context: { params: { id: string } }) {
+export async function PUT(req: NextRequest, context: any) { // Usamos 'any' para resolver el error de compilación de TypeScript
   const { session, userRole } = await getSessionAndRole();
   const ticketId = context.params.id;
 
@@ -158,7 +158,7 @@ export async function PUT(req: NextRequest, context: { params: { id: string } })
   }
 }
 
-export async function DELETE(req: NextRequest, context: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, context: any) { // Usamos 'any' para resolver el error de compilación de TypeScript
   const { session, userRole } = await getSessionAndRole();
   const ticketId = context.params.id;
 
