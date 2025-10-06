@@ -65,8 +65,10 @@ export async function GET(req: NextRequest) {
 
     // The query result is nested, so we format it to match the frontend's expectation
     const formattedData = data.map(ticket => {
-      const userData = ticket.user_data?.[0];
-      const profileData = userData?.profile?.[0];
+      const userData = Array.isArray(ticket.user_data) ? ticket.user_data[0] : ticket.user_data;
+      const profileData = userData?.profile;
+      const finalProfile = Array.isArray(profileData) ? profileData[0] : profileData;
+      
       return {
         id: ticket.id,
         created_at: ticket.created_at,
@@ -75,8 +77,8 @@ export async function GET(req: NextRequest) {
         status: ticket.status,
         priority: ticket.priority,
         user: {
-          first_name: profileData?.first_name || null,
-          last_name: profileData?.last_name || null,
+          first_name: finalProfile?.first_name || null,
+          last_name: finalProfile?.last_name || null,
           email: { email: userData?.email || null }
         }
       };
