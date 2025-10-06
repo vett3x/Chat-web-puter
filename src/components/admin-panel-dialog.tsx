@@ -22,7 +22,6 @@ import { Button } from '@/components/ui/button';
 import { Server, Shield, LayoutDashboard, LifeBuoy, Menu } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useSession } from '@/components/session-context-provider';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from './ui/scroll-area';
 import { AdminDashboardTab } from './admin/admin-dashboard';
 import { InfrastructureTab } from './server-tabs/infrastructure-tab';
@@ -34,6 +33,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { AdminPanelTabs } from './admin-panel-tabs';
 
 interface AdminPanelDialogProps {
   open: boolean;
@@ -110,18 +110,7 @@ export function AdminPanelDialog({ open, onOpenChange, onOpenAlerts, initialTab 
             Gestiona servidores, contenedores, seguridad y visualiza el estado general del sistema.
           </DialogDescription>
         </DialogHeader>
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col flex-1 py-4 overflow-hidden">
-          <TabsList className="h-auto flex-col sm:h-10 sm:flex-row">
-            {tabs.map(tab => (
-              <TabsTrigger key={tab.value} value={tab.value} className="w-full justify-start sm:w-auto sm:justify-center flex items-center gap-2">
-                {tab.icon} {tab.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          <div className="flex-1 overflow-hidden mt-4">
-            {tabContent}
-          </div>
-        </Tabs>
+        <AdminPanelTabs onOpenAlerts={onOpenAlerts} initialTab={initialTab} />
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="outline">Cerrar</Button>

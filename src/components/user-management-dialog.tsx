@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -22,7 +22,6 @@ import { Button } from '@/components/ui/button';
 import { Users, UserPlus, Menu } from 'lucide-react';
 import { useSession } from '@/components/session-context-provider';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from './ui/scroll-area';
 import { UserListTab, UserListTabRef } from '@/components/user-management-tabs/user-list-tab';
 import { AddUserForm } from '@/components/user-management-tabs/add-user-form';
@@ -32,6 +31,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { UserManagementTabs } from './user-management-tabs';
 
 interface UserManagementDialogProps {
   open: boolean;
@@ -106,18 +106,7 @@ export function UserManagementDialog({ open, onOpenChange }: UserManagementDialo
             Gestiona los usuarios de la aplicación, sus roles y permisos.
           </DialogDescription>
         </DialogHeader>
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col flex-1 py-4 overflow-hidden">
-          <TabsList className="grid w-full grid-cols-2">
-            {tabs.map(tab => (
-              <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2" disabled={isUserTemporarilyDisabled}>
-                {tab.icon} {tab.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          <div className="flex-1 overflow-hidden mt-4">
-            {tabContent}
-          </div>
-        </Tabs>
+        <UserManagementTabs isUserTemporarilyDisabled={isUserTemporarilyDisabled} />
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="outline" disabled={isUserTemporarilyDisabled}>Cerrar</Button>
