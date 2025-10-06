@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, RefreshCw, XCircle, Dock, Server, AlertCircle } from 'lucide-react';
@@ -22,10 +22,9 @@ export function AllDockerContainersTab() {
   const [containerStats, setContainerStats] = useState<DockerContainerStat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [previousStats, setPreviousStats] = useState<Map<string, { netRxBytes: number; netTxBytes: number; timestamp: number }>>(new Map());
+  const previousStatsRef = useRef<Map<string, { netRxBytes: number; netTxBytes: number; timestamp: number }>>(new Map());
 
   const fetchAllDockerStats = useCallback(async () => {
-    setError(null);
     try {
       const response = await fetch('/api/docker-stats');
       if (!response.ok) {
@@ -45,7 +44,7 @@ export function AllDockerContainersTab() {
         let netRxRateKbps = 0;
         let netTxRateKbps = 0;
 
-        const prev = previousStats.get(stat.ID);
+        const prev = previousStatsRef.current.get(stat.ID);
         if (prev) {
           const timeDiffSeconds = (now - prev.timestamp) / 1000;
           if (timeDiffSeconds > 0) {
@@ -66,15 +65,15 @@ export function AllDockerContainersTab() {
       });
 
       setContainerStats(processedData);
-      setPreviousStats(newPreviousStats);
+      previousStatsRef.current = newPreviousStats;
+      setError(null); // Clear error on success
     } catch (err: any) {
       console.error('Error fetching all Docker stats:', err);
       setError(err.message || 'Error al cargar las estadísticas de Docker.');
-      toast.error(err.message || 'Error al cargar las estadísticas de Docker.');
     } finally {
       setIsLoading(false);
     }
-  }, [previousStats]);
+  }, []);
 
   useEffect(() => {
     fetchAllDockerStats();
