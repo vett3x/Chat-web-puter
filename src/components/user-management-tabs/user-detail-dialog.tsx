@@ -162,7 +162,7 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[95vw] p-6 h-[95vh] flex flex-col">
+      <DialogContent className="w-full max-w-[95vw] p-4 h-[95vh] sm:max-w-4xl sm:p-6 flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="h-6 w-6" /> Detalles del Usuario: {userName}
@@ -235,13 +235,13 @@ export function UserDetailDialog({ open, onOpenChange, user, currentUserRole, on
           )}
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-6">
-              <TabsTrigger value="moderation-account" className="flex items-center gap-2"><UserCog className="h-4 w-4" /> Moderación y Cuenta</TabsTrigger>
-              <TabsTrigger value="servers" className="flex items-center gap-2"><Server className="h-4 w-4" /> Servidores</TabsTrigger>
-              <TabsTrigger value="cloudflare" className="flex items-center gap-2"><Cloud className="h-4 w-4" /> Cloudflare</TabsTrigger>
-              <TabsTrigger value="conversations" className="flex items-center gap-2"><MessageSquare className="h-4 w-4" /> Chats</TabsTrigger>
-              <TabsTrigger value="resources" className="flex items-center gap-2"><HardDrive className="h-4 w-4" /> Recursos</TabsTrigger>
-              <TabsTrigger value="activity" className="flex items-center gap-2"><History className="h-4 w-4" /> Actividad</TabsTrigger>
+            <TabsList className="h-auto flex-col sm:h-auto sm:flex-row sm:flex-wrap">
+              <TabsTrigger value="moderation-account" className="w-full justify-start sm:w-auto sm:justify-center flex items-center gap-2"><UserCog className="h-4 w-4" /> Moderación y Cuenta</TabsTrigger>
+              <TabsTrigger value="servers" className="w-full justify-start sm:w-auto sm:justify-center flex items-center gap-2"><Server className="h-4 w-4" /> Servidores</TabsTrigger>
+              <TabsTrigger value="cloudflare" className="w-full justify-start sm:w-auto sm:justify-center flex items-center gap-2"><Cloud className="h-4 w-4" /> Cloudflare</TabsTrigger>
+              <TabsTrigger value="conversations" className="w-full justify-start sm:w-auto sm:justify-center flex items-center gap-2"><MessageSquare className="h-4 w-4" /> Chats</TabsTrigger>
+              <TabsTrigger value="resources" className="w-full justify-start sm:w-auto sm:justify-center flex items-center gap-2"><HardDrive className="h-4 w-4" /> Recursos</TabsTrigger>
+              <TabsTrigger value="activity" className="w-full justify-start sm:w-auto sm:justify-center flex items-center gap-2"><History className="h-4 w-4" /> Actividad</TabsTrigger>
             </TabsList>
             <div className="flex-1 py-4 overflow-hidden">
               <ScrollArea className="h-full w-full">

@@ -49,17 +49,17 @@ export function ServerDetailDialog({ open, onOpenChange, server, userRole }: Ser
         </DialogHeader>
         <div className="flex-1 py-4 overflow-hidden">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
-              <TabsTrigger value="docker" className="flex items-center gap-2">
+            <TabsList className="h-auto flex-col sm:h-10 sm:flex-row">
+              <TabsTrigger value="docker" className="w-full justify-start sm:w-auto sm:justify-center flex items-center gap-2">
                 <Dock className="h-4 w-4" /> Docker
               </TabsTrigger>
-              <TabsTrigger value="resources" className="flex items-center gap-2">
+              <TabsTrigger value="resources" className="w-full justify-start sm:w-auto sm:justify-center flex items-center gap-2">
                 <HardDrive className="h-4 w-4" /> Recursos
               </TabsTrigger>
-              <TabsTrigger value="weblinks" className="flex items-center gap-2">
+              <TabsTrigger value="weblinks" className="w-full justify-start sm:w-auto sm:justify-center flex items-center gap-2">
                 <Link className="h-4 w-4" /> Web
               </TabsTrigger>
-              <TabsTrigger value="stats" className="flex items-center gap-2">
+              <TabsTrigger value="stats" className="w-full justify-start sm:w-auto sm:justify-center flex items-center gap-2">
                 <BarChartIcon className="h-4 w-4" /> Estadísticas
               </TabsTrigger>
             </TabsList>

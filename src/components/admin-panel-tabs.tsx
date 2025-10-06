@@ -24,22 +24,22 @@ export function AdminPanelTabs({ onOpenAlerts, initialTab }: AdminPanelTabsProps
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col">
-      <TabsList className={cn("grid w-full", isSuperAdmin ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:grid-cols-2")}>
+      <TabsList className="h-auto flex-col sm:h-10 sm:flex-row">
         {isSuperAdmin && (
-          <TabsTrigger value="dashboard" className="flex items-center gap-2">
+          <TabsTrigger value="dashboard" className="w-full justify-start sm:w-auto sm:justify-center flex items-center gap-2">
             <LayoutDashboard className="h-4 w-4" /> Panel
           </TabsTrigger>
         )}
-        <TabsTrigger value="servers" className="flex items-center gap-2">
+        <TabsTrigger value="servers" className="w-full justify-start sm:w-auto sm:justify-center flex items-center gap-2">
           <Server className="h-4 w-4" /> Infraestructura
         </TabsTrigger>
         {isAdmin && (
-          <TabsTrigger value="support" className="flex items-center gap-2">
+          <TabsTrigger value="support" className="w-full justify-start sm:w-auto sm:justify-center flex items-center gap-2">
             <LifeBuoy className="h-4 w-4" /> Soporte
           </TabsTrigger>
         )}
         {isSuperAdmin && (
-          <TabsTrigger value="security" className="flex items-center gap-2">
+          <TabsTrigger value="security" className="w-full justify-start sm:w-auto sm:justify-center flex items-center gap-2">
             <Shield className="h-4 w-4" /> Seguridad
           </TabsTrigger>
         )}

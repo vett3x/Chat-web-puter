@@ -247,17 +247,17 @@ export function AccountSettingsDialog({
               setHasNewUserSupportTickets(false); // Reset alert when user views tickets
             }
           }} className="w-full h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3"> {/* Adjusted grid-cols */}
-              <TabsTrigger value="general" className="flex items-center gap-2">
+            <TabsList className="h-auto flex-col sm:h-10 sm:flex-row">
+              <TabsTrigger value="general" className="w-full justify-start sm:w-auto sm:justify-center flex items-center gap-2">
                 <KeyRound className="h-4 w-4" /> General
               </TabsTrigger>
-              <TabsTrigger value="ai-preferences" className="flex items-center gap-2">
+              <TabsTrigger value="ai-preferences" className="w-full justify-start sm:w-auto sm:justify-center flex items-center gap-2">
                 <BrainCircuit className="h-4 w-4" /> Preferencias de IA
               </TabsTrigger>
-              <TabsTrigger value="support-tickets" className="flex items-center gap-2 relative"> {/* New Tab Trigger */}
+              <TabsTrigger value="support-tickets" className="w-full justify-start sm:w-auto sm:justify-center flex items-center gap-2 relative">
                 <LifeBuoy className="h-4 w-4" /> Mis Tickets
-                {hasNewUserSupportTickets && ( // NEW: Alert indicator for user support tickets
-                  <span className="absolute -top-1 -right-1 flex h-2 w-2 rounded-full bg-red-500" />
+                {hasNewUserSupportTickets && (
+                  <span className="absolute top-1 right-1 flex h-2 w-2 rounded-full bg-red-500" />
                 )}
               </TabsTrigger>
             </TabsList>
