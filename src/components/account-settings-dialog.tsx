@@ -235,7 +235,7 @@ export function AccountSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[900px] p-6 h-[90vh] flex flex-col"> {/* Increased max-width and height */}
+      <DialogContent className="w-full max-w-[95vw] p-4 h-[90vh] sm:max-w-[900px] sm:p-6 flex flex-col">
         <DialogHeader>
           <DialogTitle>Configuración de Cuenta</DialogTitle>
           <DialogDescription>Gestiona las opciones generales de tu cuenta y preferencias de IA.</DialogDescription>

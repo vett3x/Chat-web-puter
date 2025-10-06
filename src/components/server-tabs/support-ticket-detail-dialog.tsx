@@ -229,7 +229,7 @@ export function SupportTicketDetailDialog({ open, onOpenChange, ticketId, onTick
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] h-[90vh] flex flex-col">
+      <DialogContent className="w-full max-w-[95vw] p-4 h-[90vh] sm:max-w-[800px] sm:p-6 flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <LifeBuoy className="h-6 w-6" /> Ticket #{ticket.id.substring(0, 8)} - {ticket.subject}

@@ -38,7 +38,7 @@ export function ServerDetailDialog({ open, onOpenChange, server, userRole }: Ser
   const [activeTab, setActiveTab] = useState('docker');
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[900px] p-6 h-[90vh] flex flex-col">
+      <DialogContent className="w-full max-w-[95vw] p-4 h-[90vh] sm:max-w-[900px] sm:p-6 flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Server className="h-6 w-6" /> Detalles del Servidor: {server.name || server.ip_address}
