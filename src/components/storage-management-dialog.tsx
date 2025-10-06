@@ -32,6 +32,8 @@ import { useSession } from './session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
 import { ScrollArea } from './ui/scroll-area';
 import { Input } from './ui/input';
+import { Card, CardContent, CardFooter } from '@/components/ui/card'; // Import Card components
+import { Separator } from '@/components/ui/separator'; // Import Separator
 
 const VIRTUAL_PROJECTS_FOLDER = 'Proyectos DeepAI Coder';
 
@@ -166,11 +168,9 @@ export function StorageManagementDialog({ open, onOpenChange }: StorageManagemen
 
   const handleNavigate = (item: StoredItem) => {
     if (item.type !== 'folder') return;
-    // For virtual project folders, the path is already correctly formatted
     if (item.path.startsWith(VIRTUAL_PROJECTS_FOLDER)) {
       setCurrentPath(item.path);
     } else {
-      // For regular folders, construct the path
       setCurrentPath(prev => (prev ? `${prev}/${item.name}` : item.name));
     }
   };
@@ -188,8 +188,8 @@ export function StorageManagementDialog({ open, onOpenChange }: StorageManagemen
           <DialogDescription>Navega, sube y elimina los archivos de tu cuenta.</DialogDescription>
         </DialogHeader>
         <div className="flex-1 py-4 overflow-hidden flex flex-col">
-          <div className="flex justify-between items-center mb-2 gap-2">
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2 gap-2">
+            <div className="flex items-center gap-1 text-sm text-muted-foreground flex-wrap">
               <Button variant="link" className="p-0 h-auto" onClick={() => setCurrentPath('')}>Raíz</Button>
               {currentPath.split('/').map((part, index) => (
                 <React.Fragment key={index}>
@@ -198,7 +198,7 @@ export function StorageManagementDialog({ open, onOpenChange }: StorageManagemen
                 </React.Fragment>
               ))}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 self-end sm:self-center">
               <input type="file" ref={fileInputRef} onChange={handleFileSelectAndUpload} multiple hidden />
               <Button size="sm" onClick={() => fileInputRef.current?.click()} disabled={isLoading || isUploading || isInsideProjectFolder}>{isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />} Subir</Button>
               <Dialog open={isNewFolderDialogOpen} onOpenChange={setIsNewFolderDialogOpen}>
@@ -215,38 +215,50 @@ export function StorageManagementDialog({ open, onOpenChange }: StorageManagemen
           <div className="flex-1 overflow-hidden border rounded-md">
             <ScrollArea className="h-full">
               {isLoading ? <div className="flex justify-center py-4"><Loader2 className="h-6 w-6 animate-spin" /></div> : (
-                <Table>
-                  <TableHeader><TableRow><TableHead className="w-[80px]">Tipo</TableHead><TableHead>Nombre</TableHead><TableHead>Tamaño</TableHead><TableHead>Fecha</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {items.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground h-24">Esta carpeta está vacía.</TableCell></TableRow> : items.map(item => {
+                <>
+                  {/* Desktop Table */}
+                  <div className="hidden md:block">
+                    <Table>
+                      <TableHeader><TableRow><TableHead className="w-[80px]">Tipo</TableHead><TableHead>Nombre</TableHead><TableHead>Tamaño</TableHead><TableHead>Fecha</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
+                      <TableBody>
+                        {items.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground h-24">Esta carpeta está vacía.</TableCell></TableRow> : items.map(item => {
+                          const isVirtual = item.path.startsWith(VIRTUAL_PROJECTS_FOLDER);
+                          return (
+                            <TableRow key={item.path} onClick={() => item.type === 'folder' && handleNavigate(item)} className={item.type === 'folder' ? 'cursor-pointer' : ''}>
+                              <TableCell><div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md">{item.name === VIRTUAL_PROJECTS_FOLDER ? <Wand2 className="h-6 w-6 text-primary-light-purple" /> : (item.type === 'folder' ? <Folder className="h-6 w-6 text-yellow-500" /> : (item.metadata?.mimetype.startsWith('image/') ? <img src={item.publicUrl} alt={item.name} className="h-full w-full object-cover rounded-md" /> : <File className="h-6 w-6 text-muted-foreground" />))}</div></TableCell>
+                              <TableCell className="font-medium break-all">{item.name}</TableCell>
+                              <TableCell>{item.type === 'file' ? formatBytes(item.metadata?.size || 0) : '--'}</TableCell>
+                              <TableCell>{item.created_at ? format(new Date(item.created_at), 'dd/MM/yyyy HH:mm', { locale: es }) : '--'}</TableCell>
+                              <TableCell className="text-right"><div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>{item.type === 'file' && !isVirtual && <a href={item.publicUrl} download={item.name} target="_blank" rel="noopener noreferrer"><Button variant="outline" size="icon" className="h-8 w-8"><Download className="h-4 w-4" /></Button></a>}<AlertDialog><AlertDialogTrigger asChild><Button variant="destructive" size="icon" className="h-8 w-8" disabled={isDeleting === item.path || isVirtual}>{isDeleting === item.path ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará permanentemente "{item.name}". {item.type === 'folder' && 'Todo su contenido también será eliminado.'}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(item)} className="bg-destructive">Eliminar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></div></TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  {/* Mobile Cards */}
+                  <div className="md:hidden p-2 space-y-2">
+                    {items.length === 0 ? <div className="text-center text-muted-foreground py-8">Esta carpeta está vacía.</div> : items.map(item => {
                       const isVirtual = item.path.startsWith(VIRTUAL_PROJECTS_FOLDER);
                       return (
-                        <TableRow key={item.path} onClick={() => item.type === 'folder' && handleNavigate(item)} className={item.type === 'folder' ? 'cursor-pointer' : ''}>
-                          <TableCell>
-                            <div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md">
-                              {item.name === VIRTUAL_PROJECTS_FOLDER ? <Wand2 className="h-6 w-6 text-primary-light-purple" /> : (item.type === 'folder' ? <Folder className="h-6 w-6 text-yellow-500" /> : (item.metadata?.mimetype.startsWith('image/') ? <img src={item.publicUrl} alt={item.name} className="h-full w-full object-cover rounded-md" /> : <File className="h-6 w-6 text-muted-foreground" />))}
+                        <Card key={item.path} onClick={() => item.type === 'folder' && handleNavigate(item)} className={item.type === 'folder' ? 'cursor-pointer' : ''}>
+                          <CardContent className="p-3 flex items-center gap-3">
+                            <div className="h-12 w-12 flex-shrink-0 flex items-center justify-center bg-muted rounded-md">{item.name === VIRTUAL_PROJECTS_FOLDER ? <Wand2 className="h-6 w-6 text-primary-light-purple" /> : (item.type === 'folder' ? <Folder className="h-6 w-6 text-yellow-500" /> : (item.metadata?.mimetype.startsWith('image/') ? <img src={item.publicUrl} alt={item.name} className="h-full w-full object-cover rounded-md" /> : <File className="h-6 w-6 text-muted-foreground" />))}</div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium break-words">{item.name}</p>
+                              <p className="text-xs text-muted-foreground">{item.created_at ? format(new Date(item.created_at), 'dd/MM/yyyy HH:mm', { locale: es }) : '--'}</p>
+                              <p className="text-xs text-muted-foreground">{item.type === 'file' ? formatBytes(item.metadata?.size || 0) : 'Carpeta'}</p>
                             </div>
-                          </TableCell>
-                          <TableCell className="font-medium break-all">{item.name}</TableCell>
-                          <TableCell>{item.type === 'file' ? formatBytes(item.metadata?.size || 0) : '--'}</TableCell>
-                          <TableCell>{item.created_at ? format(new Date(item.created_at), 'dd/MM/yyyy HH:mm', { locale: es }) : '--'}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
                               {item.type === 'file' && !isVirtual && <a href={item.publicUrl} download={item.name} target="_blank" rel="noopener noreferrer"><Button variant="outline" size="icon" className="h-8 w-8"><Download className="h-4 w-4" /></Button></a>}
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild><Button variant="destructive" size="icon" className="h-8 w-8" disabled={isDeleting === item.path || isVirtual}>{isDeleting === item.path ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</Button></AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará permanentemente "{item.name}". {item.type === 'folder' && 'Todo su contenido también será eliminado.'}</AlertDialogDescription></AlertDialogHeader>
-                                  <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(item)} className="bg-destructive">Eliminar</AlertDialogAction></AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
+                              <AlertDialog><AlertDialogTrigger asChild><Button variant="destructive" size="icon" className="h-8 w-8" disabled={isDeleting === item.path || isVirtual}>{isDeleting === item.path ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará permanentemente "{item.name}". {item.type === 'folder' && 'Todo su contenido también será eliminado.'}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(item)} className="bg-destructive">Eliminar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
                             </div>
-                          </TableCell>
-                        </TableRow>
+                          </CardContent>
+                        </Card>
                       );
                     })}
-                  </TableBody>
-                </Table>
+                  </div>
+                </>
               )}
             </ScrollArea>
           </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, RefreshCw, XCircle, Dock, Server, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from '@/lib/utils';
 import { parseDataSizeToBytes } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
 
 const POLLING_INTERVAL = 5000; // Poll every 5 seconds
 
@@ -120,80 +121,73 @@ export function AllDockerContainersTab() {
             <p>No se encontraron contenedores Docker activos en tus servidores listos.</p>
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Servidor</TableHead>
-                <TableHead>ID Contenedor</TableHead>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Imagen</TableHead>
-                <TableHead>CPU</TableHead>
-                <TableHead>Memoria</TableHead>
-                <TableHead>Red (RX/TX)</TableHead>
-                <TableHead>Estado</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <>
+            {/* Desktop Table */}
+            <div className="hidden md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Servidor</TableHead>
+                    <TableHead>ID Contenedor</TableHead>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Imagen</TableHead>
+                    <TableHead>CPU</TableHead>
+                    <TableHead>Memoria</TableHead>
+                    <TableHead>Red (RX/TX)</TableHead>
+                    <TableHead>Estado</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {containerStats.map((stat) => {
+                    const isRunning = stat.Status.includes('Up');
+                    return (
+                      <TableRow key={`${stat.serverId}-${stat.ID}`} className={cn(!isRunning && "text-muted-foreground opacity-70")}>
+                        <TableCell className="flex items-center gap-1">
+                          <Server className="h-4 w-4 text-muted-foreground" />
+                          <TooltipProvider><Tooltip><TooltipTrigger asChild><span className="truncate max-w-[100px]">{stat.serverName}</span></TooltipTrigger><TooltipContent><p>{stat.serverName} ({stat.serverIpAddress})</p></TooltipContent></Tooltip></TooltipProvider>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{stat.ID.substring(0, 12)}</TableCell>
+                        <TableCell>{stat.Name}</TableCell>
+                        <TableCell>{stat.Image}</TableCell>
+                        <TableCell>{stat['CPU %']}</TableCell>
+                        <TableCell><TooltipProvider><Tooltip><TooltipTrigger asChild><span>{stat['Mem Usage'] ? stat['Mem Usage'].split('/')[0].trim() : 'N/A'}</span></TooltipTrigger><TooltipContent><p>Uso: {stat['Mem Usage'] || 'N/A'}</p><p>Porcentaje: {stat['Mem %'] || 'N/A'}</p></TooltipContent></Tooltip></TooltipProvider></TableCell>
+                        <TableCell><TooltipProvider><Tooltip><TooltipTrigger asChild><span>{formatRate(stat.netRxRateKbps)} / {formatRate(stat.netTxRateKbps)}</span></TooltipTrigger><TooltipContent><p>Total I/O: {stat['Net I/O']}</p></TooltipContent></Tooltip></TooltipProvider></TableCell>
+                        <TableCell>{isRunning ? <span className="text-green-500">Activo</span> : <span className="text-red-500">Inactivo</span>}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+            {/* Mobile Cards */}
+            <div className="md:hidden space-y-4 pt-4">
               {containerStats.map((stat) => {
                 const isRunning = stat.Status.includes('Up');
                 return (
-                  <TableRow key={`${stat.serverId}-${stat.ID}`} className={cn(
-                    !isRunning && "text-muted-foreground opacity-70"
-                  )}>
-                    <TableCell className="flex items-center gap-1">
-                      <Server className="h-4 w-4 text-muted-foreground" />
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="truncate max-w-[100px]">{stat.serverName}</span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{stat.serverName} ({stat.serverIpAddress})</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{stat.ID.substring(0, 12)}</TableCell>
-                    <TableCell>{stat.Name}</TableCell>
-                    <TableCell>{stat.Image}</TableCell>
-                    <TableCell>{stat['CPU %']}</TableCell>
-                    <TableCell>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span>{stat['Mem Usage'] ? stat['Mem Usage'].split('/')[0].trim() : 'N/A'}</span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Uso: {stat['Mem Usage'] || 'N/A'}</p>
-                            <p>Porcentaje: {stat['Mem %'] || 'N/A'}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </TableCell>
-                    <TableCell>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span>{formatRate(stat.netRxRateKbps)} / {formatRate(stat.netTxRateKbps)}</span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Total I/O: {stat['Net I/O']}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </TableCell>
-                    <TableCell>
-                      {isRunning ? (
-                        <span className="text-green-500">Activo</span>
-                      ) : (
-                        <span className="text-red-500">Inactivo</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
+                  <Card key={`${stat.serverId}-${stat.ID}`} className={cn(!isRunning && "opacity-70")}>
+                    <CardContent className="p-3 space-y-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-semibold">{stat.Name}</p>
+                          <p className="text-xs text-muted-foreground font-mono">{stat.ID.substring(0, 12)}</p>
+                        </div>
+                        {isRunning ? <span className="text-green-500 text-xs font-bold">Activo</span> : <span className="text-red-500 text-xs font-bold">Inactivo</span>}
+                      </div>
+                      <Separator />
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                        <p><span className="font-medium">Servidor:</span> {stat.serverName}</p>
+                        <p><span className="font-medium">Imagen:</span> <span className="truncate">{stat.Image}</span></p>
+                        <p><span className="font-medium">CPU:</span> {stat['CPU %']}</p>
+                        <p><span className="font-medium">Memoria:</span> {stat['Mem Usage'] ? stat['Mem Usage'].split('/')[0].trim() : 'N/A'}</p>
+                        <p><span className="font-medium">Red RX:</span> {formatRate(stat.netRxRateKbps)}</p>
+                        <p><span className="font-medium">Red TX:</span> {formatRate(stat.netTxRateKbps)}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
                 );
               })}
-            </TableBody>
-          </Table>
+            </div>
+          </>
         )}
       </CardContent>
     </Card>
