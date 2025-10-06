@@ -10,10 +10,20 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerClose,
+} from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Users } from 'lucide-react';
-import { UserManagementTabs } from './UserManagementTabs'; // Updated import path
-import { useSession } from '@/components/session-context-provider'; // Import useSession
+import { UserManagementTabs } from './UserManagementTabs';
+import { useSession } from '@/components/session-context-provider';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface UserManagementDialogProps {
   open: boolean;
@@ -21,7 +31,37 @@ interface UserManagementDialogProps {
 }
 
 export function UserManagementDialog({ open, onOpenChange }: UserManagementDialogProps) {
-  const { isUserTemporarilyDisabled } = useSession(); // Get the disabled state
+  const { isUserTemporarilyDisabled } = useSession();
+  const isMobile = useIsMobile();
+
+  const content = (
+    <div className="flex-1 py-4 overflow-hidden">
+      <UserManagementTabs isUserTemporarilyDisabled={isUserTemporarilyDisabled} />
+    </div>
+  );
+
+  if (isMobile) {
+    return (
+      <Drawer open={open} onOpenChange={onOpenChange}>
+        <DrawerContent className="h-[95vh] flex flex-col">
+          <DrawerHeader className="text-left">
+            <DrawerTitle className="flex items-center gap-2">
+              <Users className="h-6 w-6" /> Gestión de Usuarios
+            </DrawerTitle>
+            <DrawerDescription>
+              Gestiona los usuarios de la aplicación, sus roles y permisos.
+            </DrawerDescription>
+          </DrawerHeader>
+          {content}
+          <DrawerFooter className="pt-2">
+            <DrawerClose asChild>
+              <Button variant="outline" disabled={isUserTemporarilyDisabled}>Cerrar</Button>
+            </DrawerClose>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -34,9 +74,7 @@ export function UserManagementDialog({ open, onOpenChange }: UserManagementDialo
             Gestiona los usuarios de la aplicación, sus roles y permisos.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex-1 py-4 overflow-hidden">
-          <UserManagementTabs isUserTemporarilyDisabled={isUserTemporarilyDisabled} /> {/* Pass the prop */}
-        </div>
+        {content}
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="outline" disabled={isUserTemporarilyDisabled}>Cerrar</Button>
