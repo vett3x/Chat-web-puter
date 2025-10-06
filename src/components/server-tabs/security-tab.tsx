@@ -219,26 +219,51 @@ export function SecurityTab() {
           {isLoadingCommands ? (
             <div className="flex items-center justify-center py-4"><Loader2 className="h-6 w-6 animate-spin" /></div>
           ) : (
-            <Table>
-              <TableHeader><TableRow><TableHead>Comando</TableHead><TableHead>Descripción</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
-              <TableBody>
+            <>
+              {/* Desktop Table */}
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader><TableRow><TableHead>Comando</TableHead><TableHead>Descripción</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {filteredCommands.map((cmd) => (
+                      <TableRow key={cmd.command}>
+                        <TableCell className="font-mono">{cmd.command}</TableCell>
+                        <TableCell>{cmd.description || 'N/A'}</TableCell>
+                        <TableCell className="text-right">
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild><Button variant="destructive" size="icon" className="h-8 w-8" disabled={!isSuperAdmin}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription>Eliminar "{cmd.command}" impedirá que la IA lo ejecute. Esta acción es irreversible.</AlertDialogDescription></AlertDialogHeader>
+                              <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(cmd.command)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {/* Mobile Cards */}
+              <div className="md:hidden space-y-4">
                 {filteredCommands.map((cmd) => (
-                  <TableRow key={cmd.command}>
-                    <TableCell className="font-mono">{cmd.command}</TableCell>
-                    <TableCell>{cmd.description || 'N/A'}</TableCell>
-                    <TableCell className="text-right">
+                  <Card key={cmd.command}>
+                    <CardContent className="p-4 flex justify-between items-start">
+                      <div className="space-y-1">
+                        <h4 className="font-mono font-semibold">{cmd.command}</h4>
+                        <p className="text-sm text-muted-foreground">{cmd.description || 'Sin descripción.'}</p>
+                      </div>
                       <AlertDialog>
-                        <AlertDialogTrigger asChild><Button variant="destructive" size="icon" className="h-8 w-8" disabled={!isSuperAdmin}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                        <AlertDialogTrigger asChild><Button variant="destructive" size="icon" className="h-8 w-8 flex-shrink-0" disabled={!isSuperAdmin}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription>Eliminar "{cmd.command}" impedirá que la IA lo ejecute. Esta acción es irreversible.</AlertDialogDescription></AlertDialogHeader>
                           <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(cmd.command)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
-                    </TableCell>
-                  </TableRow>
+                    </CardContent>
+                  </Card>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

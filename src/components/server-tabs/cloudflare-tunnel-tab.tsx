@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Cloud, PlusCircle, Loader2, Trash2, RefreshCw, AlertCircle, CheckCircle2, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -245,25 +245,51 @@ export function CloudflareTunnelTab() {
           ) : cloudflareDomains.length === 0 ? (
             <p className="text-muted-foreground">No hay dominios de Cloudflare registrados aún.</p>
           ) : (
-            <Table>
-              <TableHeader><TableRow><TableHead>Dominio</TableHead><TableHead>Zone ID</TableHead><TableHead>Account ID</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
-              <TableBody>
+            <>
+              {/* Desktop Table */}
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader><TableRow><TableHead>Dominio</TableHead><TableHead>Zone ID</TableHead><TableHead>Account ID</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {cloudflareDomains.map((domain) => (
+                      <TableRow key={domain.id}>
+                        <TableCell className="font-medium">{domain.domain_name}</TableCell><TableCell className="font-mono text-xs">{domain.zone_id}</TableCell><TableCell className="font-mono text-xs">{domain.account_id}</TableCell>
+                        <TableCell className="text-right">
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild><Button variant="destructive" size="icon" className="h-8 w-8" disabled={!canManageCloudflareDomains}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader><AlertDialogTitle>¿Estás seguro de eliminar este dominio?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará el dominio "{domain.domain_name}" y todos los túneles asociados a él.</AlertDialogDescription></AlertDialogHeader>
+                              <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteDomain(domain.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {/* Mobile Cards */}
+              <div className="md:hidden space-y-4">
                 {cloudflareDomains.map((domain) => (
-                  <TableRow key={domain.id}>
-                    <TableCell className="font-medium">{domain.domain_name}</TableCell><TableCell className="font-mono text-xs">{domain.zone_id}</TableCell><TableCell className="font-mono text-xs">{domain.account_id}</TableCell>
-                    <TableCell className="text-right">
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild><Button variant="destructive" size="icon" className="h-8 w-8" disabled={!canManageCloudflareDomains}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader><AlertDialogTitle>¿Estás seguro de eliminar este dominio?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará el dominio "{domain.domain_name}" y todos los túneles asociados a él.</AlertDialogDescription></AlertDialogHeader>
-                          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteDomain(domain.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </TableCell>
-                  </TableRow>
+                  <Card key={domain.id}>
+                    <CardContent className="p-4 space-y-2">
+                      <div className="flex justify-between items-start">
+                        <h4 className="font-semibold break-all">{domain.domain_name}</h4>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild><Button variant="destructive" size="icon" className="h-8 w-8 flex-shrink-0" disabled={!canManageCloudflareDomains}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader><AlertDialogTitle>¿Estás seguro de eliminar este dominio?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará el dominio "{domain.domain_name}" y todos los túneles asociados a él.</AlertDialogDescription></AlertDialogHeader>
+                            <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteDomain(domain.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                      <p className="text-xs text-muted-foreground font-mono">Zone ID: {domain.zone_id}</p>
+                      <p className="text-xs text-muted-foreground font-mono">Account ID: {domain.account_id}</p>
+                    </CardContent>
+                  </Card>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -286,31 +312,65 @@ export function CloudflareTunnelTab() {
           ) : dockerTunnels.length === 0 ? (
             <p className="text-muted-foreground">No hay túneles Docker de Cloudflare configurados aún.</p>
           ) : (
-            <Table>
-              <TableHeader><TableRow><TableHead>Dominio Completo</TableHead><TableHead>Servidor</TableHead><TableHead>Contenedor</TableHead><TableHead>Puerto</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
-              <TableBody>
+            <>
+              {/* Desktop Table */}
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader><TableRow><TableHead>Dominio Completo</TableHead><TableHead>Servidor</TableHead><TableHead>Contenedor</TableHead><TableHead>Puerto</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {dockerTunnels.map((tunnel) => (
+                      <TableRow key={tunnel.id}>
+                        <TableCell className="font-medium"><a href={`https://${tunnel.full_domain}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline flex items-center gap-1"><Globe className="h-4 w-4" /> {tunnel.full_domain}</a></TableCell>
+                        <TableCell>{tunnel.server_name}</TableCell>
+                        <TableCell className="font-mono text-xs">{tunnel.container_id?.substring(0, 12) || 'N/A'}</TableCell>
+                        <TableCell>{tunnel.container_port}</TableCell>
+                        <TableCell>
+                          <span className={cn("flex items-center gap-1", tunnel.status === 'active' && "text-green-500", tunnel.status === 'failed' && "text-destructive", (tunnel.status === 'pending' || tunnel.status === 'provisioning') && "text-blue-500")}>
+                            {tunnel.status === 'active' && <CheckCircle2 className="h-4 w-4" />}
+                            {tunnel.status === 'failed' && <AlertCircle className="h-4 w-4" />}
+                            {(tunnel.status === 'pending' || tunnel.status === 'provisioning') && <Loader2 className="h-4 w-4 animate-spin" />}
+                            {tunnel.status === 'pending' && 'Pendiente'}
+                            {tunnel.status === 'provisioning' && 'Aprovisionando'}
+                            {tunnel.status === 'active' && 'Activo'}
+                            {tunnel.status === 'failed' && 'Fallido'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right"><Button variant="destructive" size="icon" className="h-8 w-8" disabled={!canManageCloudflareDomains}><Trash2 className="h-4 w-4" /></Button></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {/* Mobile Cards */}
+              <div className="md:hidden space-y-4">
                 {dockerTunnels.map((tunnel) => (
-                  <TableRow key={tunnel.id}>
-                    <TableCell className="font-medium"><a href={`https://${tunnel.full_domain}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline flex items-center gap-1"><Globe className="h-4 w-4" /> {tunnel.full_domain}</a></TableCell>
-                    <TableCell>{tunnel.server_name}</TableCell>
-                    <TableCell className="font-mono text-xs">{tunnel.container_id?.substring(0, 12) || 'N/A'}</TableCell>
-                    <TableCell>{tunnel.container_port}</TableCell>
-                    <TableCell>
-                      <span className={cn("flex items-center gap-1", tunnel.status === 'active' && "text-green-500", tunnel.status === 'failed' && "text-destructive", (tunnel.status === 'pending' || tunnel.status === 'provisioning') && "text-blue-500")}>
-                        {tunnel.status === 'active' && <CheckCircle2 className="h-4 w-4" />}
-                        {tunnel.status === 'failed' && <AlertCircle className="h-4 w-4" />}
-                        {(tunnel.status === 'pending' || tunnel.status === 'provisioning') && <Loader2 className="h-4 w-4 animate-spin" />}
-                        {tunnel.status === 'pending' && 'Pendiente'}
-                        {tunnel.status === 'provisioning' && 'Aprovisionando'}
-                        {tunnel.status === 'active' && 'Activo'}
-                        {tunnel.status === 'failed' && 'Fallido'}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right"><Button variant="destructive" size="icon" className="h-8 w-8" disabled={!canManageCloudflareDomains}><Trash2 className="h-4 w-4" /></Button></TableCell>
-                  </TableRow>
+                  <Card key={tunnel.id}>
+                    <CardContent className="p-4 space-y-2">
+                      <div className="flex justify-between items-start">
+                        <a href={`https://${tunnel.full_domain}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline flex items-center gap-1 font-semibold break-all">
+                          <Globe className="h-4 w-4" /> {tunnel.full_domain}
+                        </a>
+                        <Button variant="destructive" size="icon" className="h-8 w-8 flex-shrink-0" disabled={!canManageCloudflareDomains}><Trash2 className="h-4 w-4" /></Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground">Servidor: {tunnel.server_name}</p>
+                      <p className="text-xs text-muted-foreground font-mono">Contenedor: {tunnel.container_id?.substring(0, 12) || 'N/A'}</p>
+                      <div className="flex items-center justify-between text-sm">
+                        <span>Puerto: {tunnel.container_port}</span>
+                        <span className={cn("flex items-center gap-1", tunnel.status === 'active' && "text-green-500", tunnel.status === 'failed' && "text-destructive", (tunnel.status === 'pending' || tunnel.status === 'provisioning') && "text-blue-500")}>
+                          {tunnel.status === 'active' && <CheckCircle2 className="h-4 w-4" />}
+                          {tunnel.status === 'failed' && <AlertCircle className="h-4 w-4" />}
+                          {(tunnel.status === 'pending' || tunnel.status === 'provisioning') && <Loader2 className="h-4 w-4 animate-spin" />}
+                          {tunnel.status === 'pending' && 'Pendiente'}
+                          {tunnel.status === 'provisioning' && 'Aprovisionando'}
+                          {tunnel.status === 'active' && 'Activo'}
+                          {tunnel.status === 'failed' && 'Fallido'}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

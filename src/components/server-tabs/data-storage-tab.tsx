@@ -13,7 +13,7 @@ import { Loader2, Save, Database, TestTube2, PlusCircle, Trash2, Edit, CheckCirc
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDescriptionComponent, DialogFooter, DialogClose, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDescriptionComponent, DialogFooter, DialogClose, DialogTrigger } from '@/components/ui/dialog'; // Renamed DialogDescription to avoid conflict
 import CodeEditor from '@uiw/react-textarea-code-editor';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { format } from 'date-fns';
@@ -171,10 +171,10 @@ export function DataStorageTab() {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="database" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="database">Bases de Datos</TabsTrigger>
-            <TabsTrigger value="s3-storage">Almacenamiento S3</TabsTrigger>
-            <TabsTrigger value="s3-backups">Backups</TabsTrigger>
+          <TabsList className="h-auto flex-col sm:h-10 sm:flex-row">
+            <TabsTrigger value="database" className="w-full justify-start sm:w-auto sm:justify-center">Bases de Datos</TabsTrigger>
+            <TabsTrigger value="s3-storage" className="w-full justify-start sm:w-auto sm:justify-center">Almacenamiento S3</TabsTrigger>
+            <TabsTrigger value="s3-backups" className="w-full justify-start sm:w-auto sm:justify-center">Backups</TabsTrigger>
           </TabsList>
           <TabsContent value="database" className="mt-4">
             {isLoadingDb ? <div className="flex items-center justify-center py-4"><Loader2 className="h-6 w-6 animate-spin" /></div> : (
