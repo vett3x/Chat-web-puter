@@ -15,6 +15,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
+import { DatabaseConfigTab } from '@/components/admin/database-config-tab';
+import { S3StorageTab } from './s3-storage-tab';
+import { S3BackupsTab } from './s3-backups-tab';
 
 const templateSchema = z.object({
   template: z.string().min(1, 'La plantilla no puede estar vacía.'),
@@ -126,6 +129,12 @@ export function InfrastructureTab() {
       <CloudflareTunnelTab />
       <Separator />
       <UsageHistoryTab />
+      <Separator />
+      <DatabaseConfigTab />
+      <Separator />
+      <S3StorageTab />
+      <Separator />
+      <S3BackupsTab />
     </div>
   );
 }
