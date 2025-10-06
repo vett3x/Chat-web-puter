@@ -24,7 +24,7 @@ export function AdminPanelTabs({ onOpenAlerts, initialTab }: AdminPanelTabsProps
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col">
-      <TabsList className={cn("grid w-full", isSuperAdmin ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2")}>
+      <TabsList className={cn("grid w-full", isSuperAdmin ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:grid-cols-2")}>
         {isSuperAdmin && (
           <TabsTrigger value="dashboard" className="flex items-center gap-2">
             <LayoutDashboard className="h-4 w-4" /> Panel
