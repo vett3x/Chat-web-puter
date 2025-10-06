@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Server, Shield, LayoutDashboard, LifeBuoy, Menu } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useSession } from '@/components/session-context-provider';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from './ui/scroll-area';
 import { AdminDashboardTab } from './admin/admin-dashboard';
 import { InfrastructureTab } from './server-tabs/infrastructure-tab';
