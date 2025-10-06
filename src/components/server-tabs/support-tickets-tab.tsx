@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Loader2, RefreshCw, Trash2, LifeBuoy, ChevronDown, ChevronRight, Search, CheckCircle2, MessageSquareText, Eye } from 'lucide-react';
@@ -155,6 +155,83 @@ export function SupportTicketsTab() {
     setIsDetailDialogOpen(true);
   };
 
+  const renderTicketTable = (tickets: Ticket[]) => (
+    <div className="hidden md:block">
+      <Table>
+        <TableHeader><TableRow><TableHead className="w-10"></TableHead><TableHead>Asunto</TableHead><TableHead>Usuario</TableHead><TableHead>Prioridad</TableHead><TableHead>Estado</TableHead><TableHead>Fecha</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
+        <TableBody>
+          {tickets.map(ticket => (
+            <TableRow key={ticket.id}>
+              <TableCell><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenTicketDetails(ticket.id)}><Eye className="h-4 w-4" /></Button></TableCell>
+              <TableCell className="font-medium">{ticket.subject}</TableCell>
+              <TableCell>{ticket.user?.first_name || ticket.user?.email?.email || 'Usuario Desconocido'}</TableCell>
+              <TableCell>{getPriorityBadge(ticket.priority)}</TableCell>
+              <TableCell>{getStatusBadge(ticket.status)}</TableCell>
+              <TableCell>{format(new Date(ticket.created_at), 'dd/MM/yyyy HH:mm', { locale: es })}</TableCell>
+              <TableCell className="text-right">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild><Button variant="outline" size="sm">Acciones</Button></DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleStatusChange(ticket.id, 'new')}>Marcar como Nuevo</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleStatusChange(ticket.id, 'in_progress')}>Marcar como En Progreso</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleStatusChange(ticket.id, 'resolved')}>Marcar como Resuelto</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">Eliminar</DropdownMenuItem></AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader><AlertDialogTitle>¿Eliminar ticket?</AlertDialogTitle><AlertDialogDescription>Esta acción es irreversible.</AlertDialogDescription></AlertDialogHeader>
+                        <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(ticket.id)} className="bg-destructive">Eliminar</AlertDialogAction></AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
+  const renderTicketCards = (tickets: Ticket[]) => (
+    <div className="md:hidden space-y-4">
+      {tickets.map(ticket => (
+        <Card key={ticket.id}>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex justify-between items-start">
+              <h4 className="font-semibold break-all">{ticket.subject}</h4>
+              <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => handleOpenTicketDetails(ticket.id)}><Eye className="h-4 w-4" /></Button>
+            </div>
+            <p className="text-sm text-muted-foreground">Usuario: {ticket.user?.first_name || ticket.user?.email?.email || 'N/A'}</p>
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="font-medium">Prioridad:</span> {getPriorityBadge(ticket.priority)}
+              <span className="font-medium">Estado:</span> {getStatusBadge(ticket.status)}
+            </div>
+            <p className="text-xs text-muted-foreground">Fecha: {format(new Date(ticket.created_at), 'dd/MM/yyyy HH:mm', { locale: es })}</p>
+          </CardContent>
+          <CardFooter className="p-4 pt-0 flex justify-end">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild><Button variant="outline" size="sm">Acciones</Button></DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleStatusChange(ticket.id, 'new')}>Marcar como Nuevo</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleStatusChange(ticket.id, 'in_progress')}>Marcar como En Progreso</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleStatusChange(ticket.id, 'resolved')}>Marcar como Resuelto</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <AlertDialog>
+                  <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">Eliminar</DropdownMenuItem></AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader><AlertDialogTitle>¿Eliminar ticket?</AlertDialogTitle><AlertDialogDescription>Esta acción es irreversible.</AlertDialogDescription></AlertDialogHeader>
+                    <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(ticket.id)} className="bg-destructive">Eliminar</AlertDialogAction></AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </CardFooter>
+        </Card>
+      ))}
+    </div>
+  );
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -167,18 +244,10 @@ export function SupportTicketsTab() {
         <div className="flex flex-col sm:flex-row gap-4 mb-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar tickets..."
-              className="pl-9"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              disabled={isLoading}
-            />
+            <Input placeholder="Buscar tickets..." className="pl-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} disabled={isLoading} />
           </div>
           <Select value={filterStatus} onValueChange={(value: 'all' | 'new' | 'in_progress' | 'resolved') => setFilterStatus(value)} disabled={isLoading}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filtrar por estado" />
-            </SelectTrigger>
+            <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filtrar por estado" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los Estados</SelectItem>
               <SelectItem value="new">Nuevos</SelectItem>
@@ -196,48 +265,9 @@ export function SupportTicketsTab() {
               <>
                 {activeTickets.length > 0 && (
                   <div className="mb-8">
-                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                      <MessageSquareText className="h-5 w-5 text-muted-foreground" /> Tickets Activos ({activeTickets.length})
-                    </h3>
-                    <Table>
-                      <TableHeader><TableRow><TableHead className="w-10"></TableHead><TableHead>Asunto</TableHead><TableHead>Usuario</TableHead><TableHead>Prioridad</TableHead><TableHead>Estado</TableHead><TableHead>Fecha</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
-                      <TableBody>
-                        {activeTickets.map(ticket => (
-                          <React.Fragment key={ticket.id}>
-                            <TableRow>
-                              <TableCell>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenTicketDetails(ticket.id)}>
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                              </TableCell>
-                              <TableCell className="font-medium">{ticket.subject}</TableCell>
-                              <TableCell>{ticket.user?.first_name || ticket.user?.email?.email || 'Usuario Desconocido'}</TableCell>
-                              <TableCell>{getPriorityBadge(ticket.priority)}</TableCell>
-                              <TableCell>{getStatusBadge(ticket.status)}</TableCell>
-                              <TableCell>{format(new Date(ticket.created_at), 'dd/MM/yyyy HH:mm', { locale: es })}</TableCell>
-                              <TableCell className="text-right">
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild><Button variant="outline" size="sm">Acciones</Button></DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => handleStatusChange(ticket.id, 'new')}>Marcar como Nuevo</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleStatusChange(ticket.id, 'in_progress')}>Marcar como En Progreso</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleStatusChange(ticket.id, 'resolved')}>Marcar como Resuelto</DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <AlertDialog>
-                                      <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">Eliminar</DropdownMenuItem></AlertDialogTrigger>
-                                      <AlertDialogContent>
-                                        <AlertDialogHeader><AlertDialogTitle>¿Eliminar ticket?</AlertDialogTitle><AlertDialogDescription>Esta acción es irreversible.</AlertDialogDescription></AlertDialogHeader>
-                                        <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(ticket.id)} className="bg-destructive">Eliminar</AlertDialogAction></AlertDialogFooter>
-                                      </AlertDialogContent>
-                                    </AlertDialog>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
-                            </TableRow>
-                          </React.Fragment>
-                        ))}
-                      </TableBody>
-                    </Table>
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2"><MessageSquareText className="h-5 w-5 text-muted-foreground" /> Tickets Activos ({activeTickets.length})</h3>
+                    {renderTicketTable(activeTickets)}
+                    {renderTicketCards(activeTickets)}
                   </div>
                 )}
 
@@ -252,42 +282,8 @@ export function SupportTicketsTab() {
                         </Button>
                       </CollapsibleTrigger>
                       <CollapsibleContent className="mt-4">
-                        <Table>
-                          <TableHeader><TableRow><TableHead className="w-10"></TableHead><TableHead>Asunto</TableHead><TableHead>Usuario</TableHead><TableHead>Fecha</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
-                          <TableBody>
-                            {displayedResolvedTickets.map(ticket => (
-                              <React.Fragment key={ticket.id}>
-                                <TableRow>
-                                  <TableCell>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenTicketDetails(ticket.id)}>
-                                      <Eye className="h-4 w-4" />
-                                    </Button>
-                                  </TableCell>
-                                  <TableCell className="font-medium">{ticket.subject}</TableCell>
-                                  <TableCell>{ticket.user?.first_name || ticket.user?.email?.email || 'Usuario Desconocido'}</TableCell>
-                                  <TableCell>{format(new Date(ticket.created_at), 'dd/MM/yyyy HH:mm', { locale: es })}</TableCell>
-                                  <TableCell className="text-right">
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild><Button variant="outline" size="sm">Acciones</Button></DropdownMenuTrigger>
-                                      <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={() => handleStatusChange(ticket.id, 'new')}>Marcar como Nuevo</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleStatusChange(ticket.id, 'in_progress')}>Marcar como En Progreso</DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <AlertDialog>
-                                          <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">Eliminar</DropdownMenuItem></AlertDialogTrigger>
-                                          <AlertDialogContent>
-                                            <AlertDialogHeader><AlertDialogTitle>¿Eliminar ticket?</AlertDialogTitle><AlertDialogDescription>Esta acción es irreversible.</AlertDialogDescription></AlertDialogHeader>
-                                            <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(ticket.id)} className="bg-destructive">Eliminar</AlertDialogAction></AlertDialogFooter>
-                                          </AlertDialogContent>
-                                        </AlertDialog>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
-                                  </TableCell>
-                                </TableRow>
-                              </React.Fragment>
-                            ))}
-                          </TableBody>
-                        </Table>
+                        {renderTicketTable(displayedResolvedTickets)}
+                        {renderTicketCards(displayedResolvedTickets)}
                         {resolvedTicketsDisplayCount < resolvedTickets.length && (
                           <div className="flex justify-center mt-4">
                             <Button variant="outline" onClick={handleLoadMoreResolvedTickets} disabled={isLoading}>
