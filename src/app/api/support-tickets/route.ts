@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
         description,
         status,
         priority,
-        user:profiles (
+        user:profiles!user_id (
           first_name,
           last_name,
           email:auth_users ( email )
