@@ -41,8 +41,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // This query joins through the auth.users table to link support_tickets and profiles
-    const { data, error } = await supabaseAdmin
+    // 1. Fetch all support tickets with just the user_id
+    const { data: tickets, error: ticketsError } = await supabaseAdmin
       .from('support_tickets')
       .select(`
         id,
@@ -51,24 +51,42 @@ export async function GET(req: NextRequest) {
         description,
         status,
         priority,
-        user_data: auth_users (
-          email,
-          profile: profiles (
-            first_name,
-            last_name
-          )
-        )
+        user_id
       `)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (ticketsError) throw ticketsError;
 
-    // The query result is nested, so we format it to match the frontend's expectation
-    const formattedData = data.map(ticket => {
-      const userData = Array.isArray(ticket.user_data) ? ticket.user_data[0] : ticket.user_data;
-      const profileData = userData?.profile;
-      const finalProfile = Array.isArray(profileData) ? profileData[0] : profileData;
-      
+    // 2. Collect all unique user IDs from the tickets
+    const uniqueUserIds = [...new Set(tickets.map(ticket => ticket.user_id))];
+
+    // 3. Fetch all profiles for these unique user IDs
+    const { data: profiles, error: profilesError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, first_name, last_name')
+      .in('id', uniqueUserIds);
+
+    if (profilesError) {
+      console.error('[API /support-tickets GET] Error fetching profiles:', profilesError);
+      // Continue even if profiles fail, just user names might be missing
+    }
+    const profilesMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+    // 4. Fetch user emails from auth.users for these unique user IDs
+    // Note: supabase.auth.admin.listUsers() is more efficient than getUserById in a loop
+    const { data: { users: authUsers }, error: authUsersError } = await supabaseAdmin.auth.admin.listUsers();
+    if (authUsersError) {
+      console.error('[API /support-tickets GET] Error fetching auth users:', authUsersError);
+      // Continue even if auth users fail
+    }
+    const authUsersMap = new Map(authUsers?.map(u => [u.id, u]) || []);
+
+
+    // 5. Format the data, combining ticket, profile, and email information
+    const formattedData = tickets.map(ticket => {
+      const profile = profilesMap.get(ticket.user_id);
+      const authUser = authUsersMap.get(ticket.user_id);
+
       return {
         id: ticket.id,
         created_at: ticket.created_at,
@@ -77,9 +95,9 @@ export async function GET(req: NextRequest) {
         status: ticket.status,
         priority: ticket.priority,
         user: {
-          first_name: finalProfile?.first_name || null,
-          last_name: finalProfile?.last_name || null,
-          email: { email: userData?.email || null }
+          first_name: profile?.first_name || null,
+          last_name: profile?.last_name || null,
+          email: { email: authUser?.email || null }
         }
       };
     });
