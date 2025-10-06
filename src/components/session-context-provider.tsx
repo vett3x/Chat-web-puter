@@ -25,6 +25,8 @@ interface SessionContextType {
   triggerGlobalRefresh: () => void;
   userDefaultModel: string | null;
   globalRefreshKey: number; // New key to trigger refreshes
+  hasNewUserSupportTickets: boolean; // NEW: State for user support tickets
+  setHasNewUserSupportTickets: (value: boolean) => void; // NEW: Setter for user support tickets
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -41,6 +43,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
   const [userStatus, setUserStatus] = useState<UserStatus | null>(null);
   const [userDefaultModel, setUserDefaultModel] = useState<string | null>(null);
   const [globalRefreshKey, setGlobalRefreshKey] = useState(0); // New state
+  const [hasNewUserSupportTickets, setHasNewUserSupportTickets] = useState(false); // NEW: State for user support tickets
   const router = useRouter();
   const pathname = usePathname();
   const isInitialProfileFetch = useRef(true);
@@ -249,6 +252,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
             }
 
             if (ticket) {
+              setHasNewUserSupportTickets(true); // Set the new state to true
               toast.info(`¡Nueva respuesta en tu ticket: "${ticket.subject}"!`, {
                 description: 'Haz clic en "Mis Tickets" en la configuración de tu cuenta para verla.',
                 duration: 8000,
@@ -276,7 +280,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
   }
   
   return (
-    <SessionContext.Provider value={{ session, isLoading, userRole, userPermissions, userAvatarUrl, userLanguage, userStatus, isUserTemporarilyDisabled, triggerGlobalRefresh, userDefaultModel, globalRefreshKey }}>
+    <SessionContext.Provider value={{ session, isLoading, userRole, userPermissions, userAvatarUrl, userLanguage, userStatus, isUserTemporarilyDisabled, triggerGlobalRefresh, userDefaultModel, globalRefreshKey, hasNewUserSupportTickets, setHasNewUserSupportTickets }}>
       {children}
     </SessionContext.Provider>
   );

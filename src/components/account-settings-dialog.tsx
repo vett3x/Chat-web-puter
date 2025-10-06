@@ -83,7 +83,7 @@ export function AccountSettingsDialog({
   isLoadingApiKeys,
   currentUserRole,
 }: AccountSettingsDialogProps) {
-  const { session, isLoading: isSessionLoading, userDefaultModel } = useSession();
+  const { session, isLoading: isSessionLoading, userDefaultModel, hasNewUserSupportTickets, setHasNewUserSupportTickets } = useSession(); // NEW: Get hasNewUserSupportTickets and its setter
   const router = useRouter();
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -241,7 +241,12 @@ export function AccountSettingsDialog({
           <DialogDescription>Gestiona las opciones generales de tu cuenta y preferencias de IA.</DialogDescription>
         </DialogHeader>
         <div className="flex-1 py-4 overflow-hidden">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col">
+          <Tabs value={activeTab} onValueChange={(value) => {
+            setActiveTab(value);
+            if (value === 'support-tickets') {
+              setHasNewUserSupportTickets(false); // Reset alert when user views tickets
+            }
+          }} className="w-full h-full flex flex-col">
             <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3"> {/* Adjusted grid-cols */}
               <TabsTrigger value="general" className="flex items-center gap-2">
                 <KeyRound className="h-4 w-4" /> General
@@ -249,8 +254,11 @@ export function AccountSettingsDialog({
               <TabsTrigger value="ai-preferences" className="flex items-center gap-2">
                 <BrainCircuit className="h-4 w-4" /> Preferencias de IA
               </TabsTrigger>
-              <TabsTrigger value="support-tickets" className="flex items-center gap-2"> {/* New Tab Trigger */}
+              <TabsTrigger value="support-tickets" className="flex items-center gap-2 relative"> {/* New Tab Trigger */}
                 <LifeBuoy className="h-4 w-4" /> Mis Tickets
+                {hasNewUserSupportTickets && ( // NEW: Alert indicator for user support tickets
+                  <span className="absolute -top-1 -right-1 flex h-2 w-2 rounded-full bg-red-500" />
+                )}
               </TabsTrigger>
             </TabsList>
             <div className="flex-1 overflow-hidden mt-4">

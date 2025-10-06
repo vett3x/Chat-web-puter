@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
-import { Moon, Sun, Settings, LogOut, User as UserIcon, Bot, Ban, LogOut as LogOutIcon, Crown, Shield } from 'lucide-react';
+import { Moon, Sun, Settings, LogOut, User as UserIcon, Bot, Ban, LogOut as LogOutIcon, Crown, Shield, LifeBuoy } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
@@ -38,7 +38,7 @@ interface ProfileDropdownProps {
 }
 
 export function ProfileDropdown({ onOpenProfileSettings, onOpenAccountSettings }: ProfileDropdownProps) {
-  const { session, userRole, userStatus } = useSession();
+  const { session, userRole, userStatus, hasNewUserSupportTickets } = useSession(); // NEW: Get hasNewUserSupportTickets
   const router = useRouter();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -158,9 +158,14 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAccountSettings }
             />
           )}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={onOpenAccountSettings} className="flex items-center cursor-pointer">
-          <Settings className="mr-2 h-4 w-4" />
-          <span>Configuración de Cuenta</span>
+        <DropdownMenuItem onClick={onOpenAccountSettings} className="flex items-center justify-between cursor-pointer">
+          <div className="flex items-center">
+            <Settings className="mr-2 h-4 w-4" />
+            <span>Configuración de Cuenta</span>
+          </div>
+          {hasNewUserSupportTickets && ( // NEW: Alert indicator for user support tickets
+            <span className="flex h-2 w-2 rounded-full bg-red-500" />
+          )}
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive" onClick={handleSignOut}>
