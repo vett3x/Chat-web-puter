@@ -34,6 +34,7 @@ import { StorageManagementDialog } from "@/components/storage-management-dialog"
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileHeader } from "@/components/mobile-header";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { SupportTicketDialog } from "@/components/support-ticket-dialog";
 
 interface UserApp {
   id: string;
@@ -89,6 +90,7 @@ function HomePageContent() {
   const [isApiManagementOpen, setIsApiManagementOpen] = useState(false);
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [isStorageManagementOpen, setIsStorageManagementOpen] = useState(false);
+  const [isSupportTicketOpen, setIsSupportTicketOpen] = useState(false);
   
   const [aiResponseSpeed, setAiResponseSpeed] = useState<'slow' | 'normal' | 'fast'>(() => {
     if (typeof window !== 'undefined') {
@@ -358,6 +360,7 @@ function HomePageContent() {
   const handleOpenApiManagement = () => setIsApiManagementOpen(true);
   const handleOpenAlerts = () => setIsAlertsOpen(true);
   const handleOpenStorageManagement = () => setIsStorageManagementOpen(true);
+  const handleOpenSupportTicket = () => setIsSupportTicketOpen(true);
   
   const handleAiResponseSpeedChange = (speed: 'slow' | 'normal' | 'fast') => {
     setAiResponseSpeed(speed);
@@ -410,6 +413,7 @@ function HomePageContent() {
     isDeletingAppId,
     fileTreeRefreshKey,
     onOpenStorageManagement: handleOpenStorageManagement,
+    onOpenSupportTicket: handleOpenSupportTicket,
   };
 
   if (isSessionLoading) {
@@ -607,6 +611,7 @@ function HomePageContent() {
       />
       {userRole === 'super_admin' && <UpdateManagerDialog open={isUpdateManagerOpen} onOpenChange={setIsUpdateManagerOpen} />}
       <StorageManagementDialog open={isStorageManagementOpen} onOpenChange={setIsStorageManagementOpen} />
+      <SupportTicketDialog open={isSupportTicketOpen} onOpenChange={setIsSupportTicketOpen} />
     </div>
   );
 }

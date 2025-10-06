@@ -12,9 +12,8 @@ import { DraggableNoteItem } from './draggable-note-item';
 import { DraggableAppItem } from './draggable-app-item';
 import { toast } from 'sonner';
 import { FileTree } from './file-tree';
-import { VersionDisplay } from './version-display';
 import { useSidebarData } from '@/hooks/use-sidebar-data';
-import { StorageUsageIndicator } from './storage-usage-indicator'; // Import the new component
+import { SidebarFooter } from './sidebar-footer'; // Import the new footer
 
 interface Conversation {
   id: string;
@@ -63,6 +62,7 @@ interface ConversationSidebarProps {
   isDeletingAppId: string | null;
   fileTreeRefreshKey: number;
   onOpenStorageManagement: () => void;
+  onOpenSupportTicket: () => void; // New prop
 }
 
 export const ConversationSidebar = React.memo(({
@@ -81,6 +81,7 @@ export const ConversationSidebar = React.memo(({
   isDeletingAppId,
   fileTreeRefreshKey,
   onOpenStorageManagement,
+  onOpenSupportTicket, // New prop
 }: ConversationSidebarProps) => {
   const {
     apps,
@@ -256,9 +257,10 @@ export const ConversationSidebar = React.memo(({
           )}
         </div>
       </ScrollArea>
-      <Separator className="my-2 bg-sidebar-border" />
-      <StorageUsageIndicator onOpenStorageManagement={onOpenStorageManagement} />
-      <VersionDisplay />
+      <SidebarFooter 
+        onOpenSupportTicket={onOpenSupportTicket}
+        onOpenStorageManagement={onOpenStorageManagement}
+      />
     </div>
   );
 });
