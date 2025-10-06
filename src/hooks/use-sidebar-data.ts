@@ -38,7 +38,7 @@ interface Note {
 }
 
 export function useSidebarData() {
-  const { session, isLoading: isSessionLoading, userDefaultModel } = useSession(); // Get userDefaultModel
+  const { session, isLoading: isSessionLoading, userDefaultModel, globalRefreshKey } = useSession();
   const userId = session?.user?.id;
 
   const [apps, setApps] = useState<UserApp[]>([]);
@@ -99,7 +99,7 @@ export function useSidebarData() {
       setFolders([]);
       setNotes([]);
     }
-  }, [userId, isSessionLoading, fetchData]);
+  }, [userId, isSessionLoading, fetchData, globalRefreshKey]);
 
   useEffect(() => {
     if (!userId) return;

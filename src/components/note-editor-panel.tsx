@@ -36,7 +36,7 @@ export interface NoteEditorPanelRef {
 }
 
 export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelProps>(({ noteId, onNoteUpdated, userApiKeys, aiKeyGroups, isLoadingApiKeys, userLanguage, userDefaultModel }, ref) => {
-  const { session } = useSession();
+  const { session, globalRefreshKey } = useSession();
   const { resolvedTheme } = useTheme();
   const [note, setNote] = useState<Note | null>(null);
   const [title, setTitle] = useState('');
@@ -99,7 +99,7 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
 
     const toastId = toast.loading(`Subiendo ${files.length} imagen(es)...`);
 
-    for (const file of Array.from(files)) {
+    for (const file of files) {
       const filePath = `${session.user.id}/${note.id}/${Date.now()}-${file.name}`;
       
       const { error: uploadError } = await supabase.storage
@@ -224,7 +224,7 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
     if (noteId && session?.user?.id) {
       fetchNote(); 
     }
-  }, [noteId, session?.user?.id, fetchNote]);
+  }, [noteId, session?.user?.id, fetchNote, globalRefreshKey]);
 
   useEffect(() => {
     const hasSeenHint = localStorage.getItem('hasSeenNoteAiHint');

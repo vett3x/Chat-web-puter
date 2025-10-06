@@ -152,6 +152,7 @@ export function useGeneralChat({
   isLoadingApiKeys,
   userDefaultModel, // New prop
 }: UseGeneralChatProps) {
+  const { globalRefreshKey } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isPuterReady, setIsPuterReady] = useState(false);
@@ -444,7 +445,7 @@ export function useGeneralChat({
 
   useEffect(() => {
     loadConversationData();
-  }, [loadConversationData]);
+  }, [loadConversationData, globalRefreshKey]);
 
   const createNewConversationInDB = async () => {
     if (!userId) return null;

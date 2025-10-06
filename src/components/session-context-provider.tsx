@@ -23,10 +23,13 @@ interface SessionContextType {
   userStatus: UserStatus | null;
   isUserTemporarilyDisabled: boolean;
   triggerGlobalRefresh: () => void;
-  userDefaultModel: string | null; // New field
+  userDefaultModel: string | null;
+  globalRefreshKey: number; // New key to trigger refreshes
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
+
+const INACTIVITY_THRESHOLD = 15 * 60 * 1000; // 15 minutes
 
 export const SessionContextProvider = ({ children, onGlobalRefresh }: { children: React.ReactNode; onGlobalRefresh?: () => void }) => {
   const [session, setSession] = useState<Session | null>(null);
@@ -36,14 +39,17 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
   const [userLanguage, setUserLanguage] = useState<string | null>('es');
   const [userStatus, setUserStatus] = useState<UserStatus | null>(null);
-  const [userDefaultModel, setUserDefaultModel] = useState<string | null>(null); // New state
+  const [userDefaultModel, setUserDefaultModel] = useState<string | null>(null);
+  const [globalRefreshKey, setGlobalRefreshKey] = useState(0); // New state
   const router = useRouter();
   const pathname = usePathname();
-  const isInitialProfileFetch = useRef(true); // Track initial fetch
+  const isInitialProfileFetch = useRef(true);
+  const lastHiddenTimestamp = useRef<number | null>(null);
 
   const isUserTemporarilyDisabled = userStatus === 'banned' || userStatus === 'kicked';
 
   const triggerGlobalRefresh = useCallback(() => {
+    setGlobalRefreshKey(prev => prev + 1);
     if (onGlobalRefresh) {
       onGlobalRefresh();
     }
@@ -56,7 +62,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
       setUserAvatarUrl(null);
       setUserLanguage('es');
       setUserStatus(null);
-      setUserDefaultModel(null); // Reset default model
+      setUserDefaultModel(null);
       isInitialProfileFetch.current = false;
       return;
     }
@@ -68,7 +74,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
       let determinedLanguage: string | null = 'es';
       let determinedStatus: UserStatus = 'active';
       let determinedKickedAt: string | null = null;
-      let determinedDefaultModel: string | null = null; // New variable
+      let determinedDefaultModel: string | null = null;
 
       if (SUPERUSER_EMAILS.includes(currentSession.user.email || '')) {
         determinedRole = 'super_admin';
@@ -81,7 +87,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
           determinedLanguage = profile.language || 'es';
           determinedStatus = profile.status as UserStatus;
           determinedKickedAt = profile.kicked_at;
-          determinedDefaultModel = profile.default_ai_model; // Fetch default model
+          determinedDefaultModel = profile.default_ai_model;
         }
       } else {
         const { data: profile, error } = await supabase
@@ -103,7 +109,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
           determinedLanguage = profile.language || 'es';
           determinedStatus = profile.status as UserStatus;
           determinedKickedAt = profile.kicked_at;
-          determinedDefaultModel = profile.default_ai_model; // Fetch default model
+          determinedDefaultModel = profile.default_ai_model;
         } else {
           determinedRole = 'user';
         }
@@ -123,7 +129,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
       setUserAvatarUrl(determinedAvatarUrl);
       setUserLanguage(determinedLanguage);
       setUserStatus(determinedStatus);
-      setUserDefaultModel(determinedDefaultModel); // Set default model state
+      setUserDefaultModel(determinedDefaultModel);
 
     } catch (fetchError: any) {
       console.error('[SessionContext] Critical error during profile fetch:', fetchError);
@@ -135,6 +141,28 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
       isInitialProfileFetch.current = false;
     }
   }, []);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        lastHiddenTimestamp.current = Date.now();
+      } else {
+        if (lastHiddenTimestamp.current) {
+          const inactiveDuration = Date.now() - lastHiddenTimestamp.current;
+          if (inactiveDuration > INACTIVITY_THRESHOLD) {
+            toast.info('Refrescando datos por inactividad...');
+            triggerGlobalRefresh();
+          }
+          lastHiddenTimestamp.current = null;
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [triggerGlobalRefresh]);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
@@ -184,7 +212,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
           setUserPermissions(newProfile.permissions || {});
           setUserAvatarUrl(newProfile.avatar_url);
           setUserLanguage(newProfile.language || 'es');
-          setUserDefaultModel(newProfile.default_ai_model); // Update default model on change
+          setUserDefaultModel(newProfile.default_ai_model);
 
           if (newStatus === 'banned' || newStatus === 'kicked') {
             toast.error(`Tu cuenta ha sido ${newStatus === 'banned' ? 'baneada' : 'expulsada'}. Se cerrará tu sesión.`);
@@ -212,7 +240,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
   }
   
   return (
-    <SessionContext.Provider value={{ session, isLoading, userRole, userPermissions, userAvatarUrl, userLanguage, userStatus, isUserTemporarilyDisabled, triggerGlobalRefresh, userDefaultModel }}>
+    <SessionContext.Provider value={{ session, isLoading, userRole, userPermissions, userAvatarUrl, userLanguage, userStatus, isUserTemporarilyDisabled, triggerGlobalRefresh, userDefaultModel, globalRefreshKey }}>
       {children}
     </SessionContext.Provider>
   );
