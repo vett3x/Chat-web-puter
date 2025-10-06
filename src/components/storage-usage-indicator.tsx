@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSession } from './session-context-provider';
-import { HardDrive, Loader2, FolderOpen } from 'lucide-react';
+import { HardDrive, Loader2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import {
   Tooltip,
@@ -11,7 +11,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { toast } from 'sonner';
-import { Button } from './ui/button';
 
 function formatBytes(bytes: number, decimals = 2) {
   if (bytes === 0) return '0 Bytes';
@@ -93,11 +92,11 @@ export function StorageUsageIndicator({ onOpenStorageManagement }: StorageUsageI
   const percentage = usage.limit_mb > 0 ? (usageMb / usage.limit_mb) * 100 : 0;
 
   return (
-    <div className="px-4 py-2 space-y-2">
+    <div className="px-4 py-2">
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="space-y-1.5">
+            <button onClick={onOpenStorageManagement} className="w-full text-left space-y-1.5 cursor-pointer">
               <div className="flex justify-between items-center text-xs text-sidebar-foreground/80">
                 <span className="flex items-center gap-1.5 font-medium">
                   <HardDrive className="h-3.5 w-3.5" />
@@ -106,17 +105,14 @@ export function StorageUsageIndicator({ onOpenStorageManagement }: StorageUsageI
                 <span>{percentage.toFixed(1)}%</span>
               </div>
               <Progress value={percentage} className="h-1.5" />
-            </div>
+            </button>
           </TooltipTrigger>
           <TooltipContent>
             <p>{formatBytes(usage.usage_bytes)} / {usage.limit_mb} MB</p>
+            <p className="text-xs text-muted-foreground">Haz clic para gestionar tus archivos.</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      <Button variant="outline" size="sm" className="w-full" onClick={onOpenStorageManagement}>
-        <FolderOpen className="mr-2 h-4 w-4" />
-        Ver mis archivos
-      </Button>
     </div>
   );
 }
