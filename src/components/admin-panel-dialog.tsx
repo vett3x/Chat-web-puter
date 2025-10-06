@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -15,14 +15,25 @@ import {
   DrawerContent,
   DrawerHeader,
   DrawerTitle,
-  DrawerDescription,
   DrawerFooter,
   DrawerClose,
 } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
-import { Server } from 'lucide-react';
-import { AdminPanelTabs } from './admin-panel-tabs';
+import { Server, Shield, LayoutDashboard, LifeBuoy, Menu } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useSession } from '@/components/session-context-provider';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from './ui/scroll-area';
+import { AdminDashboardTab } from './admin/admin-dashboard';
+import { InfrastructureTab } from './server-tabs/infrastructure-tab';
+import { SupportTicketsTab } from './server-tabs/support-tickets-tab';
+import { SecurityTab } from './server-tabs/security-tab';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface AdminPanelDialogProps {
   open: boolean;
@@ -33,26 +44,51 @@ interface AdminPanelDialogProps {
 
 export function AdminPanelDialog({ open, onOpenChange, onOpenAlerts, initialTab }: AdminPanelDialogProps) {
   const isMobile = useIsMobile();
+  const { userRole } = useSession();
+  const isSuperAdmin = userRole === 'super_admin';
+  const isAdmin = userRole === 'admin' || isSuperAdmin;
+  const [activeTab, setActiveTab] = useState(initialTab || (isSuperAdmin ? 'dashboard' : 'servers'));
 
-  const content = (
-    <div className="flex-1 py-4 overflow-hidden">
-      <AdminPanelTabs onOpenAlerts={onOpenAlerts} initialTab={initialTab} />
-    </div>
+  const tabs = [
+    isSuperAdmin && { value: 'dashboard', label: 'Panel', icon: <LayoutDashboard className="h-4 w-4" /> },
+    { value: 'servers', label: 'Infraestructura', icon: <Server className="h-4 w-4" /> },
+    isAdmin && { value: 'support', label: 'Soporte', icon: <LifeBuoy className="h-4 w-4" /> },
+    isSuperAdmin && { value: 'security', label: 'Seguridad', icon: <Shield className="h-4 w-4" /> },
+  ].filter(Boolean) as { value: string; label: string; icon: React.ReactNode }[];
+
+  const tabContent = (
+    <ScrollArea className="h-full w-full">
+      {activeTab === 'dashboard' && isSuperAdmin && <AdminDashboardTab onOpenAlerts={onOpenAlerts} />}
+      {activeTab === 'servers' && <InfrastructureTab />}
+      {activeTab === 'support' && isAdmin && <SupportTicketsTab />}
+      {activeTab === 'security' && isSuperAdmin && <SecurityTab />}
+    </ScrollArea>
   );
 
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={onOpenChange}>
         <DrawerContent className="h-[95vh] flex flex-col">
-          <DrawerHeader className="text-left">
-            <DrawerTitle className="flex items-center gap-2">
-              <Server className="h-6 w-6" /> Panel de Administración
+          <DrawerHeader className="flex flex-row items-center justify-between p-4 border-b">
+            <DrawerTitle className="flex items-center gap-2 text-lg font-semibold">
+              <Server className="h-5 w-5" /> Panel de Admin
             </DrawerTitle>
-            <DrawerDescription>
-              Gestiona servidores, contenedores, seguridad y visualiza el estado general del sistema.
-            </DrawerDescription>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon"><Menu className="h-5 w-5" /></Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {tabs.map(tab => (
+                  <DropdownMenuItem key={tab.value} onClick={() => setActiveTab(tab.value)} className="flex items-center gap-2">
+                    {tab.icon} <span>{tab.label}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </DrawerHeader>
-          {content}
+          <div className="flex-1 overflow-hidden p-2">
+            {tabContent}
+          </div>
           <DrawerFooter className="pt-2">
             <DrawerClose asChild>
               <Button variant="outline">Cerrar</Button>
@@ -74,7 +110,18 @@ export function AdminPanelDialog({ open, onOpenChange, onOpenAlerts, initialTab 
             Gestiona servidores, contenedores, seguridad y visualiza el estado general del sistema.
           </DialogDescription>
         </DialogHeader>
-        {content}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col flex-1 py-4 overflow-hidden">
+          <TabsList className="h-auto flex-col sm:h-10 sm:flex-row">
+            {tabs.map(tab => (
+              <TabsTrigger key={tab.value} value={tab.value} className="w-full justify-start sm:w-auto sm:justify-center flex items-center gap-2">
+                {tab.icon} {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <div className="flex-1 overflow-hidden mt-4">
+            {tabContent}
+          </div>
+        </Tabs>
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="outline">Cerrar</Button>

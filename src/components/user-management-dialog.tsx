@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -15,15 +15,23 @@ import {
   DrawerContent,
   DrawerHeader,
   DrawerTitle,
-  DrawerDescription,
   DrawerFooter,
   DrawerClose,
 } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
-import { Users } from 'lucide-react';
-import { UserManagementTabs } from './UserManagementTabs';
+import { Users, UserPlus, Menu } from 'lucide-react';
 import { useSession } from '@/components/session-context-provider';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from './ui/scroll-area';
+import { UserListTab, UserListTabRef } from '@/components/user-management-tabs/user-list-tab';
+import { AddUserForm } from '@/components/user-management-tabs/add-user-form';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface UserManagementDialogProps {
   open: boolean;
@@ -33,26 +41,50 @@ interface UserManagementDialogProps {
 export function UserManagementDialog({ open, onOpenChange }: UserManagementDialogProps) {
   const { isUserTemporarilyDisabled } = useSession();
   const isMobile = useIsMobile();
+  const [activeTab, setActiveTab] = useState('user-list');
+  const userListTabRef = React.useRef<UserListTabRef>(null);
 
-  const content = (
-    <div className="flex-1 py-4 overflow-hidden">
-      <UserManagementTabs isUserTemporarilyDisabled={isUserTemporarilyDisabled} />
-    </div>
+  const handleUserAdded = () => {
+    userListTabRef.current?.fetchUsers();
+    setActiveTab('user-list');
+  };
+
+  const tabs = [
+    { value: 'user-list', label: 'Lista de Usuarios', icon: <Users className="h-4 w-4" /> },
+    { value: 'add-user', label: 'Añadir Usuario', icon: <UserPlus className="h-4 w-4" /> },
+  ];
+
+  const tabContent = (
+    <ScrollArea className="h-full w-full">
+      {activeTab === 'user-list' && <UserListTab ref={userListTabRef} isUserTemporarilyDisabled={isUserTemporarilyDisabled} />}
+      {activeTab === 'add-user' && <AddUserForm onUserAdded={handleUserAdded} isUserTemporarilyDisabled={isUserTemporarilyDisabled} />}
+    </ScrollArea>
   );
 
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={onOpenChange}>
         <DrawerContent className="h-[95vh] flex flex-col">
-          <DrawerHeader className="text-left">
-            <DrawerTitle className="flex items-center gap-2">
-              <Users className="h-6 w-6" /> Gestión de Usuarios
+          <DrawerHeader className="flex flex-row items-center justify-between p-4 border-b">
+            <DrawerTitle className="flex items-center gap-2 text-lg font-semibold">
+              <Users className="h-5 w-5" /> Gestión de Usuarios
             </DrawerTitle>
-            <DrawerDescription>
-              Gestiona los usuarios de la aplicación, sus roles y permisos.
-            </DrawerDescription>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" disabled={isUserTemporarilyDisabled}><Menu className="h-5 w-5" /></Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {tabs.map(tab => (
+                  <DropdownMenuItem key={tab.value} onClick={() => setActiveTab(tab.value)} className="flex items-center gap-2">
+                    {tab.icon} <span>{tab.label}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </DrawerHeader>
-          {content}
+          <div className="flex-1 overflow-hidden p-2">
+            {tabContent}
+          </div>
           <DrawerFooter className="pt-2">
             <DrawerClose asChild>
               <Button variant="outline" disabled={isUserTemporarilyDisabled}>Cerrar</Button>
@@ -74,7 +106,18 @@ export function UserManagementDialog({ open, onOpenChange }: UserManagementDialo
             Gestiona los usuarios de la aplicación, sus roles y permisos.
           </DialogDescription>
         </DialogHeader>
-        {content}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col flex-1 py-4 overflow-hidden">
+          <TabsList className="grid w-full grid-cols-2">
+            {tabs.map(tab => (
+              <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2" disabled={isUserTemporarilyDisabled}>
+                {tab.icon} {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <div className="flex-1 overflow-hidden mt-4">
+            {tabContent}
+          </div>
+        </Tabs>
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="outline" disabled={isUserTemporarilyDisabled}>Cerrar</Button>
