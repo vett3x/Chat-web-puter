@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Loader2, PlusCircle, Server, Trash2, Info, CheckCircle2, XCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,6 +43,8 @@ import {
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Separator } from '@/components/ui/separator';
 
 const serverFormSchema = z.object({
   ip_address: z.string().ip({ message: 'Dirección IP inválida.' }),
@@ -64,83 +66,6 @@ interface RegisteredServer {
 }
 
 const DEEPCODER_API_BASE_PATH = '/api/servers';
-
-function ServerListItem({ server, onDeleteServer, onSelectServerForDetails, userRole }: { server: RegisteredServer; onDeleteServer: (serverId: string) => void; onSelectServerForDetails: (server: RegisteredServer) => void; userRole: 'user' | 'admin' | 'super_admin' | null }) {
-  const [isLogOpen, setIsLogOpen] = useState(false);
-  const isSuperAdmin = userRole === 'super_admin';
-
-  const getStatusIndicator = () => {
-    switch (server.status) {
-      case 'pending':
-      case 'provisioning':
-        return <Loader2 className="h-5 w-5 animate-spin text-blue-500" />;
-      case 'ready':
-        return <CheckCircle2 className="h-5 w-5 text-green-500" />;
-      case 'failed':
-        return <XCircle className="h-5 w-5 text-destructive" />;
-      default:
-        return null;
-    }
-  };
-
-  return (
-    <Collapsible open={isLogOpen} onOpenChange={setIsLogOpen}>
-      <div className="border p-4 rounded-md bg-muted/50 flex items-center justify-between">
-        <div className="flex items-center gap-3 flex-1">
-          <div className="flex-shrink-0 flex items-center justify-center w-5 h-5">
-            {getStatusIndicator()}
-          </div>
-          <div className="flex flex-col justify-center">
-            <h4 className="font-semibold">{server.name || 'Servidor sin nombre'}</h4>
-            <p className="text-sm text-muted-foreground">IP: {server.ip_address}{server.ssh_port ? `:${server.ssh_port}` : ''}</p>
-          </div>
-          {server.provisioning_log && (
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="icon" title={isLogOpen ? "Ocultar log" : "Mostrar log"} className="h-8 w-8 ml-2">
-                {isLogOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </Button>
-            </CollapsibleTrigger>
-          )}
-        </div>
-        <div className="flex gap-2 flex-shrink-0">
-          <Button variant="outline" size="icon" onClick={() => onSelectServerForDetails(server)} title="Ver detalles" disabled={server.status !== 'ready'} className="h-8 w-8">
-            <Info className="h-4 w-4" />
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="icon" className="h-8 w-8" title="Eliminar servidor" disabled={!isSuperAdmin}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader><AlertDialogTitle>¿Estás seguro de eliminar este servidor?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará el servidor "{server.name || server.ip_address}" de la lista.</AlertDialogDescription></AlertDialogHeader>
-              <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => onDeleteServer(server.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      </div>
-      <CollapsibleContent>
-        <div className="mt-2 border rounded-md overflow-hidden">
-          <div className="max-h-[400px] overflow-auto">
-            <CodeEditor
-              value={server.provisioning_log || 'No hay logs disponibles.'}
-              language="bash"
-              readOnly
-              padding={15}
-              style={{
-                fontSize: '0.875rem',
-                lineHeight: '1.25rem',
-                fontFamily: 'var(--font-geist-mono)',
-                backgroundColor: '#1E1E1E',
-                color: '#d4d4d4',
-              }}
-            />
-          </div>
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
-  );
-}
 
 export function ServerListTab() {
   const { userRole, userPermissions } = useSession();
@@ -227,6 +152,20 @@ export function ServerListTab() {
     setIsDetailDialogOpen(true);
   };
 
+  const getStatusIndicator = (status: RegisteredServer['status']) => {
+    switch (status) {
+      case 'pending':
+      case 'provisioning':
+        return <Loader2 className="h-5 w-5 animate-spin text-blue-500" />;
+      case 'ready':
+        return <CheckCircle2 className="h-5 w-5 text-green-500" />;
+      case 'failed':
+        return <XCircle className="h-5 w-5 text-destructive" />;
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="space-y-8 p-1">
       <Card>
@@ -270,11 +209,69 @@ export function ServerListTab() {
           ) : servers.length === 0 ? (
             <p className="text-muted-foreground">No hay servidores registrados aún.</p>
           ) : (
-            <div className="space-y-4">
-              {servers.map((server) => (
-                <ServerListItem key={server.id} server={server} onDeleteServer={handleDeleteServer} onSelectServerForDetails={handleSelectServerForDetails} userRole={userRole} />
-              ))}
-            </div>
+            <>
+              {/* Desktop Table */}
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader><TableRow><TableHead>Estado</TableHead><TableHead>Nombre</TableHead><TableHead>IP</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {servers.map((server) => (
+                      <Collapsible asChild key={server.id}>
+                        <>
+                          <TableRow>
+                            <TableCell>{getStatusIndicator(server.status)}</TableCell>
+                            <TableCell className="font-semibold">{server.name || 'Servidor sin nombre'}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{server.ip_address}{server.ssh_port ? `:${server.ssh_port}` : ''}</TableCell>
+                            <TableCell className="text-right space-x-2">
+                              {server.provisioning_log && <CollapsibleTrigger asChild><Button variant="ghost" size="icon" title="Mostrar/Ocultar log"><ChevronDown className="h-4 w-4" /></Button></CollapsibleTrigger>}
+                              <Button variant="outline" size="icon" onClick={() => handleSelectServerForDetails(server)} title="Ver detalles" disabled={server.status !== 'ready'}><Info className="h-4 w-4" /></Button>
+                              <AlertDialog><AlertDialogTrigger asChild><Button variant="destructive" size="icon" title="Eliminar servidor" disabled={userRole !== 'super_admin'}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Eliminar servidor?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará "{server.name || server.ip_address}".</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteServer(server.id)} className="bg-destructive">Eliminar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+                            </TableCell>
+                          </TableRow>
+                          <CollapsibleContent asChild>
+                            <tr>
+                              <td colSpan={4} className="p-0">
+                                <div className="p-2 bg-[#1E1E1E] rounded-b-md max-h-[400px] overflow-y-auto">
+                                  <CodeEditor value={server.provisioning_log || 'No hay logs.'} language="bash" readOnly padding={15} style={{ fontSize: '0.8rem', fontFamily: 'var(--font-geist-mono)', backgroundColor: 'transparent', color: '#d4d4d4' }} />
+                                </div>
+                              </td>
+                            </tr>
+                          </CollapsibleContent>
+                        </>
+                      </Collapsible>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {/* Mobile Cards */}
+              <div className="md:hidden space-y-4">
+                {servers.map((server) => (
+                  <Card key={server.id}>
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-3">
+                          {getStatusIndicator(server.status)}
+                          <div>
+                            <h4 className="font-semibold">{server.name || 'Servidor sin nombre'}</h4>
+                            <p className="text-sm text-muted-foreground">{server.ip_address}{server.ssh_port ? `:${server.ssh_port}` : ''}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleSelectServerForDetails(server)} title="Ver detalles" disabled={server.status !== 'ready'}><Info className="h-4 w-4" /></Button>
+                          <AlertDialog><AlertDialogTrigger asChild><Button variant="destructive" size="icon" className="h-8 w-8" title="Eliminar servidor" disabled={userRole !== 'super_admin'}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Eliminar servidor?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará "{server.name || server.ip_address}".</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteServer(server.id)} className="bg-destructive">Eliminar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+                        </div>
+                      </div>
+                      {server.provisioning_log && (
+                        <Collapsible>
+                          <CollapsibleTrigger asChild><Button variant="secondary" size="sm" className="w-full">Ver Log</Button></CollapsibleTrigger>
+                          <CollapsibleContent className="mt-2"><CodeEditor value={server.provisioning_log} language="bash" readOnly padding={10} style={{ fontSize: '0.75rem', fontFamily: 'var(--font-geist-mono)', backgroundColor: '#1E1E1E', color: '#d4d4d4', borderRadius: '0.5rem' }} /></CollapsibleContent>
+                        </Collapsible>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

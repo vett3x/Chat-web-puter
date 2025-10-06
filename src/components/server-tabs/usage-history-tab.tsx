@@ -70,10 +70,6 @@ export function UsageHistoryTab() {
         <CardTitle className="flex items-center gap-2">
           <History className="h-5 w-5" /> Historial de Uso
         </CardTitle>
-        {/* Add a refresh button if needed */}
-        {/* <Button variant="ghost" size="icon" onClick={fetchServerHistory} disabled={isLoading} title="Refrescar">
-          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-        </Button> */}
       </CardHeader>
       <CardContent className="pt-0">
         {isLoading && events.length === 0 ? (
@@ -91,31 +87,54 @@ export function UsageHistoryTab() {
             <p>No hay eventos registrados aún.</p>
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[150px]">Fecha</TableHead>
-                <TableHead className="w-[150px]">Tipo de Evento</TableHead>
-                <TableHead>Descripción</TableHead>
-                <TableHead className="w-[150px]">Servidor</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <>
+            {/* Desktop Table */}
+            <div className="hidden md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[150px]">Fecha</TableHead>
+                    <TableHead className="w-[150px]">Tipo de Evento</TableHead>
+                    <TableHead>Descripción</TableHead>
+                    <TableHead className="w-[150px]">Servidor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {events.map((event) => (
+                    <TableRow key={event.id}>
+                      <TableCell className="text-xs">
+                        {format(new Date(event.created_at), 'dd/MM/yyyy HH:mm:ss', { locale: es })}
+                      </TableCell>
+                      <TableCell className="font-medium text-xs">{getEventTypeLabel(event.event_type)}</TableCell>
+                      <TableCell className="text-sm">{event.description}</TableCell>
+                      <TableCell className="text-xs flex items-center gap-1">
+                        {event.server_name !== 'N/A' && <Server className="h-3 w-3 text-muted-foreground" />}
+                        {event.server_name}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            {/* Mobile Cards */}
+            <div className="md:hidden space-y-4 pt-4">
               {events.map((event) => (
-                <TableRow key={event.id}>
-                  <TableCell className="text-xs">
-                    {format(new Date(event.created_at), 'dd/MM/yyyy HH:mm:ss', { locale: es })}
-                  </TableCell>
-                  <TableCell className="font-medium text-xs">{getEventTypeLabel(event.event_type)}</TableCell>
-                  <TableCell className="text-sm">{event.description}</TableCell>
-                  <TableCell className="text-xs flex items-center gap-1">
-                    {event.server_name !== 'N/A' && <Server className="h-3 w-3 text-muted-foreground" />}
-                    {event.server_name}
-                  </TableCell>
-                </TableRow>
+                <Card key={event.id}>
+                  <CardContent className="p-4 space-y-2">
+                    <h4 className="font-semibold">{getEventTypeLabel(event.event_type)}</h4>
+                    <p className="text-sm text-muted-foreground">{event.description}</p>
+                    <div className="flex justify-between items-center text-xs text-muted-foreground pt-2">
+                      <span className="flex items-center gap-1">
+                        {event.server_name !== 'N/A' && <Server className="h-3 w-3" />}
+                        {event.server_name}
+                      </span>
+                      <span>{format(new Date(event.created_at), 'dd/MM/yy HH:mm', { locale: es })}</span>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
-            </TableBody>
-          </Table>
+            </div>
+          </>
         )}
       </CardContent>
     </Card>
