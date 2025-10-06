@@ -388,11 +388,9 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
                     <Separator />
                     <div className="text-xs space-y-1">
                       <p className="font-medium">Cuotas:</p>
-                      <div className="flex items-center justify-between text-muted-foreground">
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
                         <span className="flex items-center gap-1"><Server className="h-3 w-3" /> Servidores: {user.role === 'super_admin' ? '∞' : user.max_servers}</span>
                         <span className="flex items-center gap-1"><Dock className="h-3 w-3" /> Contenedores: {user.role === 'super_admin' ? '∞' : user.max_containers}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-muted-foreground">
                         <span className="flex items-center gap-1"><Globe className="h-3 w-3" /> Túneles: {user.role === 'super_admin' ? '∞' : user.max_tunnels}</span>
                         <span className="flex items-center gap-1"><HardDrive className="h-3 w-3" /> Almacenamiento: {user.role === 'super_admin' ? '∞' : `${user.storage_limit_mb}MB`}</span>
                       </div>
@@ -435,8 +433,8 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
       <CardContent className="flex-1 overflow-hidden pt-0">
         <div className="flex flex-col sm:flex-row gap-4 mb-4">
           <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" disabled={isUserTemporarilyDisabled} /></div>
-          <Select value={roleFilter} onValueChange={(v: any) => setRoleFilter(v)} disabled={isUserTemporarilyDisabled}><SelectTrigger className="w-[180px]"><SelectValue placeholder="Filtrar por rol" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los Roles</SelectItem><SelectItem value="super_admin">Super Admin</SelectItem><SelectItem value="admin">Admin</SelectItem><SelectItem value="user">Usuario</SelectItem></SelectContent></Select>
-          <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)} disabled={isUserTemporarilyDisabled}><SelectTrigger className="w-[180px]"><SelectValue placeholder="Filtrar por estado" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los Estados</SelectItem><SelectItem value="active">Activo</SelectItem><SelectItem value="banned">Baneado</SelectItem><SelectItem value="kicked">Expulsado</SelectItem></SelectContent></Select>
+          <Select value={roleFilter} onValueChange={(v: any) => setRoleFilter(v)} disabled={isUserTemporarilyDisabled}><SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filtrar por rol" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los Roles</SelectItem><SelectItem value="super_admin">Super Admin</SelectItem><SelectItem value="admin">Admin</SelectItem><SelectItem value="user">Usuario</SelectItem></SelectContent></Select>
+          <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)} disabled={isUserTemporarilyDisabled}><SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filtrar por estado" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los Estados</SelectItem><SelectItem value="active">Activo</SelectItem><SelectItem value="banned">Baneado</SelectItem><SelectItem value="kicked">Expulsado</SelectItem></SelectContent></Select>
         </div>
         {isLoadingUsers && filteredUsers.length === 0 ? (
           <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>

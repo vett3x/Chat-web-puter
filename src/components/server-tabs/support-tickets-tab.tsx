@@ -203,9 +203,13 @@ export function SupportTicketsTab() {
               <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => handleOpenTicketDetails(ticket.id)}><Eye className="h-4 w-4" /></Button>
             </div>
             <p className="text-sm text-muted-foreground">Usuario: {ticket.user?.first_name || ticket.user?.email?.email || 'N/A'}</p>
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="font-medium">Prioridad:</span> {getPriorityBadge(ticket.priority)}
-              <span className="font-medium">Estado:</span> {getStatusBadge(ticket.status)}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="font-medium">Prioridad:</span> {getPriorityBadge(ticket.priority)}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">Estado:</span> {getStatusBadge(ticket.status)}
+              </div>
             </div>
             <p className="text-xs text-muted-foreground">Fecha: {format(new Date(ticket.created_at), 'dd/MM/yyyy HH:mm', { locale: es })}</p>
           </CardContent>
