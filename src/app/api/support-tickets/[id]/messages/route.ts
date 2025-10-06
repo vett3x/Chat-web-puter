@@ -28,7 +28,7 @@ async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | '
 
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
-export async function POST(req: NextRequest, context: { params: { id: string } }) {
+export async function POST(req: NextRequest, context: any) {
   const { session, userRole } = await getSessionAndRole();
   const ticketId = context.params.id;
 
