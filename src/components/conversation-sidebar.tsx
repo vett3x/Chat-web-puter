@@ -213,14 +213,7 @@ export const ConversationSidebar = React.memo(({
         onOpenAlerts={onOpenAlerts}
       />
 
-      {/* Nuevo botón grande "Ver Archivos" */}
-      <Button
-        variant="outline"
-        className="w-full justify-center py-2 mb-4 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-        onClick={onOpenStorageManagement}
-      >
-        <HardDrive className="mr-2 h-4 w-4" /> Ver Archivos
-      </Button>
+      {/* El botón grande "Ver Archivos" se ha movido al SidebarFooter */}
 
       <ScrollArea className="flex-1" onDrop={(e) => handleDrop(e, null)} onDragOver={(e) => e.preventDefault()} onDragEnter={(e) => handleDragEnter(e, null)} onDragLeave={(e) => handleDragLeave(e, null)}>
         <div className="space-y-2">
@@ -270,7 +263,7 @@ export const ConversationSidebar = React.memo(({
       </ScrollArea>
       <SidebarFooter 
         onOpenSupportTicket={onOpenSupportTicket}
-        // onOpenStorageManagement ya no es necesario aquí, se llama directamente desde el botón grande
+        onOpenStorageManagement={onOpenStorageManagement}
       />
     </div>
   );
