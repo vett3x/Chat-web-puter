@@ -13,10 +13,11 @@ import { SupportTicketsTab } from './server-tabs/support-tickets-tab';
 
 interface AdminPanelTabsProps {
   onOpenAlerts: () => void;
+  initialTab?: string; // NEW: Prop para la pestaña inicial
 }
 
-export function AdminPanelTabs({ onOpenAlerts }: AdminPanelTabsProps) {
-  const [activeTab, setActiveTab] = useState('dashboard');
+export function AdminPanelTabs({ onOpenAlerts, initialTab }: AdminPanelTabsProps) {
+  const [activeTab, setActiveTab] = useState(initialTab || 'dashboard'); // Usar initialTab como valor por defecto
   const { userRole } = useSession();
   const isSuperAdmin = userRole === 'super_admin';
   const isAdmin = userRole === 'admin' || isSuperAdmin;

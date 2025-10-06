@@ -84,6 +84,7 @@ function HomePageContent() {
   const [isProfileSettingsOpen, setIsProfileSettingsOpen] = useState(false);
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+  const [adminPanelInitialTab, setAdminPanelInitialTab] = useState<string | undefined>(undefined); // NEW: Estado para la pestaña inicial del panel de admin
   const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
   const [isDeepAiCoderOpen, setIsDeepAiCoderOpen] = useState(false);
   const [isUpdateManagerOpen, setIsUpdateManagerOpen] = useState(false);
@@ -353,14 +354,26 @@ function HomePageContent() {
 
   const handleOpenProfileSettings = () => setIsProfileSettingsOpen(true);
   const handleOpenAccountSettings = () => setIsAccountSettingsOpen(true);
-  const handleOpenAdminPanel = () => setIsAdminPanelOpen(true);
+  const handleOpenAdminPanel = () => {
+    setAdminPanelInitialTab(undefined); // Reset to default tab
+    setIsAdminPanelOpen(true);
+  };
   const handleOpenUserManagement = () => setIsUserManagementOpen(true);
   const handleOpenDeepAiCoder = () => setIsDeepAiCoderOpen(true);
   const handleOpenUpdateManager = () => setIsUpdateManagerOpen(true);
   const handleOpenApiManagement = () => setIsApiManagementOpen(true);
   const handleOpenAlerts = () => setIsAlertsOpen(true);
   const handleOpenStorageManagement = () => setIsStorageManagementOpen(true);
-  const handleOpenSupportTicket = () => setIsSupportTicketOpen(true);
+  
+  // NEW: Lógica condicional para el botón de soporte
+  const handleOpenSupportTicket = () => {
+    if (userRole === 'admin' || userRole === 'super_admin') {
+      setAdminPanelInitialTab('support'); // Abrir el panel de admin en la pestaña de soporte
+      setIsAdminPanelOpen(true);
+    } else {
+      setIsSupportTicketOpen(true); // Abrir el diálogo de creación de ticket para usuarios normales
+    }
+  };
   
   const handleAiResponseSpeedChange = (speed: 'slow' | 'normal' | 'fast') => {
     setAiResponseSpeed(speed);
@@ -598,7 +611,7 @@ function HomePageContent() {
         isLoadingApiKeys={isLoadingApiKeys}
         currentUserRole={userRole}
       />
-      {isAdmin && <AdminPanelDialog open={isAdminPanelOpen} onOpenChange={setIsAdminPanelOpen} onOpenAlerts={handleOpenAlerts} />}
+      {isAdmin && <AdminPanelDialog open={isAdminPanelOpen} onOpenChange={setIsAdminPanelOpen} onOpenAlerts={handleOpenAlerts} initialTab={adminPanelInitialTab} />} {/* Pasar initialTab */}
       {isAdmin && <UserManagementDialog open={isUserManagementOpen} onOpenChange={setIsUserManagementOpen} />}
       <ApiManagementDialog open={isApiManagementOpen} onOpenChange={setIsApiManagementOpen} />
       {isAdmin && <AlertsDialog open={isAlertsOpen} onOpenChange={setIsAlertsOpen} />}

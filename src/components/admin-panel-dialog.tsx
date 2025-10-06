@@ -18,9 +18,10 @@ interface AdminPanelDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onOpenAlerts: () => void;
+  initialTab?: string; // NEW: Prop para la pestaña inicial
 }
 
-export function AdminPanelDialog({ open, onOpenChange, onOpenAlerts }: AdminPanelDialogProps) {
+export function AdminPanelDialog({ open, onOpenChange, onOpenAlerts, initialTab }: AdminPanelDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[95vw] p-6 h-[95vh] flex flex-col">
@@ -33,7 +34,7 @@ export function AdminPanelDialog({ open, onOpenChange, onOpenAlerts }: AdminPane
           </DialogDescription>
         </DialogHeader>
         <div className="flex-1 py-4 overflow-hidden">
-          <AdminPanelTabs onOpenAlerts={onOpenAlerts} />
+          <AdminPanelTabs onOpenAlerts={onOpenAlerts} initialTab={initialTab} /> {/* Pasar initialTab */}
         </div>
         <DialogFooter>
           <DialogClose asChild>
