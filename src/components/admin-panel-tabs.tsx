@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Server, Shield, LayoutDashboard, Database, HardDrive } from 'lucide-react';
+import { Server, Shield, LayoutDashboard, Database, HardDrive, LifeBuoy } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import { SecurityTab } from './server-tabs/security-tab';
 import { useSession } from '@/components/session-context-provider';
@@ -12,6 +12,7 @@ import { DatabaseConfigTab } from './admin/database-config-tab';
 import { InfrastructureTab } from './server-tabs/infrastructure-tab';
 import { S3StorageTab } from './server-tabs/s3-storage-tab';
 import { S3BackupsTab } from './server-tabs/s3-backups-tab';
+import { SupportTicketsTab } from './server-tabs/support-tickets-tab';
 
 interface AdminPanelTabsProps {
   onOpenAlerts: () => void;
@@ -21,10 +22,11 @@ export function AdminPanelTabs({ onOpenAlerts }: AdminPanelTabsProps) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const { userRole } = useSession();
   const isSuperAdmin = userRole === 'super_admin';
+  const isAdmin = userRole === 'admin' || isSuperAdmin;
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col">
-      <TabsList className={cn("grid w-full", isSuperAdmin ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6" : "grid-cols-1")}>
+      <TabsList className={cn("grid w-full", isSuperAdmin ? "grid-cols-2 sm:grid-cols-4 lg:grid-cols-7" : "grid-cols-2")}>
         {isSuperAdmin && (
           <TabsTrigger value="dashboard" className="flex items-center gap-2">
             <LayoutDashboard className="h-4 w-4" /> Panel
@@ -33,6 +35,11 @@ export function AdminPanelTabs({ onOpenAlerts }: AdminPanelTabsProps) {
         <TabsTrigger value="servers" className="flex items-center gap-2">
           <Server className="h-4 w-4" /> Infraestructura
         </TabsTrigger>
+        {isAdmin && (
+          <TabsTrigger value="support" className="flex items-center gap-2">
+            <LifeBuoy className="h-4 w-4" /> Soporte
+          </TabsTrigger>
+        )}
         {isSuperAdmin && (
           <TabsTrigger value="database" className="flex items-center gap-2">
             <Database className="h-4 w-4" /> Base de Datos
@@ -64,6 +71,11 @@ export function AdminPanelTabs({ onOpenAlerts }: AdminPanelTabsProps) {
           <TabsContent value="servers" className="h-full">
             <InfrastructureTab />
           </TabsContent>
+          {isAdmin && (
+            <TabsContent value="support" className="h-full">
+              <SupportTicketsTab />
+            </TabsContent>
+          )}
           {isSuperAdmin && (
             <TabsContent value="database" className="h-full">
               <DatabaseConfigTab />
