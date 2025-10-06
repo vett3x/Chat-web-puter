@@ -32,8 +32,8 @@ export async function POST(req: NextRequest, context: { params: { id: string } }
   const { session, userRole } = await getSessionAndRole();
   const ticketId = context.params.id;
 
-  if (!session || (userRole !== 'admin' && userRole !== 'super_admin')) {
-    return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
+  if (!session) {
+    return NextResponse.json({ message: 'Acceso denegado.' }, { status: 401 });
   }
 
   if (!ticketId) {
@@ -43,6 +43,29 @@ export async function POST(req: NextRequest, context: { params: { id: string } }
   try {
     const body = await req.json();
     const { content, is_internal_note } = messageSchema.parse(body);
+
+    // Check if the user is an admin or the owner of the ticket
+    const { data: ticket, error: ticketError } = await supabaseAdmin
+      .from('support_tickets')
+      .select('user_id')
+      .eq('id', ticketId)
+      .single();
+
+    if (ticketError || !ticket) {
+      return NextResponse.json({ message: 'Ticket no encontrado o acceso denegado.' }, { status: 404 });
+    }
+
+    const isTicketOwner = ticket.user_id === session.user.id;
+    const isAdminOrSuperAdmin = userRole === 'admin' || userRole === 'super_admin';
+
+    if (!isAdminOrSuperAdmin && !isTicketOwner) {
+      return NextResponse.json({ message: 'Acceso denegado. No eres el propietario del ticket ni un administrador.' }, { status: 403 });
+    }
+
+    // Only admins can send internal notes
+    if (is_internal_note && !isAdminOrSuperAdmin) {
+      return NextResponse.json({ message: 'Acceso denegado. Solo los administradores pueden enviar notas internas.' }, { status: 403 });
+    }
 
     const { data, error } = await supabaseAdmin
       .from('support_ticket_messages')

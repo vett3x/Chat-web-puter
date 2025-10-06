@@ -225,10 +225,46 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
       )
       .subscribe();
 
+    // NEW: Realtime subscription for support ticket messages
+    const supportTicketMessagesChannel = supabase
+      .channel(`support_ticket_messages_for_user_${session.user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'support_ticket_messages' },
+        async (payload) => {
+          const newMessage = payload.new as any;
+          // Check if the message is from an admin and not an internal note
+          // And if the ticket belongs to the current user
+          if (newMessage.sender_id !== session.user.id && !newMessage.is_internal_note) {
+            const { data: ticket, error } = await supabase
+              .from('support_tickets')
+              .select('subject')
+              .eq('id', newMessage.ticket_id)
+              .eq('user_id', session.user.id)
+              .single();
+
+            if (error) {
+              console.error('Error fetching ticket for notification:', error);
+              return;
+            }
+
+            if (ticket) {
+              toast.info(`¡Nueva respuesta en tu ticket: "${ticket.subject}"!`, {
+                description: 'Haz clic en "Mis Tickets" en la configuración de tu cuenta para verla.',
+                duration: 8000,
+              });
+              triggerGlobalRefresh(); // Trigger a global refresh to update UI if needed
+            }
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(profileChannel);
+      supabase.removeChannel(supportTicketMessagesChannel); // Clean up new channel
     };
-  }, [session?.user?.id, router, userStatus]);
+  }, [session?.user?.id, router, userStatus, triggerGlobalRefresh]);
 
   if (isLoading) {
     return (
