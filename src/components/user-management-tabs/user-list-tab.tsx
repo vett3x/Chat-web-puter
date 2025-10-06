@@ -363,54 +363,48 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
 
               return (
                 <Card key={user.id} className={cn('w-full', user.status === 'banned' && 'bg-destructive/10', user.status === 'kicked' && 'bg-warning/10')}>
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex justify-between items-start">
+                  <CardContent className="p-3">
+                    <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10"><AvatarImage src={user.avatar_url || ''} alt="Avatar" /><AvatarFallback className="bg-primary text-primary-foreground"><Bot className="h-5 w-5" /></AvatarFallback></Avatar>
-                        <div>
-                          <p className="font-semibold">{user.first_name || 'N/A'} {user.last_name || ''}</p>
-                          <p className="text-xs text-muted-foreground">{user.email}</p>
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={user.avatar_url || ''} alt="Avatar" />
+                          <AvatarFallback className="bg-primary text-primary-foreground"><Bot className="h-5 w-5" /></AvatarFallback>
+                        </Avatar>
+                        <div className="space-y-0.5">
+                          <p className="font-semibold leading-none">{user.first_name || 'N/A'} {user.last_name || ''}</p>
+                          <p className="text-xs text-muted-foreground leading-none">{user.email}</p>
+                          <div className="flex items-center gap-2 pt-1">
+                            {user.role === 'user' ? <Badge variant="outline">Usuario</Badge> : <Badge className={cn(user.role === 'super_admin' && 'bg-yellow-500 text-yellow-900 dark:bg-yellow-400 dark:text-yellow-950 border-transparent', user.role === 'admin' && 'bg-primary-light-purple text-white border-transparent')}>{user.role === 'super_admin' ? <Crown className="h-3 w-3 mr-1" /> : <Shield className="h-3 w-3 mr-1" />}{user.role === 'super_admin' ? 'Super Admin' : 'Admin'}</Badge>}
+                            {user.status === 'active' && <Badge>Activo</Badge>}
+                            {user.status === 'banned' && <Badge variant="destructive">Baneado</Badge>}
+                            {user.status === 'kicked' && <Badge variant="warning">Expulsado</Badge>}
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {user.role === 'user' ? <Badge variant="outline">Usuario</Badge> : <Badge className={cn(user.role === 'super_admin' && 'bg-yellow-500 text-yellow-900 dark:bg-yellow-400 dark:text-yellow-950 border-transparent', user.role === 'admin' && 'bg-primary-light-purple text-white border-transparent')}>{user.role === 'super_admin' ? <Crown className="h-3 w-3 mr-1" /> : <Shield className="h-3 w-3 mr-1" />}{user.role === 'super_admin' ? 'Super Admin' : 'Admin'}</Badge>}
+                      <div className="flex flex-col items-end gap-2">
+                        {isActionLoading === user.id ? <Loader2 className="h-5 w-5 animate-spin" /> : (
+                          <>
+                            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleOpenUserDetails(user)} disabled={!canViewDetails || isUserTemporarilyDisabled} title={!canViewDetails ? "No tienes permiso para ver los detalles de este usuario" : "Ver detalles"}><Eye className="h-4 w-4" /></Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8" disabled={!canPerformModeration || isUserTemporarilyDisabled} title={!canPerformModeration ? "No tienes permiso para moderar a este usuario" : "Acciones de moderación"}><UserCog className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {user.status !== 'kicked' ? <DropdownMenuItem onClick={() => openReasonDialog(user, 'expulsar')} disabled={isUserTemporarilyDisabled}><LogOut className="mr-2 h-4 w-4" /> Expulsar</DropdownMenuItem> : <DropdownMenuItem onClick={() => handleUserStatusChange(user.id, 'unban', 'Reactivado por administrador.')} disabled={isUserTemporarilyDisabled}><CheckCircle className="mr-2 h-4 w-4" /> Reactivar</DropdownMenuItem>}
+                                {user.status === 'banned' ? <DropdownMenuItem onClick={() => openReasonDialog(user, 'unban')} disabled={isUserTemporarilyDisabled}><CheckCircle className="mr-2 h-4 w-4" /> Desbanear</DropdownMenuItem> : <DropdownMenuItem onClick={() => openReasonDialog(user, 'banear')} className="text-destructive focus:text-destructive" disabled={isUserTemporarilyDisabled}><Ban className="mr-2 h-4 w-4" /> Banear</DropdownMenuItem>}
+                                {isCurrentUserSuperAdmin && (<><DropdownMenuSeparator /><AlertDialog><AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive" disabled={isUserTemporarilyDisabled}><Trash2 className="mr-2 h-4 w-4" /> Eliminar</DropdownMenuItem></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará permanentemente al usuario "{user.first_name || user.email}".</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteUser(user.id)} className="bg-destructive">Eliminar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></>)}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </>
+                        )}
                       </div>
                     </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="font-medium">Estado:</span>
-                      <div className="flex items-center gap-2">
-                        {user.status === 'active' && <Badge>Activo</Badge>}
-                        {user.status === 'banned' && <Badge variant="destructive">Baneado</Badge>}
-                        {user.status === 'kicked' && <Badge variant="warning">Expulsado</Badge>}
-                        {user.status === 'kicked' && <span className="text-xs text-muted-foreground">({remainingTime || 'Calculando...'})</span>}
-                      </div>
-                    </div>
-                    <Separator />
-                    <div className="text-xs space-y-1">
-                      <p className="font-medium">Cuotas:</p>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
-                        <span className="flex items-center gap-1"><Server className="h-3 w-3" /> Servidores: {user.role === 'super_admin' ? '∞' : user.max_servers}</span>
-                        <span className="flex items-center gap-1"><Dock className="h-3 w-3" /> Contenedores: {user.role === 'super_admin' ? '∞' : user.max_containers}</span>
-                        <span className="flex items-center gap-1"><Globe className="h-3 w-3" /> Túneles: {user.role === 'super_admin' ? '∞' : user.max_tunnels}</span>
-                        <span className="flex items-center gap-1"><HardDrive className="h-3 w-3" /> Almacenamiento: {user.role === 'super_admin' ? '∞' : `${user.storage_limit_mb}MB`}</span>
-                      </div>
+                    {(user.status === 'kicked' && remainingTime) && (
+                      <p className="text-xs text-yellow-200 mt-2">Tiempo restante: {remainingTime}</p>
+                    )}
+                    <Separator className="my-2" />
+                    <div className="text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">Cuotas:</span> S: {user.role === 'super_admin' ? '∞' : user.max_servers} | C: {user.role === 'super_admin' ? '∞' : user.max_containers} | T: {user.role === 'super_admin' ? '∞' : user.max_tunnels} | D: {user.role === 'super_admin' ? '∞' : `${user.storage_limit_mb}MB`}
                     </div>
                   </CardContent>
-                  <CardFooter className="p-4 pt-0 flex justify-end gap-2">
-                    {isActionLoading === user.id ? <Loader2 className="h-5 w-5 animate-spin" /> : (
-                      <>
-                        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleOpenUserDetails(user)} disabled={!canViewDetails || isUserTemporarilyDisabled} title={!canViewDetails ? "No tienes permiso para ver los detalles de este usuario" : "Ver detalles"}><Eye className="h-4 w-4" /></Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8" disabled={!canPerformModeration || isUserTemporarilyDisabled} title={!canPerformModeration ? "No tienes permiso para moderar a este usuario" : "Acciones de moderación"}><UserCog className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {user.status !== 'kicked' ? <DropdownMenuItem onClick={() => openReasonDialog(user, 'expulsar')} disabled={isUserTemporarilyDisabled}><LogOut className="mr-2 h-4 w-4" /> Expulsar</DropdownMenuItem> : <DropdownMenuItem onClick={() => handleUserStatusChange(user.id, 'unban', 'Reactivado por administrador.')} disabled={isUserTemporarilyDisabled}><CheckCircle className="mr-2 h-4 w-4" /> Reactivar</DropdownMenuItem>}
-                            {user.status === 'banned' ? <DropdownMenuItem onClick={() => openReasonDialog(user, 'unban')} disabled={isUserTemporarilyDisabled}><CheckCircle className="mr-2 h-4 w-4" /> Desbanear</DropdownMenuItem> : <DropdownMenuItem onClick={() => openReasonDialog(user, 'banear')} className="text-destructive focus:text-destructive" disabled={isUserTemporarilyDisabled}><Ban className="mr-2 h-4 w-4" /> Banear</DropdownMenuItem>}
-                            {isCurrentUserSuperAdmin && (<><DropdownMenuSeparator /><AlertDialog><AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive" disabled={isUserTemporarilyDisabled}><Trash2 className="mr-2 h-4 w-4" /> Eliminar</DropdownMenuItem></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará permanentemente al usuario "{user.first_name || user.email}".</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteUser(user.id)} className="bg-destructive">Eliminar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></>)}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </>
-                    )}
-                  </CardFooter>
                 </Card>
               );
             })}

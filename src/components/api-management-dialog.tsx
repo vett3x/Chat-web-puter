@@ -497,193 +497,215 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                 <PlusCircle className="mr-2 h-4 w-4" /> Añadir Clave o Grupo
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col p-0">
+              <DialogHeader className="p-6 pb-0 flex-shrink-0">
                 <DialogTitle>{editingKeyId ? 'Editar API Key' : (editingGroupId ? 'Editar Grupo de Claves' : 'Añadir Nueva Clave o Grupo')}</DialogTitle>
                 <DialogDescription>
                   {editingKeyId ? 'Actualiza los detalles de tu API Key.' : (editingGroupId ? 'Actualiza los detalles de tu grupo de claves.' : 'Crea una nueva API Key o un grupo de claves.')}
                 </DialogDescription>
               </DialogHeader>
-              <Tabs defaultValue="key" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="key" disabled={!!editingGroupId}>Añadir/Editar Clave</TabsTrigger>
-                  <TabsTrigger value="group" disabled={!!editingKeyId}>Añadir/Editar Grupo</TabsTrigger>
-                </TabsList>
-                <TabsContent value="key">
-                  <Form {...apiKeyForm}>
-                    <form onSubmit={apiKeyForm.handleSubmit(onApiKeySubmit)} className="space-y-4 py-4">
-                      <FormField control={apiKeyForm.control} name="provider" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Proveedor</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || editingKeyId !== null}>
-                            <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un proveedor" /></SelectTrigger></FormControl>
-                            <SelectContent>
-                              {providerOptions.map(opt => (
-                                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
+              <div className="flex-1 overflow-y-auto px-6">
+                <Tabs defaultValue="key" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="key" disabled={!!editingGroupId}>Añadir/Editar Clave</TabsTrigger>
+                    <TabsTrigger value="group" disabled={!!editingKeyId}>Añadir/Editar Grupo</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="key">
+                    <Form {...apiKeyForm}>
+                      <form onSubmit={apiKeyForm.handleSubmit(onApiKeySubmit)} className="space-y-4 py-4">
+                        <FormField control={apiKeyForm.control} name="provider" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Proveedor</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || editingKeyId !== null}>
+                              <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un proveedor" /></SelectTrigger></FormControl>
+                              <SelectContent>
+                                {providerOptions.map(opt => (
+                                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
 
-                      {isGoogleGemini && (
-                        <>
-                          <FormField control={apiKeyForm.control} name="use_vertex_ai" render={({ field }) => (
-                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                              <div className="space-y-0.5">
-                                <FormLabel>Usar Vertex AI</FormLabel>
-                                <FormDescription>
-                                  Habilita esta opción para usar Google Vertex AI en lugar de la API pública de Gemini.
-                                </FormDescription>
-                              </div>
-                              <FormControl>
-                                <Switch
-                                  checked={field.value}
-                                  onCheckedChange={(checked) => {
-                                    field.onChange(checked);
-                                    if (!checked) {
-                                      setSelectedJsonKeyFile(null);
-                                      setJsonKeyFileName(null);
-                                      if (jsonKeyFileInputRef.current) {
-                                        jsonKeyFileInputRef.current.value = '';
+                        {isGoogleGemini && (
+                          <>
+                            <FormField control={apiKeyForm.control} name="use_vertex_ai" render={({ field }) => (
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                                <div className="space-y-0.5">
+                                  <FormLabel>Usar Vertex AI</FormLabel>
+                                  <FormDescription>
+                                    Habilita esta opción para usar Google Vertex AI en lugar de la API pública de Gemini.
+                                  </FormDescription>
+                                </div>
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value}
+                                    onCheckedChange={(checked) => {
+                                      field.onChange(checked);
+                                      if (!checked) {
+                                        setSelectedJsonKeyFile(null);
+                                        setJsonKeyFileName(null);
+                                        if (jsonKeyFileInputRef.current) {
+                                          jsonKeyFileInputRef.current.value = '';
+                                        }
                                       }
-                                    }
-                                  }}
-                                  disabled={isSubmitting}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )} />
-
-                          {useVertexAI ? (
-                            <>
-                              <FormField control={apiKeyForm.control} name="project_id" render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Google Cloud Project ID</FormLabel>
-                                  <FormControl><Input placeholder="tu-id-de-proyecto" {...field} disabled={isSubmitting} /></FormControl>
-                                  <FormDescription>
-                                    Puedes encontrar tu Project ID en el <a href="https://console.cloud.google.com/welcome" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Dashboard de Google Cloud Console</a>.
-                                  </FormDescription>
-                                  <FormMessage />
-                                </FormItem>
-                              )} />
-                              <FormField control={apiKeyForm.control} name="location_id" render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Google Cloud Location ID</FormLabel>
-                                  <FormControl><Input placeholder="ej: us-central1 o global" {...field} disabled={isSubmitting} /></FormControl>
-                                  <FormDescription>
-                                    Consulta las <a href="https://cloud.google.com/vertex-ai/docs/general/locations" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">ubicaciones disponibles para Vertex AI</a>.
-                                  </FormDescription>
-                                  <FormMessage />
-                                </FormItem>
-                              )} />
-                              <FormField control={apiKeyForm.control} name="model_name" render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Modelo de Gemini (Vertex AI)</FormLabel>
-                                  <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
-                                    <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
-                                    <SelectContent>
-                                      {currentProviderModels.filter(m => m.apiType === 'vertex').map(model => (
-                                        <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )} />
-                              <FormItem>
-                                <FormLabel>Archivo JSON de Cuenta de Servicio</FormLabel>
-                                <div className="flex items-center space-x-2">
-                                  <Input
-                                    id="json_key_file"
-                                    type="file"
-                                    accept="application/json"
-                                    onChange={handleJsonKeyFileChange}
-                                    ref={jsonKeyFileInputRef}
-                                    className="hidden"
+                                    }}
                                     disabled={isSubmitting}
                                   />
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => jsonKeyFileInputRef.current?.click()}
-                                    disabled={isSubmitting}
-                                    className="flex-1"
-                                  >
-                                    <Upload className="mr-2 h-4 w-4" /> {jsonKeyFileName ? jsonKeyFileName : "Subir archivo JSON"}
-                                  </Button>
-                                  {jsonKeyFileName && (
+                                </FormControl>
+                              </FormItem>
+                            )} />
+
+                            {useVertexAI ? (
+                              <>
+                                <FormField control={apiKeyForm.control} name="project_id" render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Google Cloud Project ID</FormLabel>
+                                    <FormControl><Input placeholder="tu-id-de-proyecto" {...field} disabled={isSubmitting} /></FormControl>
+                                    <FormDescription>
+                                      Puedes encontrar tu Project ID en el <a href="https://console.cloud.google.com/welcome" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Dashboard de Google Cloud Console</a>.
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )} />
+                                <FormField control={apiKeyForm.control} name="location_id" render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Google Cloud Location ID</FormLabel>
+                                    <FormControl><Input placeholder="ej: us-central1 o global" {...field} disabled={isSubmitting} /></FormControl>
+                                    <FormDescription>
+                                      Consulta las <a href="https://cloud.google.com/vertex-ai/docs/general/locations" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">ubicaciones disponibles para Vertex AI</a>.
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )} />
+                                <FormField control={apiKeyForm.control} name="model_name" render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Modelo de Gemini (Vertex AI)</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
+                                      <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
+                                      <SelectContent>
+                                        {currentProviderModels.filter(m => m.apiType === 'vertex').map(model => (
+                                          <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                  </FormItem>
+                                )} />
+                                <FormItem>
+                                  <FormLabel>Archivo JSON de Cuenta de Servicio</FormLabel>
+                                  <div className="flex items-center space-x-2">
+                                    <Input
+                                      id="json_key_file"
+                                      type="file"
+                                      accept="application/json"
+                                      onChange={handleJsonKeyFileChange}
+                                      ref={jsonKeyFileInputRef}
+                                      className="hidden"
+                                      disabled={isSubmitting}
+                                    />
                                     <Button
                                       type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={handleRemoveJsonKeyFile}
+                                      variant="outline"
+                                      onClick={() => jsonKeyFileInputRef.current?.click()}
                                       disabled={isSubmitting}
+                                      className="flex-1"
                                     >
-                                      <XCircle className="h-4 w-4 text-destructive" />
+                                      <Upload className="mr-2 h-4 w-4" /> {jsonKeyFileName ? jsonKeyFileName : "Subir archivo JSON"}
                                     </Button>
-                                  )}
-                                </div>
+                                    {jsonKeyFileName && (
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={handleRemoveJsonKeyFile}
+                                        disabled={isSubmitting}
+                                      >
+                                        <XCircle className="h-4 w-4 text-destructive" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                  <FormDescription>
+                                    Sube el archivo JSON de tu cuenta de servicio de Google Cloud.
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              </>
+                            ) : (
+                              <>
+                                <FormField control={apiKeyForm.control} name="api_key" render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>API Key</FormLabel>
+                                    <FormControl><Input type="password" placeholder={editingKeyId ? "Dejar en blanco para no cambiar" : "Pega tu API key aquí"} {...field} disabled={isSubmitting} /></FormControl>
+                                    <FormDescription>
+                                      Obtén tu API Key desde <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Google AI Studio</a>.
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )} />
+                                <FormField control={apiKeyForm.control} name="model_name" render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Modelo de Gemini</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
+                                      <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
+                                      <SelectContent>
+                                        {currentProviderModels.filter(m => m.apiType === 'public').map(model => (
+                                          <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                  </FormItem>
+                                )} />
+                              </>
+                            )}
+                          </>
+                        )}
+
+                        {isCustomEndpoint && (
+                          <>
+                            <FormField control={apiKeyForm.control} name="nickname" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Apodo</FormLabel>
+                                <FormControl><Input placeholder="Ej: Mi LLM Personalizado" {...field} disabled={isSubmitting} /></FormControl>
                                 <FormDescription>
-                                  Sube el archivo JSON de tu cuenta de servicio de Google Cloud.
+                                  Este apodo se mostrará en el selector de modelos del chat.
                                 </FormDescription>
                                 <FormMessage />
                               </FormItem>
-                            </>
-                          ) : (
-                            <>
-                              <FormField control={apiKeyForm.control} name="api_key" render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>API Key</FormLabel>
-                                  <FormControl><Input type="password" placeholder={editingKeyId ? "Dejar en blanco para no cambiar" : "Pega tu API key aquí"} {...field} disabled={isSubmitting} /></FormControl>
-                                  <FormDescription>
-                                    Obtén tu API Key desde <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Google AI Studio</a>.
-                                  </FormDescription>
-                                  <FormMessage />
-                                </FormItem>
-                              )} />
-                              <FormField control={apiKeyForm.control} name="model_name" render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Modelo de Gemini</FormLabel>
-                                  <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
-                                    <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
-                                    <SelectContent>
-                                      {currentProviderModels.filter(m => m.apiType === 'public').map(model => (
-                                        <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )} />
-                            </>
-                          )}
-                        </>
-                      )}
+                            )} />
+                            <FormField control={apiKeyForm.control} name="api_endpoint" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Link del Endpoint</FormLabel>
+                                <FormControl><Input placeholder="https://tu-api.com/v1/chat/completions" {...field} disabled={isSubmitting} /></FormControl>
+                                <FormDescription>
+                                  La URL completa de tu endpoint de chat (ej. compatible con OpenAI API).
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                            <FormField control={apiKeyForm.control} name="api_key" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>API Key</FormLabel>
+                                <FormControl><Input type="password" placeholder={editingKeyId ? "Dejar en blanco para no cambiar" : "Pega tu API key aquí"} {...field} disabled={isSubmitting} /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                            <FormField control={apiKeyForm.control} name="model_name" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>ID del Modelo</FormLabel>
+                                <FormControl><Input placeholder="Ej: gpt-4o, llama3-8b-chat" {...field} disabled={isSubmitting} /></FormControl>
+                                <FormDescription>
+                                  El ID del modelo que tu endpoint espera (ej. 'gpt-4o').
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                          </>
+                        )}
 
-                      {isCustomEndpoint && (
-                        <>
-                          <FormField control={apiKeyForm.control} name="nickname" render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Apodo</FormLabel>
-                              <FormControl><Input placeholder="Ej: Mi LLM Personalizado" {...field} disabled={isSubmitting} /></FormControl>
-                              <FormDescription>
-                                Este apodo se mostrará en el selector de modelos del chat.
-                              </FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )} />
-                          <FormField control={apiKeyForm.control} name="api_endpoint" render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Link del Endpoint</FormLabel>
-                              <FormControl><Input placeholder="https://tu-api.com/v1/chat/completions" {...field} disabled={isSubmitting} /></FormControl>
-                              <FormDescription>
-                                La URL completa de tu endpoint de chat (ej. compatible con OpenAI API).
-                              </FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )} />
+                        {!isGoogleGemini && !isCustomEndpoint && (
                           <FormField control={apiKeyForm.control} name="api_key" render={({ field }) => (
                             <FormItem>
                               <FormLabel>API Key</FormLabel>
@@ -691,46 +713,44 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                               <FormMessage />
                             </FormItem>
                           )} />
-                          <FormField control={apiKeyForm.control} name="model_name" render={({ field }) => (
+                        )}
+
+                        {!isGoogleGemini && !isCustomEndpoint && (
+                          <FormField control={apiKeyForm.control} name="nickname" render={({ field }) => (
                             <FormItem>
-                              <FormLabel>ID del Modelo</FormLabel>
-                              <FormControl><Input placeholder="Ej: gpt-4o, llama3-8b-chat" {...field} disabled={isSubmitting} /></FormControl>
-                              <FormDescription>
-                                El ID del modelo que tu endpoint espera (ej. 'gpt-4o').
-                              </FormDescription>
+                              <FormLabel>Apodo (Opcional)</FormLabel>
+                              <FormControl><Input placeholder="Ej: Clave personal, Clave de equipo" {...field} disabled={isSubmitting} /></FormControl>
                               <FormMessage />
                             </FormItem>
                           )} />
-                        </>
-                      )}
+                        )}
+                        
+                        {isSuperAdmin && (
+                          <FormField control={apiKeyForm.control} name="is_global" render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                              <div className="space-y-0.5">
+                                <FormLabel>Clave Global</FormLabel>
+                                <FormDescription>
+                                  Si está activado, esta clave estará disponible para todos los usuarios.
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  disabled={isSubmitting}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )} />
+                        )}
 
-                      {!isGoogleGemini && !isCustomEndpoint && (
-                        <FormField control={apiKeyForm.control} name="api_key" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>API Key</FormLabel>
-                            <FormControl><Input type="password" placeholder={editingKeyId ? "Dejar en blanco para no cambiar" : "Pega tu API key aquí"} {...field} disabled={isSubmitting} /></FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-                      )}
-
-                      {!isGoogleGemini && !isCustomEndpoint && (
-                        <FormField control={apiKeyForm.control} name="nickname" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Apodo (Opcional)</FormLabel>
-                            <FormControl><Input placeholder="Ej: Clave personal, Clave de equipo" {...field} disabled={isSubmitting} /></FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-                      )}
-                      
-                      {isSuperAdmin && (
-                        <FormField control={apiKeyForm.control} name="is_global" render={({ field }) => (
+                        <FormField control={apiKeyForm.control} name="is_active" render={({ field }) => (
                           <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
                             <div className="space-y-0.5">
-                              <FormLabel>Clave Global</FormLabel>
+                              <FormLabel>Clave Activa</FormLabel>
                               <FormDescription>
-                                Si está activado, esta clave estará disponible para todos los usuarios.
+                                Desactiva esta opción para deshabilitar temporalmente la clave sin eliminarla.
                               </FormDescription>
                             </div>
                             <FormControl>
@@ -742,134 +762,119 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                             </FormControl>
                           </FormItem>
                         )} />
-                      )}
 
-                      <FormField control={apiKeyForm.control} name="is_active" render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                          <div className="space-y-0.5">
-                            <FormLabel>Clave Activa</FormLabel>
+                        <FormField control={apiKeyForm.control} name="group_id" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Asignar a Grupo (Opcional)</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
+                              <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un grupo" /></SelectTrigger></FormControl>
+                              <SelectContent>
+                                <SelectItem value="null">Sin Grupo</SelectItem>
+                                {groups.filter(g => g.provider === selectedProvider && (g.user_id === currentUserId || g.is_global || isSuperAdmin)).map(group => (
+                                  <SelectItem key={group.id} value={group.id}>{group.name} {group.is_global && '(Global)'}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                             <FormDescription>
-                              Desactiva esta opción para deshabilitar temporalmente la clave sin eliminarla.
+                              Las claves de Google Gemini se agrupan automáticamente si no se selecciona un grupo.
                             </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                              disabled={isSubmitting}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )} />
-
-                      <FormField control={apiKeyForm.control} name="group_id" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Asignar a Grupo (Opcional)</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
-                            <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un grupo" /></SelectTrigger></FormControl>
-                            <SelectContent>
-                              <SelectItem value="null">Sin Grupo</SelectItem>
-                              {groups.filter(g => g.provider === selectedProvider && (g.user_id === currentUserId || g.is_global || isSuperAdmin)).map(group => (
-                                <SelectItem key={group.id} value={group.id}>{group.name} {group.is_global && '(Global)'}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormDescription>
-                            Las claves de Google Gemini se agrupan automáticamente si no se selecciona un grupo.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-
-                      <div className="flex gap-2">
-                        <Button type="submit" disabled={isSubmitting || !selectedProvider}>
-                          {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingKeyId ? <Edit className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />)}
-                          {editingKeyId ? 'Actualizar Clave' : 'Añadir Clave'}
-                        </Button>
-                        {editingKeyId && (
-                          <Button type="button" variant="outline" onClick={handleCancelEdit} disabled={isSubmitting}>
-                            Cancelar Edición
-                          </Button>
-                        )}
-                      </div>
-                    </form>
-                  </Form>
-                </TabsContent>
-                <TabsContent value="group">
-                  <Form {...aiKeyGroupForm}>
-                    <form onSubmit={aiKeyGroupForm.handleSubmit(onAiKeyGroupSubmit)} className="space-y-4 py-4">
-                      <FormField control={aiKeyGroupForm.control} name="name" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Nombre del Grupo</FormLabel>
-                          <FormControl><Input placeholder="Ej: Mis Claves Gemini Principales" {...field} disabled={isSubmitting} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      <FormField control={aiKeyGroupForm.control} name="provider" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Proveedor</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || editingGroupId !== null}>
-                            <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un proveedor" /></SelectTrigger></FormControl>
-                            <SelectContent>
-                              {providerOptions.map(opt => (
-                                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      <FormField control={aiKeyGroupForm.control} name="model_name" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Modelo por Defecto del Grupo (Opcional)</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
-                            <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
-                            <SelectContent>
-                              {getUniqueModelsForProvider(aiKeyGroupForm.watch('provider')).map(model => (
-                                <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormDescription>
-                            Este modelo se usará por defecto para las claves de este grupo si no se especifica uno individual.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      {isSuperAdmin && (
-                        <FormField control={aiKeyGroupForm.control} name="is_global" render={({ field }) => (
-                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                            <div className="space-y-0.5">
-                              <FormLabel>Grupo Global</FormLabel>
-                              <FormDescription>
-                                Si está activado, este grupo y sus claves estarán disponibles para todos los usuarios.
-                              </FormDescription>
-                            </div>
-                            <FormControl>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                                disabled={isSubmitting}
-                              />
-                            </FormControl>
+                            <FormMessage />
                           </FormItem>
                         )} />
-                      )}
-                      <div className="flex gap-2">
-                        <Button type="submit" disabled={isSubmitting || !aiKeyGroupForm.watch('provider')}>
-                          {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingGroupId ? <Edit className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />)}
-                          {editingGroupId ? 'Actualizar Grupo' : 'Crear Grupo'}
-                        </Button>
-                        {editingGroupId && (
-                          <Button type="button" variant="outline" onClick={handleCancelEdit} disabled={isSubmitting}>
-                            Cancelar Edición
+
+                        <div className="flex gap-2">
+                          <Button type="submit" disabled={isSubmitting || !selectedProvider}>
+                            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingKeyId ? <Edit className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />)}
+                            {editingKeyId ? 'Actualizar Clave' : 'Añadir Clave'}
                           </Button>
+                          {editingKeyId && (
+                            <Button type="button" variant="outline" onClick={handleCancelEdit} disabled={isSubmitting}>
+                              Cancelar Edición
+                            </Button>
+                          )}
+                        </div>
+                      </form>
+                    </Form>
+                  </TabsContent>
+                  <TabsContent value="group">
+                    <Form {...aiKeyGroupForm}>
+                      <form onSubmit={aiKeyGroupForm.handleSubmit(onAiKeyGroupSubmit)} className="space-y-4 py-4">
+                        <FormField control={aiKeyGroupForm.control} name="name" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Nombre del Grupo</FormLabel>
+                            <FormControl><Input placeholder="Ej: Mis Claves Gemini Principales" {...field} disabled={isSubmitting} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={aiKeyGroupForm.control} name="provider" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Proveedor</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || editingGroupId !== null}>
+                              <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un proveedor" /></SelectTrigger></FormControl>
+                              <SelectContent>
+                                {providerOptions.map(opt => (
+                                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={aiKeyGroupForm.control} name="model_name" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Modelo por Defecto del Grupo (Opcional)</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
+                              <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
+                              <SelectContent>
+                                {getUniqueModelsForProvider(aiKeyGroupForm.watch('provider')).map(model => (
+                                  <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormDescription>
+                              Este modelo se usará por defecto para las claves de este grupo si no se especifica uno individual.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        {isSuperAdmin && (
+                          <FormField control={aiKeyGroupForm.control} name="is_global" render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                              <div className="space-y-0.5">
+                                <FormLabel>Grupo Global</FormLabel>
+                                <FormDescription>
+                                  Si está activado, este grupo y sus claves estarán disponibles para todos los usuarios.
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  disabled={isSubmitting}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )} />
                         )}
-                      </div>
-                    </form>
-                  </Form>
-                </TabsContent>
-              </Tabs>
+                        <div className="flex gap-2">
+                          <Button type="submit" disabled={isSubmitting || !aiKeyGroupForm.watch('provider')}>
+                            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingGroupId ? <Edit className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />)}
+                            {editingGroupId ? 'Actualizar Grupo' : 'Crear Grupo'}
+                          </Button>
+                          {editingGroupId && (
+                            <Button type="button" variant="outline" onClick={handleCancelEdit} disabled={isSubmitting}>
+                              Cancelar Edición
+                            </Button>
+                          )}
+                        </div>
+                      </form>
+                    </Form>
+                  </TabsContent>
+                </Tabs>
+              </div>
+              <DialogFooter className="p-6 pt-4 flex-shrink-0">
+                <DialogClose asChild><Button variant="outline">Cerrar</Button></DialogClose>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
 
