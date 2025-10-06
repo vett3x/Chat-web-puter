@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { LifeBuoy, GitPullRequest } from 'lucide-react';
+import { LifeBuoy, GitPullRequest, HardDrive } from 'lucide-react'; // Import HardDrive icon
 import { VersionDisplay } from './version-display';
 import { StorageUsageIndicator } from './storage-usage-indicator';
 import {
@@ -31,6 +31,16 @@ export function SidebarFooter({ onOpenSupportTicket, onOpenStorageManagement }: 
             </TooltipTrigger>
             <TooltipContent>
               <p>Soporte Técnico</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={onOpenStorageManagement}>
+                <HardDrive className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Ver Archivos</p>
             </TooltipContent>
           </Tooltip>
           <Tooltip>
