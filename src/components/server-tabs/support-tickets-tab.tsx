@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Loader2, RefreshCw, Trash2, LifeBuoy, ChevronDown, ChevronRight, Search, CheckCircle2, MessageSquareText } from 'lucide-react';
+import { Loader2, RefreshCw, Trash2, LifeBuoy, ChevronDown, ChevronRight, Search, CheckCircle2, MessageSquareText, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -32,6 +32,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Separator } from '@/components/ui/separator';
+import { SupportTicketDetailDialog } from './support-ticket-detail-dialog'; // Import the new dialog
 
 interface Ticket {
   id: string;
@@ -58,6 +59,8 @@ export function SupportTicketsTab() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'new' | 'in_progress' | 'resolved'>('all');
   const [expandedResolvedSection, setExpandedResolvedSection] = useState(false);
   const [resolvedTicketsDisplayCount, setResolvedTicketsDisplayCount] = useState(RESOLVED_TICKETS_INITIAL_DISPLAY_COUNT);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
 
   const fetchTickets = useCallback(async () => {
     setIsLoading(true);
@@ -147,6 +150,11 @@ export function SupportTicketsTab() {
     setResolvedTicketsDisplayCount(prev => prev + RESOLVED_TICKETS_INITIAL_DISPLAY_COUNT);
   };
 
+  const handleOpenTicketDetails = (id: string) => {
+    setSelectedTicketId(id);
+    setIsDetailDialogOpen(true);
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -198,8 +206,8 @@ export function SupportTicketsTab() {
                           <React.Fragment key={ticket.id}>
                             <TableRow>
                               <TableCell>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setExpandedTicketId(expandedTicketId === ticket.id ? null : ticket.id)}>
-                                  {expandedTicketId === ticket.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenTicketDetails(ticket.id)}>
+                                  <Eye className="h-4 w-4" />
                                 </Button>
                               </TableCell>
                               <TableCell className="font-medium">{ticket.subject}</TableCell>
@@ -226,13 +234,6 @@ export function SupportTicketsTab() {
                                 </DropdownMenu>
                               </TableCell>
                             </TableRow>
-                            {expandedTicketId === ticket.id && (
-                              <TableRow>
-                                <TableCell colSpan={7} className="p-4 bg-muted/50">
-                                  <p className="whitespace-pre-wrap">{ticket.description}</p>
-                                </TableCell>
-                              </TableRow>
-                            )}
                           </React.Fragment>
                         ))}
                       </TableBody>
@@ -258,8 +259,8 @@ export function SupportTicketsTab() {
                               <React.Fragment key={ticket.id}>
                                 <TableRow>
                                   <TableCell>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setExpandedTicketId(expandedTicketId === ticket.id ? null : ticket.id)}>
-                                      {expandedTicketId === ticket.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenTicketDetails(ticket.id)}>
+                                      <Eye className="h-4 w-4" />
                                     </Button>
                                   </TableCell>
                                   <TableCell className="font-medium">{ticket.subject}</TableCell>
@@ -283,13 +284,6 @@ export function SupportTicketsTab() {
                                     </DropdownMenu>
                                   </TableCell>
                                 </TableRow>
-                                {expandedTicketId === ticket.id && (
-                                  <TableRow>
-                                    <TableCell colSpan={7} className="p-4 bg-muted/50">
-                                      <p className="whitespace-pre-wrap">{ticket.description}</p>
-                                    </TableCell>
-                                  </TableRow>
-                                )}
                               </React.Fragment>
                             ))}
                           </TableBody>
@@ -311,6 +305,14 @@ export function SupportTicketsTab() {
           </>
         )}
       </CardContent>
+      {selectedTicketId && (
+        <SupportTicketDetailDialog
+          open={isDetailDialogOpen}
+          onOpenChange={setIsDetailDialogOpen}
+          ticketId={selectedTicketId}
+          onTicketUpdated={fetchTickets}
+        />
+      )}
     </Card>
   );
 }
