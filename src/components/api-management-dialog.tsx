@@ -11,9 +11,18 @@ import {
   DialogClose,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerClose,
+} from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { KeyRound, PlusCircle, Trash2, Loader2, RefreshCw, Edit, Upload, XCircle, Search, Folder, CheckCircle2, AlertCircle, Ban, ChevronDown, ChevronRight } from 'lucide-react';
+import { KeyRound, PlusCircle, Trash2, Loader2, RefreshCw, Edit, Upload, XCircle, Search, Folder, CheckCircle2, AlertCircle, Ban, ChevronDown, ChevronRight, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -37,6 +46,7 @@ import {
   TabsTrigger,
   TabsContent,
 } from '@/components/ui/tabs';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 
 // Schemas
@@ -113,6 +123,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
   const { session, userRole } = useSession();
   const isSuperAdmin = userRole === 'super_admin';
   const currentUserId = session?.user?.id;
+  const isMobile = useIsMobile();
 
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [groups, setGroups] = useState<AiKeyGroup[]>([]);
@@ -125,6 +136,8 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
   const [jsonKeyFileName, setJsonKeyFileName] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
+  const [mobileView, setMobileView] = useState<'list' | 'form'>('list');
 
   const toggleGroupExpansion = (groupId: string) => {
     setExpandedGroups(prev => {
@@ -205,17 +218,10 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
   useEffect(() => {
     if (open) {
       fetchKeysAndGroups();
-      apiKeyForm.reset({
-        provider: '', api_key: '', nickname: '', project_id: '', location_id: '', use_vertex_ai: false, model_name: '', json_key_file: undefined, json_key_content: undefined, api_endpoint: '', is_global: false, is_active: true, group_id: null, status: 'active', status_message: null,
-      });
-      aiKeyGroupForm.reset({ name: '', provider: '', model_name: '', is_global: false });
-      setEditingKeyId(null);
-      setEditingGroupId(null);
-      setSelectedJsonKeyFile(null);
-      setJsonKeyFileName(null);
-      setSearchQuery('');
+      handleCancelEdit(); // Reset all forms and states
+      setMobileView('list');
     }
-  }, [open, fetchKeysAndGroups, apiKeyForm, aiKeyGroupForm]);
+  }, [open, fetchKeysAndGroups]);
 
   const handleEditKey = (key: ApiKey) => {
     setEditingKeyId(key.id);
@@ -240,7 +246,11 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
     });
     setSelectedJsonKeyFile(null);
     setJsonKeyFileName(key.use_vertex_ai && key.json_key_content ? 'Archivo JSON existente' : null);
-    setIsAddEditDialogOpen(true);
+    if (isMobile) {
+      setMobileView('form');
+    } else {
+      setIsAddEditDialogOpen(true);
+    }
   };
 
   const handleEditGroup = (group: AiKeyGroup) => {
@@ -253,7 +263,11 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       model_name: group.model_name || '',
       is_global: group.is_global,
     });
-    setIsAddEditDialogOpen(true);
+    if (isMobile) {
+      setMobileView('form');
+    } else {
+      setIsAddEditDialogOpen(true);
+    }
   };
 
   const handleCancelEdit = () => {
@@ -265,7 +279,11 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
     aiKeyGroupForm.reset({ name: '', provider: '', model_name: '', is_global: false });
     setSelectedJsonKeyFile(null);
     setJsonKeyFileName(null);
-    setIsAddEditDialogOpen(false);
+    if (isMobile) {
+      setMobileView('list');
+    } else {
+      setIsAddEditDialogOpen(false);
+    }
   };
 
   const handleJsonKeyFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -477,529 +495,442 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
     }
   };
 
-  const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
+  const formContent = (
+    <Tabs defaultValue={editingGroupId ? 'group' : 'key'} className="w-full">
+      <TabsList className="grid w-full grid-cols-2">
+        <TabsTrigger value="key" disabled={!!editingGroupId}>Añadir/Editar Clave</TabsTrigger>
+        <TabsTrigger value="group" disabled={!!editingKeyId}>Añadir/Editar Grupo</TabsTrigger>
+      </TabsList>
+      <TabsContent value="key">
+        <Form {...apiKeyForm}>
+          <form onSubmit={apiKeyForm.handleSubmit(onApiKeySubmit)} className="space-y-4 py-4">
+            <FormField control={apiKeyForm.control} name="provider" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Proveedor</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || editingKeyId !== null}>
+                  <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un proveedor" /></SelectTrigger></FormControl>
+                  <SelectContent>
+                    {providerOptions.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] p-6 max-h-[90vh] overflow-y-auto flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <KeyRound className="h-6 w-6" /> Gestión de API Keys de IA
-          </DialogTitle>
-          <DialogDescription>
-            Añade y gestiona tus API keys y grupos para diferentes proveedores de IA.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="py-4 space-y-6 flex-1 flex flex-col">
-          <Dialog open={isAddEditDialogOpen} onOpenChange={setIsAddEditDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="w-fit" onClick={handleCancelEdit}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Añadir Clave o Grupo
+            {isGoogleGemini && (
+              <>
+                <FormField control={apiKeyForm.control} name="use_vertex_ai" render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                    <div className="space-y-0.5">
+                      <FormLabel>Usar Vertex AI</FormLabel>
+                      <FormDescription>
+                        Habilita esta opción para usar Google Vertex AI en lugar de la API pública de Gemini.
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={(checked) => {
+                          field.onChange(checked);
+                          if (!checked) {
+                            setSelectedJsonKeyFile(null);
+                            setJsonKeyFileName(null);
+                            if (jsonKeyFileInputRef.current) {
+                              jsonKeyFileInputRef.current.value = '';
+                            }
+                          }
+                        }}
+                        disabled={isSubmitting}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )} />
+
+                {useVertexAI ? (
+                  <>
+                    <FormField control={apiKeyForm.control} name="project_id" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Google Cloud Project ID</FormLabel>
+                        <FormControl><Input placeholder="tu-id-de-proyecto" {...field} disabled={isSubmitting} /></FormControl>
+                        <FormDescription>
+                          Puedes encontrar tu Project ID en el <a href="https://console.cloud.google.com/welcome" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Dashboard de Google Cloud Console</a>.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={apiKeyForm.control} name="location_id" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Google Cloud Location ID</FormLabel>
+                        <FormControl><Input placeholder="ej: us-central1 o global" {...field} disabled={isSubmitting} /></FormControl>
+                        <FormDescription>
+                          Consulta las <a href="https://cloud.google.com/vertex-ai/docs/general/locations" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">ubicaciones disponibles para Vertex AI</a>.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={apiKeyForm.control} name="model_name" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Modelo de Gemini (Vertex AI)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            {currentProviderModels.filter(m => m.apiType === 'vertex').map(model => (
+                              <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormItem>
+                      <FormLabel>Archivo JSON de Cuenta de Servicio</FormLabel>
+                      <div className="flex items-center space-x-2">
+                        <Input
+                          id="json_key_file"
+                          type="file"
+                          accept="application/json"
+                          onChange={handleJsonKeyFileChange}
+                          ref={jsonKeyFileInputRef}
+                          className="hidden"
+                          disabled={isSubmitting}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => jsonKeyFileInputRef.current?.click()}
+                          disabled={isSubmitting}
+                          className="flex-1"
+                        >
+                          <Upload className="mr-2 h-4 w-4" /> {jsonKeyFileName ? jsonKeyFileName : "Subir archivo JSON"}
+                        </Button>
+                        {jsonKeyFileName && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={handleRemoveJsonKeyFile}
+                            disabled={isSubmitting}
+                          >
+                            <XCircle className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
+                      </div>
+                      <FormDescription>
+                        Sube el archivo JSON de tu cuenta de servicio de Google Cloud.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  </>
+                ) : (
+                  <>
+                    <FormField control={apiKeyForm.control} name="api_key" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>API Key</FormLabel>
+                        <FormControl><Input type="password" placeholder={editingKeyId ? "Dejar en blanco para no cambiar" : "Pega tu API key aquí"} {...field} disabled={isSubmitting} /></FormControl>
+                        <FormDescription>
+                          Obtén tu API Key desde <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Google AI Studio</a>.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={apiKeyForm.control} name="model_name" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Modelo de Gemini</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            {currentProviderModels.filter(m => m.apiType === 'public').map(model => (
+                              <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </>
+                )}
+              </>
+            )}
+
+            {isCustomEndpoint && (
+              <>
+                <FormField control={apiKeyForm.control} name="nickname" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Apodo</FormLabel>
+                    <FormControl><Input placeholder="Ej: Mi LLM Personalizado" {...field} disabled={isSubmitting} /></FormControl>
+                    <FormDescription>
+                      Este apodo se mostrará en el selector de modelos del chat.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={apiKeyForm.control} name="api_endpoint" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Link del Endpoint</FormLabel>
+                    <FormControl><Input placeholder="https://tu-api.com/v1/chat/completions" {...field} disabled={isSubmitting} /></FormControl>
+                    <FormDescription>
+                      La URL completa de tu endpoint de chat (ej. compatible con OpenAI API).
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={apiKeyForm.control} name="api_key" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>API Key</FormLabel>
+                    <FormControl><Input type="password" placeholder={editingKeyId ? "Dejar en blanco para no cambiar" : "Pega tu API key aquí"} {...field} disabled={isSubmitting} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={apiKeyForm.control} name="model_name" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>ID del Modelo</FormLabel>
+                    <FormControl><Input placeholder="Ej: gpt-4o, llama3-8b-chat" {...field} disabled={isSubmitting} /></FormControl>
+                    <FormDescription>
+                      El ID del modelo que tu endpoint espera (ej. 'gpt-4o').
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </>
+            )}
+
+            {!isGoogleGemini && !isCustomEndpoint && (
+              <FormField control={apiKeyForm.control} name="api_key" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>API Key</FormLabel>
+                  <FormControl><Input type="password" placeholder={editingKeyId ? "Dejar en blanco para no cambiar" : "Pega tu API key aquí"} {...field} disabled={isSubmitting} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            )}
+
+            {!isGoogleGemini && !isCustomEndpoint && (
+              <FormField control={apiKeyForm.control} name="nickname" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Apodo (Opcional)</FormLabel>
+                  <FormControl><Input placeholder="Ej: Clave personal, Clave de equipo" {...field} disabled={isSubmitting} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            )}
+            
+            {isSuperAdmin && (
+              <FormField control={apiKeyForm.control} name="is_global" render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                  <div className="space-y-0.5">
+                    <FormLabel>Clave Global</FormLabel>
+                    <FormDescription>
+                      Si está activado, esta clave estará disponible para todos los usuarios.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={isSubmitting}
+                    />
+                  </FormControl>
+                </FormItem>
+              )} />
+            )}
+
+            <FormField control={apiKeyForm.control} name="is_active" render={({ field }) => (
+              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                <div className="space-y-0.5">
+                  <FormLabel>Clave Activa</FormLabel>
+                  <FormDescription>
+                    Desactiva esta opción para deshabilitar temporalmente la clave sin eliminarla.
+                  </FormDescription>
+                </div>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                    disabled={isSubmitting}
+                  />
+                </FormControl>
+              </FormItem>
+            )} />
+
+            <FormField control={apiKeyForm.control} name="group_id" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Asignar a Grupo (Opcional)</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
+                  <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un grupo" /></SelectTrigger></FormControl>
+                  <SelectContent>
+                    <SelectItem value="null">Sin Grupo</SelectItem>
+                    {groups.filter(g => g.provider === selectedProvider && (g.user_id === currentUserId || g.is_global || isSuperAdmin)).map(group => (
+                      <SelectItem key={group.id} value={group.id}>{group.name} {group.is_global && '(Global)'}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormDescription>
+                  Las claves de Google Gemini se agrupan automáticamente si no se selecciona un grupo.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <div className="flex gap-2">
+              <Button type="submit" disabled={isSubmitting || !selectedProvider}>
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingKeyId ? <Edit className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />)}
+                {editingKeyId ? 'Actualizar Clave' : 'Añadir Clave'}
               </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col p-0">
-              <DialogHeader className="p-6 pb-0 flex-shrink-0">
-                <DialogTitle>{editingKeyId ? 'Editar API Key' : (editingGroupId ? 'Editar Grupo de Claves' : 'Añadir Nueva Clave o Grupo')}</DialogTitle>
-                <DialogDescription>
-                  {editingKeyId ? 'Actualiza los detalles de tu API Key.' : (editingGroupId ? 'Actualiza los detalles de tu grupo de claves.' : 'Crea una nueva API Key o un grupo de claves.')}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex-1 overflow-y-auto px-6">
-                <Tabs defaultValue="key" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="key" disabled={!!editingGroupId}>Añadir/Editar Clave</TabsTrigger>
-                    <TabsTrigger value="group" disabled={!!editingKeyId}>Añadir/Editar Grupo</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="key">
-                    <Form {...apiKeyForm}>
-                      <form onSubmit={apiKeyForm.handleSubmit(onApiKeySubmit)} className="space-y-4 py-4">
-                        <FormField control={apiKeyForm.control} name="provider" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Proveedor</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || editingKeyId !== null}>
-                              <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un proveedor" /></SelectTrigger></FormControl>
-                              <SelectContent>
-                                {providerOptions.map(opt => (
-                                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-
-                        {isGoogleGemini && (
-                          <>
-                            <FormField control={apiKeyForm.control} name="use_vertex_ai" render={({ field }) => (
-                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                                <div className="space-y-0.5">
-                                  <FormLabel>Usar Vertex AI</FormLabel>
-                                  <FormDescription>
-                                    Habilita esta opción para usar Google Vertex AI en lugar de la API pública de Gemini.
-                                  </FormDescription>
-                                </div>
-                                <FormControl>
-                                  <Switch
-                                    checked={field.value}
-                                    onCheckedChange={(checked) => {
-                                      field.onChange(checked);
-                                      if (!checked) {
-                                        setSelectedJsonKeyFile(null);
-                                        setJsonKeyFileName(null);
-                                        if (jsonKeyFileInputRef.current) {
-                                          jsonKeyFileInputRef.current.value = '';
-                                        }
-                                      }
-                                    }}
-                                    disabled={isSubmitting}
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )} />
-
-                            {useVertexAI ? (
-                              <>
-                                <FormField control={apiKeyForm.control} name="project_id" render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Google Cloud Project ID</FormLabel>
-                                    <FormControl><Input placeholder="tu-id-de-proyecto" {...field} disabled={isSubmitting} /></FormControl>
-                                    <FormDescription>
-                                      Puedes encontrar tu Project ID en el <a href="https://console.cloud.google.com/welcome" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Dashboard de Google Cloud Console</a>.
-                                    </FormDescription>
-                                    <FormMessage />
-                                  </FormItem>
-                                )} />
-                                <FormField control={apiKeyForm.control} name="location_id" render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Google Cloud Location ID</FormLabel>
-                                    <FormControl><Input placeholder="ej: us-central1 o global" {...field} disabled={isSubmitting} /></FormControl>
-                                    <FormDescription>
-                                      Consulta las <a href="https://cloud.google.com/vertex-ai/docs/general/locations" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">ubicaciones disponibles para Vertex AI</a>.
-                                    </FormDescription>
-                                    <FormMessage />
-                                  </FormItem>
-                                )} />
-                                <FormField control={apiKeyForm.control} name="model_name" render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Modelo de Gemini (Vertex AI)</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
-                                      <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
-                                      <SelectContent>
-                                        {currentProviderModels.filter(m => m.apiType === 'vertex').map(model => (
-                                          <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                  </FormItem>
-                                )} />
-                                <FormItem>
-                                  <FormLabel>Archivo JSON de Cuenta de Servicio</FormLabel>
-                                  <div className="flex items-center space-x-2">
-                                    <Input
-                                      id="json_key_file"
-                                      type="file"
-                                      accept="application/json"
-                                      onChange={handleJsonKeyFileChange}
-                                      ref={jsonKeyFileInputRef}
-                                      className="hidden"
-                                      disabled={isSubmitting}
-                                    />
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      onClick={() => jsonKeyFileInputRef.current?.click()}
-                                      disabled={isSubmitting}
-                                      className="flex-1"
-                                    >
-                                      <Upload className="mr-2 h-4 w-4" /> {jsonKeyFileName ? jsonKeyFileName : "Subir archivo JSON"}
-                                    </Button>
-                                    {jsonKeyFileName && (
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={handleRemoveJsonKeyFile}
-                                        disabled={isSubmitting}
-                                      >
-                                        <XCircle className="h-4 w-4 text-destructive" />
-                                      </Button>
-                                    )}
-                                  </div>
-                                  <FormDescription>
-                                    Sube el archivo JSON de tu cuenta de servicio de Google Cloud.
-                                  </FormDescription>
-                                  <FormMessage />
-                                </FormItem>
-                              </>
-                            ) : (
-                              <>
-                                <FormField control={apiKeyForm.control} name="api_key" render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>API Key</FormLabel>
-                                    <FormControl><Input type="password" placeholder={editingKeyId ? "Dejar en blanco para no cambiar" : "Pega tu API key aquí"} {...field} disabled={isSubmitting} /></FormControl>
-                                    <FormDescription>
-                                      Obtén tu API Key desde <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Google AI Studio</a>.
-                                    </FormDescription>
-                                    <FormMessage />
-                                  </FormItem>
-                                )} />
-                                <FormField control={apiKeyForm.control} name="model_name" render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Modelo de Gemini</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
-                                      <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
-                                      <SelectContent>
-                                        {currentProviderModels.filter(m => m.apiType === 'public').map(model => (
-                                          <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                  </FormItem>
-                                )} />
-                              </>
-                            )}
-                          </>
-                        )}
-
-                        {isCustomEndpoint && (
-                          <>
-                            <FormField control={apiKeyForm.control} name="nickname" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Apodo</FormLabel>
-                                <FormControl><Input placeholder="Ej: Mi LLM Personalizado" {...field} disabled={isSubmitting} /></FormControl>
-                                <FormDescription>
-                                  Este apodo se mostrará en el selector de modelos del chat.
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                            <FormField control={apiKeyForm.control} name="api_endpoint" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Link del Endpoint</FormLabel>
-                                <FormControl><Input placeholder="https://tu-api.com/v1/chat/completions" {...field} disabled={isSubmitting} /></FormControl>
-                                <FormDescription>
-                                  La URL completa de tu endpoint de chat (ej. compatible con OpenAI API).
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                            <FormField control={apiKeyForm.control} name="api_key" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>API Key</FormLabel>
-                                <FormControl><Input type="password" placeholder={editingKeyId ? "Dejar en blanco para no cambiar" : "Pega tu API key aquí"} {...field} disabled={isSubmitting} /></FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                            <FormField control={apiKeyForm.control} name="model_name" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>ID del Modelo</FormLabel>
-                                <FormControl><Input placeholder="Ej: gpt-4o, llama3-8b-chat" {...field} disabled={isSubmitting} /></FormControl>
-                                <FormDescription>
-                                  El ID del modelo que tu endpoint espera (ej. 'gpt-4o').
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                          </>
-                        )}
-
-                        {!isGoogleGemini && !isCustomEndpoint && (
-                          <FormField control={apiKeyForm.control} name="api_key" render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>API Key</FormLabel>
-                              <FormControl><Input type="password" placeholder={editingKeyId ? "Dejar en blanco para no cambiar" : "Pega tu API key aquí"} {...field} disabled={isSubmitting} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )} />
-                        )}
-
-                        {!isGoogleGemini && !isCustomEndpoint && (
-                          <FormField control={apiKeyForm.control} name="nickname" render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Apodo (Opcional)</FormLabel>
-                              <FormControl><Input placeholder="Ej: Clave personal, Clave de equipo" {...field} disabled={isSubmitting} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )} />
-                        )}
-                        
-                        {isSuperAdmin && (
-                          <FormField control={apiKeyForm.control} name="is_global" render={({ field }) => (
-                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                              <div className="space-y-0.5">
-                                <FormLabel>Clave Global</FormLabel>
-                                <FormDescription>
-                                  Si está activado, esta clave estará disponible para todos los usuarios.
-                                </FormDescription>
-                              </div>
-                              <FormControl>
-                                <Switch
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                  disabled={isSubmitting}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )} />
-                        )}
-
-                        <FormField control={apiKeyForm.control} name="is_active" render={({ field }) => (
-                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                            <div className="space-y-0.5">
-                              <FormLabel>Clave Activa</FormLabel>
-                              <FormDescription>
-                                Desactiva esta opción para deshabilitar temporalmente la clave sin eliminarla.
-                              </FormDescription>
-                            </div>
-                            <FormControl>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                                disabled={isSubmitting}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )} />
-
-                        <FormField control={apiKeyForm.control} name="group_id" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Asignar a Grupo (Opcional)</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
-                              <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un grupo" /></SelectTrigger></FormControl>
-                              <SelectContent>
-                                <SelectItem value="null">Sin Grupo</SelectItem>
-                                {groups.filter(g => g.provider === selectedProvider && (g.user_id === currentUserId || g.is_global || isSuperAdmin)).map(group => (
-                                  <SelectItem key={group.id} value={group.id}>{group.name} {group.is_global && '(Global)'}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormDescription>
-                              Las claves de Google Gemini se agrupan automáticamente si no se selecciona un grupo.
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-
-                        <div className="flex gap-2">
-                          <Button type="submit" disabled={isSubmitting || !selectedProvider}>
-                            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingKeyId ? <Edit className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />)}
-                            {editingKeyId ? 'Actualizar Clave' : 'Añadir Clave'}
-                          </Button>
-                          {editingKeyId && (
-                            <Button type="button" variant="outline" onClick={handleCancelEdit} disabled={isSubmitting}>
-                              Cancelar Edición
-                            </Button>
-                          )}
-                        </div>
-                      </form>
-                    </Form>
-                  </TabsContent>
-                  <TabsContent value="group">
-                    <Form {...aiKeyGroupForm}>
-                      <form onSubmit={aiKeyGroupForm.handleSubmit(onAiKeyGroupSubmit)} className="space-y-4 py-4">
-                        <FormField control={aiKeyGroupForm.control} name="name" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Nombre del Grupo</FormLabel>
-                            <FormControl><Input placeholder="Ej: Mis Claves Gemini Principales" {...field} disabled={isSubmitting} /></FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-                        <FormField control={aiKeyGroupForm.control} name="provider" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Proveedor</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || editingGroupId !== null}>
-                              <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un proveedor" /></SelectTrigger></FormControl>
-                              <SelectContent>
-                                {providerOptions.map(opt => (
-                                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-                        <FormField control={aiKeyGroupForm.control} name="model_name" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Modelo por Defecto del Grupo (Opcional)</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
-                              <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
-                              <SelectContent>
-                                {getUniqueModelsForProvider(aiKeyGroupForm.watch('provider')).map(model => (
-                                  <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormDescription>
-                              Este modelo se usará por defecto para las claves de este grupo si no se especifica uno individual.
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-                        {isSuperAdmin && (
-                          <FormField control={aiKeyGroupForm.control} name="is_global" render={({ field }) => (
-                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                              <div className="space-y-0.5">
-                                <FormLabel>Grupo Global</FormLabel>
-                                <FormDescription>
-                                  Si está activado, este grupo y sus claves estarán disponibles para todos los usuarios.
-                                </FormDescription>
-                              </div>
-                              <FormControl>
-                                <Switch
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                  disabled={isSubmitting}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )} />
-                        )}
-                        <div className="flex gap-2">
-                          <Button type="submit" disabled={isSubmitting || !aiKeyGroupForm.watch('provider')}>
-                            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingGroupId ? <Edit className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />)}
-                            {editingGroupId ? 'Actualizar Grupo' : 'Crear Grupo'}
-                          </Button>
-                          {editingGroupId && (
-                            <Button type="button" variant="outline" onClick={handleCancelEdit} disabled={isSubmitting}>
-                              Cancelar Edición
-                            </Button>
-                          )}
-                        </div>
-                      </form>
-                    </Form>
-                  </TabsContent>
-                </Tabs>
-              </div>
-              <DialogFooter className="p-6 pt-4 flex-shrink-0">
-                <DialogClose asChild><Button variant="outline">Cerrar</Button></DialogClose>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          <Separator />
-          <div className="flex-1 flex flex-col">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-lg font-semibold">Claves y Grupos Guardados</h3>
-              <div className="relative flex-1 max-w-xs ml-auto">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar clave o grupo..."
-                  className="pl-9"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-              <Button variant="ghost" size="icon" onClick={fetchKeysAndGroups} disabled={isLoading}><RefreshCw className="h-4 w-4" /></Button>
+              {editingKeyId && (
+                <Button type="button" variant="outline" onClick={handleCancelEdit} disabled={isSubmitting}>
+                  Cancelar Edición
+                </Button>
+              )}
             </div>
-            <ScrollArea className="flex-1">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Proveedor</TableHead>
-                    <TableHead>Configuración</TableHead>
-                    {isSuperAdmin && <TableHead>Global</TableHead>}
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <TableRow><TableCell colSpan={isSuperAdmin ? 6 : 5} className="text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
-                  ) : (
-                    <>
-                      {filteredGroups.map(group => {
-                        const canManageGroup = isSuperAdmin || (group.user_id === currentUserId && !group.is_global);
-                        const isExpanded = expandedGroups.has(group.id);
-                        const activeKeysCount = group.api_keys?.filter(k => k.status === 'active' && k.is_active).length || 0;
-                        return (
-                          <React.Fragment key={group.id}>
-                            <TableRow className="bg-muted/50 hover:bg-muted/70" onClick={() => toggleGroupExpansion(group.id)}>
-                              <TableCell className="font-semibold flex items-center gap-2 cursor-pointer">
-                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                                <Folder className="h-4 w-4" /> {group.name}
-                              </TableCell>
-                              <TableCell>{providerOptions.find(p => p.value === group.provider)?.label || group.provider}</TableCell>
-                              <TableCell className="font-mono text-xs">
-                                {group.model_name ? `Modelo: ${getModelLabel(group.model_name)}` : 'N/A'}
-                              </TableCell>
-                              {isSuperAdmin && <TableCell>{group.is_global ? 'Sí' : 'No'}</TableCell>}
-                              <TableCell>
-                                <Badge variant="secondary">{group.api_keys && group.api_keys.length > 0 ? `${activeKeysCount} activas` : 'Sin claves'}</Badge>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                                  <Button variant="outline" size="icon" onClick={() => handleEditGroup(group)} disabled={!canManageGroup} title={!canManageGroup ? "No tienes permiso para editar este grupo" : "Editar grupo"}>
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <Button variant="destructive" size="icon" onClick={() => handleDelete(group.id, 'group')} disabled={!canManageGroup} title={!canManageGroup ? "No tienes permiso para eliminar este grupo" : "Eliminar grupo"}>
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                            {isExpanded && group.api_keys?.map(key => {
-                              const canManageKey = isSuperAdmin || (key.user_id === currentUserId && !key.is_global);
-                              return (
-                                <TableRow key={key.id} className={cn(key.status === 'failed' && 'bg-destructive/10', key.status === 'blocked' && 'bg-red-900/20', !key.is_active && 'opacity-50')}>
-                                  <TableCell className="pl-8"><div className="flex items-center gap-2"><KeyRound className="h-4 w-4 text-muted-foreground" /> {key.nickname || 'N/A'}</div></TableCell>
-                                  <TableCell>{providerOptions.find(p => p.value === key.provider)?.label || key.provider}</TableCell>
-                                  <TableCell className="font-mono text-xs">
-                                    {key.provider === 'custom_endpoint' ? (
-                                      <div className="flex flex-col">
-                                        <span>Endpoint: {key.api_endpoint || 'N/A'}</span>
-                                        <span className="text-muted-foreground">Modelo ID: {key.model_name || 'N/A'}</span>
-                                        <span className="text-muted-foreground">API Key: {key.api_key ? `${key.api_key.substring(0, 4)}...${key.api_key.substring(key.api_key.length - 4)}` : 'N/A'}</span>
-                                      </div>
-                                    ) : key.use_vertex_ai ? (
-                                      <div className="flex flex-col">
-                                        <span>Vertex AI (Activo)</span>
-                                        <span className="text-muted-foreground">Project: {key.project_id || 'N/A'}</span>
-                                        <span className="text-muted-foreground">Location: {key.location_id || 'N/A'}</span>
-                                        <span className="text-muted-foreground">Modelo: {getModelLabel(key.model_name ?? undefined) || 'N/A'}</span>
-                                        {key.json_key_content && <span className="text-muted-foreground">JSON Key: Subido</span>}
-                                      </div>
-                                    ) : (
-                                      <div className="flex flex-col">
-                                        <span>{key.api_key}</span>
-                                        <span className="text-muted-foreground">Modelo: {getModelLabel(key.model_name ?? undefined) || 'N/A'}</span>
-                                      </div>
-                                    )}
-                                  </TableCell>
-                                  {isSuperAdmin && <TableCell>{key.is_global ? 'Sí' : 'No'}</TableCell>}
-                                  <TableCell>{renderStatusBadge(key)}</TableCell>
-                                  <TableCell className="text-right">
-                                    <div className="flex justify-end gap-2">
-                                      <Button variant="outline" size="icon" onClick={() => handleEditKey(key)} disabled={!canManageKey} title={!canManageKey ? "No tienes permiso para editar esta clave" : "Editar clave"}>
-                                        <Edit className="h-4 w-4" />
-                                      </Button>
-                                      <Button variant="destructive" size="icon" onClick={() => handleDelete(key.id, 'key')} disabled={!canManageKey} title={!canManageKey ? "No tienes permiso para eliminar esta clave" : "Eliminar clave"}>
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </React.Fragment>
-                        );
-                      })}
-                      {filteredStandaloneKeys.length > 0 && (
-                        <TableRow className="bg-muted/50 hover:bg-muted/70">
-                          <TableCell colSpan={isSuperAdmin ? 6 : 5} className="font-semibold">
-                            <div className="flex items-center gap-2">
-                              <KeyRound className="h-4 w-4" /> Claves Individuales
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                      {filteredStandaloneKeys.map(key => {
+          </form>
+        </Form>
+      </TabsContent>
+      <TabsContent value="group">
+        <Form {...aiKeyGroupForm}>
+          <form onSubmit={aiKeyGroupForm.handleSubmit(onAiKeyGroupSubmit)} className="space-y-4 py-4">
+            <FormField control={aiKeyGroupForm.control} name="name" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Nombre del Grupo</FormLabel>
+                <FormControl><Input placeholder="Ej: Mis Claves Gemini Principales" {...field} disabled={isSubmitting} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={aiKeyGroupForm.control} name="provider" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Proveedor</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || editingGroupId !== null}>
+                  <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un proveedor" /></SelectTrigger></FormControl>
+                  <SelectContent>
+                    {providerOptions.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={aiKeyGroupForm.control} name="model_name" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Modelo por Defecto del Grupo (Opcional)</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
+                  <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo" /></SelectTrigger></FormControl>
+                  <SelectContent>
+                    {getUniqueModelsForProvider(aiKeyGroupForm.watch('provider')).map(model => (
+                      <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormDescription>
+                  Este modelo se usará por defecto para las claves de este grupo si no se especifica uno individual.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )} />
+            {isSuperAdmin && (
+              <FormField control={aiKeyGroupForm.control} name="is_global" render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                  <div className="space-y-0.5">
+                    <FormLabel>Grupo Global</FormLabel>
+                    <FormDescription>
+                      Si está activado, este grupo y sus claves estarán disponibles para todos los usuarios.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={isSubmitting}
+                    />
+                  </FormControl>
+                </FormItem>
+              )} />
+            )}
+            <div className="flex gap-2">
+              <Button type="submit" disabled={isSubmitting || !aiKeyGroupForm.watch('provider')}>
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingGroupId ? <Edit className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />)}
+                {editingGroupId ? 'Actualizar Grupo' : 'Crear Grupo'}
+              </Button>
+              {editingGroupId && (
+                <Button type="button" variant="outline" onClick={handleCancelEdit} disabled={isSubmitting}>
+                  Cancelar Edición
+                </Button>
+              )}
+            </div>
+          </form>
+        </Form>
+      </TabsContent>
+    </Tabs>
+  );
+
+  const listContent = (
+    <div className="py-4 space-y-6 flex-1 flex flex-col">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-semibold">Claves y Grupos Guardados</h3>
+        <div className="relative flex-1 max-w-xs ml-auto">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar clave o grupo..."
+            className="pl-9"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <Button variant="ghost" size="icon" onClick={fetchKeysAndGroups} disabled={isLoading}><RefreshCw className="h-4 w-4" /></Button>
+      </div>
+      <ScrollArea className="flex-1">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nombre</TableHead>
+              <TableHead>Proveedor</TableHead>
+              <TableHead>Configuración</TableHead>
+              {isSuperAdmin && <TableHead>Global</TableHead>}
+              <TableHead>Estado</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              <TableRow><TableCell colSpan={isSuperAdmin ? 6 : 5} className="text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+            ) : (
+              <>
+                {filteredGroups.map(group => {
+                  const canManageGroup = isSuperAdmin || (group.user_id === currentUserId && !group.is_global);
+                  const isExpanded = expandedGroups.has(group.id);
+                  const activeKeysCount = group.api_keys?.filter(k => k.status === 'active' && k.is_active).length || 0;
+                  return (
+                    <React.Fragment key={group.id}>
+                      <TableRow className="bg-muted/50 hover:bg-muted/70" onClick={() => toggleGroupExpansion(group.id)}>
+                        <TableCell className="font-semibold flex items-center gap-2 cursor-pointer">
+                          {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          <Folder className="h-4 w-4" /> {group.name}
+                        </TableCell>
+                        <TableCell>{providerOptions.find(p => p.value === group.provider)?.label || group.provider}</TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {group.model_name ? `Modelo: ${getModelLabel(group.model_name)}` : 'N/A'}
+                        </TableCell>
+                        {isSuperAdmin && <TableCell>{group.is_global ? 'Sí' : 'No'}</TableCell>}
+                        <TableCell>
+                          <Badge variant="secondary">{group.api_keys && group.api_keys.length > 0 ? `${activeKeysCount} activas` : 'Sin claves'}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                            <Button variant="outline" size="icon" onClick={() => handleEditGroup(group)} disabled={!canManageGroup} title={!canManageGroup ? "No tienes permiso para editar este grupo" : "Editar grupo"}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="destructive" size="icon" onClick={() => handleDelete(group.id, 'group')} disabled={!canManageGroup} title={!canManageGroup ? "No tienes permiso para eliminar este grupo" : "Eliminar grupo"}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      {isExpanded && group.api_keys?.map(key => {
                         const canManageKey = isSuperAdmin || (key.user_id === currentUserId && !key.is_global);
                         return (
                           <TableRow key={key.id} className={cn(key.status === 'failed' && 'bg-destructive/10', key.status === 'blocked' && 'bg-red-900/20', !key.is_active && 'opacity-50')}>
-                            <TableCell><div className="flex items-center gap-2"><KeyRound className="h-4 w-4" /> {key.nickname || 'N/A'}</div></TableCell>
+                            <TableCell className="pl-8"><div className="flex items-center gap-2"><KeyRound className="h-4 w-4 text-muted-foreground" /> {key.nickname || 'N/A'}</div></TableCell>
                             <TableCell>{providerOptions.find(p => p.value === key.provider)?.label || key.provider}</TableCell>
                             <TableCell className="font-mono text-xs">
                               {key.provider === 'custom_endpoint' ? (
@@ -1038,16 +969,151 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                           </TableRow>
                         );
                       })}
-                      {filteredGroups.length === 0 && filteredStandaloneKeys.length === 0 && !isLoading && (
-                        <TableRow><TableCell colSpan={isSuperAdmin ? 6 : 5} className="text-center text-muted-foreground">No hay claves o grupos que coincidan con la búsqueda.</TableCell></TableRow>
-                      )}
-                    </>
-                  )}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          </div>
-        </div>
+                    </React.Fragment>
+                  );
+                })}
+                {filteredStandaloneKeys.length > 0 && (
+                  <TableRow className="bg-muted/50 hover:bg-muted/70">
+                    <TableCell colSpan={isSuperAdmin ? 6 : 5} className="font-semibold">
+                      <div className="flex items-center gap-2">
+                        <KeyRound className="h-4 w-4" /> Claves Individuales
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {filteredStandaloneKeys.map(key => {
+                  const canManageKey = isSuperAdmin || (key.user_id === currentUserId && !key.is_global);
+                  return (
+                    <TableRow key={key.id} className={cn(key.status === 'failed' && 'bg-destructive/10', key.status === 'blocked' && 'bg-red-900/20', !key.is_active && 'opacity-50')}>
+                      <TableCell><div className="flex items-center gap-2"><KeyRound className="h-4 w-4" /> {key.nickname || 'N/A'}</div></TableCell>
+                      <TableCell>{providerOptions.find(p => p.value === key.provider)?.label || key.provider}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {key.provider === 'custom_endpoint' ? (
+                          <div className="flex flex-col">
+                            <span>Endpoint: {key.api_endpoint || 'N/A'}</span>
+                            <span className="text-muted-foreground">Modelo ID: {key.model_name || 'N/A'}</span>
+                            <span className="text-muted-foreground">API Key: {key.api_key ? `${key.api_key.substring(0, 4)}...${key.api_key.substring(key.api_key.length - 4)}` : 'N/A'}</span>
+                          </div>
+                        ) : key.use_vertex_ai ? (
+                          <div className="flex flex-col">
+                            <span>Vertex AI (Activo)</span>
+                            <span className="text-muted-foreground">Project: {key.project_id || 'N/A'}</span>
+                            <span className="text-muted-foreground">Location: {key.location_id || 'N/A'}</span>
+                            <span className="text-muted-foreground">Modelo: {getModelLabel(key.model_name ?? undefined) || 'N/A'}</span>
+                            {key.json_key_content && <span className="text-muted-foreground">JSON Key: Subido</span>}
+                          </div>
+                        ) : (
+                          <div className="flex flex-col">
+                            <span>{key.api_key}</span>
+                            <span className="text-muted-foreground">Modelo: {getModelLabel(key.model_name ?? undefined) || 'N/A'}</span>
+                          </div>
+                        )}
+                      </TableCell>
+                      {isSuperAdmin && <TableCell>{key.is_global ? 'Sí' : 'No'}</TableCell>}
+                      <TableCell>{renderStatusBadge(key)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="outline" size="icon" onClick={() => handleEditKey(key)} disabled={!canManageKey} title={!canManageKey ? "No tienes permiso para editar esta clave" : "Editar clave"}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="destructive" size="icon" onClick={() => handleDelete(key.id, 'key')} disabled={!canManageKey} title={!canManageKey ? "No tienes permiso para eliminar esta clave" : "Eliminar clave"}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {filteredGroups.length === 0 && filteredStandaloneKeys.length === 0 && !isLoading && (
+                  <TableRow><TableCell colSpan={isSuperAdmin ? 6 : 5} className="text-center text-muted-foreground">No hay claves o grupos que coincidan con la búsqueda.</TableCell></TableRow>
+                )}
+              </>
+            )}
+          </TableBody>
+        </Table>
+      </ScrollArea>
+    </div>
+  );
+
+  if (isMobile) {
+    return (
+      <Drawer open={open} onOpenChange={onOpenChange}>
+        <DrawerContent className="h-[95vh] flex flex-col">
+          {mobileView === 'list' ? (
+            <>
+              <DrawerHeader className="text-left">
+                <DrawerTitle className="flex items-center gap-2">
+                  <KeyRound className="h-6 w-6" /> Gestión de API Keys
+                </DrawerTitle>
+                <DrawerDescription>
+                  Añade y gestiona tus claves y grupos de IA.
+                </DrawerDescription>
+              </DrawerHeader>
+              <div className="flex-1 overflow-hidden p-4 flex flex-col">
+                <Button size="sm" className="w-fit mb-4" onClick={() => { handleCancelEdit(); setMobileView('form'); }}>
+                  <PlusCircle className="mr-2 h-4 w-4" /> Añadir Clave o Grupo
+                </Button>
+                {listContent}
+              </div>
+              <DrawerFooter className="pt-2">
+                <DrawerClose asChild><Button variant="outline">Cerrar</Button></DrawerClose>
+              </DrawerFooter>
+            </>
+          ) : (
+            <>
+              <DrawerHeader className="text-left flex-shrink-0">
+                <Button variant="ghost" size="icon" className="mb-2" onClick={() => setMobileView('list')}>
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <DrawerTitle>{editingKeyId ? 'Editar API Key' : (editingGroupId ? 'Editar Grupo' : 'Añadir Clave/Grupo')}</DrawerTitle>
+                <DrawerDescription>
+                  {editingKeyId ? 'Actualiza los detalles.' : (editingGroupId ? 'Actualiza los detalles.' : 'Crea una nueva clave o grupo.')}
+                </DrawerDescription>
+              </DrawerHeader>
+              <div className="flex-1 overflow-y-auto px-4">
+                {formContent}
+              </div>
+            </>
+          )}
+        </DrawerContent>
+      </Drawer>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[800px] p-6 max-h-[90vh] overflow-y-auto flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <KeyRound className="h-6 w-6" /> Gestión de API Keys de IA
+          </DialogTitle>
+          <DialogDescription>
+            Añade y gestiona tus API keys y grupos para diferentes proveedores de IA.
+          </DialogDescription>
+        </DialogHeader>
+        <Dialog open={isAddEditDialogOpen} onOpenChange={setIsAddEditDialogOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" className="w-fit" onClick={handleCancelEdit}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Añadir Clave o Grupo
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col p-0">
+            <DialogHeader className="p-6 pb-0 flex-shrink-0">
+              <DialogTitle>{editingKeyId ? 'Editar API Key' : (editingGroupId ? 'Editar Grupo de Claves' : 'Añadir Nueva Clave o Grupo')}</DialogTitle>
+              <DialogDescription>
+                {editingKeyId ? 'Actualiza los detalles de tu API Key.' : (editingGroupId ? 'Actualiza los detalles de tu grupo de claves.' : 'Crea una nueva API Key o un grupo de claves.')}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto px-6">
+              {formContent}
+            </div>
+            <DialogFooter className="p-6 pt-4 flex-shrink-0">
+              <DialogClose asChild><Button variant="outline">Cerrar</Button></DialogClose>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        <Separator className="my-4" />
+        {listContent}
         <DialogFooter>
           <DialogClose asChild><Button variant="outline">Cerrar</Button></DialogClose>
         </DialogFooter>
