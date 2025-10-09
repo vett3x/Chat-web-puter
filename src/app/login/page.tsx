@@ -5,7 +5,7 @@ import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Moon, Sun, ShieldAlert, Loader2, Ban, LogOut } from 'lucide-react';
+import { Moon, Sun, ShieldAlert, Loader2, Ban, LogOut, LogIn } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useSearchParams } from 'next/navigation';
 import { formatDistanceToNow, addMinutes } from 'date-fns';
@@ -97,8 +97,8 @@ export default function LoginPage() {
         </Button>
       )}
       <div className="relative w-[450px] max-w-[95vw] backdrop-blur-xl border-2 border-[hsl(var(--primary-color-login))] rounded-[15px] pt-[7.5em] pb-[4em] px-[1.5em] sm:px-[2.5em] text-[hsl(var(--second-color-login))] shadow-lg shadow-black/20">
-        <div className="login-header absolute top-0 left-1/2 -translate-x-1/2 flex items-center justify-center bg-[hsl(var(--primary-color-login))] w-[140px] h-[70px] rounded-b-[20px] z-10">
-          <span className="text-3xl text-black">Iniciar Sesión</span>
+        <div className="login-header absolute top-0 left-1/2 -translate-x-1/2 flex items-center justify-center bg-[hsl(var(--primary-color-login))] w-[100px] h-[70px] rounded-b-[20px] z-10">
+          <LogIn className="h-10 w-10 text-black" />
         </div>
 
         {maintenanceMode && (
