@@ -64,7 +64,7 @@ export function UserManagementDialog({ open, onOpenChange }: UserManagementDialo
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={onOpenChange}>
-        <DrawerContent className="h-[95vh] flex flex-col">
+        <DrawerContent className="h-[95dvh] flex flex-col">
           <DrawerHeader className="flex flex-row items-center justify-between p-4 border-b">
             <DrawerTitle className="flex items-center gap-2 text-lg font-semibold">
               <Users className="h-5 w-5" /> Gestión de Usuarios

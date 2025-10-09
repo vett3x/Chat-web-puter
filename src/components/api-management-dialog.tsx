@@ -1038,7 +1038,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={onOpenChange}>
-        <DrawerContent className="h-[95vh] flex flex-col">
+        <DrawerContent className="h-[95dvh] flex flex-col">
           {mobileView === 'list' ? (
             <>
               <DrawerHeader className="text-left">
