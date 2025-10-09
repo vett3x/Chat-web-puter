@@ -35,6 +35,11 @@ export function PersonalizationTab() {
 
   const form = useForm<PersonalizationFormValues>({
     resolver: zodResolver(personalizationSchema),
+    defaultValues: {
+      app_name: '',
+      theme_primary_color: '#000000',
+      theme_sidebar_color: '#000000',
+    },
   });
 
   const fetchSettings = useCallback(async () => {
@@ -44,7 +49,11 @@ export function PersonalizationTab() {
       if (!response.ok) throw new Error('No se pudo cargar la configuración.');
       const data = await response.json();
       setCurrentSettings(data);
-      form.reset(data);
+      form.reset({
+        app_name: data.app_name || '',
+        theme_primary_color: data.theme_primary_color || '#000000',
+        theme_sidebar_color: data.theme_sidebar_color || '#000000',
+      });
       setLoginBgPreview(data.login_background_url);
       setAppLogoPreview(data.app_logo_url);
     } catch (err: any) {
