@@ -46,13 +46,19 @@ export function useSidebarData() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const isInitialFetch = useRef(true);
 
   const fetchData = useCallback(async () => {
     if (!userId) {
+      setApps([]);
+      setConversations([]);
+      setFolders([]);
+      setNotes([]);
       setIsLoading(false);
       return;
     }
 
+    setIsLoading(true);
     try {
       const [appsRes, convRes, folderRes, notesRes] = await Promise.all([
         supabase.from('user_apps').select('id, name, status, url, conversation_id').eq('user_id', userId).order('created_at', { ascending: false }),
@@ -67,118 +73,52 @@ export function useSidebarData() {
       if (notesRes.error) throw notesRes.error;
 
       const appConversationIds = new Set((appsRes.data || []).map(app => app.conversation_id));
-      const fetchedApps = appsRes.data || [];
-      const fetchedConversations = (convRes.data || []).filter(conv => !appConversationIds.has(conv.id));
-      const fetchedFolders = folderRes.data || [];
-      const fetchedNotes = notesRes.data || [];
-
-      setApps(fetchedApps);
-      setConversations(fetchedConversations);
-      setFolders(fetchedFolders);
-      setNotes(fetchedNotes);
-
-      // Cache the fresh data
-      if (typeof window !== 'undefined') {
-        const dataToCache = {
-          apps: fetchedApps,
-          conversations: fetchedConversations,
-          folders: fetchedFolders,
-          notes: fetchedNotes,
-        };
-        localStorage.setItem(`sidebar_data_${userId}`, JSON.stringify(dataToCache));
-      }
+      setApps(appsRes.data || []);
+      setConversations((convRes.data || []).filter(conv => !appConversationIds.has(conv.id)));
+      setFolders(folderRes.data || []);
+      setNotes(notesRes.data || []);
 
     } catch (error: any) {
       console.error("Error fetching sidebar data:", error);
-      toast.error("Error al cargar los datos de la barra lateral.");
+      if (!isInitialFetch.current) {
+        toast.error("Error al cargar los datos de la barra lateral.");
+      }
     } finally {
       setIsLoading(false);
+      isInitialFetch.current = false;
     }
   }, [userId]);
 
   useEffect(() => {
-    if (isSessionLoading) return;
-
     if (userId) {
-      // Try to load from cache first for instant UI
-      const cachedData = typeof window !== 'undefined' ? localStorage.getItem(`sidebar_data_${userId}`) : null;
-      if (cachedData) {
-        try {
-          const { apps, conversations, folders, notes } = JSON.parse(cachedData);
-          setApps(apps || []);
-          setConversations(conversations || []);
-          setFolders(folders || []);
-          setNotes(notes || []);
-          setIsLoading(false); // We have data, so stop initial loading indicator
-        } catch (e) {
-          console.error("Error parsing cached sidebar data:", e);
-          localStorage.removeItem(`sidebar_data_${userId}`);
-          setIsLoading(true); // Fallback to loading state
-        }
-      } else {
-        setIsLoading(true); // Show loader only if no cache
-      }
-      
-      // Always fetch fresh data in the background
       fetchData();
-    } else {
-      // Clear data if no user
+    } else if (!isSessionLoading) {
+      setIsLoading(false);
       setApps([]);
       setConversations([]);
       setFolders([]);
       setNotes([]);
-      setIsLoading(false);
     }
   }, [userId, isSessionLoading, fetchData, globalRefreshKey]);
 
   useEffect(() => {
     if (!userId) return;
 
-    const handleInserts = <T extends { id: string }>(payload: any, setter: React.Dispatch<React.SetStateAction<T[]>>) => {
-      setter(prev => {
-        if (prev.some(item => item.id === payload.new.id)) {
-          return prev;
-        }
-        return [payload.new as T, ...prev];
-      });
-    };
-    const handleUpdates = <T extends { id: string }>(payload: any, setter: React.Dispatch<React.SetStateAction<T[]>>) => {
-      setter(prev => prev.map(item => item.id === payload.new.id ? { ...item, ...payload.new } : item));
-    };
-    const handleDeletes = <T extends { id: string }>(payload: any, setter: React.Dispatch<React.SetStateAction<T[]>>) => {
-      const oldId = payload.old?.id;
-      if (oldId) {
-        setter(prev => prev.filter(item => item.id !== oldId));
-      } else {
-        fetchData();
-      }
+    const handleAllChanges = (payload: any) => {
+      console.log('Realtime change detected, refetching sidebar data:', payload);
+      fetchData();
     };
 
     const channel = supabase.channel(`sidebar-updates-for-user-${userId}`);
 
-    const tablesToSubscribe = [
-      { table: 'user_apps', setter: setApps },
-      { table: 'conversations', setter: setConversations },
-      { table: 'folders', setter: setFolders },
-      { table: 'notes', setter: setNotes },
-    ];
+    const tablesToSubscribe = ['user_apps', 'conversations', 'folders', 'notes'];
 
-    tablesToSubscribe.forEach(({ table, setter }) => {
+    tablesToSubscribe.forEach(table => {
       channel
         .on(
           'postgres_changes',
-          { event: 'INSERT', schema: 'public', table, filter: `user_id=eq.${userId}` },
-          (payload) => handleInserts(payload, setter as any)
-        )
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table, filter: `user_id=eq.${userId}` },
-          (payload) => handleUpdates(payload, setter as any)
-        )
-        .on(
-          'postgres_changes',
-          { event: 'DELETE', schema: 'public', table, filter: `user_id=eq.${userId}` },
-          (payload) => handleDeletes(payload, setter as any)
+          { event: '*', schema: 'public', table, filter: `user_id=eq.${userId}` },
+          handleAllChanges
         );
     });
 
@@ -207,7 +147,7 @@ export function useSidebarData() {
       throw new Error(error.message);
     }
     toast.success('Nueva conversación creada.');
-    setConversations(prev => [data, ...prev]);
+    await fetchData(); // Refetch data instead of optimistic update
     onSuccess(data);
     return data.id;
   };
@@ -224,7 +164,7 @@ export function useSidebarData() {
       throw new Error(error.message);
     }
     toast.success(`${newFolderName} creada.`);
-    setFolders(prev => [data, ...prev]);
+    await fetchData(); // Refetch data instead of optimistic update
     return data.id;
   };
 
@@ -239,7 +179,7 @@ export function useSidebarData() {
       throw new Error(error.message);
     }
     toast.success('Nueva nota creada.');
-    setNotes(prev => [data, ...prev]);
+    await fetchData(); // Refetch data instead of optimistic update
     onSuccess(data);
     return data.id;
   };
