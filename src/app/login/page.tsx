@@ -98,7 +98,7 @@ export default function LoginPage() {
       )}
       <div className="relative w-[450px] max-w-[95vw] backdrop-blur-xl border-2 border-[hsl(var(--primary-color-login))] rounded-[15px] pt-[7.5em] pb-[4em] px-[1.5em] sm:px-[2.5em] text-[hsl(var(--second-color-login))] shadow-lg shadow-black/20">
         <div className="login-header absolute top-0 left-1/2 -translate-x-1/2 flex items-center justify-center bg-[hsl(var(--primary-color-login))] w-[140px] h-[70px] rounded-b-[20px]">
-          <span className="text-3xl text-black">Login</span>
+          <span className="text-3xl text-black">Iniciar Sesión</span>
         </div>
 
         {maintenanceMode && (
@@ -181,10 +181,39 @@ export default function LoginPage() {
           }}
           localization={{
             variables: {
-              sign_in: { email_label: 'Email', password_label: 'Contraseña', button_label: 'Login' },
-              sign_up: { email_label: 'Email', password_label: 'Contraseña', button_label: 'Registrarse' },
-              forgotten_password: { email_label: 'Email', button_label: 'Enviar instrucciones' },
-            }
+              sign_in: {
+                email_label: 'Correo electrónico',
+                password_label: 'Contraseña',
+                button_label: 'Iniciar Sesión',
+                link_text: '¿No tienes una cuenta? Regístrate',
+                loading_button_label: 'Iniciando sesión...',
+                social_provider_text: 'Iniciar sesión con {{provider}}',
+              },
+              sign_up: {
+                email_label: 'Correo electrónico',
+                password_label: 'Contraseña',
+                button_label: 'Registrarse',
+                link_text: '¿Ya tienes una cuenta? Inicia sesión',
+                loading_button_label: 'Registrando...',
+                social_provider_text: 'Registrarse con {{provider}}',
+                confirmation_text: 'Revisa tu correo para el enlace de confirmación.',
+              },
+              forgotten_password: {
+                email_label: 'Correo electrónico',
+                password_label: 'Tu contraseña',
+                button_label: 'Enviar instrucciones',
+                link_text: '¿Olvidaste tu contraseña?',
+                loading_button_label: 'Enviando instrucciones...',
+                confirmation_text: 'Revisa tu correo para el enlace de recuperación.',
+              },
+              update_password: {
+                password_label: 'Nueva contraseña',
+                password_input_placeholder: 'Tu nueva contraseña',
+                button_label: 'Actualizar contraseña',
+                loading_button_label: 'Actualizando contraseña...',
+                confirmation_text: 'Tu contraseña ha sido actualizada.',
+              },
+            },
           }}
           theme="dark"
           redirectTo={typeof window !== 'undefined' ? `${window.location.origin}/` : undefined}
