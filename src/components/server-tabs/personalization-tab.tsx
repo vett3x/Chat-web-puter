@@ -144,12 +144,7 @@ export function PersonalizationTab() {
               {/* Left Column */}
               <div className="space-y-6">
                 <FormField control={form.control} name="app_name" render={({ field }) => (<FormItem><FormLabel className="flex items-center gap-2 text-sm"><Text className="h-4 w-4" /> Nombre de la Aplicación</FormLabel><FormControl><Input placeholder="DeepAI Coder" {...field} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="theme_primary_color" render={({ field }) => (<FormItem><FormLabel className="flex items-center gap-2 text-sm"><Palette className="h-4 w-4" /> Color Primario</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1" /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="theme_sidebar_color" render={({ field }) => (<FormItem><FormLabel className="flex items-center gap-2 text-sm"><Palette className="h-4 w-4" /> Color de la Barra Lateral</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1" /></FormControl></FormItem>)} />
-              </div>
-
-              {/* Right Column */}
-              <div className="space-y-6">
+                
                 <div>
                   <FormLabel className="flex items-center gap-2 mb-2 text-sm"><Bot className="h-4 w-4" /> Logo de la Aplicación</FormLabel>
                   <div className="border rounded-lg p-3 flex items-center gap-3">
@@ -165,6 +160,18 @@ export function PersonalizationTab() {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Right Column */}
+              <div className="space-y-6">
+                <div>
+                  <FormLabel className="flex items-center gap-2 mb-2 text-sm"><Palette className="h-4 w-4" /> Colores del Tema</FormLabel>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField control={form.control} name="theme_primary_color" render={({ field }) => (<FormItem><FormLabel className="text-xs">Primario</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1" /></FormControl></FormItem>)} />
+                    <FormField control={form.control} name="theme_sidebar_color" render={({ field }) => (<FormItem><FormLabel className="text-xs">Barra Lateral</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1" /></FormControl></FormItem>)} />
+                  </div>
+                </div>
+
                 <div>
                   <FormLabel className="flex items-center gap-2 mb-2 text-sm"><ImageIcon className="h-4 w-4" /> Fondo de Inicio de Sesión</FormLabel>
                   <input type="file" ref={loginBgInputRef} onChange={(e) => handleFileChange(e, 'login_background')} accept="image/*" hidden />
