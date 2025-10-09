@@ -87,10 +87,10 @@
     --user-avatar-shadow: 210 90% 50%; /* Blue for user avatar shadow */
     --ai-avatar-shadow: 30 90% 50%;   /* Orange for AI avatar shadow */
 
-    /* New variables for modern login */
-    --primary-color-login: 0 0% 77.6%; /* #c6c3c3 */
-    --second-color-login: 0 0% 100%; /* #ffffff */
-    --black-color-login: 0 0% 0%; /* #000000 */
+    /* New variables for modern login - Mapped to theme */
+    --primary-color-login: 0 0% 89.8%; /* --border */
+    --second-color-login: 0 0% 3.9%; /* --foreground */
+    --black-color-login: 0 0% 98%; /* --primary-foreground */
   }
   .dark {
 
@@ -174,10 +174,10 @@
     --user-avatar-shadow: 210 90% 50%; /* Blue for user avatar shadow */
     --ai-avatar-shadow: 30 90% 50%;   /* Orange for AI avatar shadow */
 
-    /* New variables for modern login */
-    --primary-color-login: 0 0% 77.6%; /* #c6c3c3 */
-    --second-color-login: 0 0% 100%; /* #ffffff */
-    --black-color-login: 0 0% 0%; /* #000000 */
+    /* New variables for modern login - Mapped to theme */
+    --primary-color-login: 220 10% 15%; /* --border */
+    --second-color-login: 0 0% 98%; /* --foreground */
+    --black-color-login: 0 0% 98%; /* --primary-foreground */
   }
 
   body.login-page {
