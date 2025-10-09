@@ -9,7 +9,7 @@ import { getModelLabel } from '@/lib/ai-models';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Message } from '@/hooks/use-general-chat';
 import { ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys'; // Import AiKeyGroup
-import { RenderablePart } from '@/lib/utils';
+import { RenderablePart, cn } from '@/lib/utils';
 
 interface ChatMessageItemProps {
   message: Message;
@@ -85,7 +85,12 @@ const ChatMessageItemComponent: React.FC<ChatMessageItemProps> = ({
             </div>
           )}
         </div>
-        <div className={`rounded-lg p-3 ${message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+        <div className={cn(
+          "rounded-lg p-3 text-sm",
+          message.role === 'user' 
+            ? 'bg-black/30 backdrop-blur-md border border-white/10 text-primary-foreground' 
+            : 'bg-black/20 backdrop-blur-md border border-white/10'
+        )}>
           {message.isTyping ? (
             <div className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin" />

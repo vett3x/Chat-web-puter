@@ -170,9 +170,9 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
   };
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background to-transparent pt-8">
+    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/50 via-background/50 to-transparent pt-8">
       <div className="flex justify-center px-4 pb-4">
-        <div className="w-full max-w-3xl bg-card rounded-xl border border-input p-2 flex flex-col gap-2 focus-within:ring-2 focus-within:ring-green-500 focus-within:ring-offset-2 focus-within:ring-offset-background transition-all duration-200">
+        <div className="w-full max-w-3xl bg-black/20 backdrop-blur-md border border-white/10 rounded-xl p-2 flex flex-col gap-2 focus-within:ring-2 focus-within:ring-green-500 focus-within:ring-offset-2 focus-within:ring-offset-background transition-all duration-200">
           <FileAttachmentPreview selectedFiles={selectedFiles} onRemoveFile={removeFile} />
           
           <div className="flex items-center gap-2">
