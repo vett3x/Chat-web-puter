@@ -7,7 +7,7 @@ const BUILD_NUMBER = "802"; // Updated build number
 
 export function VersionDisplay() {
   return (
-    <div className="px-2 py-2 text-center text-xs text-sidebar-foreground/50">
+    <div className="px-2 py-2 pb-4 text-center text-xs text-sidebar-foreground/50">
       <p>
         Versión: <span className="font-semibold">{APP_VERSION}</span>
       </p>
