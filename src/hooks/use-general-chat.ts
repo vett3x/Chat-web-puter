@@ -198,7 +198,6 @@ export function useGeneralChat({
     const { data, error } = await supabase.from('conversations').select('id, title, model').eq('id', convId).single();
     if (error) {
       console.error('Error fetching conversation details:', error);
-      toast.error('Error al cargar los detalles de la conversación.');
       return null;
     }
     return data;
@@ -398,34 +397,37 @@ export function useGeneralChat({
   }, [userId, saveMessageToDB, userApiKeys, aiKeyGroups]);
 
   const loadConversationData = useCallback(async () => {
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-    debounceTimeoutRef.current = setTimeout(async () => {
-      if (conversationId && userId) {
-        setIsLoading(true);
-        setMessages([]);
-        setPage(0);
-        setHasMoreMessages(true);
-        
-        const details = await getConversationDetails(conversationId);
-        
-        if (details?.model && (details.model.startsWith('puter:') || details.model.startsWith('user_key:') || details.model.startsWith('group:'))) {
-          setSelectedModel(details.model);
-        } else {
-          setSelectedModel(determineDefaultModel(userApiKeys, aiKeyGroups, userDefaultModel));
-        }
-
-        const fetchedMsgs = await getMessagesFromDB(conversationId, 0);
-        setMessages(fetchedMsgs);
-        if (fetchedMsgs.length < MESSAGES_PER_PAGE) {
-          setHasMoreMessages(false);
-        }
+    if (conversationId && userId) {
+      setIsLoading(true);
+      setMessages([]);
+      setPage(0);
+      setHasMoreMessages(true);
+      
+      const details = await getConversationDetails(conversationId);
+      
+      if (!details) {
+        toast.error("No se pudieron cargar los detalles de la conversación. Puede que aún se esté creando o que haya un problema de red.");
         setIsLoading(false);
-      } else {
-        setMessages([]);
+        setHasMoreMessages(false);
+        return;
       }
-    }, 100);
+
+      if (details.model && (details.model.startsWith('puter:') || details.model.startsWith('user_key:') || details.model.startsWith('group:'))) {
+        setSelectedModel(details.model);
+      } else {
+        setSelectedModel(determineDefaultModel(userApiKeys, aiKeyGroups, userDefaultModel));
+      }
+
+      const fetchedMsgs = await getMessagesFromDB(conversationId, 0);
+      setMessages(fetchedMsgs);
+      if (fetchedMsgs.length < MESSAGES_PER_PAGE) {
+        setHasMoreMessages(false);
+      }
+      setIsLoading(false);
+      
+    } else {
+      setMessages([]);
+    }
   }, [conversationId, userId, getMessagesFromDB, getConversationDetails, userApiKeys, aiKeyGroups, userDefaultModel]);
 
   const loadMoreMessages = useCallback(async () => {
