@@ -18,6 +18,7 @@ export default function LoginPage() {
   const [usersDisabled, setUsersDisabled] = useState(false);
   const [adminsDisabled, setAdminsDisabled] = useState(false);
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
+  const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
   const searchParams = useSearchParams();
   const accountDisabledError = searchParams.get('error') === 'account_type_disabled';
   const accountBannedError = searchParams.get('error') === 'account_banned';
@@ -28,26 +29,38 @@ export default function LoginPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    document.body.classList.add('login-page');
+    
     const checkStatus = async () => {
       try {
-        const response = await fetch('/api/settings/public-status');
-        const data = await response.json();
-        setMaintenanceMode(data.maintenanceModeEnabled);
-        setUsersDisabled(data.usersDisabled);
-        setAdminsDisabled(data.adminsDisabled);
+        const [statusRes, brandingRes] = await Promise.all([
+          fetch('/api/settings/public-status'),
+          fetch('/api/settings/public-branding')
+        ]);
+        const statusData = await statusRes.json();
+        const brandingData = await brandingRes.json();
+        setMaintenanceMode(statusData.maintenanceModeEnabled);
+        setUsersDisabled(statusData.usersDisabled);
+        setAdminsDisabled(statusData.adminsDisabled);
+        setBackgroundUrl(brandingData.login_background_url);
       } catch (error) {
-        console.error("Failed to fetch public status, defaulting to off:", error);
+        console.error("Failed to fetch public settings, defaulting to off:", error);
       } finally {
         setIsLoadingStatus(false);
       }
     };
     checkStatus();
+  }, []);
 
+  useEffect(() => {
+    if (backgroundUrl) {
+      document.body.classList.remove('login-page');
+    } else {
+      document.body.classList.add('login-page');
+    }
     return () => {
       document.body.classList.remove('login-page');
     };
-  }, []);
+  }, [backgroundUrl]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -83,8 +96,16 @@ export default function LoginPage() {
     );
   }
 
+  const backgroundStyle = backgroundUrl ? {
+    backgroundImage: `url(${backgroundUrl})`,
+    backgroundPosition: 'center',
+    backgroundSize: 'cover',
+    backgroundRepeat: 'no-repeat',
+    backgroundAttachment: 'fixed',
+  } : {};
+
   return (
-    <div className="w-full flex justify-center items-center min-h-screen bg-black/20">
+    <div className="w-full flex justify-center items-center min-h-screen bg-black/20" style={backgroundStyle}>
       {isMounted && (
         <Button 
           variant="outline" 

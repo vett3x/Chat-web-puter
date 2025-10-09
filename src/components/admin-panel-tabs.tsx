@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Server, Shield, LayoutDashboard, LifeBuoy } from 'lucide-react';
+import { Server, Shield, LayoutDashboard, LifeBuoy, Menu, Paintbrush } from 'lucide-react'; // Import Paintbrush
 import { useSession } from '@/components/session-context-provider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from './ui/scroll-area';
@@ -9,6 +9,7 @@ import { AdminDashboardTab } from './admin/admin-dashboard';
 import { InfrastructureTab } from './server-tabs/infrastructure-tab';
 import { SupportTicketsTab } from './server-tabs/support-tickets-tab';
 import { SecurityTab } from './server-tabs/security-tab';
+import { PersonalizationTab } from './server-tabs/personalization-tab'; // Import the new tab
 
 interface AdminPanelTabsProps {
   onOpenAlerts: () => void;
@@ -26,6 +27,7 @@ export function AdminPanelTabs({ onOpenAlerts, initialTab }: AdminPanelTabsProps
     { value: 'servers', label: 'Infraestructura', icon: <Server className="h-4 w-4" /> },
     isAdmin && { value: 'support', label: 'Soporte', icon: <LifeBuoy className="h-4 w-4" /> },
     isSuperAdmin && { value: 'security', label: 'Seguridad', icon: <Shield className="h-4 w-4" /> },
+    isSuperAdmin && { value: 'personalization', label: 'Personalización', icon: <Paintbrush className="h-4 w-4" /> }, // New Tab
   ].filter(Boolean) as { value: string; label: string; icon: React.ReactNode }[];
 
   return (
@@ -50,6 +52,9 @@ export function AdminPanelTabs({ onOpenAlerts, initialTab }: AdminPanelTabsProps
           </TabsContent>
           <TabsContent value="security" className="h-full">
             {isSuperAdmin && <SecurityTab />}
+          </TabsContent>
+          <TabsContent value="personalization" className="h-full">
+            {isSuperAdmin && <PersonalizationTab />}
           </TabsContent>
         </ScrollArea>
       </div>
