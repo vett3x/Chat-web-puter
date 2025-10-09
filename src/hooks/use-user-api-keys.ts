@@ -44,7 +44,6 @@ export function useUserApiKeys() {
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [groups, setGroups] = useState<AiKeyGroup[]>([]); // NEW: State for groups
   const [isLoading, setIsLoading] = useState(true);
-  const isInitialFetch = useRef(true); // Track initial fetch
 
   const fetchKeysAndGroups = useCallback(async () => { // Renamed fetchKeys to fetchKeysAndGroups
     if (!userId) {
@@ -58,34 +57,19 @@ export function useUserApiKeys() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.message);
       
-      // NEW: Separate keys and groups from the API response
-      setKeys(prevKeys => {
-        if (JSON.stringify(prevKeys) === JSON.stringify(data.apiKeys)) {
-          return prevKeys;
-        }
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(`api_keys_${userId}`, JSON.stringify(data.apiKeys));
-        }
-        return data.apiKeys;
-      });
+      setKeys(data.apiKeys);
+      setGroups(data.aiKeyGroups);
 
-      setGroups(prevGroups => {
-        if (JSON.stringify(prevGroups) === JSON.stringify(data.aiKeyGroups)) {
-          return prevGroups;
-        }
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(`ai_key_groups_${userId}`, JSON.stringify(data.aiKeyGroups));
-        }
-        return data.aiKeyGroups;
-      });
+      // Cache the fresh data
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`api_keys_${userId}`, JSON.stringify(data.apiKeys));
+        localStorage.setItem(`ai_key_groups_${userId}`, JSON.stringify(data.aiKeyGroups));
+      }
 
     } catch (error: any) {
-      if (!isInitialFetch.current) {
-        toast.error(`Error al refrescar las claves de API: ${error.message}`);
-      }
+      toast.error(`Error al refrescar las claves de API: ${error.message}`);
     } finally {
       setIsLoading(false);
-      isInitialFetch.current = false;
     }
   }, [userId]);
 
@@ -115,14 +99,18 @@ export function useUserApiKeys() {
 
       if (!cachedKeys && !cachedGroups) {
         setIsLoading(true);
+      } else {
+        setIsLoading(false); // We have cached data, so no loading state
       }
+      
+      // Always fetch fresh data in the background
       fetchKeysAndGroups();
     } else {
       setKeys([]);
       setGroups([]);
       setIsLoading(false);
     }
-  }, [userId, isSessionLoading, fetchKeysAndGroups]);
+  }, [userId, isSessionLoading, fetchKeysAndGroups, globalRefreshKey]);
 
   // Realtime subscription
   useEffect(() => {

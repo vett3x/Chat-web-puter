@@ -46,19 +46,13 @@ export function useSidebarData() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const isInitialFetch = useRef(true);
 
   const fetchData = useCallback(async () => {
     if (!userId) {
-      setApps([]);
-      setConversations([]);
-      setFolders([]);
-      setNotes([]);
       setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
     try {
       const [appsRes, convRes, folderRes, notesRes] = await Promise.all([
         supabase.from('user_apps').select('id, name, status, url, conversation_id').eq('user_id', userId).order('created_at', { ascending: false }),
@@ -73,31 +67,67 @@ export function useSidebarData() {
       if (notesRes.error) throw notesRes.error;
 
       const appConversationIds = new Set((appsRes.data || []).map(app => app.conversation_id));
-      setApps(appsRes.data || []);
-      setConversations((convRes.data || []).filter(conv => !appConversationIds.has(conv.id)));
-      setFolders(folderRes.data || []);
-      setNotes(notesRes.data || []);
+      const fetchedApps = appsRes.data || [];
+      const fetchedConversations = (convRes.data || []).filter(conv => !appConversationIds.has(conv.id));
+      const fetchedFolders = folderRes.data || [];
+      const fetchedNotes = notesRes.data || [];
+
+      setApps(fetchedApps);
+      setConversations(fetchedConversations);
+      setFolders(fetchedFolders);
+      setNotes(fetchedNotes);
+
+      // Cache the fresh data
+      if (typeof window !== 'undefined') {
+        const dataToCache = {
+          apps: fetchedApps,
+          conversations: fetchedConversations,
+          folders: fetchedFolders,
+          notes: fetchedNotes,
+        };
+        localStorage.setItem(`sidebar_data_${userId}`, JSON.stringify(dataToCache));
+      }
 
     } catch (error: any) {
       console.error("Error fetching sidebar data:", error);
-      if (!isInitialFetch.current) {
-        toast.error("Error al cargar los datos de la barra lateral.");
-      }
+      toast.error("Error al cargar los datos de la barra lateral.");
     } finally {
       setIsLoading(false);
-      isInitialFetch.current = false;
     }
   }, [userId]);
 
   useEffect(() => {
+    if (isSessionLoading) return;
+
     if (userId) {
+      // Try to load from cache first for instant UI
+      const cachedData = typeof window !== 'undefined' ? localStorage.getItem(`sidebar_data_${userId}`) : null;
+      if (cachedData) {
+        try {
+          const { apps, conversations, folders, notes } = JSON.parse(cachedData);
+          setApps(apps || []);
+          setConversations(conversations || []);
+          setFolders(folders || []);
+          setNotes(notes || []);
+          setIsLoading(false); // We have data, so stop initial loading indicator
+        } catch (e) {
+          console.error("Error parsing cached sidebar data:", e);
+          localStorage.removeItem(`sidebar_data_${userId}`);
+          setIsLoading(true); // Fallback to loading state
+        }
+      } else {
+        setIsLoading(true); // Show loader only if no cache
+      }
+      
+      // Always fetch fresh data in the background
       fetchData();
-    } else if (!isSessionLoading) {
-      setIsLoading(false);
+    } else {
+      // Clear data if no user
       setApps([]);
       setConversations([]);
       setFolders([]);
       setNotes([]);
+      setIsLoading(false);
     }
   }, [userId, isSessionLoading, fetchData, globalRefreshKey]);
 
@@ -158,7 +188,6 @@ export function useSidebarData() {
       }
       if (status === 'CHANNEL_ERROR') {
         console.error('Sidebar updates channel error:', err);
-        // toast.error('Error de conexión en tiempo real. La barra lateral puede no actualizarse.');
       }
     });
 
