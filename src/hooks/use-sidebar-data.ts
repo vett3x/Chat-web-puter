@@ -158,7 +158,7 @@ export function useSidebarData() {
       }
       if (status === 'CHANNEL_ERROR') {
         console.error('Sidebar updates channel error:', err);
-        toast.error('Error de conexión en tiempo real. La barra lateral puede no actualizarse.');
+        // toast.error('Error de conexión en tiempo real. La barra lateral puede no actualizarse.');
       }
     });
 
