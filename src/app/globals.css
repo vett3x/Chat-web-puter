@@ -86,6 +86,11 @@
 
     --user-avatar-shadow: 210 90% 50%; /* Blue for user avatar shadow */
     --ai-avatar-shadow: 30 90% 50%;   /* Orange for AI avatar shadow */
+
+    /* New variables for modern login */
+    --primary-color-login: 0 0% 77.6%; /* #c6c3c3 */
+    --second-color-login: 0 0% 100%; /* #ffffff */
+    --black-color-login: 0 0% 0%; /* #000000 */
   }
   .dark {
 
@@ -168,6 +173,19 @@
 
     --user-avatar-shadow: 210 90% 50%; /* Blue for user avatar shadow */
     --ai-avatar-shadow: 30 90% 50%;   /* Orange for AI avatar shadow */
+
+    /* New variables for modern login */
+    --primary-color-login: 0 0% 77.6%; /* #c6c3c3 */
+    --second-color-login: 0 0% 100%; /* #ffffff */
+    --black-color-login: 0 0% 0%; /* #000000 */
+  }
+
+  body.login-page {
+    background-image: url("/login-background.png");
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
   }
 }
 
@@ -198,5 +216,30 @@
     transform-origin: center;
     animation: lightsaber-on 0.3s ease-out forwards, lightsaber-pulse 2s ease-in-out infinite alternate;
     animation-delay: 0s, 0.3s; /* Start pulsing after the 'on' animation finishes */
+  }
+
+  /* Custom styles for the modern login form header */
+  .login-header::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -30px;
+    width: 30px;
+    height: 30px;
+    border-top-right-radius: 50%;
+    background: transparent;
+    box-shadow: 15px 0 0 0 hsl(var(--primary-color-login));
+  }
+
+  .login-header::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: -30px;
+    width: 30px;
+    height: 30px;
+    border-top-left-radius: 50%;
+    background: transparent;
+    box-shadow: -15px 0 0 0 hsl(var(--primary-color-login));
   }
 }

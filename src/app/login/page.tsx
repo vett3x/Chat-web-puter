@@ -3,18 +3,15 @@
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Moon, Sun, ShieldAlert, Loader2, Ban, LogOut } from 'lucide-react'; // NEW: Import LogOut icon
+import { Moon, Sun, ShieldAlert, Loader2, Ban, LogOut } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useSearchParams } from 'next/navigation';
 import { formatDistanceToNow, addMinutes } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 export default function LoginPage() {
-  const [currentLang, setCurrentLang] = useState('es');
   const { theme, setTheme } = useTheme();
   const [isMounted, setIsMounted] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
@@ -31,6 +28,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     setIsMounted(true);
+    document.body.classList.add('login-page');
     const checkStatus = async () => {
       try {
         const response = await fetch('/api/settings/public-status');
@@ -45,6 +43,10 @@ export default function LoginPage() {
       }
     };
     checkStatus();
+
+    return () => {
+      document.body.classList.remove('login-page');
+    };
   }, []);
 
   useEffect(() => {
@@ -60,7 +62,6 @@ export default function LoginPage() {
         } else {
           setTimeRemaining(null);
           if (interval) clearInterval(interval);
-          // Optionally, redirect to login without error to clear params
           window.location.href = '/login'; 
         }
       };
@@ -74,26 +75,6 @@ export default function LoginPage() {
     };
   }, [accountKickedError, kickedAt]);
 
-  const spanishVariables = {
-    sign_in: { email_label: 'Correo electrónico', password_label: 'Contraseña', email_input_placeholder: 'Tu correo electrónico', password_input_placeholder: 'Tu contraseña', button_label: 'Iniciar sesión', social_auth_typography: 'O continuar con', link_text: '¿Ya tienes una cuenta? Inicia sesión', forgotten_password_text: '¿Olvidaste tu contraseña?', no_account_text: '¿No tienes una cuenta? Regístrate', },
-    sign_up: { email_label: 'Correo electrónico', password_label: 'Contraseña', email_input_placeholder: 'Tu correo electrónico', password_input_placeholder: 'Crea una contraseña', button_label: 'Registrarse', social_auth_typography: 'O continuar con', link_text: '¿Ya tienes una cuenta? Inicia sesión', },
-    forgotten_password: { email_label: 'Correo electrónico', email_input_placeholder: 'Tu correo electrónico', button_label: 'Enviar instrucciones de recuperación', link_text: '¿Recordaste tu contraseña? Inicia sesión', },
-    update_password: { password_label: 'Nueva contraseña', password_input_placeholder: 'Tu nueva contraseña', button_label: 'Actualizar contraseña', },
-    magic_link: { email_input_placeholder: 'Tu correo electrónico', button_label: 'Enviar enlace mágico', link_text: 'Enviar un enlace mágico por correo electrónico', },
-  };
-  const englishVariables = {
-    sign_in: { email_label: 'Email', password_label: 'Password', email_input_placeholder: 'Your email address', password_input_placeholder: 'Your password', button_label: 'Sign In', social_auth_typography: 'Or continue with', link_text: 'Already have an account? Sign In', forgotten_password_text: 'Forgot your password?', no_account_text: 'Don\'t have an account? Sign Up', },
-    sign_up: { email_label: 'Email', password_label: 'Password', email_input_placeholder: 'Your email address', password_input_placeholder: 'Create a password', button_label: 'Sign Up', social_auth_typography: 'Or continue with', link_text: 'Already have an account? Sign In', },
-    forgotten_password: { email_label: 'Email', email_input_placeholder: 'Your email address', button_label: 'Send recovery instructions', link_text: 'Remembered your password? Sign In', },
-    update_password: { password_label: 'New Password', password_input_placeholder: 'Your new password', button_label: 'Update Password', },
-    magic_link: { email_input_placeholder: 'Your email address', button_label: 'Send magic link', link_text: 'Send a magic link by email', },
-  };
-
-  const localizationConfig = {
-    lang: currentLang,
-    variables: currentLang === 'es' ? spanishVariables : englishVariables,
-  };
-
   if (isLoadingStatus) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
@@ -103,79 +84,112 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4 relative">
+    <div className="w-full flex justify-center items-center min-h-screen bg-black/20">
       {isMounted && (
-        <Button variant="outline" size="icon" className="absolute top-4 right-4 h-12 w-12 rounded-full text-foreground" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label="Toggle theme">
+        <Button 
+          variant="outline" 
+          size="icon" 
+          className="absolute top-4 right-4 h-12 w-12 rounded-full text-white bg-black/20 border-white/50 hover:bg-white/20" 
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} 
+          aria-label="Toggle theme"
+        >
           {theme === 'dark' ? <Sun className="h-6 w-6" /> : <Moon className="h-6 w-6" />}
         </Button>
       )}
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          {maintenanceMode ? (
-            <>
-              <ShieldAlert className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-              <CardTitle className="text-2xl">Modo Mantenimiento</CardTitle>
-              <CardDescription>Solo el personal autorizado puede iniciar sesión.</CardDescription>
-            </>
-          ) : (
-            <>
-              <CardTitle className="text-2xl">{currentLang === 'es' ? 'Bienvenido' : 'Welcome'}</CardTitle>
-              <CardDescription>{currentLang === 'es' ? 'Inicia sesión o regístrate para continuar' : 'Sign in or sign up to continue'}</CardDescription>
-            </>
-          )}
-        </CardHeader>
-        <CardContent>
-          {accountDisabledError && (
-            <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-center text-sm text-destructive-foreground flex items-center gap-2">
-              <Ban className="h-5 w-5" />
-              <span>El inicio de sesión para tu tipo de cuenta está temporalmente desactivado.</span>
-            </div>
-          )}
-          {accountBannedError && (
-            <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-center text-sm text-destructive-foreground flex items-center gap-2">
-              <Ban className="h-5 w-5" />
-              <span>Tu cuenta ha sido baneada. {kickReason && `Razón: ${kickReason}`} Contacta al soporte para más información.</span>
-            </div>
-          )}
-          {accountKickedError && (
-            <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-center text-sm text-yellow-200 flex flex-col items-center gap-2">
-              <LogOut className="h-5 w-5" />
-              <span>Has sido expulsado del sistema.</span>
-              {kickReason && <span className="font-semibold">Razón: {kickReason}</span>}
-              {timeRemaining && <span className="text-xs mt-1">Podrás volver a iniciar sesión {timeRemaining}.</span>}
-            </div>
-          )}
-          {usersDisabled && !maintenanceMode && (
-            <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-center text-sm text-yellow-200 flex items-center gap-2">
-              <Ban className="h-5 w-5" />
-              <span>El inicio de sesión para cuentas de <strong>Usuario</strong> está desactivado temporalmente.</span>
-            </div>
-          )}
-          {adminsDisabled && !maintenanceMode && (
-            <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-center text-sm text-yellow-200 flex items-center gap-2">
-              <Ban className="h-5 w-5" />
-              <span>El inicio de sesión para cuentas de <strong>Admin</strong> está desactivado temporalmente.</span>
-            </div>
-          )}
-          <div className="mb-4 flex justify-end">
-            <Select value={currentLang} onValueChange={setCurrentLang}>
-              <SelectTrigger className="w-[120px]"><SelectValue placeholder="Idioma" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="es">Español</SelectItem>
-                <SelectItem value="en">English</SelectItem>
-              </SelectContent>
-            </Select>
+      <div className="relative w-[450px] max-w-[95vw] backdrop-blur-xl border-2 border-[hsl(var(--primary-color-login))] rounded-[15px] pt-[7.5em] pb-[4em] px-[1.5em] sm:px-[2.5em] text-[hsl(var(--second-color-login))] shadow-lg shadow-black/20">
+        <div className="login-header absolute top-0 left-1/2 -translate-x-1/2 flex items-center justify-center bg-[hsl(var(--primary-color-login))] w-[140px] h-[70px] rounded-b-[20px]">
+          <span className="text-3xl text-black">Login</span>
+        </div>
+
+        {maintenanceMode && (
+          <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-center text-sm text-yellow-200 flex items-center gap-2">
+            <ShieldAlert className="h-5 w-5" />
+            <span>Modo Mantenimiento: Solo personal autorizado puede iniciar sesión.</span>
           </div>
-          <Auth
-            supabaseClient={supabase}
-            providers={[]}
-            appearance={{ theme: ThemeSupa, variables: { default: { colors: { brand: 'hsl(var(--primary))', brandAccent: 'hsl(var(--primary-foreground))' } } } }}
-            theme="dark"
-            redirectTo={typeof window !== 'undefined' ? `${window.location.origin}/` : undefined}
-            localization={localizationConfig}
-          />
-        </CardContent>
-      </Card>
+        )}
+        {accountDisabledError && (
+          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-center text-sm text-white flex items-center gap-2">
+            <Ban className="h-5 w-5" />
+            <span>El inicio de sesión para tu tipo de cuenta está temporalmente desactivado.</span>
+          </div>
+        )}
+        {accountBannedError && (
+          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-center text-sm text-white flex items-center gap-2">
+            <Ban className="h-5 w-5" />
+            <span>Tu cuenta ha sido baneada. {kickReason && `Razón: ${kickReason}`}</span>
+          </div>
+        )}
+        {accountKickedError && (
+          <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-center text-sm text-yellow-200 flex flex-col items-center gap-2">
+            <LogOut className="h-5 w-5" />
+            <span>Has sido expulsado del sistema.</span>
+            {kickReason && <span className="font-semibold">Razón: {kickReason}</span>}
+            {timeRemaining && <span className="text-xs mt-1">Podrás volver a iniciar sesión {timeRemaining}.</span>}
+          </div>
+        )}
+        {usersDisabled && !maintenanceMode && (
+          <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-center text-sm text-yellow-200 flex items-center gap-2">
+            <Ban className="h-5 w-5" />
+            <span>El inicio de sesión para cuentas de <strong>Usuario</strong> está desactivado.</span>
+          </div>
+        )}
+        {adminsDisabled && !maintenanceMode && (
+          <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-center text-sm text-yellow-200 flex items-center gap-2">
+            <Ban className="h-5 w-5" />
+            <span>El inicio de sesión para cuentas de <strong>Admin</strong> está desactivado.</span>
+          </div>
+        )}
+
+        <Auth
+          supabaseClient={supabase}
+          providers={[]}
+          appearance={{
+            theme: ThemeSupa,
+            variables: {
+              default: {
+                colors: {
+                  brand: 'hsl(var(--primary-color-login))',
+                  brandAccent: 'hsl(var(--black-color-login))',
+                  brandButtonText: 'hsl(var(--black-color-login))',
+                  defaultButtonBackground: 'transparent',
+                  defaultButtonBackgroundHover: 'hsl(var(--primary-color-login) / 0.1)',
+                  defaultButtonBorder: 'hsl(var(--primary-color-login))',
+                  defaultButtonText: 'hsl(var(--second-color-login))',
+                  inputBackground: 'transparent',
+                  inputBorder: 'hsl(var(--primary-color-login))',
+                  inputBorderHover: 'hsl(var(--primary-color-login))',
+                  inputBorderFocus: 'hsl(var(--second-color-login))',
+                  inputText: 'hsl(var(--second-color-login))',
+                  inputLabelText: 'hsl(var(--second-color-login))',
+                  inputPlaceholder: 'hsl(var(--primary-color-login))',
+                  messageText: 'hsl(var(--second-color-login))',
+                  messageTextDanger: 'hsl(var(--destructive))',
+                  anchorTextColor: 'hsl(var(--second-color-login))',
+                  anchorTextHoverColor: 'hsl(var(--primary-color-login))',
+                },
+                space: {
+                  inputPadding: '1rem 1.5rem',
+                  buttonPadding: '0.75rem 1.5rem',
+                },
+                radii: {
+                  borderRadiusButton: '30px',
+                  buttonBorderRadius: '30px',
+                  inputBorderRadius: '30px',
+                },
+              },
+            },
+          }}
+          localization={{
+            variables: {
+              sign_in: { email_label: 'Email', password_label: 'Contraseña', button_label: 'Login' },
+              sign_up: { email_label: 'Email', password_label: 'Contraseña', button_label: 'Registrarse' },
+              forgotten_password: { email_label: 'Email', button_label: 'Enviar instrucciones' },
+            }
+          }}
+          theme="dark"
+          redirectTo={typeof window !== 'undefined' ? `${window.location.origin}/` : undefined}
+        />
+      </div>
     </div>
   );
 }
