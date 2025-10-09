@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, Image as ImageIcon, Upload, Save, Trash2, Palette, Text, Bot } from 'lucide-react';
@@ -133,76 +133,75 @@ export function PersonalizationTab() {
   };
 
   return (
-    <div className="space-y-8 p-1">
+    <div className="p-1">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSave)} className="space-y-8">
+        <form onSubmit={form.handleSubmit(handleSave)}>
           <Card>
             <CardHeader>
-              <CardTitle>Marca y Apariencia General</CardTitle>
-              <CardDescription>Define la identidad visual de tu aplicación.</CardDescription>
+              <CardTitle>Personalización de la Aplicación</CardTitle>
+              <CardDescription>Define la identidad visual, colores y apariencia de tu aplicación.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <FormField control={form.control} name="app_name" render={({ field }) => (<FormItem><FormLabel className="flex items-center gap-2"><Text className="h-4 w-4" /> Nombre de la Aplicación</FormLabel><FormControl><Input placeholder="DeepAI Coder" {...field} /></FormControl></FormItem>)} />
-              
+              {/* Section 1: Marca */}
               <div>
-                <FormLabel className="flex items-center gap-2 mb-2"><Bot className="h-4 w-4" /> Logo de la Aplicación</FormLabel>
-                <div className="border rounded-lg p-4 flex flex-col sm:flex-row items-center gap-4">
-                  <div className="relative w-24 h-24 bg-muted rounded-md overflow-hidden flex-shrink-0">
-                    {appLogoPreview ? <Image src={appLogoPreview} alt="Vista previa del logo" layout="fill" objectFit="contain" /> : <div className="flex items-center justify-center h-full text-muted-foreground"><Bot className="h-10 w-10" /></div>}
-                  </div>
-                  <div className="flex-1 space-y-2">
-                    <p className="text-xs text-muted-foreground">Sube el logo de tu aplicación (recomendado: 256x256px, PNG transparente).</p>
-                    <div className="flex gap-2">
-                      <Button type="button" variant="outline" onClick={() => appLogoInputRef.current?.click()} disabled={isSaving}><Upload className="mr-2 h-4 w-4" /> Cambiar Logo</Button>
-                      <Button type="button" variant="destructive" onClick={() => handleRemoveAsset('app_logo')} disabled={!currentSettings.app_logo_url || isSaving}><Trash2 className="mr-2 h-4 w-4" /> Eliminar</Button>
+                <h3 className="text-lg font-medium mb-4">Marca</h3>
+                <div className="space-y-4">
+                  <FormField control={form.control} name="app_name" render={({ field }) => (<FormItem><FormLabel className="flex items-center gap-2 text-sm"><Text className="h-4 w-4" /> Nombre de la Aplicación</FormLabel><FormControl><Input placeholder="DeepAI Coder" {...field} /></FormControl></FormItem>)} />
+                  <div>
+                    <FormLabel className="flex items-center gap-2 mb-2 text-sm"><Bot className="h-4 w-4" /> Logo de la Aplicación</FormLabel>
+                    <div className="border rounded-lg p-3 flex flex-col sm:flex-row items-center gap-3">
+                      <div className="relative w-16 h-16 bg-muted rounded-md overflow-hidden flex-shrink-0">
+                        {appLogoPreview ? <Image src={appLogoPreview} alt="Vista previa del logo" layout="fill" objectFit="contain" /> : <div className="flex items-center justify-center h-full text-muted-foreground"><Bot className="h-8 w-8" /></div>}
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <p className="text-xs text-muted-foreground">Sube el logo de tu aplicación (recomendado: 256x256px, PNG transparente, max 5MB).</p>
+                        <div className="flex gap-2">
+                          <Button type="button" size="sm" variant="outline" onClick={() => appLogoInputRef.current?.click()} disabled={isSaving}><Upload className="mr-2 h-4 w-4" /> Cambiar</Button>
+                          <Button type="button" size="sm" variant="destructive" onClick={() => handleRemoveAsset('app_logo')} disabled={!currentSettings.app_logo_url || isSaving}><Trash2 className="mr-2 h-4 w-4" /> Eliminar</Button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Colores del Tema</CardTitle>
-              <CardDescription>Personaliza la paleta de colores de la interfaz.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-6 sm:grid-cols-2">
-              <FormField control={form.control} name="theme_primary_color" render={({ field }) => (<FormItem><FormLabel className="flex items-center gap-2"><Palette className="h-4 w-4" /> Color Primario</FormLabel><FormControl><Input type="color" {...field} className="h-12 p-1" /></FormControl></FormItem>)} />
-              <FormField control={form.control} name="theme_sidebar_color" render={({ field }) => (<FormItem><FormLabel className="flex items-center gap-2"><Palette className="h-4 w-4" /> Color de la Barra Lateral</FormLabel><FormControl><Input type="color" {...field} className="h-12 p-1" /></FormControl></FormItem>)} />
-            </CardContent>
-          </Card>
+              <Separator />
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Página de Inicio de Sesión</CardTitle>
-              <CardDescription>Personaliza la apariencia de la página de inicio de sesión.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <input type="file" ref={loginBgInputRef} onChange={(e) => handleFileChange(e, 'login_background')} accept="image/*" hidden />
+              {/* Section 2: Colores */}
               <div>
-                <h4 className="text-sm font-medium mb-2">Fondo de Pantalla</h4>
-                <div className="border rounded-lg p-4 space-y-4">
+                <h3 className="text-lg font-medium mb-4">Colores del Tema</h3>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FormField control={form.control} name="theme_primary_color" render={({ field }) => (<FormItem><FormLabel className="flex items-center gap-2 text-sm"><Palette className="h-4 w-4" /> Color Primario</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1" /></FormControl></FormItem>)} />
+                  <FormField control={form.control} name="theme_sidebar_color" render={({ field }) => (<FormItem><FormLabel className="flex items-center gap-2 text-sm"><Palette className="h-4 w-4" /> Color de la Barra Lateral</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1" /></FormControl></FormItem>)} />
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Section 3: Login */}
+              <div>
+                <h3 className="text-lg font-medium mb-4">Página de Inicio de Sesión</h3>
+                <input type="file" ref={loginBgInputRef} onChange={(e) => handleFileChange(e, 'login_background')} accept="image/*" hidden />
+                <div className="border rounded-lg p-3 space-y-3">
                   {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
-                    <div className="relative w-full h-48 bg-muted rounded-md overflow-hidden">
-                      {loginBgPreview ? <Image src={loginBgPreview} alt="Vista previa del fondo" layout="fill" objectFit="cover" /> : <div className="flex flex-col items-center justify-center h-full text-muted-foreground"><ImageIcon className="h-10 w-10 mb-2" /><p>Sin fondo personalizado</p></div>}
+                    <div className="relative w-full h-32 bg-muted rounded-md overflow-hidden">
+                      {loginBgPreview ? <Image src={loginBgPreview} alt="Vista previa del fondo" layout="fill" objectFit="cover" /> : <div className="flex flex-col items-center justify-center h-full text-muted-foreground"><ImageIcon className="h-8 w-8 mb-2" /><p className="text-xs">Sin fondo personalizado</p></div>}
                     </div>
                   )}
                   <div className="flex flex-col sm:flex-row gap-2">
-                    <Button type="button" variant="outline" onClick={() => loginBgInputRef.current?.click()} disabled={isSaving}><Upload className="mr-2 h-4 w-4" /> Cambiar Imagen</Button>
-                    <Button type="button" variant="destructive" onClick={() => handleRemoveAsset('login_background')} disabled={!currentSettings.login_background_url || isSaving}><Trash2 className="mr-2 h-4 w-4" /> Eliminar Fondo</Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => loginBgInputRef.current?.click()} disabled={isSaving}><Upload className="mr-2 h-4 w-4" /> Cambiar Fondo</Button>
+                    <Button type="button" size="sm" variant="destructive" onClick={() => handleRemoveAsset('login_background')} disabled={!currentSettings.login_background_url || isSaving}><Trash2 className="mr-2 h-4 w-4" /> Eliminar</Button>
                   </div>
                 </div>
               </div>
             </CardContent>
+            <CardFooter className="flex justify-end">
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Guardar Cambios
+              </Button>
+            </CardFooter>
           </Card>
-
-          <div className="flex justify-end">
-            <Button type="submit" disabled={isSaving}>
-              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              Guardar Toda la Personalización
-            </Button>
-          </div>
         </form>
       </Form>
     </div>
