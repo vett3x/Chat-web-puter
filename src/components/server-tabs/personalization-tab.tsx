@@ -11,11 +11,17 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Textarea } from '@/components/ui/textarea';
+import { Slider } from '@/components/ui/slider';
 
 const personalizationSchema = z.object({
   app_name: z.string().optional(),
+  app_welcome_title: z.string().optional(),
+  app_welcome_description: z.string().optional(),
   theme_primary_color: z.string().optional(),
   theme_sidebar_color: z.string().optional(),
+  theme_accent_color: z.string().optional(),
+  theme_border_radius: z.coerce.number().min(0).max(1).optional(),
 });
 
 type PersonalizationFormValues = z.infer<typeof personalizationSchema>;
@@ -36,8 +42,12 @@ export function PersonalizationTab() {
     resolver: zodResolver(personalizationSchema),
     defaultValues: {
       app_name: '',
+      app_welcome_title: '',
+      app_welcome_description: '',
       theme_primary_color: '#000000',
       theme_sidebar_color: '#000000',
+      theme_accent_color: '#000000',
+      theme_border_radius: 0.5,
     },
   });
 
@@ -50,8 +60,12 @@ export function PersonalizationTab() {
       setCurrentSettings(data);
       form.reset({
         app_name: data.app_name || '',
+        app_welcome_title: data.app_welcome_title || '',
+        app_welcome_description: data.app_welcome_description || '',
         theme_primary_color: data.theme_primary_color || '#000000',
         theme_sidebar_color: data.theme_sidebar_color || '#000000',
+        theme_accent_color: data.theme_accent_color || '#000000',
+        theme_border_radius: data.theme_border_radius || 0.5,
       });
       setLoginBgPreview(data.login_background_url);
       setAppLogoPreview(data.app_logo_url);
@@ -144,7 +158,6 @@ export function PersonalizationTab() {
               {/* Left Column */}
               <div className="space-y-6">
                 <FormField control={form.control} name="app_name" render={({ field }) => (<FormItem><FormLabel className="flex items-center gap-2 text-sm"><Text className="h-4 w-4" /> Nombre de la Aplicación</FormLabel><FormControl><Input placeholder="DeepAI Coder" {...field} /></FormControl></FormItem>)} />
-                
                 <div>
                   <FormLabel className="flex items-center gap-2 mb-2 text-sm"><Bot className="h-4 w-4" /> Logo de la Aplicación</FormLabel>
                   <div className="border rounded-lg p-3 flex items-center gap-3">
@@ -160,18 +173,6 @@ export function PersonalizationTab() {
                     </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Right Column */}
-              <div className="space-y-6">
-                <div>
-                  <FormLabel className="flex items-center gap-2 mb-2 text-sm"><Palette className="h-4 w-4" /> Colores del Tema</FormLabel>
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField control={form.control} name="theme_primary_color" render={({ field }) => (<FormItem><FormLabel className="text-xs">Primario</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1" /></FormControl></FormItem>)} />
-                    <FormField control={form.control} name="theme_sidebar_color" render={({ field }) => (<FormItem><FormLabel className="text-xs">Barra Lateral</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1" /></FormControl></FormItem>)} />
-                  </div>
-                </div>
-
                 <div>
                   <FormLabel className="flex items-center gap-2 mb-2 text-sm"><ImageIcon className="h-4 w-4" /> Fondo de Inicio de Sesión</FormLabel>
                   <input type="file" ref={loginBgInputRef} onChange={(e) => handleFileChange(e, 'login_background')} accept="image/*" hidden />
@@ -187,6 +188,37 @@ export function PersonalizationTab() {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Right Column */}
+              <div className="space-y-6">
+                <FormField control={form.control} name="app_welcome_title" render={({ field }) => (<FormItem><FormLabel className="flex items-center gap-2 text-sm"><Text className="h-4 w-4" /> Título de Bienvenida (Login)</FormLabel><FormControl><Input placeholder="Bienvenido a DeepAI Coder" {...field} /></FormControl></FormItem>)} />
+                <FormField control={form.control} name="app_welcome_description" render={({ field }) => (<FormItem><FormLabel className="flex items-center gap-2 text-sm"><Text className="h-4 w-4" /> Descripción de Bienvenida (Login)</FormLabel><FormControl><Textarea placeholder="Tu asistente de IA para la creación de aplicaciones." {...field} /></FormControl></FormItem>)} />
+                <div>
+                  <FormLabel className="flex items-center gap-2 mb-2 text-sm"><Palette className="h-4 w-4" /> Colores del Tema</FormLabel>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <FormField control={form.control} name="theme_primary_color" render={({ field }) => (<FormItem><FormLabel className="text-xs">Primario</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1" /></FormControl></FormItem>)} />
+                    <FormField control={form.control} name="theme_sidebar_color" render={({ field }) => (<FormItem><FormLabel className="text-xs">Barra Lateral</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1" /></FormControl></FormItem>)} />
+                    <FormField control={form.control} name="theme_accent_color" render={({ field }) => (<FormItem><FormLabel className="text-xs">Acento</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1" /></FormControl></FormItem>)} />
+                  </div>
+                </div>
+                <FormField control={form.control} name="theme_border_radius" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2 text-sm">Radio de Borde (Redondez)</FormLabel>
+                    <div className="flex items-center gap-4">
+                      <FormControl>
+                        <Slider
+                          min={0}
+                          max={1}
+                          step={0.1}
+                          value={[field.value || 0.5]}
+                          onValueChange={(value) => field.onChange(value[0])}
+                        />
+                      </FormControl>
+                      <span className="text-xs font-mono w-12 text-right">{(field.value || 0.5).toFixed(1)}rem</span>
+                    </div>
+                  </FormItem>
+                )} />
               </div>
             </CardContent>
             <CardFooter className="flex justify-end">
