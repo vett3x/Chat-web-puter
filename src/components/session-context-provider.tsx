@@ -146,15 +146,24 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
   }, []);
 
   useEffect(() => {
-    const handleVisibilityChange = () => {
+    const handleVisibilityChange = async () => {
       if (document.hidden) {
         lastHiddenTimestamp.current = Date.now();
       } else {
         if (lastHiddenTimestamp.current) {
           const inactiveDuration = Date.now() - lastHiddenTimestamp.current;
           if (inactiveDuration > INACTIVITY_THRESHOLD) {
-            toast.info('Refrescando datos por inactividad...');
-            triggerGlobalRefresh();
+            const toastId = toast.loading('Refrescando sesión por inactividad...');
+            try {
+              // Step 1: Force a session refresh first.
+              await supabase.auth.getSession(); 
+              // Step 2: Now that the session is valid, trigger the data refresh.
+              triggerGlobalRefresh();
+              toast.success('¡Sesión y datos actualizados!', { id: toastId });
+            } catch (error) {
+              console.error("Error refreshing session on visibility change:", error);
+              toast.error('Error al refrescar la sesión.', { id: toastId });
+            }
           }
           lastHiddenTimestamp.current = null;
         }
