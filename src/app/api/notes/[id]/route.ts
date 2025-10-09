@@ -17,8 +17,8 @@ async function getUserId() {
   return session.user.id;
 }
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const noteId = params.id;
+export async function GET(req: NextRequest, context: any) {
+  const noteId = context.params.id;
   try {
     const userId = await getUserId();
     const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
@@ -38,8 +38,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const noteId = params.id;
+export async function PUT(req: NextRequest, context: any) {
+  const noteId = context.params.id;
   try {
     const userId = await getUserId();
     const body = await req.json();

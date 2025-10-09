@@ -19,8 +19,8 @@ async function getUserId() {
   return session.user.id;
 }
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const conversationId = params.id;
+export async function GET(req: NextRequest, context: any) {
+  const conversationId = context.params.id;
   const { searchParams } = new URL(req.url);
   const page = parseInt(searchParams.get('page') || '0', 10);
 
