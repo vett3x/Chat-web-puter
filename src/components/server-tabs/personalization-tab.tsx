@@ -56,8 +56,8 @@ const PersonalizationItem: React.FC<PersonalizationItemProps> = ({ id, icon, lab
         {isOpen ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
       </button>
     </CollapsibleTrigger>
-    <CollapsibleContent className="pt-0 px-4 pb-4">
-      <div className="border-t pt-4">
+    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
+      <div className="border-t px-4 pt-4 pb-4">
         {children}
       </div>
     </CollapsibleContent>
