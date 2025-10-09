@@ -197,8 +197,6 @@
   }
   body {
     @apply bg-background text-foreground;
-    background-image: url('/background-pattern.svg');
-    background-attachment: fixed;
   }
 }
 
