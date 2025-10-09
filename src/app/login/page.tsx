@@ -97,7 +97,7 @@ export default function LoginPage() {
         </Button>
       )}
       <div className="relative w-[450px] max-w-[95vw] backdrop-blur-xl border-2 border-[hsl(var(--primary-color-login))] rounded-[15px] pt-[7.5em] pb-[4em] px-[1.5em] sm:px-[2.5em] text-[hsl(var(--second-color-login))] shadow-lg shadow-black/20">
-        <div className="login-header absolute top-0 left-1/2 -translate-x-1/2 flex items-center justify-center bg-[hsl(var(--primary-color-login))] w-[140px] h-[70px] rounded-b-[20px]">
+        <div className="login-header absolute top-0 left-1/2 -translate-x-1/2 flex items-center justify-center bg-[hsl(var(--primary-color-login))] w-[140px] h-[70px] rounded-b-[20px] z-10">
           <span className="text-3xl text-black">Iniciar Sesión</span>
         </div>
 
@@ -184,6 +184,8 @@ export default function LoginPage() {
               sign_in: {
                 email_label: 'Correo electrónico',
                 password_label: 'Contraseña',
+                email_input_placeholder: 'Tu correo electrónico',
+                password_input_placeholder: 'Tu contraseña',
                 button_label: 'Iniciar Sesión',
                 link_text: '¿No tienes una cuenta? Regístrate',
                 loading_button_label: 'Iniciando sesión...',
@@ -192,6 +194,8 @@ export default function LoginPage() {
               sign_up: {
                 email_label: 'Correo electrónico',
                 password_label: 'Contraseña',
+                email_input_placeholder: 'Tu correo electrónico',
+                password_input_placeholder: 'Tu nueva contraseña',
                 button_label: 'Registrarse',
                 link_text: '¿Ya tienes una cuenta? Inicia sesión',
                 loading_button_label: 'Registrando...',
