@@ -158,7 +158,6 @@ export function useGeneralChat({
   const [isPuterReady, setIsPuterReady] = useState(false);
   const [isSendingFirstMessage, setIsSendingFirstMessage] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>('');
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [page, setPage] = useState(0);
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
 
@@ -194,33 +193,8 @@ export function useGeneralChat({
     setSelectedModel(newDefaultModel);
   }, [isLoadingApiKeys, userApiKeys, aiKeyGroups, userDefaultModel]);
 
-  const getConversationDetails = useCallback(async (convId: string) => {
-    const { data, error } = await supabase.from('conversations').select('id, title, model').eq('id', convId).single();
-    if (error) {
-      console.error('Error fetching conversation details:', error);
-      return null;
-    }
-    return data;
-  }, []);
-
-  const getMessagesFromDB = useCallback(async (convId: string, pageToLoad: number) => {
-    const from = pageToLoad * MESSAGES_PER_PAGE;
-    const to = from + MESSAGES_PER_PAGE - 1;
-
-    const { data, error } = await supabase
-      .from('messages')
-      .select('id, content, role, model, created_at, conversation_id, type, plan_approved, is_correction_plan, correction_approved')
-      .eq('conversation_id', convId)
-      .order('created_at', { ascending: false })
-      .range(from, to);
-
-    if (error) {
-      console.error('Error fetching messages:', error);
-      toast.error('Error al cargar los mensajes.');
-      return [];
-    }
-
-    return data.reverse().map((msg) => ({
+  const mapDbMessages = (dbMessages: any[]): Message[] => {
+    return dbMessages.map((msg) => ({
       id: msg.id,
       conversation_id: msg.conversation_id,
       content: msg.content as Message['content'],
@@ -237,7 +211,74 @@ export function useGeneralChat({
       isTyping: false,
       isAnimated: true,
     }));
-  }, []);
+  };
+
+  const loadConversationData = useCallback(async () => {
+    if (conversationId && userId) {
+      setIsLoading(true);
+      setMessages([]);
+      setPage(0);
+      setHasMoreMessages(true);
+      
+      try {
+        const response = await fetch(`/api/conversations/${conversationId}?page=0`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Error al cargar la conversación.');
+        }
+        const { details, messages: fetchedMsgsData } = await response.json();
+
+        if (details.model && (details.model.startsWith('puter:') || details.model.startsWith('user_key:') || details.model.startsWith('group:'))) {
+          setSelectedModel(details.model);
+        } else {
+          setSelectedModel(determineDefaultModel(userApiKeys, aiKeyGroups, userDefaultModel));
+        }
+
+        const fetchedMsgs = mapDbMessages(fetchedMsgsData);
+        setMessages(fetchedMsgs);
+        if (fetchedMsgs.length < MESSAGES_PER_PAGE) {
+          setHasMoreMessages(false);
+        }
+      } catch (error: any) {
+        toast.error(error.message);
+        setHasMoreMessages(false);
+      } finally {
+        setIsLoading(false);
+      }
+      
+    } else {
+      setMessages([]);
+    }
+  }, [conversationId, userId, userApiKeys, aiKeyGroups, userDefaultModel]);
+
+  const loadMoreMessages = useCallback(async () => {
+    if (!conversationId || !hasMoreMessages || isLoading) return;
+
+    const nextPage = page + 1;
+    try {
+      const response = await fetch(`/api/conversations/${conversationId}?page=${nextPage}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al cargar más mensajes.');
+      }
+      const { messages: olderMessagesData } = await response.json();
+      const olderMessages = mapDbMessages(olderMessagesData);
+
+      if (olderMessages.length > 0) {
+        setMessages(prev => [...olderMessages, ...prev]);
+        setPage(nextPage);
+      }
+      if (olderMessages.length < MESSAGES_PER_PAGE) {
+        setHasMoreMessages(false);
+      }
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  }, [conversationId, hasMoreMessages, isLoading, page]);
+
+  useEffect(() => {
+    loadConversationData();
+  }, [loadConversationData, globalRefreshKey]);
 
   const saveMessageToDB = async (convId: string, msg: Omit<Message, 'timestamp' | 'id'>) => {
     if (!userId) return null;
@@ -395,59 +436,6 @@ export function useGeneralChat({
       setIsLoading(false);
     }
   }, [userId, saveMessageToDB, userApiKeys, aiKeyGroups]);
-
-  const loadConversationData = useCallback(async () => {
-    if (conversationId && userId) {
-      setIsLoading(true);
-      setMessages([]);
-      setPage(0);
-      setHasMoreMessages(true);
-      
-      const details = await getConversationDetails(conversationId);
-      
-      if (!details) {
-        toast.error("No se pudieron cargar los detalles de la conversación. Puede que aún se esté creando o que haya un problema de red.");
-        setIsLoading(false);
-        setHasMoreMessages(false);
-        return;
-      }
-
-      if (details.model && (details.model.startsWith('puter:') || details.model.startsWith('user_key:') || details.model.startsWith('group:'))) {
-        setSelectedModel(details.model);
-      } else {
-        setSelectedModel(determineDefaultModel(userApiKeys, aiKeyGroups, userDefaultModel));
-      }
-
-      const fetchedMsgs = await getMessagesFromDB(conversationId, 0);
-      setMessages(fetchedMsgs);
-      if (fetchedMsgs.length < MESSAGES_PER_PAGE) {
-        setHasMoreMessages(false);
-      }
-      setIsLoading(false);
-      
-    } else {
-      setMessages([]);
-    }
-  }, [conversationId, userId, getMessagesFromDB, getConversationDetails, userApiKeys, aiKeyGroups, userDefaultModel]);
-
-  const loadMoreMessages = useCallback(async () => {
-    if (!conversationId || !hasMoreMessages || isLoading) return;
-
-    const nextPage = page + 1;
-    const olderMessages = await getMessagesFromDB(conversationId, nextPage);
-
-    if (olderMessages.length > 0) {
-      setMessages(prev => [...olderMessages, ...prev]);
-      setPage(nextPage);
-    }
-    if (olderMessages.length < MESSAGES_PER_PAGE) {
-      setHasMoreMessages(false);
-    }
-  }, [conversationId, hasMoreMessages, isLoading, page, getMessagesFromDB]);
-
-  useEffect(() => {
-    loadConversationData();
-  }, [loadConversationData, globalRefreshKey]);
 
   const createNewConversationInDB = async () => {
     if (!userId) return null;

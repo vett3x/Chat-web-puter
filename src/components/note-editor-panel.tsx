@@ -174,16 +174,23 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
     if (!note || saveStatus === 'saving') return;
 
     setSaveStatus('saving');
-    const { error } = await supabase.from('notes').update({ title: currentTitle, content: currentContent }).eq('id', note.id);
-
-    if (error) {
-      toast.error('Error en el autoguardado.');
-      setSaveStatus('idle');
-    } else {
+    try {
+      const response = await fetch(`/api/notes/${note.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: currentTitle, content: currentContent }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error en el autoguardado.');
+      }
       const updatedData = { title: currentTitle, content: currentContent, updated_at: new Date().toISOString() };
       onNoteUpdated(note.id, updatedData);
       setNote(prev => prev ? { ...prev, ...updatedData } : null);
       setSaveStatus('saved');
+    } catch (error: any) {
+      toast.error(error.message);
+      setSaveStatus('idle');
     }
   }, [note, onNoteUpdated, saveStatus]);
 
@@ -206,19 +213,24 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
   }, [title, note, isLoading, content, handleSave]);
 
   const fetchNote = useCallback(async () => {
-    if (!session?.user?.id || !noteId) return;
+    if (!noteId) return;
     setIsLoading(true);
-    const { data, error } = await supabase.from('notes').select('id, title, content, updated_at, chat_history').eq('id', noteId).eq('user_id', session.user.id).single();
-    if (error) {
-      toast.error('No se pudo cargar la nota.');
-      console.error(error);
-    } else {
+    try {
+      const response = await fetch(`/api/notes/${noteId}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'No se pudo cargar la nota.');
+      }
+      const data = await response.json();
       setNote(data);
       setTitle(data.title);
       setContent(data.content || '');
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
-  }, [noteId, session?.user?.id]);
+  }, [noteId]);
 
   useEffect(() => { 
     if (noteId && session?.user?.id) {
@@ -238,11 +250,19 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
 
   const handleSaveChatHistory = useCallback(async (newHistory: ChatMessage[]) => {
     if (!note) return;
-    const { error } = await supabase.from('notes').update({ chat_history: newHistory }).eq('id', note.id);
-    if (error) {
-      toast.error('Error al guardar el historial del chat.');
-    } else {
+    try {
+      const response = await fetch(`/api/notes/${note.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_history: newHistory }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al guardar el historial del chat.');
+      }
       setNote(prev => prev ? { ...prev, chat_history: newHistory } : null);
+    } catch (error: any) {
+      toast.error(error.message);
     }
   }, [note]);
 

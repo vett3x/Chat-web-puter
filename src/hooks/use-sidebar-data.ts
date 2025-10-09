@@ -46,46 +46,29 @@ export function useSidebarData() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const isInitialFetch = useRef(true);
 
   const fetchData = useCallback(async () => {
     if (!userId) {
-      setApps([]);
-      setConversations([]);
-      setFolders([]);
-      setNotes([]);
       setIsLoading(false);
       return;
     }
-
     setIsLoading(true);
     try {
-      const [appsRes, convRes, folderRes, notesRes] = await Promise.all([
-        supabase.from('user_apps').select('id, name, status, url, conversation_id').eq('user_id', userId).order('created_at', { ascending: false }),
-        supabase.from('conversations').select('id, title, created_at, folder_id, order_index').eq('user_id', userId).order('order_index', { ascending: true }).order('created_at', { ascending: false }),
-        supabase.from('folders').select('id, name, parent_id, created_at, user_id').eq('user_id', userId).order('created_at', { ascending: false }),
-        supabase.from('notes').select('id, title, folder_id, created_at, updated_at').eq('user_id', userId).order('updated_at', { ascending: false })
-      ]);
-
-      if (appsRes.error) throw appsRes.error;
-      if (convRes.error) throw convRes.error;
-      if (folderRes.error) throw folderRes.error;
-      if (notesRes.error) throw notesRes.error;
-
-      const appConversationIds = new Set((appsRes.data || []).map(app => app.conversation_id));
-      setApps(appsRes.data || []);
-      setConversations((convRes.data || []).filter(conv => !appConversationIds.has(conv.id)));
-      setFolders(folderRes.data || []);
-      setNotes(notesRes.data || []);
-
-    } catch (error: any) {
-      console.error("Error fetching sidebar data:", error);
-      if (!isInitialFetch.current) {
-        toast.error("Error al cargar los datos de la barra lateral.");
+      const response = await fetch('/api/sidebar-data');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al cargar los datos.');
       }
+      const { apps, conversations, folders, notes } = await response.json();
+      setApps(apps);
+      setConversations(conversations);
+      setFolders(folders);
+      setNotes(notes);
+    } catch (error: any) {
+      console.error("Error fetching sidebar data via API:", error);
+      toast.error(error.message);
     } finally {
       setIsLoading(false);
-      isInitialFetch.current = false;
     }
   }, [userId]);
 
@@ -93,48 +76,14 @@ export function useSidebarData() {
     if (userId) {
       fetchData();
     } else if (!isSessionLoading) {
-      setIsLoading(false);
+      // Clear data if no user
       setApps([]);
       setConversations([]);
       setFolders([]);
       setNotes([]);
+      setIsLoading(false);
     }
   }, [userId, isSessionLoading, fetchData, globalRefreshKey]);
-
-  useEffect(() => {
-    if (!userId) return;
-
-    const handleAllChanges = (payload: any) => {
-      console.log('Realtime change detected, refetching sidebar data:', payload);
-      fetchData();
-    };
-
-    const channel = supabase.channel(`sidebar-updates-for-user-${userId}`);
-
-    const tablesToSubscribe = ['user_apps', 'conversations', 'folders', 'notes'];
-
-    tablesToSubscribe.forEach(table => {
-      channel
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table, filter: `user_id=eq.${userId}` },
-          handleAllChanges
-        );
-    });
-
-    channel.subscribe((status, err) => {
-      if (status === 'SUBSCRIBED') {
-        console.log('Subscribed to sidebar updates channel!');
-      }
-      if (status === 'CHANNEL_ERROR') {
-        console.error('Sidebar updates channel error:', err);
-      }
-    });
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [userId, fetchData, globalRefreshKey]);
 
   const createConversation = async (onSuccess: (newConversation: Conversation) => void): Promise<string | null> => {
     if (!userId) {
@@ -147,7 +96,7 @@ export function useSidebarData() {
       throw new Error(error.message);
     }
     toast.success('Nueva conversación creada.');
-    await fetchData(); // Refetch data instead of optimistic update
+    await fetchData(); // Refetch data to ensure consistency
     onSuccess(data);
     return data.id;
   };
@@ -164,7 +113,7 @@ export function useSidebarData() {
       throw new Error(error.message);
     }
     toast.success(`${newFolderName} creada.`);
-    await fetchData(); // Refetch data instead of optimistic update
+    await fetchData(); // Refetch data to ensure consistency
     return data.id;
   };
 
@@ -179,7 +128,7 @@ export function useSidebarData() {
       throw new Error(error.message);
     }
     toast.success('Nueva nota creada.');
-    await fetchData(); // Refetch data instead of optimistic update
+    await fetchData(); // Refetch data to ensure consistency
     onSuccess(data);
     return data.id;
   };
