@@ -86,10 +86,10 @@ const ChatMessageItemComponent: React.FC<ChatMessageItemProps> = ({
           )}
         </div>
         <div className={cn(
-          "rounded-lg p-3 text-sm",
+          "rounded-lg p-3 text-sm bg-[var(--chat-bubble-background-color)] backdrop-blur-[var(--chat-bubble-blur)] border border-[var(--chat-bubble-border-color)]",
           message.role === 'user' 
-            ? 'bg-black/30 backdrop-blur-md border border-white/10 text-primary-foreground' 
-            : 'bg-black/20 backdrop-blur-md border border-white/10'
+            ? 'text-primary-foreground' 
+            : ''
         )}>
           {message.isTyping ? (
             <div className="flex items-center gap-2">

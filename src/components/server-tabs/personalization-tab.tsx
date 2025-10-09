@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Image as ImageIcon, Upload, Save, Trash2, Palette, Text, Bot, ChevronRight, ChevronDown, BrainCircuit } from 'lucide-react';
+import { Loader2, Image as ImageIcon, Upload, Save, Trash2, Palette, Text, Bot, ChevronRight, ChevronDown, BrainCircuit, Droplets } from 'lucide-react';
 import { toast } from 'sonner';
 import Image from 'next/image';
 import { useForm } from 'react-hook-form';
@@ -28,6 +28,10 @@ const personalizationSchema = z.object({
   theme_accent_color: z.string().optional(),
   theme_border_radius: z.coerce.number().min(0).max(1).optional(),
   default_ai_model: z.string().optional(),
+  chat_bubble_background_color: z.string().optional(),
+  chat_bubble_border_color: z.string().optional(),
+  chat_bubble_blur: z.coerce.number().min(0).max(32).optional(),
+  liquid_ether_opacity: z.coerce.number().min(0).max(1).optional(),
 });
 
 type PersonalizationFormValues = z.infer<typeof personalizationSchema>;
@@ -94,6 +98,10 @@ export function PersonalizationTab() {
       theme_accent_color: '#000000',
       theme_border_radius: 0.5,
       default_ai_model: '',
+      chat_bubble_background_color: 'hsla(0, 0%, 100%, 0.1)',
+      chat_bubble_border_color: 'hsla(0, 0%, 100%, 0.2)',
+      chat_bubble_blur: 4,
+      liquid_ether_opacity: 0.5,
     },
   });
 
@@ -114,6 +122,10 @@ export function PersonalizationTab() {
         theme_accent_color: data.theme_accent_color || '#000000',
         theme_border_radius: data.theme_border_radius || 0.5,
         default_ai_model: data.default_ai_model || '',
+        chat_bubble_background_color: data.chat_bubble_background_color || 'hsla(0, 0%, 100%, 0.1)',
+        chat_bubble_border_color: data.chat_bubble_border_color || 'hsla(0, 0%, 100%, 0.2)',
+        chat_bubble_blur: data.chat_bubble_blur || 4,
+        liquid_ether_opacity: data.liquid_ether_opacity || 0.5,
       });
       setLoginBgPreview(data.login_background_url);
       setAppLogoPreview(data.app_logo_url);
@@ -280,6 +292,14 @@ export function PersonalizationTab() {
                   <FormField control={form.control} name="theme_primary_color" render={({ field }) => (<FormItem><FormLabel className="text-xs">Primario</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1" /></FormControl></FormItem>)} />
                   <FormField control={form.control} name="theme_sidebar_color" render={({ field }) => (<FormItem><FormLabel className="text-xs">Barra Lateral</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1" /></FormControl></FormItem>)} />
                   <FormField control={form.control} name="theme_accent_color" render={({ field }) => (<FormItem><FormLabel className="text-xs">Acento</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1" /></FormControl></FormItem>)} />
+                </div>
+              </PersonalizationItem>
+              <PersonalizationItem id="chat_style" icon={<Droplets className="h-5 w-5" />} label="Estilo del Chat" description="Ajusta el efecto de cristal y el fondo animado." isOpen={openItemId === 'chat_style'} onToggle={() => handleToggle('chat_style')}>
+                <div className="space-y-4">
+                  <FormField control={form.control} name="chat_bubble_background_color" render={({ field }) => (<FormItem><FormLabel>Color de Fondo de Burbuja (con opacidad)</FormLabel><FormControl><Input placeholder="hsla(0, 0%, 100%, 0.1)" {...field} /></FormControl></FormItem>)} />
+                  <FormField control={form.control} name="chat_bubble_border_color" render={({ field }) => (<FormItem><FormLabel>Color de Borde de Burbuja (con opacidad)</FormLabel><FormControl><Input placeholder="hsla(0, 0%, 100%, 0.2)" {...field} /></FormControl></FormItem>)} />
+                  <FormField control={form.control} name="chat_bubble_blur" render={({ field }) => (<FormItem><FormLabel>Intensidad de Desenfoque (Blur)</FormLabel><FormControl><Slider defaultValue={[field.value || 4]} min={0} max={32} step={1} onValueChange={(value) => field.onChange(value[0])} /></FormControl><span className="text-xs text-muted-foreground">{field.value}px</span></FormItem>)} />
+                  <FormField control={form.control} name="liquid_ether_opacity" render={({ field }) => (<FormItem><FormLabel>Opacidad del Fondo Animado</FormLabel><FormControl><Slider defaultValue={[field.value || 0.5]} min={0} max={1} step={0.1} onValueChange={(value) => field.onChange(value[0])} /></FormControl><span className="text-xs text-muted-foreground">{Math.round((field.value || 0) * 100)}%</span></FormItem>)} />
                 </div>
               </PersonalizationItem>
               <PersonalizationItem id="default_ai_model" icon={<BrainCircuit className="h-5 w-5" />} label="Modelo de IA por Defecto" description="El modelo de IA predeterminado para nuevos usuarios y chats." isOpen={openItemId === 'default_ai_model'} onToggle={() => handleToggle('default_ai_model')}>

@@ -8,8 +8,18 @@ import { z } from 'zod';
 
 const personalizationSchema = z.object({
   app_name: z.string().optional(),
+  app_tagline: z.string().optional(),
+  app_welcome_title: z.string().optional(),
+  app_welcome_description: z.string().optional(),
   theme_primary_color: z.string().optional(),
   theme_sidebar_color: z.string().optional(),
+  theme_accent_color: z.string().optional(),
+  theme_border_radius: z.coerce.number().min(0).max(1).optional(),
+  default_ai_model: z.string().optional(),
+  chat_bubble_background_color: z.string().optional(),
+  chat_bubble_border_color: z.string().optional(),
+  chat_bubble_blur: z.coerce.number().min(0).max(32).optional(),
+  liquid_ether_opacity: z.coerce.number().min(0).max(1).optional(),
 });
 
 async function getIsSuperAdmin(): Promise<boolean> {
@@ -34,7 +44,7 @@ export async function GET(req: NextRequest) {
   try {
     const { data, error } = await supabaseAdmin
       .from('global_settings')
-      .select('login_background_url, app_name, app_logo_url, theme_primary_color, theme_sidebar_color')
+      .select('login_background_url, app_name, app_logo_url, theme_primary_color, theme_sidebar_color, app_favicon_url, app_tagline, app_welcome_title, app_welcome_description, theme_accent_color, theme_border_radius, default_ai_model, chat_bubble_background_color, chat_bubble_border_color, chat_bubble_blur, liquid_ether_opacity')
       .single();
     if (error) throw error;
     return NextResponse.json(data || {});
@@ -51,6 +61,7 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const loginBackgroundFile = formData.get('login_background') as File | null;
     const appLogoFile = formData.get('app_logo') as File | null;
+    const appFaviconFile = formData.get('app_favicon') as File | null;
     const settings = formData.get('settings');
     let parsedSettings = {};
     if (typeof settings === 'string') {
@@ -59,6 +70,7 @@ export async function POST(req: NextRequest) {
 
     let login_background_url: string | undefined = undefined;
     let app_logo_url: string | undefined = undefined;
+    let app_favicon_url: string | undefined = undefined;
 
     if (loginBackgroundFile) {
       const filePath = `public/login-background-${Date.now()}-${loginBackgroundFile.name}`;
@@ -74,10 +86,18 @@ export async function POST(req: NextRequest) {
       app_logo_url = supabaseAdmin.storage.from('app_assets').getPublicUrl(filePath).data.publicUrl;
     }
 
+    if (appFaviconFile) {
+      const filePath = `public/app-favicon-${Date.now()}-${appFaviconFile.name}`;
+      const { error } = await supabaseAdmin.storage.from('app_assets').upload(filePath, appFaviconFile, { upsert: true });
+      if (error) throw error;
+      app_favicon_url = supabaseAdmin.storage.from('app_assets').getPublicUrl(filePath).data.publicUrl;
+    }
+
     const updateData = {
       ...parsedSettings,
       ...(login_background_url && { login_background_url }),
       ...(app_logo_url && { app_logo_url }),
+      ...(app_favicon_url && { app_favicon_url }),
     };
 
     if (Object.keys(updateData).length > 0) {
@@ -104,17 +124,22 @@ export async function DELETE(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const assetType = searchParams.get('type'); // 'login_background' or 'app_logo'
 
-  if (!assetType || (assetType !== 'login_background' && assetType !== 'app_logo')) {
+  if (!assetType || (assetType !== 'login_background' && assetType !== 'app_logo' && assetType !== 'app_favicon')) {
     return NextResponse.json({ message: 'Tipo de recurso no válido.' }, { status: 400 });
   }
 
-  const urlColumn = assetType === 'login_background' ? 'login_background_url' : 'app_logo_url';
+  const urlColumnMap = {
+    'login_background': 'login_background_url',
+    'app_logo': 'app_logo_url',
+    'app_favicon': 'app_favicon_url',
+  };
+  const urlColumn = urlColumnMap[assetType as keyof typeof urlColumnMap];
 
   try {
-    const { data: currentSettings, error: fetchError } = await supabaseAdmin.from('global_settings').select('login_background_url, app_logo_url').single();
+    const { data: currentSettings, error: fetchError } = await supabaseAdmin.from('global_settings').select('login_background_url, app_logo_url, app_favicon_url').single();
     if (fetchError) throw fetchError;
 
-    const currentUrl = currentSettings?.[urlColumn];
+    const currentUrl = (currentSettings as any)?.[urlColumn];
     if (currentUrl) {
       const urlParts = currentUrl.split('/');
       const filePath = urlParts.slice(urlParts.indexOf('public')).join('/');
