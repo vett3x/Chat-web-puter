@@ -134,8 +134,8 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
   const isChatReady = isPuterReady && !isLoadingApiKeys;
 
   return (
-    <div className="relative h-full bg-background">
-      <div className="absolute inset-0 z-0 opacity-20">
+    <div className="relative h-full">
+      <div className="absolute inset-0 z-0 opacity-30">
         <LiquidEther
           colors={[ '#5227FF', '#FF9FFC', '#B19EEF' ]}
           mouseForce={20}
