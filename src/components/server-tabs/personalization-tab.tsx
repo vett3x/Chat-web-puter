@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Image as ImageIcon, Upload, Save, Trash2, Palette, Text, Bot, ChevronRight, ChevronDown } from 'lucide-react';
+import { Loader2, Image as ImageIcon, Upload, Save, Trash2, Palette, Text, Bot, ChevronRight, ChevronDown, BrainCircuit } from 'lucide-react';
 import { toast } from 'sonner';
 import Image from 'next/image';
 import { useForm } from 'react-hook-form';
@@ -14,16 +14,20 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { cn } from '@/lib/utils';
+import { useUserApiKeys, ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys';
+import { AI_PROVIDERS } from '@/lib/ai-models';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const personalizationSchema = z.object({
   app_name: z.string().optional(),
+  app_tagline: z.string().optional(),
   app_welcome_title: z.string().optional(),
   app_welcome_description: z.string().optional(),
   theme_primary_color: z.string().optional(),
   theme_sidebar_color: z.string().optional(),
   theme_accent_color: z.string().optional(),
   theme_border_radius: z.coerce.number().min(0).max(1).optional(),
+  default_ai_model: z.string().optional(),
 });
 
 type PersonalizationFormValues = z.infer<typeof personalizationSchema>;
@@ -64,25 +68,32 @@ export function PersonalizationTab() {
   const [currentSettings, setCurrentSettings] = useState<any>({});
   const [loginBgFile, setLoginBgFile] = useState<File | null>(null);
   const [appLogoFile, setAppLogoFile] = useState<File | null>(null);
+  const [appFaviconFile, setAppFaviconFile] = useState<File | null>(null);
   const [loginBgPreview, setLoginBgPreview] = useState<string | null>(null);
   const [appLogoPreview, setAppLogoPreview] = useState<string | null>(null);
+  const [appFaviconPreview, setAppFaviconPreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [openItemId, setOpenItemId] = useState<string | null>(null);
 
+  const { userApiKeys, aiKeyGroups, isLoadingApiKeys } = useUserApiKeys();
+
   const loginBgInputRef = useRef<HTMLInputElement>(null);
   const appLogoInputRef = useRef<HTMLInputElement>(null);
+  const appFaviconInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<PersonalizationFormValues>({
     resolver: zodResolver(personalizationSchema),
     defaultValues: {
       app_name: '',
+      app_tagline: '',
       app_welcome_title: '',
       app_welcome_description: '',
       theme_primary_color: '#000000',
       theme_sidebar_color: '#000000',
       theme_accent_color: '#000000',
       theme_border_radius: 0.5,
+      default_ai_model: '',
     },
   });
 
@@ -95,15 +106,18 @@ export function PersonalizationTab() {
       setCurrentSettings(data);
       form.reset({
         app_name: data.app_name || '',
+        app_tagline: data.app_tagline || '',
         app_welcome_title: data.app_welcome_title || '',
         app_welcome_description: data.app_welcome_description || '',
         theme_primary_color: data.theme_primary_color || '#000000',
         theme_sidebar_color: data.theme_sidebar_color || '#000000',
         theme_accent_color: data.theme_accent_color || '#000000',
         theme_border_radius: data.theme_border_radius || 0.5,
+        default_ai_model: data.default_ai_model || '',
       });
       setLoginBgPreview(data.login_background_url);
       setAppLogoPreview(data.app_logo_url);
+      setAppFaviconPreview(data.app_favicon_url);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -115,7 +129,7 @@ export function PersonalizationTab() {
     fetchSettings();
   }, [fetchSettings]);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, type: 'login_background' | 'app_logo') => {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, type: 'login_background' | 'app_logo' | 'app_favicon') => {
     const file = event.target.files?.[0];
     if (file) {
       if (!file.type.startsWith('image/')) {
@@ -129,9 +143,12 @@ export function PersonalizationTab() {
       if (type === 'login_background') {
         setLoginBgFile(file);
         setLoginBgPreview(URL.createObjectURL(file));
-      } else {
+      } else if (type === 'app_logo') {
         setAppLogoFile(file);
         setAppLogoPreview(URL.createObjectURL(file));
+      } else {
+        setAppFaviconFile(file);
+        setAppFaviconPreview(URL.createObjectURL(file));
       }
     }
   };
@@ -142,6 +159,7 @@ export function PersonalizationTab() {
     formData.append('settings', JSON.stringify(values));
     if (loginBgFile) formData.append('login_background', loginBgFile);
     if (appLogoFile) formData.append('app_logo', appLogoFile);
+    if (appFaviconFile) formData.append('app_favicon', appFaviconFile);
 
     try {
       const response = await fetch('/api/admin/personalization', { method: 'POST', body: formData });
@@ -150,6 +168,7 @@ export function PersonalizationTab() {
       toast.success('Configuración guardada. Refresca la página para ver todos los cambios.');
       setLoginBgFile(null);
       setAppLogoFile(null);
+      setAppFaviconFile(null);
       fetchSettings();
     } catch (err: any) {
       toast.error(`Error al guardar: ${err.message}`);
@@ -158,7 +177,7 @@ export function PersonalizationTab() {
     }
   };
 
-  const handleRemoveAsset = async (type: 'login_background' | 'app_logo') => {
+  const handleRemoveAsset = async (type: 'login_background' | 'app_logo' | 'app_favicon') => {
     setIsSaving(true);
     try {
       const response = await fetch(`/api/admin/personalization?type=${type}`, { method: 'DELETE' });
@@ -168,9 +187,12 @@ export function PersonalizationTab() {
       if (type === 'login_background') {
         setLoginBgFile(null);
         setLoginBgPreview(null);
-      } else {
+      } else if (type === 'app_logo') {
         setAppLogoFile(null);
         setAppLogoPreview(null);
+      } else {
+        setAppFaviconFile(null);
+        setAppFaviconPreview(null);
       }
       fetchSettings();
     } catch (err: any) {
@@ -183,6 +205,27 @@ export function PersonalizationTab() {
   const handleToggle = (id: string) => {
     setOpenItemId(prev => (prev === id ? null : id));
   };
+
+  const availableModels = React.useMemo(() => {
+    const models: { value: string; label: string; isGlobal?: boolean }[] = [];
+    AI_PROVIDERS.filter(p => p.source === 'puter').forEach(provider => {
+      provider.models.forEach(model => {
+        models.push({ value: `puter:${model.value}`, label: `${provider.company}: ${model.label}` });
+      });
+    });
+    aiKeyGroups.forEach(group => {
+      const activeKeysCount = group.api_keys?.filter(k => k.status === 'active').length || 0;
+      if (activeKeysCount > 0) {
+        let label = group.name;
+        models.push({ value: `group:${group.id}`, label, isGlobal: group.is_global });
+      }
+    });
+    userApiKeys.filter(key => !key.group_id && key.status === 'active').forEach(key => {
+      let label = key.nickname || `Clave ${key.id.substring(0, 4)}`;
+      models.push({ value: `user_key:${key.id}`, label, isGlobal: key.is_global });
+    });
+    return models;
+  }, [userApiKeys, aiKeyGroups]);
 
   return (
     <div className="p-1">
@@ -197,6 +240,9 @@ export function PersonalizationTab() {
               <PersonalizationItem id="app_name" icon={<Text className="h-5 w-5" />} label="Nombre de la Aplicación" description="El nombre que se mostrará en toda la aplicación." isOpen={openItemId === 'app_name'} onToggle={() => handleToggle('app_name')}>
                 <FormField control={form.control} name="app_name" render={({ field }) => (<FormItem><FormControl><Input placeholder="DeepAI Coder" {...field} /></FormControl></FormItem>)} />
               </PersonalizationItem>
+              <PersonalizationItem id="app_tagline" icon={<Text className="h-5 w-5" />} label="Lema de la Aplicación" description="Un subtítulo o eslogan para tu aplicación." isOpen={openItemId === 'app_tagline'} onToggle={() => handleToggle('app_tagline')}>
+                <FormField control={form.control} name="app_tagline" render={({ field }) => (<FormItem><FormControl><Input placeholder="Tu asistente de IA para crear software." {...field} /></FormControl></FormItem>)} />
+              </PersonalizationItem>
               <PersonalizationItem id="app_logo" icon={<Bot className="h-5 w-5" />} label="Logo de la Aplicación" description="Sube el logo de tu aplicación (PNG, max 5MB)." isOpen={openItemId === 'app_logo'} onToggle={() => handleToggle('app_logo')}>
                 <div className="flex items-center gap-3">
                   <div className="relative w-16 h-16 bg-muted rounded-md overflow-hidden flex-shrink-0">
@@ -205,6 +251,17 @@ export function PersonalizationTab() {
                   <div className="flex gap-2">
                     <Button type="button" size="sm" variant="outline" onClick={() => appLogoInputRef.current?.click()} disabled={isSaving}><Upload className="mr-2 h-4 w-4" /> Cambiar</Button>
                     <Button type="button" size="sm" variant="destructive" onClick={() => handleRemoveAsset('app_logo')} disabled={!currentSettings.app_logo_url || isSaving}><Trash2 className="mr-2 h-4 w-4" /> Eliminar</Button>
+                  </div>
+                </div>
+              </PersonalizationItem>
+              <PersonalizationItem id="app_favicon" icon={<ImageIcon className="h-5 w-5" />} label="Favicon de la Aplicación" description="El ícono para la pestaña del navegador (PNG, max 5MB)." isOpen={openItemId === 'app_favicon'} onToggle={() => handleToggle('app_favicon')}>
+                <div className="flex items-center gap-3">
+                  <div className="relative w-16 h-16 bg-muted rounded-md overflow-hidden flex-shrink-0">
+                    {appFaviconPreview ? <Image src={appFaviconPreview} alt="Vista previa del favicon" layout="fill" objectFit="contain" /> : <div className="flex items-center justify-center h-full text-muted-foreground"><ImageIcon className="h-8 w-8" /></div>}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={() => appFaviconInputRef.current?.click()} disabled={isSaving}><Upload className="mr-2 h-4 w-4" /> Cambiar</Button>
+                    <Button type="button" size="sm" variant="destructive" onClick={() => handleRemoveAsset('app_favicon')} disabled={!currentSettings.app_favicon_url || isSaving}><Trash2 className="mr-2 h-4 w-4" /> Eliminar</Button>
                   </div>
                 </div>
               </PersonalizationItem>
@@ -225,6 +282,9 @@ export function PersonalizationTab() {
                   <FormField control={form.control} name="theme_accent_color" render={({ field }) => (<FormItem><FormLabel className="text-xs">Acento</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1" /></FormControl></FormItem>)} />
                 </div>
               </PersonalizationItem>
+              <PersonalizationItem id="default_ai_model" icon={<BrainCircuit className="h-5 w-5" />} label="Modelo de IA por Defecto" description="El modelo de IA predeterminado para nuevos usuarios y chats." isOpen={openItemId === 'default_ai_model'} onToggle={() => handleToggle('default_ai_model')}>
+                <FormField control={form.control} name="default_ai_model" render={({ field }) => (<FormItem><Select onValueChange={field.onChange} value={field.value} disabled={isSaving || isLoadingApiKeys}><FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modelo..." /></SelectTrigger></FormControl><SelectContent>{availableModels.map((model) => (<SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>))}</SelectContent></Select></FormItem>)} />
+              </PersonalizationItem>
             </CardContent>
             <CardFooter className="flex justify-end">
               <Button type="submit" disabled={isSaving}>
@@ -235,6 +295,8 @@ export function PersonalizationTab() {
           </Card>
         </form>
       </Form>
+      <input type="file" ref={appLogoInputRef} onChange={(e) => handleFileChange(e, 'app_logo')} accept="image/*" hidden />
+      <input type="file" ref={appFaviconInputRef} onChange={(e) => handleFileChange(e, 'app_favicon')} accept="image/*" hidden />
     </div>
   );
 }
