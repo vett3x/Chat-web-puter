@@ -31,8 +31,6 @@ interface SessionContextType {
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
-const INACTIVITY_THRESHOLD = 15 * 60 * 1000; // 15 minutes
-
 export const SessionContextProvider = ({ children, onGlobalRefresh }: { children: React.ReactNode; onGlobalRefresh?: () => void }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,7 +45,6 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
   const router = useRouter();
   const pathname = usePathname();
   const isInitialProfileFetch = useRef(true);
-  const lastHiddenTimestamp = useRef<number | null>(null);
 
   const isUserTemporarilyDisabled = userStatus === 'banned' || userStatus === 'kicked';
 
@@ -147,26 +144,10 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
 
   useEffect(() => {
     const handleVisibilityChange = async () => {
-      if (document.hidden) {
-        lastHiddenTimestamp.current = Date.now();
-      } else {
-        if (lastHiddenTimestamp.current) {
-          const inactiveDuration = Date.now() - lastHiddenTimestamp.current;
-          if (inactiveDuration > INACTIVITY_THRESHOLD) {
-            const toastId = toast.loading('Refrescando sesión por inactividad...');
-            try {
-              // Step 1: Force a session refresh first.
-              await supabase.auth.getSession(); 
-              // Step 2: Now that the session is valid, trigger the data refresh.
-              triggerGlobalRefresh();
-              toast.success('¡Sesión y datos actualizados!', { id: toastId });
-            } catch (error) {
-              console.error("Error refreshing session on visibility change:", error);
-              toast.error('Error al refrescar la sesión.', { id: toastId });
-            }
-          }
-          lastHiddenTimestamp.current = null;
-        }
+      if (document.visibilityState === 'visible') {
+        console.log('[SessionContext] App became visible. Forcing Supabase realtime reconnection.');
+        supabase.removeAllChannels();
+        triggerGlobalRefresh();
       }
     };
 
@@ -237,7 +218,6 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
       )
       .subscribe();
 
-    // NEW: Realtime subscription for support ticket messages
     const supportTicketMessagesChannel = supabase
       .channel(`support_ticket_messages_for_user_${session.user.id}`)
       .on(
@@ -245,8 +225,6 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
         { event: 'INSERT', schema: 'public', table: 'support_ticket_messages' },
         async (payload) => {
           const newMessage = payload.new as any;
-          // Check if the message is from an admin and not an internal note
-          // And if the ticket belongs to the current user
           if (newMessage.sender_id !== session.user.id && !newMessage.is_internal_note) {
             const { data: ticket, error } = await supabase
               .from('support_tickets')
@@ -261,12 +239,12 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
             }
 
             if (ticket) {
-              setHasNewUserSupportTickets(true); // Set the new state to true
+              setHasNewUserSupportTickets(true);
               toast.info(`¡Nueva respuesta en tu ticket: "${ticket.subject}"!`, {
                 description: 'Haz clic en "Mis Tickets" en la configuración de tu cuenta para verla.',
                 duration: 8000,
               });
-              triggerGlobalRefresh(); // Trigger a global refresh to update UI if needed
+              triggerGlobalRefresh();
             }
           }
         }
@@ -275,9 +253,9 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
 
     return () => {
       supabase.removeChannel(profileChannel);
-      supabase.removeChannel(supportTicketMessagesChannel); // Clean up new channel
+      supabase.removeChannel(supportTicketMessagesChannel);
     };
-  }, [session?.user?.id, router, userStatus, triggerGlobalRefresh]);
+  }, [session?.user?.id, router, userStatus, triggerGlobalRefresh, globalRefreshKey]);
 
   if (isLoading) {
     return (

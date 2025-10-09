@@ -165,7 +165,7 @@ export function useSidebarData() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, fetchData]);
+  }, [userId, fetchData, globalRefreshKey]);
 
   const createConversation = async (onSuccess: (newConversation: Conversation) => void): Promise<string | null> => {
     if (!userId) {

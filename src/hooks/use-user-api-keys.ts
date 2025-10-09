@@ -38,7 +38,7 @@ export interface AiKeyGroup {
 }
 
 export function useUserApiKeys() {
-  const { session, isLoading: isSessionLoading } = useSession(); // Get session and loading state
+  const { session, isLoading: isSessionLoading, globalRefreshKey } = useSession(); // Get session and loading state
   const userId = session?.user?.id;
 
   const [keys, setKeys] = useState<ApiKey[]>([]);
@@ -164,7 +164,7 @@ export function useUserApiKeys() {
     return () => {
       channels.forEach(channel => supabase.removeChannel(channel));
     };
-  }, [userId, fetchKeysAndGroups]);
+  }, [userId, fetchKeysAndGroups, globalRefreshKey]);
 
   return { userApiKeys: keys, aiKeyGroups: groups, isLoadingApiKeys: isLoading, refreshApiKeys: fetchKeysAndGroups }; // NEW: Return aiKeyGroups
 }
