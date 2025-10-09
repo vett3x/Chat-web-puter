@@ -212,23 +212,32 @@ export const NoteEditorPanel = forwardRef<NoteEditorPanelRef, NoteEditorPanelPro
     return () => clearTimeout(handler);
   }, [title, note, isLoading, content, handleSave]);
 
-  const fetchNote = useCallback(async () => {
+  const fetchNote = useCallback(async (retries = 3, delay = 500) => {
     if (!noteId) return;
     setIsLoading(true);
-    try {
-      const response = await fetch(`/api/notes/${noteId}`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'No se pudo cargar la nota.');
+    for (let i = 0; i < retries; i++) {
+      try {
+        const response = await fetch(`/api/notes/${noteId}`);
+        if (response.status === 404 && i < retries - 1) {
+          await new Promise(res => setTimeout(res, delay * (i + 1)));
+          continue;
+        }
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'No se pudo cargar la nota.');
+        }
+        const data = await response.json();
+        setNote(data);
+        setTitle(data.title);
+        setContent(data.content || '');
+        setIsLoading(false);
+        return; // Success
+      } catch (error: any) {
+        if (i === retries - 1) {
+          toast.error(error.message);
+          setIsLoading(false);
+        }
       }
-      const data = await response.json();
-      setNote(data);
-      setTitle(data.title);
-      setContent(data.content || '');
-    } catch (error: any) {
-      toast.error(error.message);
-    } finally {
-      setIsLoading(false);
     }
   }, [noteId]);
 

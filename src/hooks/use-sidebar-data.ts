@@ -96,7 +96,7 @@ export function useSidebarData() {
       throw new Error(error.message);
     }
     toast.success('Nueva conversación creada.');
-    await fetchData(); // Refetch data to ensure consistency
+    setConversations(prev => [data, ...prev]); // Optimistic update
     onSuccess(data);
     return data.id;
   };
@@ -113,7 +113,7 @@ export function useSidebarData() {
       throw new Error(error.message);
     }
     toast.success(`${newFolderName} creada.`);
-    await fetchData(); // Refetch data to ensure consistency
+    setFolders(prev => [data, ...prev]); // Optimistic update
     return data.id;
   };
 
@@ -128,7 +128,7 @@ export function useSidebarData() {
       throw new Error(error.message);
     }
     toast.success('Nueva nota creada.');
-    await fetchData(); // Refetch data to ensure consistency
+    setNotes(prev => [data, ...prev]); // Optimistic update
     onSuccess(data);
     return data.id;
   };

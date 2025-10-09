@@ -242,39 +242,47 @@ export function useDeepAICoderChat({
     }));
   };
 
-  const loadConversationData = useCallback(async () => {
+  const loadConversationData = useCallback(async (retries = 3, delay = 500) => {
     if (conversationId && userId) {
       setIsLoading(true);
       setMessages([]);
       setPage(0);
       setHasMoreMessages(true);
       
-      try {
-        const response = await fetch(`/api/conversations/${conversationId}?page=0`);
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Error al cargar la conversación.');
-        }
-        const { details, messages: fetchedMsgsData } = await response.json();
+      for (let i = 0; i < retries; i++) {
+        try {
+          const response = await fetch(`/api/conversations/${conversationId}?page=0`);
+          if (response.status === 404 && i < retries - 1) {
+            await new Promise(res => setTimeout(res, delay * (i + 1)));
+            continue;
+          }
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Error al cargar la conversación.');
+          }
+          const { details, messages: fetchedMsgsData } = await response.json();
 
-        if (details.model && (details.model.startsWith('puter:') || details.model.startsWith('user_key:') || details.model.startsWith('group:'))) {
-          setSelectedModel(details.model);
-        } else {
-          setSelectedModel(determineDefaultModel(userApiKeys, aiKeyGroups, userDefaultModel));
-        }
+          if (details.model && (details.model.startsWith('puter:') || details.model.startsWith('user_key:') || details.model.startsWith('group:'))) {
+            setSelectedModel(details.model);
+          } else {
+            setSelectedModel(determineDefaultModel(userApiKeys, aiKeyGroups, userDefaultModel));
+          }
 
-        const fetchedMsgs = mapDbMessages(fetchedMsgsData);
-        setMessages(fetchedMsgs);
-        if (fetchedMsgs.length < MESSAGES_PER_PAGE) {
-          setHasMoreMessages(false);
+          const fetchedMsgs = mapDbMessages(fetchedMsgsData);
+          setMessages(fetchedMsgs);
+          if (fetchedMsgs.length < MESSAGES_PER_PAGE) {
+            setHasMoreMessages(false);
+          }
+          setIsLoading(false);
+          return; // Success
+        } catch (error: any) {
+          if (i === retries - 1) {
+            toast.error(error.message);
+            setHasMoreMessages(false);
+            setIsLoading(false);
+          }
         }
-      } catch (error: any) {
-        toast.error(error.message);
-        setHasMoreMessages(false);
-      } finally {
-        setIsLoading(false);
       }
-      
     } else {
       setMessages([]);
     }
