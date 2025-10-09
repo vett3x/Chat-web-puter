@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Image as ImageIcon, Upload, Save, Trash2, Palette, Text, Bot } from 'lucide-react';
+import { Loader2, Image as ImageIcon, Upload, Save, Trash2, Palette, Text, Bot, ChevronRight, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import Image from 'next/image';
 import { useForm } from 'react-hook-form';
@@ -13,6 +13,8 @@ import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
 
 const personalizationSchema = z.object({
   app_name: z.string().optional(),
@@ -26,6 +28,38 @@ const personalizationSchema = z.object({
 
 type PersonalizationFormValues = z.infer<typeof personalizationSchema>;
 
+interface PersonalizationItemProps {
+  id: string;
+  icon: React.ReactNode;
+  label: string;
+  description: string;
+  children: React.ReactNode;
+  isOpen: boolean;
+  onToggle: () => void;
+}
+
+const PersonalizationItem: React.FC<PersonalizationItemProps> = ({ id, icon, label, description, children, isOpen, onToggle }) => (
+  <Collapsible open={isOpen} onOpenChange={onToggle} className="border rounded-lg">
+    <CollapsibleTrigger asChild>
+      <button className="flex items-center justify-between w-full p-4 text-left">
+        <div className="flex items-center gap-3">
+          <div className="flex-shrink-0">{icon}</div>
+          <div>
+            <h4 className="font-semibold">{label}</h4>
+            <p className="text-xs text-muted-foreground">{description}</p>
+          </div>
+        </div>
+        {isOpen ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+      </button>
+    </CollapsibleTrigger>
+    <CollapsibleContent className="pt-0 px-4 pb-4">
+      <div className="border-t pt-4">
+        {children}
+      </div>
+    </CollapsibleContent>
+  </Collapsible>
+);
+
 export function PersonalizationTab() {
   const [currentSettings, setCurrentSettings] = useState<any>({});
   const [loginBgFile, setLoginBgFile] = useState<File | null>(null);
@@ -34,6 +68,7 @@ export function PersonalizationTab() {
   const [appLogoPreview, setAppLogoPreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [openItemId, setOpenItemId] = useState<string | null>(null);
 
   const loginBgInputRef = useRef<HTMLInputElement>(null);
   const appLogoInputRef = useRef<HTMLInputElement>(null);
@@ -145,6 +180,10 @@ export function PersonalizationTab() {
     }
   };
 
+  const handleToggle = (id: string) => {
+    setOpenItemId(prev => (prev === id ? null : id));
+  };
+
   return (
     <div className="p-1">
       <Form {...form}>
@@ -154,72 +193,38 @@ export function PersonalizationTab() {
               <CardTitle>Personalización de la Aplicación</CardTitle>
               <CardDescription>Define la identidad visual, colores y apariencia de tu aplicación.</CardDescription>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Left Column */}
-              <div className="space-y-6">
-                <FormField control={form.control} name="app_name" render={({ field }) => (<FormItem><FormLabel className="flex items-center gap-2 text-sm"><Text className="h-4 w-4" /> Nombre de la Aplicación</FormLabel><FormControl><Input placeholder="DeepAI Coder" {...field} /></FormControl></FormItem>)} />
-                <div>
-                  <FormLabel className="flex items-center gap-2 mb-2 text-sm"><Bot className="h-4 w-4" /> Logo de la Aplicación</FormLabel>
-                  <div className="border rounded-lg p-3 flex items-center gap-3">
-                    <div className="relative w-16 h-16 bg-muted rounded-md overflow-hidden flex-shrink-0">
-                      {appLogoPreview ? <Image src={appLogoPreview} alt="Vista previa del logo" layout="fill" objectFit="contain" /> : <div className="flex items-center justify-center h-full text-muted-foreground"><Bot className="h-8 w-8" /></div>}
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-xs text-muted-foreground">PNG transparente, max 5MB.</p>
-                      <div className="flex gap-2">
-                        <Button type="button" size="sm" variant="outline" onClick={() => appLogoInputRef.current?.click()} disabled={isSaving}><Upload className="mr-2 h-4 w-4" /> Cambiar</Button>
-                        <Button type="button" size="sm" variant="destructive" onClick={() => handleRemoveAsset('app_logo')} disabled={!currentSettings.app_logo_url || isSaving}><Trash2 className="mr-2 h-4 w-4" /> Eliminar</Button>
-                      </div>
-                    </div>
+            <CardContent className="space-y-2">
+              <PersonalizationItem id="app_name" icon={<Text className="h-5 w-5" />} label="Nombre de la Aplicación" description="El nombre que se mostrará en toda la aplicación." isOpen={openItemId === 'app_name'} onToggle={() => handleToggle('app_name')}>
+                <FormField control={form.control} name="app_name" render={({ field }) => (<FormItem><FormControl><Input placeholder="DeepAI Coder" {...field} /></FormControl></FormItem>)} />
+              </PersonalizationItem>
+              <PersonalizationItem id="app_logo" icon={<Bot className="h-5 w-5" />} label="Logo de la Aplicación" description="Sube el logo de tu aplicación (PNG, max 5MB)." isOpen={openItemId === 'app_logo'} onToggle={() => handleToggle('app_logo')}>
+                <div className="flex items-center gap-3">
+                  <div className="relative w-16 h-16 bg-muted rounded-md overflow-hidden flex-shrink-0">
+                    {appLogoPreview ? <Image src={appLogoPreview} alt="Vista previa del logo" layout="fill" objectFit="contain" /> : <div className="flex items-center justify-center h-full text-muted-foreground"><Bot className="h-8 w-8" /></div>}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={() => appLogoInputRef.current?.click()} disabled={isSaving}><Upload className="mr-2 h-4 w-4" /> Cambiar</Button>
+                    <Button type="button" size="sm" variant="destructive" onClick={() => handleRemoveAsset('app_logo')} disabled={!currentSettings.app_logo_url || isSaving}><Trash2 className="mr-2 h-4 w-4" /> Eliminar</Button>
                   </div>
                 </div>
-                <div>
-                  <FormLabel className="flex items-center gap-2 mb-2 text-sm"><ImageIcon className="h-4 w-4" /> Fondo de Inicio de Sesión</FormLabel>
-                  <input type="file" ref={loginBgInputRef} onChange={(e) => handleFileChange(e, 'login_background')} accept="image/*" hidden />
-                  <div className="border rounded-lg p-3 space-y-3">
-                    {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
-                      <div className="relative w-full h-24 bg-muted rounded-md overflow-hidden">
-                        {loginBgPreview ? <Image src={loginBgPreview} alt="Vista previa del fondo" layout="fill" objectFit="cover" /> : <div className="flex flex-col items-center justify-center h-full text-muted-foreground"><ImageIcon className="h-8 w-8" /><p className="text-xs mt-1">Sin fondo</p></div>}
-                      </div>
-                    )}
-                    <div className="flex gap-2">
-                      <Button type="button" size="sm" variant="outline" onClick={() => loginBgInputRef.current?.click()} disabled={isSaving}><Upload className="mr-2 h-4 w-4" /> Cambiar</Button>
-                      <Button type="button" size="sm" variant="destructive" onClick={() => handleRemoveAsset('login_background')} disabled={!currentSettings.login_background_url || isSaving}><Trash2 className="mr-2 h-4 w-4" /> Eliminar</Button>
-                    </div>
-                  </div>
+              </PersonalizationItem>
+              <PersonalizationItem id="login_background" icon={<ImageIcon className="h-5 w-5" />} label="Fondo de Inicio de Sesión" description="Imagen de fondo para la página de login." isOpen={openItemId === 'login_background'} onToggle={() => handleToggle('login_background')}>
+                <input type="file" ref={loginBgInputRef} onChange={(e) => handleFileChange(e, 'login_background')} accept="image/*" hidden />
+                <div className="relative w-full h-24 bg-muted rounded-md overflow-hidden mb-2">
+                  {loginBgPreview ? <Image src={loginBgPreview} alt="Vista previa del fondo" layout="fill" objectFit="cover" /> : <div className="flex flex-col items-center justify-center h-full text-muted-foreground"><ImageIcon className="h-8 w-8" /><p className="text-xs mt-1">Sin fondo</p></div>}
                 </div>
-              </div>
-
-              {/* Right Column */}
-              <div className="space-y-6">
-                <FormField control={form.control} name="app_welcome_title" render={({ field }) => (<FormItem><FormLabel className="flex items-center gap-2 text-sm"><Text className="h-4 w-4" /> Título de Bienvenida (Login)</FormLabel><FormControl><Input placeholder="Bienvenido a DeepAI Coder" {...field} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="app_welcome_description" render={({ field }) => (<FormItem><FormLabel className="flex items-center gap-2 text-sm"><Text className="h-4 w-4" /> Descripción de Bienvenida (Login)</FormLabel><FormControl><Textarea placeholder="Tu asistente de IA para la creación de aplicaciones." {...field} /></FormControl></FormItem>)} />
-                <div>
-                  <FormLabel className="flex items-center gap-2 mb-2 text-sm"><Palette className="h-4 w-4" /> Colores del Tema</FormLabel>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <FormField control={form.control} name="theme_primary_color" render={({ field }) => (<FormItem><FormLabel className="text-xs">Primario</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1" /></FormControl></FormItem>)} />
-                    <FormField control={form.control} name="theme_sidebar_color" render={({ field }) => (<FormItem><FormLabel className="text-xs">Barra Lateral</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1" /></FormControl></FormItem>)} />
-                    <FormField control={form.control} name="theme_accent_color" render={({ field }) => (<FormItem><FormLabel className="text-xs">Acento</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1" /></FormControl></FormItem>)} />
-                  </div>
+                <div className="flex gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={() => loginBgInputRef.current?.click()} disabled={isSaving}><Upload className="mr-2 h-4 w-4" /> Cambiar</Button>
+                  <Button type="button" size="sm" variant="destructive" onClick={() => handleRemoveAsset('login_background')} disabled={!currentSettings.login_background_url || isSaving}><Trash2 className="mr-2 h-4 w-4" /> Eliminar</Button>
                 </div>
-                <FormField control={form.control} name="theme_border_radius" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2 text-sm">Radio de Borde (Redondez)</FormLabel>
-                    <div className="flex items-center gap-4">
-                      <FormControl>
-                        <Slider
-                          min={0}
-                          max={1}
-                          step={0.1}
-                          value={[field.value || 0.5]}
-                          onValueChange={(value) => field.onChange(value[0])}
-                        />
-                      </FormControl>
-                      <span className="text-xs font-mono w-12 text-right">{(field.value || 0.5).toFixed(1)}rem</span>
-                    </div>
-                  </FormItem>
-                )} />
-              </div>
+              </PersonalizationItem>
+              <PersonalizationItem id="theme_colors" icon={<Palette className="h-5 w-5" />} label="Colores del Tema" description="Personaliza la paleta de colores de la interfaz." isOpen={openItemId === 'theme_colors'} onToggle={() => handleToggle('theme_colors')}>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <FormField control={form.control} name="theme_primary_color" render={({ field }) => (<FormItem><FormLabel className="text-xs">Primario</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1" /></FormControl></FormItem>)} />
+                  <FormField control={form.control} name="theme_sidebar_color" render={({ field }) => (<FormItem><FormLabel className="text-xs">Barra Lateral</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1" /></FormControl></FormItem>)} />
+                  <FormField control={form.control} name="theme_accent_color" render={({ field }) => (<FormItem><FormLabel className="text-xs">Acento</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1" /></FormControl></FormItem>)} />
+                </div>
+              </PersonalizationItem>
             </CardContent>
             <CardFooter className="flex justify-end">
               <Button type="submit" disabled={isSaving}>
