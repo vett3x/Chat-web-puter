@@ -10,17 +10,17 @@ type StarBorderProps<T extends React.ElementType> = React.ComponentPropsWithoutR
   color?: string;
   speed?: React.CSSProperties['animationDuration'];
   thickness?: number;
-  contentClassName?: string; // Nueva prop para el div de contenido interno
+  contentClassName?: string;
 };
 
 const StarBorder = <T extends React.ElementType = 'button'>({
   as,
   className = '',
-  color = 'white',
+  color = '#C000C0', // Color púrpura más cercano al de la imagen
   speed = '6s',
   thickness = 1,
   children,
-  contentClassName, // Desestructuramos la nueva prop
+  contentClassName,
   ...rest
 }: StarBorderProps<T>) => {
   const Component = as || 'button';
@@ -34,21 +34,23 @@ const StarBorder = <T extends React.ElementType = 'button'>({
         ...(rest as any).style
       }}
     >
+      {/* Estrella superior izquierda */}
       <div
-        className="absolute w-[300%] h-[50%] opacity-70 bottom-[-11px] right-[-250%] rounded-full animate-star-movement-bottom z-0"
+        className="absolute w-[100px] h-[20px] opacity-70 top-[-10px] left-[-20px] rounded-full animate-star-movement-top z-0"
         style={{
           background: `radial-gradient(circle, ${color}, transparent 10%)`,
           animationDuration: speed
         }}
       ></div>
+      {/* Estrella inferior derecha */}
       <div
-        className="absolute w-[300%] h-[50%] opacity-70 top-[-10px] left-[-250%] rounded-full animate-star-movement-top z-0"
+        className="absolute w-[100px] h-[20px] opacity-70 bottom-[-10px] right-[-20px] rounded-full animate-star-movement-bottom z-0"
         style={{
           background: `radial-gradient(circle, ${color}, transparent 10%)`,
           animationDuration: speed
         }}
       ></div>
-      {/* Aplicamos contentClassName aquí, sin estilos por defecto */}
+      {/* El contenido interno ahora se estiliza completamente a través de contentClassName */}
       <div className={cn("relative z-1", contentClassName)}>
         {children}
       </div>
