@@ -93,9 +93,9 @@
     --black-color-login: 0 0% 98%; /* --primary-foreground */
 
     /* New variables for chat glassmorphism */
-    --chat-bubble-background-color: 0 0% 10% / 0.2; /* Dark gray with opacity for light mode */
-    --chat-bubble-border-color: 0 0% 10% / 0.3;   /* Darker gray with opacity for light mode */
-    --chat-bubble-blur: 8px; /* More blur */
+    --chat-bubble-background-color: 0 0% 10% / 0.4; /* Dark gray with more opacity for light mode */
+    --chat-bubble-border-color: 0 0% 10% / 0.5;   /* Darker gray with more opacity for light mode */
+    --chat-bubble-blur: 16px; /* More blur */
     --liquid-ether-opacity: 0.5;
   }
   .dark {
@@ -186,9 +186,9 @@
     --black-color-login: 0 0% 98%; /* --primary-foreground */
 
     /* New variables for chat glassmorphism */
-    --chat-bubble-background-color: 255 100% 10% / 0.3; /* Dark blue-purple with opacity for dark mode */
-    --chat-bubble-border-color: 255 100% 15% / 0.4;   /* Slightly lighter dark blue-purple with opacity for dark mode */
-    --chat-bubble-blur: 8px; /* More blur */
+    --chat-bubble-background-color: 255 100% 10% / 0.5; /* Dark blue-purple with more opacity for dark mode */
+    --chat-bubble-border-color: 255 100% 15% / 0.6;   /* Slightly lighter dark blue-purple with more opacity for dark mode */
+    --chat-bubble-blur: 16px; /* More blur */
   }
 
   body.login-page {

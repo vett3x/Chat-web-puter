@@ -27,24 +27,24 @@ const StarBorder = <T extends React.ElementType = 'button'>({
 
   return (
     <Component
-      className={cn(`relative inline-block overflow-hidden rounded-[20px]`, className)}
+      className={cn(`relative inline-block rounded-[20px]`, className)} // Eliminado overflow-hidden de aquí
       {...(rest as any)}
       style={{
         padding: `${thickness}px 0`,
         ...(rest as any).style
       }}
     >
-      {/* Estrella superior izquierda - Estela más larga */}
+      {/* Estrella superior izquierda - Estela más larga y más visible */}
       <div
-        className="absolute w-[500%] h-[30px] opacity-70 top-[-15px] left-[-200%] rounded-full animate-star-movement-top z-0"
+        className="absolute w-[500%] h-[50px] opacity-70 top-[-25px] left-[-200%] rounded-full animate-star-movement-top z-0"
         style={{
           background: `radial-gradient(circle, ${color}, transparent 10%)`,
           animationDuration: speed
         }}
       ></div>
-      {/* Estrella inferior derecha - Estela más larga */}
+      {/* Estrella inferior derecha - Estela más larga y más visible */}
       <div
-        className="absolute w-[500%] h-[30px] opacity-70 bottom-[-15px] right-[-200%] rounded-full animate-star-movement-bottom z-0"
+        className="absolute w-[500%] h-[50px] opacity-70 bottom-[-25px] right-[-200%] rounded-full animate-star-movement-bottom z-0"
         style={{
           background: `radial-gradient(circle, ${color}, transparent 10%)`,
           animationDuration: speed

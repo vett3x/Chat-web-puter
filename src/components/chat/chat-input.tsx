@@ -185,7 +185,7 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
           as="div"
           className="w-full max-w-3xl rounded-lg"
           color="#C000C0" // Color púrpura para las estrellas
-          contentClassName="p-2 flex flex-col gap-2 bg-[var(--chat-bubble-background-color)] backdrop-blur-[var(--chat-bubble-blur)] rounded-lg" // Eliminado 'border border-[var(--chat-bubble-border-color)]'
+          contentClassName="p-2 flex flex-col gap-2 bg-[var(--chat-bubble-background-color)] backdrop-blur-[var(--chat-bubble-blur)] border border-[var(--chat-bubble-border-color)] rounded-lg overflow-hidden" // Añadido overflow-hidden aquí
         >
           <FileAttachmentPreview selectedFiles={selectedFiles} onRemoveFile={removeFile} />
           
