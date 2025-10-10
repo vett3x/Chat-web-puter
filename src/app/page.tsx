@@ -110,8 +110,9 @@ export default function LandingPage() {
                   chaos={0.5}
                   thickness={1}
                   style={{ borderRadius: 'var(--radius)' }}
+                  className="bg-[#0A021A] h-full"
                 >
-                  <div className="bg-[#0A021A] text-left flex flex-col h-full p-6 rounded-[var(--radius)]">
+                  <div className="text-left flex flex-col h-full p-6">
                     <div className="mb-6">
                       <h3 className="text-xl font-bold">{plan.name}</h3>
                       <p className="text-white/60">{plan.description}</p>
