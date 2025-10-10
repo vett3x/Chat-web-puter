@@ -41,7 +41,10 @@ interface ChatMessagesProps {
 }
 
 const SuggestionCard = ({ icon, title, description, onClick }: { icon: React.ReactNode, title: string, description: string, onClick: () => void }) => (
-  <Card onClick={onClick} className="cursor-pointer hover:bg-accent transition-colors">
+  <Card 
+    onClick={onClick} 
+    className="cursor-pointer bg-black/30 backdrop-blur-lg border border-white/10 hover:bg-black/50 transition-colors"
+  >
     <CardHeader className="flex flex-row items-start gap-4 space-y-0 p-4">
       <div className="flex-shrink-0">{icon}</div>
       <div className="flex-1">
