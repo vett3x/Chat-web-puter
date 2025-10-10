@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Loader2, Folder, Wand2, FileText, ShieldAlert, Download, LifeBuoy } from 'lucide-react'; // Import LifeBuoy
+import { Plus, Loader2, Folder, Wand2, FileText, ShieldAlert, Download, LifeBuoy } from 'lucide-react';
 import { ProfileDropdown } from './profile-dropdown';
 import { SettingsMenu } from './settings-menu'; // Import the new menu
 import { useSession } from '@/components/session-context-provider';
@@ -19,13 +19,13 @@ interface SidebarHeaderProps {
   isCreatingNote: boolean;
   onOpenProfileSettings: () => void;
   onOpenAccountSettings: () => void;
-  onOpenAdminPanel: () => void;
+  onOpenAdminPanel: (initialTab?: string) => void;
   onOpenUserManagement: () => void;
   onOpenDeepAiCoder: () => void;
   onOpenUpdateManager: () => void;
   onOpenApiManagement: () => void;
   onOpenAlerts: () => void;
-  onOpenSupportTicket: () => void; // New prop
+  onOpenSupportTicket: () => void;
 }
 
 export function SidebarHeader({
@@ -43,7 +43,7 @@ export function SidebarHeader({
   onOpenUpdateManager,
   onOpenApiManagement,
   onOpenAlerts,
-  onOpenSupportTicket, // New prop
+  onOpenSupportTicket,
 }: SidebarHeaderProps) {
   const { userRole } = useSession();
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
@@ -216,7 +216,7 @@ export function SidebarHeader({
               size="icon"
               onClick={() => {
                 setHasNewSupportTickets(false); // Reset alert when clicked
-                onOpenSupportTicket();
+                onOpenAdminPanel('support');
               }}
               className="relative text-muted-foreground bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10 hover:text-sidebar-accent-foreground rounded-full h-7 w-7"
               title="Tickets de Soporte"

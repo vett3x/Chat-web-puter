@@ -81,8 +81,10 @@ export default function AppPage() {
   };
 
   const handleOpenDialog = (dialog: keyof typeof dialogs, initialTab?: string) => {
+    if (dialog === 'adminPanel' && initialTab) {
+      setAdminPanelInitialTab(initialTab);
+    }
     setDialogs(prev => ({ ...prev, [dialog]: true }));
-    if (initialTab) setAdminPanelInitialTab(initialTab);
   };
 
   const handleAppCreated = (newApp: any) => {
@@ -226,7 +228,7 @@ export default function AppPage() {
           onFileSelect={handleFileSelect}
           onOpenProfileSettings={() => handleOpenDialog('profileSettings')}
           onOpenAccountSettings={() => handleOpenDialog('accountSettings')}
-          onOpenAdminPanel={() => handleOpenDialog('adminPanel')}
+          onOpenAdminPanel={(initialTab) => handleOpenDialog('adminPanel', initialTab)}
           onOpenUserManagement={() => handleOpenDialog('userManagement')}
           onOpenDeepAiCoder={() => handleOpenDialog('deepAiCoder')}
           onOpenUpdateManager={() => handleOpenDialog('updateManager')}

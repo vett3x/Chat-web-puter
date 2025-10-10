@@ -54,7 +54,7 @@ interface ConversationSidebarProps {
   onFileSelect: (path: string) => void;
   onOpenProfileSettings: () => void;
   onOpenAccountSettings: () => void;
-  onOpenAdminPanel: () => void;
+  onOpenAdminPanel: (initialTab?: string) => void;
   onOpenUserManagement: () => void;
   onOpenDeepAiCoder: () => void;
   onOpenUpdateManager: () => void;
