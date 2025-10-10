@@ -13,8 +13,19 @@ import CardSwap, { Card } from '@/components/CardSwap';
 import { TechnologyLogos } from '@/components/landing/TechnologyLogos';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { DeepAiCoderDialog } from '@/components/deep-ai-coder-dialog'; // Importar el nuevo diálogo
+import { useRouter } from 'next/navigation'; // Importar useRouter
 
 export default function LandingPage() {
+  const [isDeepAiCoderOpen, setIsDeepAiCoderOpen] = useState(false);
+  const router = useRouter();
+
+  const handleAppCreated = () => {
+    // Después de que la app se crea en el backend, redirigimos al usuario a la página principal de la aplicación.
+    // La lógica en la página principal se encargará de mostrar el nuevo proyecto.
+    router.push('/');
+  };
+
   const pricingPlans = [
     {
       name: 'Hobby',
@@ -151,8 +162,8 @@ export default function LandingPage() {
               Olvida la configuración compleja. Describe tu app, y deja que la IA construya, gestione y despliegue por ti.
             </p>
             <div className="mt-8">
-              <Button asChild size="lg" className="bg-primary-light-purple/20 hover:bg-primary-light-purple/30 backdrop-blur-md border border-primary-light-purple/30 text-white font-semibold text-lg px-8 py-6 rounded-full">
-                <Link href="/login">Empezar a Construir Ahora</Link>
+              <Button onClick={() => setIsDeepAiCoderOpen(true)} size="lg" className="bg-primary-light-purple/20 hover:bg-primary-light-purple/30 backdrop-blur-md border border-primary-light-purple/30 text-white font-semibold text-lg px-8 py-6 rounded-full">
+                Empezar a Construir Ahora
               </Button>
               <p className="mt-3 text-sm text-white/50">No se requiere tarjeta de crédito para el plan Hobby.</p>
             </div>
@@ -317,6 +328,11 @@ export default function LandingPage() {
         />
       </main>
       <LandingFooter ref={footerRef} />
+      <DeepAiCoderDialog
+        open={isDeepAiCoderOpen}
+        onOpenChange={setIsDeepAiCoderOpen}
+        onAppCreated={handleAppCreated}
+      />
     </div>
   );
 }
