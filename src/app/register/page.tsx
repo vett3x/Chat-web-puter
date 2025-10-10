@@ -88,7 +88,7 @@ export default function RegisterPage() {
       toast.error(error.message || 'Error al registrar la cuenta.');
     } else {
       toast.success('¡Registro exitoso! Por favor, revisa tu correo para verificar tu cuenta.');
-      router.push('/login');
+      router.push('/check-email');
     }
     setIsLoading(false);
   };
