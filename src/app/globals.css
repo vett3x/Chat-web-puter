@@ -104,7 +104,7 @@
 
     --foreground: 0 0% 98%; /* White text */
 
-    --card: 220 10% 7%; /* Same as background for consistency */
+    --card: 220 10% 10%; /* Dark gray for form background */
 
     --card-foreground: 0 0% 98%;
 
@@ -189,7 +189,6 @@
   body.login-page {
     /* Remove specific background image, let bg-background handle it */
     background-image: none;
-    background-color: hsl(var(--background)); /* Ensure it uses the theme background */
   }
 }
 

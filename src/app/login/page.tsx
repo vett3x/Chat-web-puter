@@ -152,7 +152,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen w-full bg-background text-foreground grid grid-cols-1 lg:grid-cols-3">
       {/* Left Column: Form */}
-      <div ref={leftColumnRef} className="lg:col-span-2 flex flex-col justify-center items-center p-4 sm:p-8 lg:p-12">
+      <div ref={leftColumnRef} className="lg:col-span-2 flex flex-col justify-center items-center p-4 sm:p-8 lg:p-12 bg-card">
         <div className="w-full max-w-lg">
           <div className="mb-8">
             <Link href="/" className="flex items-center gap-2 text-foreground">
