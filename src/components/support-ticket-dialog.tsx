@@ -68,7 +68,7 @@ export function SupportTicketDialog({ open, onOpenChange }: SupportTicketDialogP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg bg-[var(--sidebar-background)] backdrop-blur-[var(--chat-bubble-blur)] border-[var(--sidebar-border)]">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Abrir un Ticket de Soporte</DialogTitle>
           <DialogDescription>

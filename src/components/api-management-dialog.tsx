@@ -1082,7 +1082,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] p-6 max-h-[90vh] overflow-y-auto flex flex-col bg-[var(--sidebar-background)] backdrop-blur-[var(--chat-bubble-blur)] border-[var(--sidebar-border)]">
+      <DialogContent className="sm:max-w-[800px] p-6 max-h-[90vh] overflow-y-auto flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <KeyRound className="h-6 w-6" /> Gestión de API Keys de IA
@@ -1097,7 +1097,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
               <PlusCircle className="mr-2 h-4 w-4" /> Añadir Clave o Grupo
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col p-0 bg-[var(--sidebar-background)] backdrop-blur-[var(--chat-bubble-blur)] border-[var(--sidebar-border)]">
+          <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col p-0">
             <DialogHeader className="p-6 pb-0 flex-shrink-0">
               <DialogTitle>{editingKeyId ? 'Editar API Key' : (editingGroupId ? 'Editar Grupo de Claves' : 'Añadir Nueva Clave o Grupo')}</DialogTitle>
               <DialogDescription>

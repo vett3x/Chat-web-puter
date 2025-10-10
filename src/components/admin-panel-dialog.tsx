@@ -101,7 +101,7 @@ export function AdminPanelDialog({ open, onOpenChange, onOpenAlerts, initialTab 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-[95vw] p-4 h-[90vh] sm:max-w-4xl sm:p-6 sm:h-[95vh] flex flex-col bg-[var(--sidebar-background)] backdrop-blur-[var(--chat-bubble-blur)] border-[var(--sidebar-border)]">
+      <DialogContent className="w-full max-w-[95vw] p-4 h-[90vh] sm:max-w-4xl sm:p-6 sm:h-[95vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Server className="h-6 w-6" /> Panel de Administración
@@ -112,9 +112,7 @@ export function AdminPanelDialog({ open, onOpenChange, onOpenAlerts, initialTab 
         </DialogHeader>
         <AdminPanelTabs onOpenAlerts={onOpenAlerts} initialTab={initialTab} />
         <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="ghost" className="bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10">Cerrar</Button>
-          </DialogClose>
+          <DialogClose asChild><Button variant="ghost" className="bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10">Cerrar</Button></DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>
