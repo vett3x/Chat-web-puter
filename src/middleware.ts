@@ -107,7 +107,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (session && (req.nextUrl.pathname === '/login' || req.nextUrl.pathname === '/start')) {
+  if (session && req.nextUrl.pathname === '/login') {
     const redirectUrl = req.nextUrl.clone();
     redirectUrl.pathname = '/app';
     return NextResponse.redirect(redirectUrl);
