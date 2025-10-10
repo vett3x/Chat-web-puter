@@ -169,16 +169,15 @@ export default function LandingPage() {
             />
           </div>
           <div className="text-center z-10 p-4">
-            <Wand2 className="h-12 w-12 mx-auto mb-4 text-primary-light-purple" />
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight">
-              De la Idea al Despliegue en Minutos, con IA.
+              Tu Asistente Personal para Crear, Chatear y Organizar.
             </h1>
             <p className="mt-4 max-w-3xl mx-auto text-lg text-white/70">
-              Olvida la configuración compleja. Describe tu app, y deja que la IA construya, gestione y despliegue por ti.
+              Crea aplicaciones, chatea con tus documentos, organiza tus ideas y gestiona tu infraestructura. Todo en un solo lugar, impulsado por IA.
             </p>
             <div className="mt-8">
               <Button asChild size="lg" className="bg-primary-light-purple/20 hover:bg-primary-light-purple/30 backdrop-blur-md border border-primary-light-purple/30 text-white font-semibold text-lg px-8 py-6 rounded-full">
-                <Link href="/start" onClick={handleStartClick}>Empezar a Construir Ahora</Link>
+                <Link href="/start" onClick={handleStartClick}>Empezar Ahora</Link>
               </Button>
               <p className="mt-3 text-sm text-white/50">No se requiere tarjeta de crédito para el plan Hobby.</p>
             </div>
