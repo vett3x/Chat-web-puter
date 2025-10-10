@@ -20,14 +20,14 @@ interface SidebarFooterProps {
 
 export function SidebarFooter({ onOpenSupportTicket, onOpenStorageManagement, hasNewUserSupportTickets }: SidebarFooterProps) {
   return (
-    <div className="mt-auto flex flex-col">
+    <div className="mt-auto flex flex-col bg-[var(--chat-bubble-background-color)] backdrop-blur-[var(--chat-bubble-blur)] border-t border-[var(--chat-bubble-border-color)]">
       <StorageUsageIndicator onOpenStorageManagement={onOpenStorageManagement} />
       
       {/* Nuevo botón "Ver Archivos" aquí */}
       <div className="px-4 py-2">
         <Button 
-          variant="outline" 
-          className="w-full justify-center text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          // Eliminamos variant="outline" y aplicamos estilos directos para el efecto glassmorphism
+          className="w-full justify-center text-sidebar-foreground bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10 hover:text-sidebar-accent-foreground"
           onClick={onOpenStorageManagement}
         >
           <HardDrive className="mr-2 h-4 w-4" /> Ver Archivos
