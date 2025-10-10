@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Server, Shield, LayoutDashboard, LifeBuoy, Menu, Paintbrush, Settings2 } from 'lucide-react';
+import { Server, Shield, LayoutDashboard, LifeBuoy, Menu, Paintbrush, Settings2, CreditCard } from 'lucide-react';
 import { useSession } from '@/components/session-context-provider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from './ui/scroll-area';
@@ -11,6 +11,7 @@ import { SupportTicketsTab } from './server-tabs/support-tickets-tab';
 import { SecurityTab } from './server-tabs/security-tab';
 import { PersonalizationTab } from './server-tabs/personalization-tab';
 import { OthersTab } from './server-tabs/others-tab';
+import { PaymentsServicesTab } from './server-tabs/payments-services-tab';
 
 interface AdminPanelTabsProps {
   onOpenAlerts: () => void;
@@ -27,6 +28,7 @@ export function AdminPanelTabs({ onOpenAlerts, initialTab }: AdminPanelTabsProps
     isSuperAdmin && { value: 'dashboard', label: 'Panel', icon: <LayoutDashboard className="h-4 w-4" /> },
     { value: 'servers', label: 'Infraestructura', icon: <Server className="h-4 w-4" /> },
     isAdmin && { value: 'support', label: 'Soporte', icon: <LifeBuoy className="h-4 w-4" /> },
+    isSuperAdmin && { value: 'payments', label: 'Pagos', icon: <CreditCard className="h-4 w-4" /> },
     isSuperAdmin && { value: 'security', label: 'Seguridad', icon: <Shield className="h-4 w-4" /> },
     isSuperAdmin && { value: 'personalization', label: 'Personalización', icon: <Paintbrush className="h-4 w-4" /> },
     isSuperAdmin && { value: 'others', label: 'Otros', icon: <Settings2 className="h-4 w-4" /> },
@@ -51,6 +53,9 @@ export function AdminPanelTabs({ onOpenAlerts, initialTab }: AdminPanelTabsProps
           </TabsContent>
           <TabsContent value="support" className="h-full">
             {isAdmin && <SupportTicketsTab />}
+          </TabsContent>
+          <TabsContent value="payments" className="h-full">
+            {isSuperAdmin && <PaymentsServicesTab />}
           </TabsContent>
           <TabsContent value="security" className="h-full">
             {isSuperAdmin && <SecurityTab />}
