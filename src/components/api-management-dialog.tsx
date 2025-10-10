@@ -902,7 +902,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                   const activeKeysCount = group.api_keys?.filter(k => k.status === 'active' && k.is_active).length || 0;
                   return (
                     <React.Fragment key={group.id}>
-                      <TableRow className="bg-muted/50 hover:bg-muted/70" onClick={() => toggleGroupExpansion(group.id)}>
+                      <TableRow className="hover:bg-white/10" onClick={() => toggleGroupExpansion(group.id)}>
                         <TableCell className="font-semibold flex items-center gap-2 cursor-pointer">
                           {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                           <Folder className="h-4 w-4" /> {group.name}
@@ -973,7 +973,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                   );
                 })}
                 {filteredStandaloneKeys.length > 0 && (
-                  <TableRow className="bg-muted/50 hover:bg-muted/70">
+                  <TableRow className="hover:bg-white/10">
                     <TableCell colSpan={isSuperAdmin ? 6 : 5} className="font-semibold">
                       <div className="flex items-center gap-2">
                         <KeyRound className="h-4 w-4" /> Claves Individuales
@@ -1038,7 +1038,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={onOpenChange}>
-        <DrawerContent className="h-[95dvh] flex flex-col">
+        <DrawerContent className="h-[95dvh] flex flex-col bg-[var(--sidebar-background)] backdrop-blur-[var(--chat-bubble-blur)] border-t-[var(--sidebar-border)]">
           {mobileView === 'list' ? (
             <>
               <DrawerHeader className="text-left">
@@ -1082,7 +1082,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] p-6 max-h-[90vh] overflow-y-auto flex flex-col">
+      <DialogContent className="sm:max-w-[800px] p-6 max-h-[90vh] overflow-y-auto flex flex-col bg-[var(--sidebar-background)] backdrop-blur-[var(--chat-bubble-blur)] border-[var(--sidebar-border)]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <KeyRound className="h-6 w-6" /> Gestión de API Keys de IA
@@ -1097,7 +1097,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
               <PlusCircle className="mr-2 h-4 w-4" /> Añadir Clave o Grupo
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col p-0">
+          <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col p-0 bg-[var(--sidebar-background)] backdrop-blur-[var(--chat-bubble-blur)] border-[var(--sidebar-border)]">
             <DialogHeader className="p-6 pb-0 flex-shrink-0">
               <DialogTitle>{editingKeyId ? 'Editar API Key' : (editingGroupId ? 'Editar Grupo de Claves' : 'Añadir Nueva Clave o Grupo')}</DialogTitle>
               <DialogDescription>
@@ -1108,14 +1108,14 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
               {formContent}
             </div>
             <DialogFooter className="p-6 pt-4 flex-shrink-0">
-              <DialogClose asChild><Button variant="outline">Cerrar</Button></DialogClose>
+              <DialogClose asChild><Button variant="ghost" className="bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10">Cerrar</Button></DialogClose>
             </DialogFooter>
           </DialogContent>
         </Dialog>
         <Separator className="my-4" />
         {listContent}
         <DialogFooter>
-          <DialogClose asChild><Button variant="outline">Cerrar</Button></DialogClose>
+          <DialogClose asChild><Button variant="ghost" className="bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10">Cerrar</Button></DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>
