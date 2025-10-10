@@ -81,7 +81,7 @@ export function StorageUsageIndicator({ onOpenStorageManagement }: StorageUsageI
 
   if (isLoading) {
     return (
-      <div className="px-2 py-2 text-center text-xs text-sidebar-foreground/50 flex items-center justify-center gap-2">
+      <div className="px-2 py-2 text-center text-xs text-sidebar-foreground/50 flex items-center justify-center gap-2 bg-transparent">
         <Loader2 className="h-3 w-3 animate-spin" />
         <span>Cargando uso...</span>
       </div>
@@ -92,7 +92,7 @@ export function StorageUsageIndicator({ onOpenStorageManagement }: StorageUsageI
   const percentage = usage.limit_mb > 0 ? (usageMb / usage.limit_mb) * 100 : 0;
 
   return (
-    <div className="px-4 py-2">
+    <div className="px-4 py-2 bg-transparent">
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>

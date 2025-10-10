@@ -100,11 +100,11 @@
   }
   .dark {
 
-    --background: 255 100% 3.1%; /* Dark blue-purple background for consistency with landing */
+    --background: 240 100% 2%; /* Very dark blue-purple background */
 
     --foreground: 0 0% 98%; /* White text */
 
-    --card: 255 100% 3.1%; /* Same as background for the form column */
+    --card: 240 100% 2%; /* Same as background for the form column */
 
     --card-foreground: 0 0% 98%;
 
@@ -160,21 +160,13 @@
   ;
 
     /* Sidebar specific colors */
-
-    --sidebar-background: 220 10% 5%; /* Very dark gray, almost black for sidebar */
-
+    --sidebar-background: 240 100% 2% / 0.5; /* Semi-transparent version of main background */
     --sidebar-foreground: 0 0% 98%; /* White text */
-
-    --sidebar-primary: 220 10% 15%; /* Darker gray for selected conversation */
-
-    --sidebar-primary-foreground: 0 0% 98%; /* White text on selected conversation */
-
-    --sidebar-accent: 220 10% 10%; /* Hover/active state in sidebar */
-
+    --sidebar-primary: 0 0% 100% / 0.1; /* Transparent white for selected item */
+    --sidebar-primary-foreground: 0 0% 98%; /* White text on selected item */
+    --sidebar-accent: 0 0% 100% / 0.05; /* Very subtle transparent white for hover */
     --sidebar-accent-foreground: 0 0% 98%;
-
-    --sidebar-border: 220 10% 15%;
-
+    --sidebar-border: 0 0% 100% / 0.1; /* Subtle white border */
     --sidebar-ring: 220 10% 30%;
 
     --user-avatar-shadow: 210 90% 50%; /* Blue for user avatar shadow */
@@ -184,6 +176,12 @@
     --primary-color-login: 220 10% 15%; /* --border */
     --second-color-login: 0 0% 98%; /* --foreground */
     --black-color-login: 0 0% 98%; /* --primary-foreground */
+
+    /* New variables for chat glassmorphism */
+    --chat-bubble-background-color: 0 0% 100% / 0.15; /* Increased opacity */
+    --chat-bubble-border-color: 0 0% 100% / 0.1; /* Subtle border */
+    --chat-bubble-blur: 12px; /* Increased blur */
+    --liquid-ether-opacity: 0.5;
   }
 
   body.login-page {

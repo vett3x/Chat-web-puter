@@ -86,10 +86,10 @@ const ChatMessageItemComponent: React.FC<ChatMessageItemProps> = ({
           )}
         </div>
         <div className={cn(
-          "rounded-lg p-3 text-sm bg-[var(--chat-bubble-background-color)] backdrop-blur-[var(--chat-bubble-blur)] border border-[var(--chat-bubble-border-color)]",
+          "rounded-lg p-3 text-sm",
           message.role === 'user' 
-            ? 'text-primary-foreground' 
-            : ''
+            ? 'bg-transparent text-primary-foreground' // User messages are transparent
+            : 'bg-[var(--chat-bubble-background-color)] backdrop-blur-[var(--chat-bubble-blur)] border border-[var(--chat-bubble-border-color)]' // AI messages have glassmorphism
         )}>
           {message.isTyping ? (
             <div className="flex items-center gap-2">

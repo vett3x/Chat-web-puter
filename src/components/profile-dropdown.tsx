@@ -98,7 +98,7 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAccountSettings }
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          className="w-full justify-start p-2 h-auto text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          className="w-full justify-start p-2 h-auto text-sidebar-foreground bg-transparent hover:bg-white/10 hover:text-sidebar-accent-foreground"
         >
           <Avatar className="h-8 w-8 mr-2">
             {profile?.avatar_url && profile.avatar_url !== '' ? (

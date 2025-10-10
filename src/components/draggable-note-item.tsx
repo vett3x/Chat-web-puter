@@ -107,7 +107,8 @@ export function DraggableNoteItem({ note, selected, onSelect, onDragStart, level
   return (
     <div
       className={cn(
-        "cursor-pointer hover:bg-sidebar-accent transition-colors group relative rounded-md flex items-center justify-between gap-1 py-1 px-1.5"
+        "cursor-pointer transition-colors group relative rounded-md flex items-center justify-between gap-1 py-1 px-1.5 bg-transparent", // Changed to bg-transparent
+        selected ? "bg-sidebar-primary text-sidebar-primary-foreground" : "hover:bg-sidebar-accent" // Use transparent hover for non-selected
       )}
       onClick={onSelect}
       draggable="true"

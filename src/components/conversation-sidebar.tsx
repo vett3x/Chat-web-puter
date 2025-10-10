@@ -15,6 +15,7 @@ import { FileTree } from './file-tree';
 import { useSidebarData } from '@/hooks/use-sidebar-data';
 import { SidebarFooter } from './sidebar-footer';
 import { Button } from '@/components/ui/button'; // Import Button
+import { cn } from '@/lib/utils'; // Import cn for conditional styling
 
 interface Conversation {
   id: string;
@@ -197,7 +198,10 @@ export const ConversationSidebar = React.memo(({
   );
 
   return (
-    <div className="flex flex-col h-full p-4 border-r bg-sidebar text-sidebar-foreground">
+    <div className={cn(
+      "flex flex-col h-full p-4 border-r backdrop-blur-[var(--chat-bubble-blur)] text-sidebar-foreground",
+      "bg-[var(--sidebar-background)] border-[var(--sidebar-border)]"
+    )}>
       <SidebarHeader
         onNewConversation={handleCreateConversation}
         onNewFolder={handleCreateFolder}

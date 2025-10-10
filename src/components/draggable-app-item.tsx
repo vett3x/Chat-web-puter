@@ -54,8 +54,8 @@ export function DraggableAppItem({ app, selected, onSelect, onDelete, isDeleting
   return (
     <Card
       className={cn(
-        "cursor-pointer hover:bg-sidebar-accent transition-colors group relative",
-        selected && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary"
+        "cursor-pointer transition-colors group relative bg-transparent", // Changed to bg-transparent
+        selected ? "bg-sidebar-primary text-sidebar-primary-foreground" : "hover:bg-sidebar-accent" // Use transparent hover for non-selected
       )}
       onClick={onSelect}
     >

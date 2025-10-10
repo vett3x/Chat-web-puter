@@ -98,7 +98,7 @@ export function DraggableFolderItem({
   isDraggingOver,
   onDragEnter,
   onDragLeave,
-  draggedItemType,
+  draggedItemType, // <--- Prop received by this component
   onConversationUpdated,
   onConversationDeleted,
   onNoteUpdated,
@@ -169,7 +169,11 @@ export function DraggableFolderItem({
   return (
     <div className="space-y-1">
       <Card
-        className={cn("cursor-pointer hover:bg-sidebar-accent transition-colors group relative", isDraggingOver && draggedItemType && "border-2 border-blue-500 bg-blue-500/10")}
+        className={cn(
+          "cursor-pointer transition-colors group relative bg-transparent", // Changed to bg-transparent
+          isDraggingOver && draggedItemType && "border-2 border-blue-500 bg-blue-500/10",
+          selectedItem?.type === 'folder' && selectedItem.id === folder.id ? "bg-sidebar-primary text-sidebar-primary-foreground" : "hover:bg-sidebar-accent" // Use transparent hover for non-selected
+        )}
         style={{ paddingLeft: paddingLeft }}
         draggable="true"
         onDragStart={(e) => onDragStart(e, folder.id, 'folder')}

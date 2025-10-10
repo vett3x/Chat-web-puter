@@ -38,7 +38,12 @@ export function SidebarFooter({ onOpenSupportTicket, onOpenStorageManagement, ha
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="outline" size="icon" className="h-8 w-8 relative" onClick={onOpenSupportTicket}>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 relative bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10 hover:text-sidebar-accent-foreground" 
+                onClick={onOpenSupportTicket}
+              >
                 {hasNewUserSupportTickets && (
                   <span className="absolute -top-1 -right-1 flex h-3 w-3">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -55,7 +60,11 @@ export function SidebarFooter({ onOpenSupportTicket, onOpenStorageManagement, ha
           <Tooltip>
             <TooltipTrigger asChild>
               <a href="https://github.com/martinpensa/deep-ai-coder/issues/new/choose" target="_blank" rel="noopener noreferrer">
-                <Button variant="outline" size="icon" className="h-8 w-8">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10 hover:text-sidebar-accent-foreground"
+                >
                   <GitPullRequest className="h-4 w-4" />
                 </Button>
               </a>

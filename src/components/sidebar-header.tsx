@@ -155,7 +155,7 @@ export function SidebarHeader({
           onOpenApiManagement={onOpenApiManagement}
         />
       </div>
-      <div className="flex items-center justify-center mb-4">
+      <div className="flex items-center justify-center mb-4 bg-transparent">
         <div className="flex flex-wrap justify-center gap-2">
           <Button
             variant="default"
