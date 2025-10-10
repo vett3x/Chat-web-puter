@@ -34,6 +34,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { Input } from './ui/input';
 import { Card, CardContent, CardFooter } from '@/components/ui/card'; // Import Card components
 import { Separator } from '@/components/ui/separator'; // Import Separator
+import { cn } from '@/lib/utils';
 
 const VIRTUAL_PROJECTS_FOLDER = 'Proyectos DeepAI Coder';
 
@@ -182,7 +183,7 @@ export function StorageManagementDialog({ open, onOpenChange }: StorageManagemen
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[80vw] p-6 h-[80vh] flex flex-col">
+      <DialogContent className="sm:max-w-[80vw] p-6 h-[80vh] flex flex-col bg-[var(--sidebar-background)] backdrop-blur-[var(--chat-bubble-blur)] border-[var(--sidebar-border)]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><HardDrive className="h-6 w-6" /> Gestión de Almacenamiento</DialogTitle>
           <DialogDescription>Navega, sube y elimina los archivos de tu cuenta.</DialogDescription>
@@ -200,16 +201,16 @@ export function StorageManagementDialog({ open, onOpenChange }: StorageManagemen
             </div>
             <div className="flex items-center gap-2 self-end sm:self-center">
               <input type="file" ref={fileInputRef} onChange={handleFileSelectAndUpload} multiple hidden />
-              <Button size="sm" onClick={() => fileInputRef.current?.click()} disabled={isLoading || isUploading || isInsideProjectFolder}>{isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />} Subir</Button>
+              <Button size="sm" onClick={() => fileInputRef.current?.click()} disabled={isLoading || isUploading || isInsideProjectFolder} className="bg-primary-light-purple hover:bg-primary-light-purple/90 text-white">{isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />} Subir</Button>
               <Dialog open={isNewFolderDialogOpen} onOpenChange={setIsNewFolderDialogOpen}>
-                <DialogTrigger asChild><Button size="sm" variant="outline" disabled={isInsideProjectFolder}><PlusCircle className="mr-2 h-4 w-4" /> Nueva Carpeta</Button></DialogTrigger>
-                <DialogContent className="sm:max-w-sm">
+                <DialogTrigger asChild><Button size="sm" variant="outline" disabled={isInsideProjectFolder} className="bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10"><PlusCircle className="mr-2 h-4 w-4" /> Nueva Carpeta</Button></DialogTrigger>
+                <DialogContent className="sm:max-w-sm bg-[var(--sidebar-background)] backdrop-blur-[var(--chat-bubble-blur)] border-[var(--sidebar-border)]">
                   <DialogHeader><DialogTitle>Crear Nueva Carpeta</DialogTitle></DialogHeader>
                   <div className="py-4"><Input placeholder="Nombre de la carpeta..." value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleCreateFolder()} /></div>
                   <DialogFooter><Button onClick={handleCreateFolder}>Crear</Button></DialogFooter>
                 </DialogContent>
               </Dialog>
-              <Button variant="ghost" size="icon" onClick={() => fetchItems(currentPath)} disabled={isLoading}><RefreshCw className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" onClick={() => fetchItems(currentPath)} disabled={isLoading} className="bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10"><RefreshCw className="h-4 w-4" /></Button>
             </div>
           </div>
           <div className="flex-1 overflow-hidden border rounded-md">
@@ -224,7 +225,7 @@ export function StorageManagementDialog({ open, onOpenChange }: StorageManagemen
                         {items.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground h-24">Esta carpeta está vacía.</TableCell></TableRow> : items.map(item => {
                           const isVirtual = item.path.startsWith(VIRTUAL_PROJECTS_FOLDER);
                           return (
-                            <TableRow key={item.path} onClick={() => item.type === 'folder' && handleNavigate(item)} className={item.type === 'folder' ? 'cursor-pointer' : ''}>
+                            <TableRow key={item.path} onClick={() => item.type === 'folder' && handleNavigate(item)} className={cn(item.type === 'folder' ? 'cursor-pointer' : '', "hover:bg-white/10")}>
                               <TableCell><div className="h-12 w-12 flex items-center justify-center bg-muted rounded-md">{item.name === VIRTUAL_PROJECTS_FOLDER ? <Wand2 className="h-6 w-6 text-primary-light-purple" /> : (item.type === 'folder' ? <Folder className="h-6 w-6 text-yellow-500" /> : (item.metadata?.mimetype.startsWith('image/') ? <img src={item.publicUrl} alt={item.name} className="h-full w-full object-cover rounded-md" /> : <File className="h-6 w-6 text-muted-foreground" />))}</div></TableCell>
                               <TableCell className="font-medium break-all">{item.name}</TableCell>
                               <TableCell>{item.type === 'file' ? formatBytes(item.metadata?.size || 0) : '--'}</TableCell>
@@ -241,7 +242,7 @@ export function StorageManagementDialog({ open, onOpenChange }: StorageManagemen
                     {items.length === 0 ? <div className="text-center text-muted-foreground py-8">Esta carpeta está vacía.</div> : items.map(item => {
                       const isVirtual = item.path.startsWith(VIRTUAL_PROJECTS_FOLDER);
                       return (
-                        <Card key={item.path} onClick={() => item.type === 'folder' && handleNavigate(item)} className={item.type === 'folder' ? 'cursor-pointer' : ''}>
+                        <Card key={item.path} onClick={() => item.type === 'folder' && handleNavigate(item)} className={cn(item.type === 'folder' ? 'cursor-pointer' : '', "bg-transparent border-white/10 hover:bg-white/20")}>
                           <CardContent className="p-3 flex items-center gap-3">
                             <div className="h-12 w-12 flex-shrink-0 flex items-center justify-center bg-muted rounded-md">{item.name === VIRTUAL_PROJECTS_FOLDER ? <Wand2 className="h-6 w-6 text-primary-light-purple" /> : (item.type === 'folder' ? <Folder className="h-6 w-6 text-yellow-500" /> : (item.metadata?.mimetype.startsWith('image/') ? <img src={item.publicUrl} alt={item.name} className="h-full w-full object-cover rounded-md" /> : <File className="h-6 w-6 text-muted-foreground" />))}</div>
                             <div className="flex-1 min-w-0">
@@ -263,7 +264,7 @@ export function StorageManagementDialog({ open, onOpenChange }: StorageManagemen
             </ScrollArea>
           </div>
         </div>
-        <DialogFooter><DialogClose asChild><Button variant="outline">Cerrar</Button></DialogClose></DialogFooter>
+        <DialogFooter><DialogClose asChild><Button variant="ghost" className="bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10">Cerrar</Button></DialogClose></DialogFooter>
       </DialogContent>
     </Dialog>
   );
