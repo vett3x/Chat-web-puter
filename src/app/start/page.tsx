@@ -87,7 +87,6 @@ export default function StartPage() {
     animateOut(() => {
       if (currentQuestionIndex > 0) {
         setCurrentQuestionIndex(prev => prev - 1);
-        // Restore previous input for editing
         const previousKey = appCreationQuestions[currentQuestionIndex - 1].key as keyof typeof projectDetails;
         setUserInput(projectDetails[previousKey]);
       } else {
@@ -96,6 +95,12 @@ export default function StartPage() {
         setProjectDetails({ name: '', main_purpose: '', key_features: '' });
         setUserInput('');
       }
+    });
+  };
+
+  const handleGoBackToLanding = () => {
+    animateOut(() => {
+      router.push('/app');
     });
   };
 
@@ -109,8 +114,12 @@ export default function StartPage() {
   const renderContent = () => {
     if (step === 'choose_action') {
       return (
-        <div className="text-center">
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">Bienvenido a DeepAI Coder.</h1>
+        <div className="text-center relative">
+          <Button variant="ghost" onClick={handleGoBackToLanding} className="absolute top-0 left-0 text-white/70 hover:text-white">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Volver a la página principal
+          </Button>
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4 pt-12">Bienvenido a DeepAI Coder.</h1>
           <p className="text-lg text-white/70 mb-12">¿Qué te gustaría hacer hoy?</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
             {actionChoices.map((choice) => (
@@ -150,7 +159,7 @@ export default function StartPage() {
             />
             <div className="flex gap-4 mt-4">
               <Button variant="outline" onClick={handleGoBack} className="bg-transparent border-white/20 hover:bg-white/10 text-white">
-                <ArrowLeft className="h-4 w-4 mr-2" />
+                <ArrowLeft className="mr-2 h-4 w-4" />
                 Volver
               </Button>
               <Button onClick={handleNextQuestion} className="bg-primary-light-purple hover:bg-primary-light-purple/90 text-white">
