@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader2, Save, KeyRound, Trash2, Gauge, BrainCircuit, LifeBuoy } from 'lucide-react'; // Import LifeBuoy
+import { Loader2, Save, KeyRound, Trash2, Gauge, BrainCircuit, LifeBuoy } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -235,7 +235,7 @@ export function AccountSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-[95vw] p-4 h-[90vh] sm:max-w-[900px] sm:p-6 flex flex-col">
+      <DialogContent className="w-full max-w-[95vw] p-4 h-[90vh] sm:max-w-[900px] sm:p-6 flex flex-col bg-[var(--sidebar-background)] backdrop-blur-[var(--chat-bubble-blur)] border-[var(--sidebar-border)]">
         <DialogHeader>
           <DialogTitle>Configuración de Cuenta</DialogTitle>
           <DialogDescription>Gestiona las opciones generales de tu cuenta y preferencias de IA.</DialogDescription>
@@ -323,7 +323,7 @@ export function AccountSettingsDialog({
           </Tabs>
         </div>
         <DialogFooter>
-          <DialogClose asChild><Button variant="outline">Cerrar</Button></DialogClose>
+          <DialogClose asChild><Button variant="ghost" className="bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10">Cerrar</Button></DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>
