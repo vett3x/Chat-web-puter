@@ -27,17 +27,17 @@ export async function middleware(req: NextRequest) {
 
   let userRole: 'user' | 'admin' | 'super_admin' | null = null;
   let userStatus: 'active' | 'banned' | 'kicked' | null = null;
-  let kickedAt: string | null = null; // NEW: Fetch kicked_at
+  let kickedAt: string | null = null;
 
   if (session?.user?.id) {
     if (session.user.email && SUPERUSER_EMAILS.includes(session.user.email)) {
       userRole = 'super_admin';
       userStatus = 'active';
     } else {
-      const { data: profile } = await supabase.from('profiles').select('role, status, kicked_at').eq('id', session.user.id).single(); // NEW: Select kicked_at
+      const { data: profile } = await supabase.from('profiles').select('role, status, kicked_at').eq('id', session.user.id).single();
       userRole = profile ? profile.role as 'user' | 'admin' | 'super_admin' : 'user';
       userStatus = profile ? profile.status as 'active' | 'banned' | 'kicked' : 'active';
-      kickedAt = profile?.kicked_at || null; // NEW: Assign kickedAt
+      kickedAt = profile?.kicked_at || null;
     }
   }
 
@@ -48,9 +48,10 @@ export async function middleware(req: NextRequest) {
   const adminsDisabled = globalSettings?.admins_disabled ?? false;
   const isSuperAdmin = userRole === 'super_admin';
 
-  const publicPaths = ['/', '/login', '/maintenance'];
+  const publicPaths = ['/', '/start', '/login', '/maintenance'];
+  const isPublicPath = publicPaths.some(path => req.nextUrl.pathname === path);
 
-  if (maintenanceModeEnabled && !isSuperAdmin && !publicPaths.includes(req.nextUrl.pathname)) {
+  if (maintenanceModeEnabled && !isSuperAdmin && !isPublicPath) {
     const redirectUrl = req.nextUrl.clone();
     redirectUrl.pathname = '/maintenance';
     return NextResponse.redirect(redirectUrl);
@@ -62,7 +63,6 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  // NEW: Kick and disable logic
   if (session && !isSuperAdmin) {
     let shouldBeKicked = false;
     let kickReason = '';
@@ -72,18 +72,14 @@ export async function middleware(req: NextRequest) {
       kickReason = 'account_banned';
     } else if (userStatus === 'kicked') {
       const kickedTime = kickedAt ? new Date(kickedAt).getTime() : 0;
-      const fifteenMinutesAgo = Date.now() - (15 * 60 * 1000); // 15 minutes in milliseconds
+      const fifteenMinutesAgo = Date.now() - (15 * 60 * 1000);
 
       if (kickedTime > fifteenMinutesAgo) {
         shouldBeKicked = true;
         kickReason = 'account_kicked';
       } else {
-        // If kicked status has expired, automatically unkick the user
-        console.log(`[Middleware] User ${session.user.id} was kicked, but 15 minutes have passed. Auto-unkicking.`);
         await supabase.from('profiles').update({ status: 'active', kicked_at: null }).eq('id', session.user.id);
-        // Also update auth.users metadata to clear any kicked_at flag
-        await supabase.auth.admin.updateUserById(session.user.id, { user_metadata: { kicked_at: null } });
-        userStatus = 'active'; // Update local status for current request
+        userStatus = 'active';
       }
     } else if (usersDisabled && userRole === 'user') {
       shouldBeKicked = true;
@@ -93,40 +89,27 @@ export async function middleware(req: NextRequest) {
       kickReason = 'account_type_disabled';
     }
 
-    if (shouldBeKicked && !publicPaths.includes(req.nextUrl.pathname)) {
-      console.log(`[Middleware] User ${session.user.id} (Role: ${userRole}, Status: ${userStatus}) should be kicked.`);
+    if (shouldBeKicked && !isPublicPath) {
       await supabase.auth.signOut();
-      
-      const finalRedirectUrl = new URL('/login', req.nextUrl.origin); // Create absolute URL
+      const finalRedirectUrl = new URL('/login', req.nextUrl.origin);
       finalRedirectUrl.searchParams.set('error', kickReason);
-      
-      // Fetch the reason from moderation_logs if it's a specific kick/ban
-      if (kickReason === 'account_kicked' || kickReason === 'account_banned') {
-        const { data: moderationLog } = await supabase
-          .from('moderation_logs')
-          .select('reason')
-          .eq('target_user_id', session.user.id)
-          .eq('action', kickReason === 'account_kicked' ? 'kick' : 'ban')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-        if (moderationLog?.reason) {
-          finalRedirectUrl.searchParams.set('reason', moderationLog.reason);
-        }
-        if (kickedAt) {
-          finalRedirectUrl.searchParams.set('kicked_at', kickedAt);
-        }
+      if (kickedAt) {
+        finalRedirectUrl.searchParams.set('kicked_at', kickedAt);
       }
-      console.log(`[Middleware] Final redirecting to: ${finalRedirectUrl.toString()}`);
       return NextResponse.redirect(finalRedirectUrl);
     }
   }
 
-  if (!session && !publicPaths.includes(req.nextUrl.pathname)) {
-    console.log(`[Middleware] No session found. Redirecting to /login from ${req.nextUrl.pathname}`);
+  if (!session && !isPublicPath) {
     const redirectUrl = req.nextUrl.clone();
     redirectUrl.pathname = '/login';
     redirectUrl.searchParams.set(`redirectedFrom`, req.nextUrl.pathname);
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  if (session && (req.nextUrl.pathname === '/login' || req.nextUrl.pathname === '/start')) {
+    const redirectUrl = req.nextUrl.clone();
+    redirectUrl.pathname = '/app';
     return NextResponse.redirect(redirectUrl);
   }
 

@@ -241,7 +241,7 @@ export default function LoginPage() {
             },
           }}
           theme="dark"
-          redirectTo={typeof window !== 'undefined' ? `${window.location.origin}/` : undefined}
+          redirectTo={typeof window !== 'undefined' ? `${window.location.origin}/app` : undefined}
         />
       </div>
     </div>
