@@ -8,7 +8,7 @@ import { LandingFooter } from '@/components/landing-footer';
 import Link from 'next/link';
 import ElectricBorder from '@/components/ElectricBorder';
 import GradualBlur from '@/components/GradualBlur';
-import { LandingHeader } from '@/components/landing/LandingHeader';
+import PillNav from '@/components/PillNav';
 import CardSwap, { Card } from '@/components/CardSwap';
 import { TechnologyLogos } from '@/components/landing/TechnologyLogos';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -31,6 +31,18 @@ export default function LandingPage() {
       ease: 'power2.in',
       onComplete: () => {
         router.push('/start');
+      }
+    });
+  };
+
+  const handleLoginCtaClick = () => {
+    gsap.to(mainContentRef.current, {
+      opacity: 0,
+      y: -20,
+      duration: 0.5,
+      ease: 'power2.in',
+      onComplete: () => {
+        router.push('/login');
       }
     });
   };
@@ -142,7 +154,9 @@ export default function LandingPage() {
 
   return (
     <div className="bg-background text-white">
-      <LandingHeader />
+      <header className="absolute top-0 left-0 right-0 z-50 p-4">
+        <PillNav onCtaClick={handleLoginCtaClick} />
+      </header>
       <main className="overflow-hidden" ref={mainContentRef}>
         {/* Hero Section */}
         <section className="relative flex flex-col items-center justify-center min-h-screen pt-16">
