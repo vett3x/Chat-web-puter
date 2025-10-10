@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import Link from 'next/link';
 import ElectricBorder from '@/components/ElectricBorder';
 import { BentoCard } from '@/components/BentoCard';
+import GradualBlur from '@/components/GradualBlur';
 
 export default function LandingPage() {
   const pricingPlans = [
@@ -83,6 +84,7 @@ export default function LandingPage() {
     <div className="bg-[#060010] text-white">
       <LandingHeader />
       <main className="overflow-hidden">
+        <GradualBlur preset="page-header" />
         {/* Hero Section */}
         <section className="relative flex flex-col items-center justify-center min-h-screen pt-16">
           <div className="absolute inset-0 z-0">
@@ -171,6 +173,7 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
+        <GradualBlur preset="page-footer" />
       </main>
       <LandingFooter />
     </div>
