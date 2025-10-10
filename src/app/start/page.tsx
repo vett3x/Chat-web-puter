@@ -58,7 +58,7 @@ export default function StartPage() {
         setStep('define_app');
       } else {
         localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ action: choice }));
-        router.push('/login');
+        router.push('/register');
       }
     });
   };
@@ -78,7 +78,7 @@ export default function StartPage() {
       } else {
         const finalDetails = { ...projectDetails, [currentQuestion.key]: userInput.trim() };
         localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ action: 'create_app', details: finalDetails }));
-        router.push('/login');
+        router.push('/register');
       }
     });
   };

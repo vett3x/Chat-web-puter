@@ -48,7 +48,7 @@ export async function middleware(req: NextRequest) {
   const adminsDisabled = globalSettings?.admins_disabled ?? false;
   const isSuperAdmin = userRole === 'super_admin';
 
-  const publicPaths = ['/', '/start', '/login', '/maintenance'];
+  const publicPaths = ['/', '/start', '/login', '/register', '/maintenance'];
   const isPublicPath = publicPaths.some(path => req.nextUrl.pathname === path);
 
   if (maintenanceModeEnabled && !isSuperAdmin && !isPublicPath) {

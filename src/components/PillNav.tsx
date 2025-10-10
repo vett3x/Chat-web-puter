@@ -38,7 +38,7 @@ export default function PillNav({ onCtaClick }: PillNavProps) {
           <Link href="/login" onClick={(e) => handleNavClick(e, '/login')}>Iniciar Sesión</Link>
         </Button>
         <Button asChild className="bg-primary-light-purple hover:bg-primary-light-purple/90 text-white rounded-full">
-          <Link href="/start" onClick={(e) => handleNavClick(e, '/start')}>Registrarse</Link>
+          <Link href="/register" onClick={(e) => handleNavClick(e, '/register')}>Registrarse</Link>
         </Button>
       </div>
     </nav>
