@@ -60,10 +60,11 @@ export function PayPalButtonsWrapper({ plan }: PayPalButtonsWrapperProps) {
 
   return (
     <PayPalButtons
-      style={{ layout: 'vertical', color: 'blue', shape: 'rect', label: 'pay' }}
+      style={{ layout: 'vertical', color: 'blue', shape: 'rect', label: 'pay', height: 48 }}
       createOrder={createOrder}
       onApprove={onApprove}
       onError={onError}
+      className="w-full"
     />
   );
 }
