@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Wand2, Check } from 'lucide-react';
 import Aurora from '@/components/Aurora';
@@ -80,11 +80,35 @@ export default function LandingPage() {
     },
   ];
 
+  const [showFooterBlur, setShowFooterBlur] = useState(true);
+  const footerRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (footerRef.current) {
+        const footerTop = footerRef.current.getBoundingClientRect().top;
+        const windowHeight = window.innerHeight;
+        // Start fading out when the top of the footer is visible
+        if (footerTop < windowHeight) {
+          setShowFooterBlur(false);
+        } else {
+          setShowFooterBlur(true);
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    handleScroll(); // Initial check
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
   return (
     <div className="bg-[#060010] text-white">
       <LandingHeader />
       <main className="overflow-hidden">
-        <GradualBlur preset="page-header" />
         {/* Hero Section */}
         <section className="relative flex flex-col items-center justify-center min-h-screen pt-16">
           <div className="absolute inset-0 z-0">
@@ -173,9 +197,12 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
-        <GradualBlur preset="page-footer" />
+        <GradualBlur 
+          preset="page-footer" 
+          style={{ opacity: showFooterBlur ? 1 : 0, transition: 'opacity 0.3s ease-in-out' }} 
+        />
       </main>
-      <LandingFooter />
+      <LandingFooter ref={footerRef} />
     </div>
   );
 }
