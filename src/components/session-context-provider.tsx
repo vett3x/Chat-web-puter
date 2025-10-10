@@ -158,7 +158,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
   }, [triggerGlobalRefresh]);
 
   useEffect(() => {
-    const publicPaths = ['/', '/login', '/maintenance'];
+    const publicPaths = ['/', '/start', '/login', '/maintenance'];
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       setSession(currentSession);
       await fetchUserProfileAndRole(currentSession);
@@ -169,7 +169,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
           router.push('/login');
         }
       } else if (currentSession && pathname === '/login') {
-        router.push('/');
+        router.push('/app');
       }
     });
 
