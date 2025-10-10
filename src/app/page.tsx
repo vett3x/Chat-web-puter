@@ -14,9 +14,24 @@ import { TechnologyLogos } from '@/components/landing/TechnologyLogos';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useRouter } from 'next/navigation';
+import { gsap } from 'gsap';
 
 export default function LandingPage() {
   const router = useRouter();
+  const mainContentRef = useRef(null);
+
+  const handleStartClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    gsap.to(mainContentRef.current, {
+      opacity: 0,
+      y: -20,
+      duration: 0.5,
+      ease: 'power2.in',
+      onComplete: () => {
+        router.push('/start');
+      }
+    });
+  };
 
   const pricingPlans = [
     {
@@ -137,7 +152,7 @@ export default function LandingPage() {
         hoveredPillTextColor="#FFFFFF"
         pillTextColor="#FFFFFF"
       />
-      <main className="overflow-hidden">
+      <main className="overflow-hidden" ref={mainContentRef}>
         {/* Hero Section */}
         <section className="relative flex flex-col items-center justify-center min-h-screen pt-16">
           <div className="absolute inset-0 z-0">
@@ -158,7 +173,7 @@ export default function LandingPage() {
             </p>
             <div className="mt-8">
               <Button asChild size="lg" className="bg-primary-light-purple/20 hover:bg-primary-light-purple/30 backdrop-blur-md border border-primary-light-purple/30 text-white font-semibold text-lg px-8 py-6 rounded-full">
-                <Link href="/start">Empezar a Construir Ahora</Link>
+                <Link href="/start" onClick={handleStartClick}>Empezar a Construir Ahora</Link>
               </Button>
               <p className="mt-3 text-sm text-white/50">No se requiere tarjeta de crédito para el plan Hobby.</p>
             </div>

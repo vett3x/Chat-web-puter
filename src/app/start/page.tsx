@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,6 +8,7 @@ import { Wand2, MessageSquare, FileText, Server, Bot, Send, Loader2 } from 'luci
 import Aurora from '@/components/Aurora';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { gsap } from 'gsap';
 
 const ONBOARDING_STORAGE_KEY = 'onboarding_action';
 
@@ -31,10 +32,17 @@ export default function StartPage() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userInput, setUserInput] = useState('');
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const contentRef = useRef(null);
 
   useEffect(() => {
     // Clear any previous onboarding data when the page loads
     localStorage.removeItem(ONBOARDING_STORAGE_KEY);
+    
+    // Animate content in on page load
+    gsap.fromTo(contentRef.current, 
+      { opacity: 0, y: 20 },
+      { opacity: 1, y: 0, duration: 0.8, ease: 'power3.out', delay: 0.3 }
+    );
   }, []);
 
   const handleTransition = (callback: () => void) => {
@@ -149,7 +157,7 @@ export default function StartPage() {
           speed={0.5}
         />
       </div>
-      <div className={cn('z-10 w-full transition-opacity duration-300', isTransitioning ? 'opacity-0' : 'opacity-100')}>
+      <div ref={contentRef} className={cn('z-10 w-full opacity-0', isTransitioning && 'opacity-0')}>
         {renderContent()}
       </div>
     </div>
