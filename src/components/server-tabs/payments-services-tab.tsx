@@ -33,7 +33,7 @@ const planSchema = z.object({
   price: z.string().min(1, 'El precio es requerido.'),
   price_period: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
-  features: z.string(), // Textarea input
+  features: z.string(), // Input is a string from textarea
   cta_text: z.string().optional().nullable(),
   cta_href: z.string().optional().nullable(),
   highlight: z.boolean().optional(),
@@ -42,8 +42,13 @@ const planSchema = z.object({
   order_index: z.coerce.number().int().optional(),
 });
 
+const planSchemaWithTransform = planSchema.extend({
+  features: z.string().transform(val => val.split('\n').filter(Boolean)),
+});
+
 type PlanFormValues = z.infer<typeof planSchema>;
-interface Plan extends PlanFormValues {
+interface Plan extends z.infer<typeof planSchemaWithTransform> {
+  id: string;
   created_at: string;
 }
 
@@ -131,7 +136,7 @@ export function PaymentsServicesTab() {
 
   return (
     <div className="space-y-8 p-1">
-      <Card>
+      <Card className="bg-black/20 border-white/10">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle className="flex items-center gap-2"><CreditCard className="h-6 w-6" /> Planes de Precios</CardTitle>

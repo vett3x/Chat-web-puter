@@ -196,7 +196,7 @@ export function CloudflareTunnelTab() {
   return (
     <div className="space-y-8 p-1">
       {/* Registered Cloudflare Domains */}
-      <Card>
+      <Card className="bg-black/20 border-white/10">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2">
             <Cloud className="h-6 w-6" /> Dominios de Cloudflare Registrados
@@ -297,7 +297,7 @@ export function CloudflareTunnelTab() {
       <Separator />
 
       {/* Docker Tunnels */}
-      <Card>
+      <Card className="bg-black/20 border-white/10">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2"><Cloud className="h-6 w-6" /> Túneles Docker de Cloudflare</CardTitle>
           <Button variant="ghost" size="icon" onClick={fetchDockerTunnels} disabled={isLoadingTunnels} title="Refrescar">

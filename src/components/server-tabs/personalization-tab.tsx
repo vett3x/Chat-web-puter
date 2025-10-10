@@ -258,7 +258,7 @@ export function PersonalizationTab() {
     <div className="p-1">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSave)}>
-          <Card>
+          <Card className="bg-black/20 border-white/10">
             <CardHeader>
               <CardTitle>Personalización de la Aplicación</CardTitle>
               <CardDescription>Define la identidad visual, colores y apariencia de tu aplicación.</CardDescription>

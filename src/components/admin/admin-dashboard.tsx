@@ -11,6 +11,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Progress } from '@/components/ui/progress';
 import { formatMemory } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 interface DashboardData {
   systemStatus: {
@@ -35,7 +36,7 @@ interface DashboardData {
 }
 
 const KpiCard = ({ title, value, icon, className }: { title: string; value: number; icon: React.ReactNode, className?: string }) => (
-  <Card className={className}>
+  <Card className={cn("bg-black/20 border-white/10", className)}>
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
       <CardTitle className="text-sm font-medium">{title}</CardTitle>
       {icon}
@@ -100,7 +101,7 @@ export function AdminDashboardTab({ onOpenAlerts }: AdminDashboardTabProps) {
 
       {/* Alerts & Tickets */}
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
+        <Card className="bg-black/20 border-white/10">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2"><ShieldAlert className="text-destructive" /> Alertas Críticas Recientes</CardTitle>
             <Button size="sm" onClick={onOpenAlerts} className="bg-green-600 hover:bg-green-700 text-white">Ver Todas</Button>
@@ -111,7 +112,7 @@ export function AdminDashboardTab({ onOpenAlerts }: AdminDashboardTabProps) {
             )}
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-black/20 border-white/10">
           <CardHeader><CardTitle className="flex items-center gap-2"><Ticket className="text-blue-500" /> Nuevos Tickets de Error de IA</CardTitle></CardHeader>
           <CardContent>
             {errorTickets.length === 0 ? <p className="text-sm text-muted-foreground">No hay tickets nuevos.</p> : (
@@ -122,7 +123,7 @@ export function AdminDashboardTab({ onOpenAlerts }: AdminDashboardTabProps) {
       </div>
 
       {/* Resource Usage */}
-      <Card>
+      <Card className="bg-black/20 border-white/10">
         <CardHeader><CardTitle>Uso Agregado de Recursos</CardTitle><CardDescription>Uso combinado de todos los servidores activos.</CardDescription></CardHeader>
         <CardContent className="space-y-4">
           <div>

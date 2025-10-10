@@ -22,19 +22,18 @@ import { Button } from '@/components/ui/button';
 import { Server, Shield, LayoutDashboard, LifeBuoy, Menu } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useSession } from '@/components/session-context-provider';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea } from './ui/scroll-area';
-import { AdminDashboardTab } from './admin/admin-dashboard';
-import { InfrastructureTab } from './server-tabs/infrastructure-tab';
-import { SupportTicketsTab } from './server-tabs/support-tickets-tab';
-import { SecurityTab } from './server-tabs/security-tab';
+import { AdminPanelTabs } from './admin-panel-tabs';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { AdminPanelTabs } from './admin-panel-tabs';
+import { ScrollArea } from './ui/scroll-area';
+import { AdminDashboardTab } from './admin/admin-dashboard';
+import { InfrastructureTab } from './server-tabs/infrastructure-tab';
+import { SupportTicketsTab } from './server-tabs/support-tickets-tab';
+import { SecurityTab } from './server-tabs/security-tab';
 
 interface AdminPanelDialogProps {
   open: boolean;
@@ -69,8 +68,8 @@ export function AdminPanelDialog({ open, onOpenChange, onOpenAlerts, initialTab 
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={onOpenChange}>
-        <DrawerContent className="h-[95dvh] flex flex-col">
-          <DrawerHeader className="flex flex-row items-center justify-between p-4 border-b">
+        <DrawerContent className="h-[95dvh] flex flex-col bg-[var(--sidebar-background)] backdrop-blur-[var(--chat-bubble-blur)] border-t-[var(--sidebar-border)]">
+          <DrawerHeader className="flex flex-row items-center justify-between p-4 border-b border-b-[var(--sidebar-border)]">
             <DrawerTitle className="flex items-center gap-2 text-lg font-semibold">
               <Server className="h-5 w-5" /> Panel de Admin
             </DrawerTitle>
@@ -90,7 +89,7 @@ export function AdminPanelDialog({ open, onOpenChange, onOpenAlerts, initialTab 
           <div className="flex-1 overflow-hidden p-2">
             {tabContent}
           </div>
-          <DrawerFooter className="pt-2">
+          <DrawerFooter className="pt-2 border-t border-t-[var(--sidebar-border)]">
             <DrawerClose asChild>
               <Button variant="outline">Cerrar</Button>
             </DrawerClose>
@@ -102,7 +101,7 @@ export function AdminPanelDialog({ open, onOpenChange, onOpenAlerts, initialTab 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-[95vw] p-4 h-[90vh] sm:max-w-4xl sm:p-6 sm:h-[95vh] flex flex-col">
+      <DialogContent className="w-full max-w-[95vw] p-4 h-[90vh] sm:max-w-4xl sm:p-6 sm:h-[95vh] flex flex-col bg-[var(--sidebar-background)] backdrop-blur-[var(--chat-bubble-blur)] border-[var(--sidebar-border)]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Server className="h-6 w-6" /> Panel de Administración

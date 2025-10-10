@@ -237,7 +237,7 @@ export function SupportTicketsTab() {
   );
 
   return (
-    <Card>
+    <Card className="bg-black/20 border-white/10">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2"><LifeBuoy className="h-6 w-6" /> Tickets de Soporte</CardTitle>
         <Button variant="ghost" size="icon" onClick={fetchTickets} disabled={isLoading}>
@@ -246,19 +246,13 @@ export function SupportTicketsTab() {
       </CardHeader>
       <CardContent>
         <div className="flex flex-col sm:flex-row gap-4 mb-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar tickets..." className="pl-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} disabled={isLoading} />
-          </div>
-          <Select value={filterStatus} onValueChange={(value: 'all' | 'new' | 'in_progress' | 'resolved') => setFilterStatus(value)} disabled={isLoading}>
-            <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filtrar por estado" /></SelectTrigger>
-            <SelectContent>
+          <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Buscar tickets..." className="pl-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} disabled={isLoading} /></div>
+          <Select value={filterStatus} onValueChange={(value: 'all' | 'new' | 'in_progress' | 'resolved') => setFilterStatus(value)} disabled={isLoading}><SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filtrar por estado" /></SelectTrigger><SelectContent>
               <SelectItem value="all">Todos los Estados</SelectItem>
               <SelectItem value="new">Nuevos</SelectItem>
               <SelectItem value="in_progress">En Progreso</SelectItem>
               <SelectItem value="resolved">Resueltos</SelectItem>
-            </SelectContent>
-          </Select>
+            </SelectContent></Select>
         </div>
 
         {isLoading ? <div className="flex justify-center py-4"><Loader2 className="h-6 w-6 animate-spin" /></div> : (

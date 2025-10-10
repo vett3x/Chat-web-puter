@@ -170,7 +170,7 @@ export function ServerListTab() {
 
   return (
     <div className="space-y-8 p-1">
-      <Card>
+      <Card className="bg-black/20 border-white/10">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2"><Server className="h-6 w-6" /> Servidores Registrados</CardTitle>
           <Dialog open={isAddServerDialogOpen} onOpenChange={setIsAddServerDialogOpen}>
