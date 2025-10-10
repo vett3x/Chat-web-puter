@@ -150,9 +150,9 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-background text-foreground grid grid-cols-1 lg:grid-cols-2">
+    <div className="min-h-screen w-full bg-background text-foreground grid grid-cols-1 lg:grid-cols-3">
       {/* Left Column: Form */}
-      <div ref={leftColumnRef} className="flex flex-col justify-center items-center p-4 sm:p-8 lg:p-12">
+      <div ref={leftColumnRef} className="lg:col-span-2 flex flex-col justify-center items-center p-4 sm:p-8 lg:p-12">
         <div className="w-full max-w-sm">
           <div className="mb-8">
             <Link href="/" className="flex items-center gap-2 text-foreground">
@@ -274,7 +274,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right Column: Image & Testimonial */}
-      <div ref={rightColumnRef} className="hidden lg:block relative">
+      <div ref={rightColumnRef} className="hidden lg:block relative lg:col-span-1">
         <Image
           src={backgroundUrl || "/login-background.png"}
           alt="Mujer trabajando en un proyecto"
