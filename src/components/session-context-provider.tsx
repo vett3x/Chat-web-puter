@@ -158,7 +158,7 @@ export const SessionContextProvider = ({ children, onGlobalRefresh }: { children
   }, [triggerGlobalRefresh]);
 
   useEffect(() => {
-    const publicPaths = ['/', '/start', '/login', '/maintenance'];
+    const publicPaths = ['/', '/start', '/login', '/register', '/maintenance', '/check-email'];
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       setSession(currentSession);
       await fetchUserProfileAndRole(currentSession);
