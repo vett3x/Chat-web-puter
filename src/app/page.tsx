@@ -106,28 +106,40 @@ export default function LandingPage() {
               </Button>
             </div>
           </div>
-          <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none">
-            <CardSwap
-              width={400}
-              height={320}
-              cardDistance={50}
-              verticalDistance={60}
-              delay={4000}
-              pauseOnHover={true}
-            >
-              <Card className="p-6 flex flex-col justify-center items-center text-center bg-black/50 border-white/20 backdrop-blur-sm pointer-events-auto">
-                <h3 className="text-xl font-bold text-primary-light-purple mb-2">Desarrollo con IA</h3>
-                <p className="text-white/80">Transforma tus ideas en código funcional con un copiloto que escribe y depura por ti.</p>
-              </Card>
-              <Card className="p-6 flex flex-col justify-center items-center text-center bg-black/50 border-white/20 backdrop-blur-sm pointer-events-auto">
-                <h3 className="text-xl font-bold text-primary-light-purple mb-2">Plataforma Integrada</h3>
-                <p className="text-white/80">Gestiona servidores, bases de datos y despliegues desde una única interfaz.</p>
-              </Card>
-              <Card className="p-6 flex flex-col justify-center items-center text-center bg-black/50 border-white/20 backdrop-blur-sm pointer-events-auto">
-                <h3 className="text-xl font-bold text-primary-light-purple mb-2">Despliegue Simplificado</h3>
-                <p className="text-white/80">Publica tus aplicaciones en la web con un solo clic, sin configuraciones complejas.</p>
-              </Card>
-            </CardSwap>
+        </section>
+
+        {/* Features Section with CardSwap */}
+        <section id="features" className="py-24 bg-[#0A021A]">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center gap-16">
+            <div className="md:w-1/2 text-center md:text-left">
+              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Una Plataforma, Infinitas Posibilidades</h2>
+              <p className="mt-4 text-lg text-white/70">
+                Desde la idea hasta el despliegue, DeepAI Coder te proporciona las herramientas para construir rápidamente, con la ayuda de una IA que entiende tu visión.
+              </p>
+            </div>
+            <div className="md:w-1/2 h-[400px] flex items-center justify-center">
+              <CardSwap
+                width={400}
+                height={320}
+                cardDistance={50}
+                verticalDistance={60}
+                delay={4000}
+                pauseOnHover={true}
+              >
+                <Card className="p-6 flex flex-col justify-center items-center text-center bg-black/50 border-white/20 backdrop-blur-sm pointer-events-auto">
+                  <h3 className="text-xl font-bold text-primary-light-purple mb-2">Desarrollo con IA</h3>
+                  <p className="text-white/80">Transforma tus ideas en código funcional con un copiloto que escribe y depura por ti.</p>
+                </Card>
+                <Card className="p-6 flex flex-col justify-center items-center text-center bg-black/50 border-white/20 backdrop-blur-sm pointer-events-auto">
+                  <h3 className="text-xl font-bold text-primary-light-purple mb-2">Plataforma Integrada</h3>
+                  <p className="text-white/80">Gestiona servidores, bases de datos y despliegues desde una única interfaz.</p>
+                </Card>
+                <Card className="p-6 flex flex-col justify-center items-center text-center bg-black/50 border-white/20 backdrop-blur-sm pointer-events-auto">
+                  <h3 className="text-xl font-bold text-primary-light-purple mb-2">Despliegue Simplificado</h3>
+                  <p className="text-white/80">Publica tus aplicaciones en la web con un solo clic, sin configuraciones complejas.</p>
+                </Card>
+              </CardSwap>
+            </div>
           </div>
         </section>
 
