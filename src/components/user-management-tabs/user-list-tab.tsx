@@ -362,7 +362,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
               const remainingTime = kickedUsersTimeRemaining.get(user.id);
 
               return (
-                <Card key={user.id} className={cn('w-full', user.status === 'banned' && 'bg-destructive/10', user.status === 'kicked' && 'bg-warning/10')}>
+                <Card key={user.id} className={cn('w-full bg-black/20 border-white/10', user.status === 'banned' && 'bg-destructive/10', user.status === 'kicked' && 'bg-warning/10')}>
                   <CardContent className="p-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-3">
@@ -419,7 +419,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
   const kickedUsers = filteredUsers.filter(u => u.status === 'kicked');
 
   return (
-    <Card className="h-full flex flex-col">
+    <Card className="h-full flex flex-col bg-transparent border-none shadow-none">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" /> Lista de Usuarios</CardTitle>
         <Button variant="ghost" size="icon" onClick={fetchUsers} disabled={isLoadingUsers || isUserTemporarilyDisabled}><RefreshCw className="h-4 w-4" /></Button>

@@ -86,7 +86,7 @@ export function AddUserForm({ onUserAdded, isUserTemporarilyDisabled }: AddUserF
   };
 
   return (
-    <Card className="h-full">
+    <Card className="h-full bg-transparent border-none shadow-none">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <UserPlus className="h-6 w-6" /> Añadir Nuevo Usuario

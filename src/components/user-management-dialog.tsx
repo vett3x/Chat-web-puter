@@ -64,8 +64,8 @@ export function UserManagementDialog({ open, onOpenChange }: UserManagementDialo
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={onOpenChange}>
-        <DrawerContent className="h-[95dvh] flex flex-col">
-          <DrawerHeader className="flex flex-row items-center justify-between p-4 border-b">
+        <DrawerContent className="h-[95dvh] flex flex-col bg-[var(--sidebar-background)] backdrop-blur-[var(--chat-bubble-blur)] border-t-[var(--sidebar-border)]">
+          <DrawerHeader className="flex flex-row items-center justify-between p-4 border-b border-b-[var(--sidebar-border)]">
             <DrawerTitle className="flex items-center gap-2 text-lg font-semibold">
               <Users className="h-5 w-5" /> Gestión de Usuarios
             </DrawerTitle>
@@ -85,7 +85,7 @@ export function UserManagementDialog({ open, onOpenChange }: UserManagementDialo
           <div className="flex-1 overflow-hidden p-2">
             {tabContent}
           </div>
-          <DrawerFooter className="pt-2">
+          <DrawerFooter className="pt-2 border-t border-t-[var(--sidebar-border)]">
             <DrawerClose asChild>
               <Button variant="outline" disabled={isUserTemporarilyDisabled}>Cerrar</Button>
             </DrawerClose>
@@ -97,7 +97,7 @@ export function UserManagementDialog({ open, onOpenChange }: UserManagementDialo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-[95vw] p-4 h-[90vh] sm:max-w-4xl sm:p-6 sm:h-[95vh] flex flex-col">
+      <DialogContent className="w-full max-w-[95vw] p-4 h-[90vh] sm:max-w-4xl sm:p-6 sm:h-[95vh] flex flex-col bg-[var(--sidebar-background)] backdrop-blur-[var(--chat-bubble-blur)] border-[var(--sidebar-border)]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-6 w-6" /> Gestión de Usuarios
@@ -109,7 +109,7 @@ export function UserManagementDialog({ open, onOpenChange }: UserManagementDialo
         <UserManagementTabs isUserTemporarilyDisabled={isUserTemporarilyDisabled} />
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline" disabled={isUserTemporarilyDisabled}>Cerrar</Button>
+            <Button variant="ghost" className="bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10">Cerrar</Button>
           </DialogClose>
         </DialogFooter>
       </DialogContent>
