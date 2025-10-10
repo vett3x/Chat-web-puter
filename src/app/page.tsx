@@ -9,6 +9,7 @@ import { LandingHeader } from '@/components/landing-header';
 import { LandingFooter } from '@/components/landing-footer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import Link from 'next/link';
+import ElectricBorder from '@/components/ElectricBorder';
 
 export default function LandingPage() {
   const pricingPlans = [
@@ -102,28 +103,37 @@ export default function LandingPage() {
             </p>
             <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8">
               {pricingPlans.map((plan) => (
-                <Card key={plan.name} className={`bg-[#0A021A] border-white/10 text-left flex flex-col ${plan.highlight ? 'border-primary-light-purple border-2' : ''}`}>
-                  <CardHeader>
-                    <CardTitle>{plan.name}</CardTitle>
-                    <CardDescription className="text-white/60">{plan.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex-1">
-                    <p className="text-4xl font-bold mb-6">{plan.price}<span className="text-lg font-normal text-white/60">{plan.price.startsWith('$') ? '/mes' : ''}</span></p>
-                    <ul className="space-y-3">
-                      {plan.features.map((feature) => (
-                        <li key={feature} className="flex items-center gap-2 text-sm">
-                          <Check className="h-4 w-4 text-green-500" />
-                          <span className="text-white/80">{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                  <CardFooter>
-                    <Button asChild className={`w-full ${plan.highlight ? 'bg-primary-light-purple hover:bg-primary-light-purple/90 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
-                      <Link href={plan.href}>{plan.cta}</Link>
-                    </Button>
-                  </CardFooter>
-                </Card>
+                <ElectricBorder
+                  key={plan.name}
+                  color={plan.highlight ? 'hsl(var(--primary-light-purple))' : 'rgba(255, 255, 255, 0.3)'}
+                  speed={1}
+                  chaos={0.5}
+                  thickness={1}
+                  style={{ borderRadius: 'var(--radius)' }}
+                >
+                  <Card className="bg-[#0A021A] border-transparent text-left flex flex-col h-full">
+                    <CardHeader>
+                      <CardTitle>{plan.name}</CardTitle>
+                      <CardDescription className="text-white/60">{plan.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-1">
+                      <p className="text-4xl font-bold mb-6">{plan.price}<span className="text-lg font-normal text-white/60">{plan.price.startsWith('$') ? '/mes' : ''}</span></p>
+                      <ul className="space-y-3">
+                        {plan.features.map((feature) => (
+                          <li key={feature} className="flex items-center gap-2 text-sm">
+                            <Check className="h-4 w-4 text-green-500" />
+                            <span className="text-white/80">{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                    <CardFooter>
+                      <Button asChild className={`w-full ${plan.highlight ? 'bg-primary-light-purple hover:bg-primary-light-purple/90 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
+                        <Link href={plan.href}>{plan.cta}</Link>
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                </ElectricBorder>
               ))}
             </div>
           </div>
