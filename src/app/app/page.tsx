@@ -24,6 +24,7 @@ import { PanelLeftOpen, PanelLeftClose } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import LiquidEther from '@/components/liquid-ether';
 
 type SelectedItem = { id: string; type: 'app' | 'conversation' | 'note' | 'folder' };
 
@@ -209,7 +210,26 @@ export default function AppPage() {
   };
 
   return (
-    <div className="h-screen w-screen flex flex-col md:flex-row bg-background text-foreground overflow-hidden">
+    <div className="relative h-screen w-screen flex flex-col md:flex-row bg-background text-foreground overflow-hidden">
+      <div className="absolute inset-0 z-0" style={{ opacity: 'var(--liquid-ether-opacity, 0.5)' }}>
+        <LiquidEther
+          colors={[ '#5227FF', '#FF9FFC', '#B19EEF' ]}
+          mouseForce={20}
+          cursorSize={100}
+          isViscous={false}
+          viscous={30}
+          iterationsViscous={32}
+          iterationsPoisson={32}
+          resolution={0.5}
+          isBounce={false}
+          autoDemo={true}
+          autoSpeed={0.5}
+          autoIntensity={2.2}
+          takeoverDuration={0.25}
+          autoResumeDelay={3000}
+          autoRampDuration={0.6}
+        />
+      </div>
       {isMobile && (
         <MobileHeader>
           <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(prev => !prev)}>
@@ -218,8 +238,8 @@ export default function AppPage() {
         </MobileHeader>
       )}
       <aside className={cn(
-        "flex-shrink-0 transition-all duration-300 ease-in-out",
-        isMobile ? "absolute top-14 left-0 h-[calc(100%-56px)] z-30" : "relative",
+        "flex-shrink-0 transition-all duration-300 ease-in-out z-20", // Added z-20
+        isMobile ? "absolute top-14 left-0 h-[calc(100%-56px)]" : "relative",
         isSidebarOpen ? "w-72" : "w-0"
       )}>
         <ConversationSidebar
@@ -242,7 +262,7 @@ export default function AppPage() {
           hasNewUserSupportTickets={hasNewUserSupportTickets}
         />
       </aside>
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="relative z-10 flex-1 flex flex-col overflow-hidden">
         {renderMainContent()}
       </main>
 

@@ -9,7 +9,6 @@ import { ChatInput, ChatMode } from '@/components/chat/chat-input';
 import { ApiKey, AiKeyGroup } from '@/hooks/use-user-api-keys'; // NEW: Import AiKeyGroup
 import { useSession } from './session-context-provider';
 import { AutoFixStatus as AutoFixStatusComponent } from './chat/auto-fix-status';
-import LiquidEther from '@/components/liquid-ether'; // Import the new component
 
 interface ChatInterfaceProps {
   userId: string | undefined;
@@ -135,25 +134,6 @@ export const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>(({
 
   return (
     <div className="relative h-full">
-      <div className="absolute inset-0 z-0" style={{ opacity: 'var(--liquid-ether-opacity, 0.5)' }}>
-        <LiquidEther
-          colors={[ '#5227FF', '#FF9FFC', '#B19EEF' ]}
-          mouseForce={20}
-          cursorSize={100}
-          isViscous={false}
-          viscous={30}
-          iterationsViscous={32}
-          iterationsPoisson={32}
-          resolution={0.5}
-          isBounce={false}
-          autoDemo={true}
-          autoSpeed={0.5}
-          autoIntensity={2.2}
-          takeoverDuration={0.25}
-          autoResumeDelay={3000}
-          autoRampDuration={0.6}
-        />
-      </div>
       <ChatMessages
         messages={messages}
         isLoading={isLoading}
