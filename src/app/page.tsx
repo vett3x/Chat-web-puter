@@ -153,7 +153,7 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="bg-[#060010] text-white">
+    <div className="bg-background text-white">
       <PillNav
         items={[
           { label: 'Precios', href: '#pricing' },

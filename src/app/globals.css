@@ -100,11 +100,11 @@
   }
   .dark {
 
-    --background: 222 84% 5%; /* Dark blue background for better contrast */
+    --background: 255 100% 3.1%; /* Dark blue-purple background for consistency with landing */
 
     --foreground: 0 0% 98%; /* White text */
 
-    --card: 220 10% 10%; /* Dark gray for form background */
+    --card: 255 100% 3.1%; /* Same as background for the form column */
 
     --card-foreground: 0 0% 98%;
 
