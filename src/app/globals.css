@@ -160,7 +160,7 @@
   ;
 
     /* Sidebar specific colors */
-    --sidebar-background: 0 0% 100% / 0.25; /* White with 25% opacity for frosted glass */
+    --sidebar-background: 0 0% 100% / 0.1; /* White with 10% opacity for frosted glass */
     --sidebar-foreground: 0 0% 98%; /* White text */
     --sidebar-primary: 0 0% 100% / 0.15; /* Slightly more opaque white for selected item */
     --sidebar-primary-foreground: 0 0% 98%; /* White text on selected item */
@@ -178,8 +178,8 @@
     --black-color-login: 0 0% 98%; /* --primary-foreground */
 
     /* New variables for chat glassmorphism */
-    --chat-bubble-background-color: 0 0% 100% / 0.25; /* Increased opacity for frosted glass */
-    --chat-bubble-border-color: 0 0% 100% / 0.15; /* Subtle border */
+    --chat-bubble-background-color: 0 0% 100% / 0.1; /* Increased opacity for frosted glass */
+    --chat-bubble-border-color: 0 0% 100% / 0.1; /* Subtle border */
     --chat-bubble-blur: 24px; /* Significantly increased blur */
     --liquid-ether-opacity: 0.5;
   }
