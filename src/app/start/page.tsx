@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Wand2, MessageSquare, FileText, Server, Bot, Send, Loader2 } from 'lucide-react';
+import { Wand2, MessageSquare, FileText, Server, Bot, Send, Loader2, ArrowLeft } from 'lucide-react';
 import Aurora from '@/components/Aurora';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -31,30 +31,28 @@ export default function StartPage() {
   const [projectDetails, setProjectDetails] = useState({ name: '', main_purpose: '', key_features: '' });
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userInput, setUserInput] = useState('');
-  const [isTransitioning, setIsTransitioning] = useState(false);
   const contentRef = useRef(null);
 
+  // Animate content IN when step or question changes
   useEffect(() => {
-    // Clear any previous onboarding data when the page loads
-    localStorage.removeItem(ONBOARDING_STORAGE_KEY);
-    
-    // Animate content in on page load
     gsap.fromTo(contentRef.current, 
       { opacity: 0, y: 20 },
-      { opacity: 1, y: 0, duration: 0.8, ease: 'power3.out', delay: 0.3 }
+      { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out', delay: 0.3 }
     );
-  }, []);
+  }, [step, currentQuestionIndex]);
 
-  const handleTransition = (callback: () => void) => {
-    setIsTransitioning(true);
-    setTimeout(() => {
-      callback();
-      setIsTransitioning(false);
-    }, 300);
+  const animateOut = (callback: () => void) => {
+    gsap.to(contentRef.current, {
+      opacity: 0,
+      y: -20,
+      duration: 0.3,
+      ease: 'power2.in',
+      onComplete: callback
+    });
   };
 
   const handleActionChoice = (choice: string) => {
-    handleTransition(() => {
+    animateOut(() => {
       setUserChoice(choice);
       if (choice === 'create_app') {
         setStep('define_app');
@@ -72,17 +70,25 @@ export default function StartPage() {
       return;
     }
 
-    handleTransition(() => {
+    animateOut(() => {
       setProjectDetails(prev => ({ ...prev, [currentQuestion.key]: userInput.trim() }));
       setUserInput('');
       if (currentQuestionIndex < appCreationQuestions.length - 1) {
         setCurrentQuestionIndex(prev => prev + 1);
       } else {
-        // All questions answered, store and redirect
         const finalDetails = { ...projectDetails, [currentQuestion.key]: userInput.trim() };
         localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ action: 'create_app', details: finalDetails }));
         router.push('/login');
       }
+    });
+  };
+
+  const handleGoBack = () => {
+    animateOut(() => {
+      setStep('choose_action');
+      setCurrentQuestionIndex(0);
+      setProjectDetails({ name: '', main_purpose: '', key_features: '' });
+      setUserInput('');
     });
   };
 
@@ -121,7 +127,11 @@ export default function StartPage() {
     if (step === 'define_app') {
       const { prompt, placeholder } = appCreationQuestions[currentQuestionIndex];
       return (
-        <div className="w-full max-w-xl mx-auto text-center">
+        <div className="w-full max-w-xl mx-auto text-center relative">
+          <Button variant="ghost" onClick={handleGoBack} className="absolute -top-16 left-0 text-white/70 hover:text-white">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Volver
+          </Button>
           <div className="flex flex-col items-center text-center space-y-4">
             <div className="w-12 h-12 bg-secondary rounded-lg flex items-center justify-center shadow-md">
               <Bot className="h-6 w-6 text-secondary-foreground" />
@@ -132,11 +142,10 @@ export default function StartPage() {
               onChange={(e) => setUserInput(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder={placeholder}
-              disabled={isTransitioning}
               className="w-full resize-none min-h-24 bg-black/20 border-white/20 text-white placeholder:text-white/40"
               autoFocus
             />
-            <Button onClick={handleNextQuestion} disabled={isTransitioning} className="bg-primary-light-purple hover:bg-primary-light-purple/90 text-white">
+            <Button onClick={handleNextQuestion} className="bg-primary-light-purple hover:bg-primary-light-purple/90 text-white">
               Siguiente <Send className="ml-2 h-4 w-4" />
             </Button>
           </div>
@@ -157,7 +166,7 @@ export default function StartPage() {
           speed={0.5}
         />
       </div>
-      <div ref={contentRef} className={cn('z-10 w-full opacity-0', isTransitioning && 'opacity-0')}>
+      <div ref={contentRef} className="z-10 w-full">
         {renderContent()}
       </div>
     </div>
