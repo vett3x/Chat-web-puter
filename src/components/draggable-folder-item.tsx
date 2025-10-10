@@ -98,7 +98,7 @@ export function DraggableFolderItem({
   isDraggingOver,
   onDragEnter,
   onDragLeave,
-  draggedItemType, // <--- Prop received by this component
+  draggedItemType,
   onConversationUpdated,
   onConversationDeleted,
   onNoteUpdated,
