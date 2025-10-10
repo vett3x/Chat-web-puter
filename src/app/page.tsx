@@ -99,7 +99,7 @@ export default function LandingPage() {
               La plataforma todo en uno que convierte tus ideas en software real. Escribe, gestiona y despliega, todo desde una única interfaz.
             </p>
             <div className="mt-8">
-              <Button asChild size="lg" className="bg-primary-light-purple hover:bg-primary-light-purple/90 text-white font-semibold text-lg px-8 py-6 rounded-full">
+              <Button asChild size="lg" className="bg-primary-light-purple/20 hover:bg-primary-light-purple/30 backdrop-blur-md border border-primary-light-purple/30 text-white font-semibold text-lg px-8 py-6 rounded-full">
                 <Link href="/login">Empezar a Construir Ahora</Link>
               </Button>
             </div>
