@@ -8,7 +8,6 @@ import { LandingFooter } from '@/components/landing-footer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import Link from 'next/link';
 import ElectricBorder from '@/components/ElectricBorder';
-import { BentoCard } from '@/components/BentoCard';
 import GradualBlur from '@/components/GradualBlur';
 import PillNav from '@/components/PillNav';
 
@@ -38,45 +37,6 @@ export default function LandingPage() {
       features: ['Proyectos Ilimitados', 'Soporte Dedicado 24/7', 'Infraestructura Personalizada', 'SSO y Seguridad Avanzada'],
       cta: 'Contactar Ventas',
       href: '#contact'
-    },
-  ];
-
-  const featureCards = [
-    {
-      label: 'Innovación',
-      title: 'Desarrollo Asistido por IA',
-      description: 'Transforma tus ideas en aplicaciones funcionales con un copiloto de IA que escribe, depura y despliega por ti.',
-      className: 'md:col-span-1',
-    },
-    {
-      label: 'Integrado',
-      title: 'Plataforma Todo en Uno',
-      description: 'Desde la gestión de servidores y bases de datos hasta la integración con Cloudflare. Todo en una única interfaz.',
-      className: 'md:col-span-1',
-    },
-    {
-      label: 'Poder',
-      title: 'Control Total para el Dev',
-      description: 'No eres un simple espectador. Edita el código, gestiona la infraestructura y toma las decisiones finales en todo momento.',
-      className: 'md:col-span-2 md:row-span-2',
-    },
-    {
-      label: 'Eficiencia',
-      title: 'Despliegue Simplificado',
-      description: 'Publica tus aplicaciones en la web con un solo clic gracias a la integración automática de túneles y dominios.',
-      className: 'md:col-span-2 md:row-span-2',
-    },
-    {
-      label: 'Stack',
-      title: 'Tecnología Moderna',
-      description: 'Construido sobre un stack que ya conoces y amas: Next.js, TypeScript, Tailwind CSS y Supabase.',
-      className: 'md:col-span-1',
-    },
-    {
-      label: 'Premium',
-      title: 'Modelo Sostenible',
-      description: 'Nuestros planes de suscripción garantizan un servicio estable, seguro y en constante evolución para tus proyectos.',
-      className: 'md:col-span-1',
     },
   ];
 
@@ -111,7 +71,6 @@ export default function LandingPage() {
         logo="/logo.svg"
         logoAlt="DeepAI Coder Logo"
         items={[
-          { label: 'Características', href: '#features' },
           { label: 'Precios', href: '#pricing' },
           { label: 'Contacto', href: '#contact' },
           { label: 'Iniciar Sesión', href: '/login' }
@@ -145,23 +104,6 @@ export default function LandingPage() {
               <Button asChild size="lg" className="bg-primary-light-purple hover:bg-primary-light-purple/90 text-white font-semibold text-lg px-8 py-6 rounded-full">
                 <Link href="/login">Empezar a Construir Ahora</Link>
               </Button>
-            </div>
-          </div>
-        </section>
-
-        {/* Features Section */}
-        <section id="features" className="py-24">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Una Plataforma, Posibilidades Infinitas</h2>
-            <p className="mt-4 max-w-2xl mx-auto text-lg text-white/70">
-              Desde la idea hasta el despliegue, DeepAI Coder te proporciona todas las herramientas que necesitas.
-            </p>
-          </div>
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 mt-12">
-            <div className="grid grid-cols-1 md:grid-cols-4 auto-rows-[250px] gap-4">
-              {featureCards.map((card, i) => (
-                <BentoCard key={i} {...card} />
-              ))}
             </div>
           </div>
         </section>
