@@ -161,7 +161,6 @@ const CardSwap: React.FC<CardSwapProps> = ({
       tl.addLabel('return', `promote+=${config.durMove * config.returnDelay}`);
       
       tl.set(elFront, {
-        y: 400,
         opacity: 0,
         zIndex: backSlot.zIndex
       }, 'return');

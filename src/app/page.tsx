@@ -107,7 +107,7 @@ export default function LandingPage() {
         </section>
 
         {/* Features Section with CardSwap */}
-        <section id="features" className="py-24 bg-[#060010]">
+        <section id="features" className="py-24 bg-[#0A021A]">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center gap-16">
             <div className="md:w-1/2 text-center md:text-left">
               <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Una Plataforma, Infinitas Posibilidades</h2>
