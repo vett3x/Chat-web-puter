@@ -91,7 +91,7 @@ export function UpdateManagerDialog({ open, onOpenChange }: UpdateManagerDialogP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] p-6">
+      <DialogContent className="sm:max-w-[600px] p-6 bg-[var(--sidebar-background)] backdrop-blur-[var(--chat-bubble-blur)] border-[var(--sidebar-border)]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <GitPullRequest className="h-6 w-6" /> Gestor de Actualizaciones
@@ -166,7 +166,7 @@ export function UpdateManagerDialog({ open, onOpenChange }: UpdateManagerDialogP
         </div>
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline">Cerrar</Button>
+            <Button variant="ghost" className="bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10">Cerrar</Button>
           </DialogClose>
         </DialogFooter>
       </DialogContent>
