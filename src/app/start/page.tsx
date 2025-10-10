@@ -85,10 +85,16 @@ export default function StartPage() {
 
   const handleGoBack = () => {
     animateOut(() => {
-      setStep('choose_action');
-      setCurrentQuestionIndex(0);
-      setProjectDetails({ name: '', main_purpose: '', key_features: '' });
-      setUserInput('');
+      if (currentQuestionIndex > 0) {
+        setCurrentQuestionIndex(prev => prev - 1);
+        const previousKey = appCreationQuestions[currentQuestionIndex - 1].key as keyof typeof projectDetails;
+        setUserInput(projectDetails[previousKey]);
+      } else {
+        setStep('choose_action');
+        setCurrentQuestionIndex(0);
+        setProjectDetails({ name: '', main_purpose: '', key_features: '' });
+        setUserInput('');
+      }
     });
   };
 
@@ -128,10 +134,6 @@ export default function StartPage() {
       const { prompt, placeholder } = appCreationQuestions[currentQuestionIndex];
       return (
         <div className="w-full max-w-xl mx-auto text-center relative">
-          <Button variant="ghost" onClick={handleGoBack} className="absolute top-0 left-0 text-white/70 hover:text-white">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Volver
-          </Button>
           <div className="flex flex-col items-center text-center space-y-4">
             <div className="w-12 h-12 bg-secondary rounded-lg flex items-center justify-center shadow-md">
               <Bot className="h-6 w-6 text-secondary-foreground" />
@@ -145,9 +147,15 @@ export default function StartPage() {
               className="w-full resize-none min-h-24 bg-black/20 border-white/20 text-white placeholder:text-white/40"
               autoFocus
             />
-            <Button onClick={handleNextQuestion} className="bg-primary-light-purple hover:bg-primary-light-purple/90 text-white">
-              Siguiente <Send className="ml-2 h-4 w-4" />
-            </Button>
+            <div className="flex gap-4 mt-4">
+              <Button variant="outline" onClick={handleGoBack} className="bg-transparent border-white/20 hover:bg-white/10 text-white">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Volver
+              </Button>
+              <Button onClick={handleNextQuestion} className="bg-primary-light-purple hover:bg-primary-light-purple/90 text-white">
+                Siguiente <Send className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       );
