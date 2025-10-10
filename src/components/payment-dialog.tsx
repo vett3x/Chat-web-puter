@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,9 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { PayPalButtonsWrapper } from './paypal-buttons-wrapper';
-import { Check } from 'lucide-react';
+import { Check, CreditCard } from 'lucide-react';
+import { PayPalPaymentForm } from './paypal-payment-form';
+import { cn } from '@/lib/utils';
 
 interface PricingPlan {
   id: string;
@@ -29,11 +31,12 @@ interface PaymentDialogProps {
 }
 
 export function PaymentDialog({ open, onOpenChange, plan }: PaymentDialogProps) {
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'paypal'>('card');
+
   if (!plan) return null;
 
   const handlePaymentSuccess = () => {
     onOpenChange(false);
-    // You can add further logic here, like redirecting to a thank you page
   };
 
   return (
@@ -59,8 +62,41 @@ export function PaymentDialog({ open, onOpenChange, plan }: PaymentDialogProps) 
             ))}
           </ul>
         </div>
-        <PayPalButtonsWrapper plan={plan} onPaymentSuccess={handlePaymentSuccess} />
-        <DialogFooter className="sm:justify-start">
+
+        <div className="flex border-b mb-4">
+          <button
+            onClick={() => setPaymentMethod('card')}
+            className={cn(
+              "flex-1 py-2 text-sm font-medium flex items-center justify-center gap-2",
+              paymentMethod === 'card' ? 'border-b-2 border-primary-light-purple text-primary-light-purple' : 'text-muted-foreground'
+            )}
+          >
+            <CreditCard className="h-4 w-4" />
+            Tarjeta
+          </button>
+          <button
+            onClick={() => setPaymentMethod('paypal')}
+            className={cn(
+              "flex-1 py-2 text-sm font-medium",
+              paymentMethod === 'paypal' ? 'border-b-2 border-primary-light-purple text-primary-light-purple' : 'text-muted-foreground'
+            )}
+          >
+            PayPal
+          </button>
+        </div>
+
+        {paymentMethod === 'card' && (
+          <PayPalPaymentForm plan={plan} onPaymentSuccess={handlePaymentSuccess} />
+        )}
+
+        {paymentMethod === 'paypal' && (
+          <div className="px-4">
+            <p className="text-center text-sm text-muted-foreground mb-4">Serás redirigido a PayPal para completar tu compra de forma segura.</p>
+            <PayPalButtonsWrapper plan={plan} onPaymentSuccess={handlePaymentSuccess} fundingSource="paypal" />
+          </div>
+        )}
+
+        <DialogFooter className="sm:justify-start mt-4">
           <DialogClose asChild>
             <Button type="button" variant="ghost">
               Cancelar

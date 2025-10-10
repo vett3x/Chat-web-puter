@@ -10,10 +10,11 @@ interface PayPalButtonsWrapperProps {
     price: string;
     name: string;
   };
-  onPaymentSuccess?: () => void; // New prop
+  onPaymentSuccess?: () => void;
+  fundingSource?: 'paypal' | 'card' | 'paylater' | 'credit';
 }
 
-export function PayPalButtonsWrapper({ plan, onPaymentSuccess }: PayPalButtonsWrapperProps) {
+export function PayPalButtonsWrapper({ plan, onPaymentSuccess, fundingSource }: PayPalButtonsWrapperProps) {
   const [{ isPending }] = usePayPalScriptReducer();
 
   const createOrder = async (): Promise<string> => {
@@ -43,7 +44,7 @@ export function PayPalButtonsWrapper({ plan, onPaymentSuccess }: PayPalButtonsWr
       const result = await response.json();
       if (!response.ok) throw new Error(result.message);
       toast.success(`¡Gracias por suscribirte al plan ${plan.name}!`);
-      onPaymentSuccess?.(); // Call the success handler
+      onPaymentSuccess?.();
     } catch (error: any) {
       toast.error(`Error al procesar el pago: ${error.message}`);
       throw error;
@@ -66,6 +67,7 @@ export function PayPalButtonsWrapper({ plan, onPaymentSuccess }: PayPalButtonsWr
       onApprove={onApprove}
       onError={onError}
       className="w-full"
+      fundingSource={fundingSource}
     />
   );
 }
