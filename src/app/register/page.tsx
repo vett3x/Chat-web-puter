@@ -50,7 +50,7 @@ export default function RegisterPage() {
       try {
         const res = await fetch('/api/settings/public-branding');
         const data = await res.json();
-        setBackgroundUrl(data.login_background_url);
+        setBackgroundUrl(data.register_background_url);
       } catch (error) {
         console.error("Failed to fetch branding settings:", error);
       }
