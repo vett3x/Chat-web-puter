@@ -24,6 +24,7 @@ export interface PillNavProps {
   pillTextColor?: string;
   onMobileMenuClick?: () => void;
   initialLoadAnimation?: boolean;
+  onCtaClick?: () => void; // New prop for CTA click
 }
 
 const PillNav: React.FC<PillNavProps> = ({
@@ -36,7 +37,8 @@ const PillNav: React.FC<PillNavProps> = ({
   hoveredPillTextColor = '#060010',
   pillTextColor,
   onMobileMenuClick,
-  initialLoadAnimation = true
+  initialLoadAnimation = true,
+  onCtaClick, // New prop
 }) => {
   const resolvedPillTextColor = pillTextColor ?? baseColor;
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -277,8 +279,8 @@ const PillNav: React.FC<PillNavProps> = ({
           </div>
 
           <div ref={ctaRef} className="hidden md:flex">
-            <Button asChild className="bg-white/10 hover:bg-white/20 text-white font-semibold rounded-full">
-              <Link href={ctaItem.href}>{ctaItem.label}</Link>
+            <Button onClick={onCtaClick} className="bg-white/10 hover:bg-white/20 text-white font-semibold rounded-full">
+              {ctaItem.label}
             </Button>
           </div>
 
@@ -303,9 +305,12 @@ const PillNav: React.FC<PillNavProps> = ({
         <ul className="list-none m-0 p-4 flex flex-col gap-2">
           {items.map(item => {
             const linkClasses = 'block py-3 px-4 text-[16px] font-medium rounded-full transition-all duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)] text-center bg-primary-light-purple/20 backdrop-blur-md border border-primary-light-purple/30';
+            const isCta = item.href === '#';
             return (
               <li key={item.href}>
-                {isRouterLink(item.href) ? (
+                {isCta ? (
+                  <button onClick={() => { onCtaClick?.(); setIsMobileMenuOpen(false); }} className={`${linkClasses} w-full`} style={{ color: 'var(--pill-text, #000)' }}>{item.label}</button>
+                ) : isRouterLink(item.href) ? (
                   <Link href={item.href} className={linkClasses} style={{ color: 'var(--pill-text, #000)' }} onClick={() => setIsMobileMenuOpen(false)}>{item.label}</Link>
                 ) : (
                   <a href={item.href} className={linkClasses} style={{ color: 'var(--pill-text, #000)' }} onClick={() => setIsMobileMenuOpen(false)}>{item.label}</a>
