@@ -5,11 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Wand2, Check } from 'lucide-react';
 import Aurora from '@/components/Aurora';
 import { LandingFooter } from '@/components/landing-footer';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import Link from 'next/link';
 import ElectricBorder from '@/components/ElectricBorder';
 import GradualBlur from '@/components/GradualBlur';
 import PillNav from '@/components/PillNav';
+import CardSwap, { Card } from '@/components/CardSwap';
 
 export default function LandingPage() {
   const pricingPlans = [
@@ -105,6 +105,29 @@ export default function LandingPage() {
                 <Link href="/login">Empezar a Construir Ahora</Link>
               </Button>
             </div>
+          </div>
+          <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none">
+            <CardSwap
+              width={400}
+              height={320}
+              cardDistance={50}
+              verticalDistance={60}
+              delay={4000}
+              pauseOnHover={true}
+            >
+              <Card className="p-6 flex flex-col justify-center items-center text-center bg-black/50 border-white/20 backdrop-blur-sm pointer-events-auto">
+                <h3 className="text-xl font-bold text-primary-light-purple mb-2">Desarrollo con IA</h3>
+                <p className="text-white/80">Transforma tus ideas en código funcional con un copiloto que escribe y depura por ti.</p>
+              </Card>
+              <Card className="p-6 flex flex-col justify-center items-center text-center bg-black/50 border-white/20 backdrop-blur-sm pointer-events-auto">
+                <h3 className="text-xl font-bold text-primary-light-purple mb-2">Plataforma Integrada</h3>
+                <p className="text-white/80">Gestiona servidores, bases de datos y despliegues desde una única interfaz.</p>
+              </Card>
+              <Card className="p-6 flex flex-col justify-center items-center text-center bg-black/50 border-white/20 backdrop-blur-sm pointer-events-auto">
+                <h3 className="text-xl font-bold text-primary-light-purple mb-2">Despliegue Simplificado</h3>
+                <p className="text-white/80">Publica tus aplicaciones en la web con un solo clic, sin configuraciones complejas.</p>
+              </Card>
+            </CardSwap>
           </div>
         </section>
 
