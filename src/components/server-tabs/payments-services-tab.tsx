@@ -31,13 +31,13 @@ const planSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().min(1, 'El nombre es requerido.'),
   price: z.string().min(1, 'El precio es requerido.'),
-  price_period: z.string().optional(),
-  description: z.string().optional(),
+  price_period: z.string().optional().nullable(),
+  description: z.string().optional().nullable(),
   features: z.string(), // Textarea input
-  cta_text: z.string().optional(),
-  cta_href: z.string().optional(),
+  cta_text: z.string().optional().nullable(),
+  cta_href: z.string().optional().nullable(),
   highlight: z.boolean().optional(),
-  badge_text: z.string().optional(),
+  badge_text: z.string().optional().nullable(),
   is_active: z.boolean().optional(),
   order_index: z.coerce.number().int().optional(),
 });
@@ -78,7 +78,15 @@ export function PaymentsServicesTab() {
 
   const handleEdit = (plan: Plan) => {
     setEditingPlan(plan);
-    form.reset({ ...plan, features: Array.isArray(plan.features) ? plan.features.join('\n') : '' });
+    form.reset({
+      ...plan,
+      price_period: plan.price_period || '',
+      description: plan.description || '',
+      features: Array.isArray(plan.features) ? plan.features.join('\n') : '',
+      cta_text: plan.cta_text || '',
+      cta_href: plan.cta_href || '',
+      badge_text: plan.badge_text || '',
+    });
     setIsDialogOpen(true);
   };
 
@@ -164,17 +172,17 @@ export function PaymentsServicesTab() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="price" render={({ field }) => (<FormItem><FormLabel>Precio</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                <FormField control={form.control} name="price_period" render={({ field }) => (<FormItem><FormLabel>Periodo (ej. /mes)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="price_period" render={({ field }) => (<FormItem><FormLabel>Periodo (ej. /mes)</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="order_index" render={({ field }) => (<FormItem><FormLabel>Orden</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>)} />
               </div>
-              <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Descripción</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Descripción</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="features" render={({ field }) => (<FormItem><FormLabel>Características (una por línea)</FormLabel><FormControl><Textarea {...field} rows={5} /></FormControl><FormMessage /></FormItem>)} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField control={form.control} name="cta_text" render={({ field }) => (<FormItem><FormLabel>Texto del Botón (CTA)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                <FormField control={form.control} name="cta_href" render={({ field }) => (<FormItem><FormLabel>Enlace del Botón (CTA)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="cta_text" render={({ field }) => (<FormItem><FormLabel>Texto del Botón (CTA)</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="cta_href" render={({ field }) => (<FormItem><FormLabel>Enlace del Botón (CTA)</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField control={form.control} name="badge_text" render={({ field }) => (<FormItem><FormLabel>Texto de la Insignia</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="badge_text" render={({ field }) => (<FormItem><FormLabel>Texto de la Insignia</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="highlight" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm mt-6"><FormLabel>Destacar Plan</FormLabel><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)} />
               </div>
               <FormField control={form.control} name="is_active" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm"><FormLabel>Activo</FormLabel><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)} />
