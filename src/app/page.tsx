@@ -5,8 +5,8 @@ import MagicBento from '@/components/MagicBento';
 import { Button } from '@/components/ui/button';
 import { Wand2, Check } from 'lucide-react';
 import Aurora from '@/components/Aurora';
-import { LandingHeader } from '@/components/landing-header.tsx';
-import { LandingFooter } from '@/components/landing-footer.tsx';
+import { LandingHeader } from '@/components/landing-header';
+import { LandingFooter } from '@/components/landing-footer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import Link from 'next/link';
 
