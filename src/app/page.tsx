@@ -16,13 +16,11 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useRouter } from 'next/navigation';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import Autoplay from "embla-carousel-autoplay";
-import { LoginDialog } from '@/components/login-dialog'; // Import the new dialog
 import { gsap } from 'gsap';
 
 export default function LandingPage() {
   const router = useRouter();
   const mainContentRef = useRef(null);
-  const [isLoginOpen, setIsLoginOpen] = useState(false);
 
   const handleStartClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
@@ -148,9 +146,8 @@ export default function LandingPage() {
         items={[
           { label: 'Precios', href: '#pricing' },
           { label: 'Contacto', href: '#contact' },
-          { label: 'Iniciar Sesión', href: '#' } // Changed href to #
+          { label: 'Iniciar Sesión', href: '/login' }
         ]}
-        onCtaClick={() => setIsLoginOpen(true)} // Added onClick handler
         activeHref="/"
         baseColor="#0A021A"
         pillColor="hsl(var(--primary-light-purple))"
@@ -362,7 +359,6 @@ export default function LandingPage() {
         />
       </main>
       <LandingFooter ref={footerRef} />
-      <LoginDialog open={isLoginOpen} onOpenChange={setIsLoginOpen} />
     </div>
   );
 }

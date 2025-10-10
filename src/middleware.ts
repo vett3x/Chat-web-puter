@@ -91,7 +91,7 @@ export async function middleware(req: NextRequest) {
 
     if (shouldBeKicked && !isPublicPath) {
       await supabase.auth.signOut();
-      const finalRedirectUrl = new URL('/', req.nextUrl.origin); // Redirect to landing page
+      const finalRedirectUrl = new URL('/login', req.nextUrl.origin); // Redirect to login page
       finalRedirectUrl.searchParams.set('error', kickReason);
       if (kickedAt) {
         finalRedirectUrl.searchParams.set('kicked_at', kickedAt);
@@ -102,7 +102,7 @@ export async function middleware(req: NextRequest) {
 
   if (!session && !isPublicPath) {
     const redirectUrl = req.nextUrl.clone();
-    redirectUrl.pathname = '/'; // Redirect to landing page
+    redirectUrl.pathname = '/login'; // Redirect to login page
     redirectUrl.searchParams.set(`redirectedFrom`, req.nextUrl.pathname);
     return NextResponse.redirect(redirectUrl);
   }
