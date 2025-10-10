@@ -87,6 +87,7 @@ export default function StartPage() {
     animateOut(() => {
       if (currentQuestionIndex > 0) {
         setCurrentQuestionIndex(prev => prev - 1);
+        // Restore previous input for editing
         const previousKey = appCreationQuestions[currentQuestionIndex - 1].key as keyof typeof projectDetails;
         setUserInput(projectDetails[previousKey]);
       } else {
@@ -149,7 +150,7 @@ export default function StartPage() {
             />
             <div className="flex gap-4 mt-4">
               <Button variant="outline" onClick={handleGoBack} className="bg-transparent border-white/20 hover:bg-white/10 text-white">
-                <ArrowLeft className="mr-2 h-4 w-4" />
+                <ArrowLeft className="h-4 w-4 mr-2" />
                 Volver
               </Button>
               <Button onClick={handleNextQuestion} className="bg-primary-light-purple hover:bg-primary-light-purple/90 text-white">
