@@ -44,6 +44,7 @@ const PillNav: React.FC<PillNavProps> = ({
   const hamburgerRef = useRef<HTMLButtonElement | null>(null);
   const mobileMenuRef = useRef<HTMLDivElement | null>(null);
   const navItemsRef = useRef<HTMLDivElement | null>(null);
+  const initialAnimationRan = useRef(false);
 
   useEffect(() => {
     const layout = () => {
@@ -109,7 +110,7 @@ const PillNav: React.FC<PillNavProps> = ({
       gsap.set(menu, { visibility: 'hidden', opacity: 0, scaleY: 1, y: 0 });
     }
 
-    if (initialLoadAnimation) {
+    if (initialLoadAnimation && !initialAnimationRan.current) {
       const navItems = navItemsRef.current;
       if (navItems) {
         gsap.set(navItems, { width: 0, overflow: 'hidden' });
@@ -119,6 +120,7 @@ const PillNav: React.FC<PillNavProps> = ({
           ease
         });
       }
+      initialAnimationRan.current = true;
     }
 
     return () => window.removeEventListener('resize', onResize);
