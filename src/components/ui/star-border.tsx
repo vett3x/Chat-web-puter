@@ -8,7 +8,6 @@ interface StarBorderProps {
   className?: string;
   color?: string;
   speed?: React.CSSProperties['animationDuration'];
-  thickness?: number;
 }
 
 export function StarBorder({
@@ -16,35 +15,32 @@ export function StarBorder({
   className,
   color = 'hsl(var(--primary-light-purple))',
   speed = '6s',
-  thickness = 1,
 }: StarBorderProps) {
   return (
-    <div
-      className={cn(
-        "relative inline-block overflow-hidden rounded-[20px] group",
-        className
-      )}
-    >
+    <div className={cn("relative w-full h-full group", className)}>
+      {/* The static border element that changes color on focus */}
+      <div className="absolute inset-0 rounded-[20px] border border-[var(--chat-bubble-border-color)] group-focus-within:border-primary-light-purple transition-colors duration-300 pointer-events-none" />
+      
+      {/* Star 1 */}
       <div
-        className="absolute w-[300%] h-[50%] opacity-0 group-focus-within:opacity-70 bottom-[-11px] right-[-250%] rounded-full animate-star-movement-bottom z-0 transition-opacity duration-300 pointer-events-none"
+        className="absolute h-3 w-3 rounded-full opacity-0 group-focus-within:opacity-100 transition-opacity duration-300 pointer-events-none animate-star-orbit-clockwise"
         style={{
-          background: `radial-gradient(circle, ${color}, transparent 10%)`,
+          background: `radial-gradient(circle, ${color} 10%, transparent 60%)`,
           animationDuration: speed,
         }}
       />
+      {/* Star 2 */}
       <div
-        className="absolute w-[300%] h-[50%] opacity-0 group-focus-within:opacity-70 top-[-10px] left-[-250%] rounded-full animate-star-movement-top z-0 transition-opacity duration-300 pointer-events-none"
+        className="absolute h-3 w-3 rounded-full opacity-0 group-focus-within:opacity-100 transition-opacity duration-300 pointer-events-none animate-star-orbit-counter-clockwise"
         style={{
-          background: `radial-gradient(circle, ${color}, transparent 10%)`,
+          background: `radial-gradient(circle, ${color} 10%, transparent 60%)`,
           animationDuration: speed,
+          animationDelay: `-${parseFloat(speed) / 2}s`,
         }}
       />
-      <div 
-        className="relative z-10 bg-[var(--chat-bubble-background-color)] backdrop-blur-[var(--chat-bubble-blur)] border border-[var(--chat-bubble-border-color)] rounded-[20px] group-focus-within:border-primary-light-purple transition-colors duration-300"
-        style={{
-          borderWidth: `${thickness}px`,
-        }}
-      >
+      
+      {/* The content */}
+      <div className="relative z-10 w-full h-full">
         {children}
       </div>
     </div>
