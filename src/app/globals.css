@@ -187,11 +187,8 @@
   }
 
   body.login-page {
-    background-image: url("/login-background.png");
-    background-position: center;
-    background-size: cover;
-    background-repeat: no-repeat;
-    background-attachment: fixed;
+    /* Remove specific background image, let bg-background handle it */
+    background-image: none;
   }
 }
 
@@ -224,28 +221,5 @@
     animation-delay: 0s, 0.3s; /* Start pulsing after the 'on' animation finishes */
   }
 
-  /* Custom styles for the modern login form header */
-  .login-header::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: -30px;
-    width: 30px;
-    height: 30px;
-    border-top-right-radius: 50%;
-    background: transparent;
-    box-shadow: 15px 0 0 0 hsl(var(--primary-color-login));
-  }
-
-  .login-header::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    right: -30px;
-    width: 30px;
-    height: 30px;
-    border-top-left-radius: 50%;
-    background: transparent;
-    box-shadow: -15px 0 0 0 hsl(var(--primary-color-login));
-  }
+  /* Removed custom login-header styles as they are not in the reference image */
 }
