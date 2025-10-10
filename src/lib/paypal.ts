@@ -3,11 +3,11 @@ import CryptoJS from 'crypto-js';
 
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
-const PAYPAL_API_URL = 'https://api-m.sandbox.paypal.com'; // Cambiar a producción cuando esté listo
 
 interface PayPalCredentials {
   clientId: string;
   clientSecret: string;
+  mode: 'sandbox' | 'live';
 }
 
 async function getPayPalCredentials(): Promise<PayPalCredentials> {
@@ -17,7 +17,7 @@ async function getPayPalCredentials(): Promise<PayPalCredentials> {
 
   const { data: config, error } = await supabaseAdmin
     .from('paypal_configs')
-    .select('client_id, client_secret')
+    .select('client_id, client_secret, mode')
     .eq('is_active', true)
     .single();
 
@@ -32,12 +32,17 @@ async function getPayPalCredentials(): Promise<PayPalCredentials> {
     throw new Error('No se pudieron desencriptar las credenciales de PayPal.');
   }
 
-  return { clientId, clientSecret };
+  return { clientId, clientSecret, mode: config.mode as 'sandbox' | 'live' };
 }
 
-export async function getPayPalAccessToken(): Promise<string> {
-  const { clientId, clientSecret } = await getPayPalCredentials();
+function getPayPalApiUrl(mode: 'sandbox' | 'live'): string {
+  return mode === 'sandbox' ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
+}
+
+export async function getPayPalAccessToken(): Promise<{ accessToken: string; mode: 'sandbox' | 'live' }> {
+  const { clientId, clientSecret, mode } = await getPayPalCredentials();
   const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+  const PAYPAL_API_URL = getPayPalApiUrl(mode);
 
   const response = await fetch(`${PAYPAL_API_URL}/v1/oauth2/token`, {
     method: 'POST',
@@ -53,5 +58,5 @@ export async function getPayPalAccessToken(): Promise<string> {
     throw new Error(data.error_description || 'Error al obtener el token de acceso de PayPal.');
   }
 
-  return data.access_token;
+  return { accessToken: data.access_token, mode };
 }

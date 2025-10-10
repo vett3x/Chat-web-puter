@@ -3,8 +3,6 @@ export const runtime = 'nodejs';
 import { NextResponse, type NextRequest } from 'next/server';
 import { getPayPalAccessToken } from '@/lib/paypal';
 
-const PAYPAL_API_URL = 'https://api-m.sandbox.paypal.com';
-
 export async function POST(req: NextRequest) {
   try {
     const { amount } = await req.json();
@@ -12,7 +10,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'El monto es inválido.' }, { status: 400 });
     }
 
-    const accessToken = await getPayPalAccessToken();
+    const { accessToken, mode } = await getPayPalAccessToken();
+    const PAYPAL_API_URL = mode === 'sandbox' ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
 
     const response = await fetch(`${PAYPAL_API_URL}/v2/checkout/orders`, {
       method: 'POST',

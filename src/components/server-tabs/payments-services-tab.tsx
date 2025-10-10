@@ -27,6 +27,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // Plan Schema
 const planSchema = z.object({
@@ -55,6 +56,7 @@ const paypalConfigSchema = z.object({
   client_id: z.string().min(1, 'El Client ID es requerido.'),
   client_secret: z.string().optional(),
   is_active: z.boolean().optional(),
+  mode: z.enum(['sandbox', 'live']),
 });
 
 // Types
@@ -86,7 +88,7 @@ export function PaymentsServicesTab() {
 
   // Forms
   const planForm = useForm<PlanFormValues>({ resolver: zodResolver(planSchema), defaultValues: { name: '', price: '', price_period: '', description: '', features: '', cta_text: '', cta_href: '', highlight: false, badge_text: '', is_active: true, order_index: 0 } });
-  const paypalForm = useForm<PayPalConfigFormValues>({ resolver: zodResolver(paypalConfigSchema), defaultValues: { nickname: '', client_id: '', client_secret: '', is_active: false } });
+  const paypalForm = useForm<PayPalConfigFormValues>({ resolver: zodResolver(paypalConfigSchema), defaultValues: { nickname: '', client_id: '', client_secret: '', is_active: false, mode: 'sandbox' } });
 
   // Fetch Functions
   const fetchPlans = useCallback(async () => { setIsLoadingPlans(true); try { const res = await fetch('/api/admin/pricing-plans'); if (!res.ok) throw new Error((await res.json()).message); setPlans(await res.json()); } catch (e: any) { toast.error(`Error al cargar planes: ${e.message}`); } finally { setIsLoadingPlans(false); } }, []);
@@ -102,7 +104,7 @@ export function PaymentsServicesTab() {
 
   // PayPal Handlers
   const handleEditPayPal = (config: PayPalConfig) => { setEditingPayPalConfig(config); paypalForm.reset({ ...config, client_secret: '' }); setIsPayPalDialogOpen(true); };
-  const handleAddNewPayPal = () => { setEditingPayPalConfig(null); paypalForm.reset({ nickname: '', client_id: '', client_secret: '', is_active: false }); setIsPayPalDialogOpen(true); };
+  const handleAddNewPayPal = () => { setEditingPayPalConfig(null); paypalForm.reset({ nickname: '', client_id: '', client_secret: '', is_active: false, mode: 'sandbox' }); setIsPayPalDialogOpen(true); };
   const onPayPalSubmit = async (values: PayPalConfigFormValues) => { if (editingPayPalConfig && !values.client_secret) { delete values.client_secret; } else if (!editingPayPalConfig && !values.client_secret) { paypalForm.setError('client_secret', { message: 'El Client Secret es requerido.' }); return; } setIsSubmittingPayPal(true); try { const method = editingPayPalConfig ? 'PUT' : 'POST'; const res = await fetch('/api/admin/paypal-configs', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editingPayPalConfig ? { ...values, id: editingPayPalConfig.id } : values) }); const result = await res.json(); if (!res.ok) throw new Error(result.message); toast.success(result.message); setIsPayPalDialogOpen(false); fetchPayPalConfigs(); } catch (e: any) { toast.error(`Error al guardar: ${e.message}`); } finally { setIsSubmittingPayPal(false); } };
   const handleDeletePayPal = async (id: string) => { try { const res = await fetch(`/api/admin/paypal-configs?id=${id}`, { method: 'DELETE' }); const result = await res.json(); if (!res.ok) throw new Error(result.message); toast.success(result.message); fetchPayPalConfigs(); } catch (e: any) { toast.error(`Error al eliminar: ${e.message}`); } };
   const handleTestPayPal = async (id: string) => { setIsTestingPayPalId(id); const toastId = toast.loading('Probando conexión con PayPal...'); try { const res = await fetch('/api/admin/paypal-configs/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }); const result = await res.json(); if (!res.ok) throw new Error(result.message); toast.success(result.message, { id: toastId }); fetchPayPalConfigs(); } catch (e: any) { toast.error(e.message, { id: toastId, duration: 10000 }); } finally { setIsTestingPayPalId(null); } };
@@ -154,11 +156,12 @@ export function PaymentsServicesTab() {
         <CardContent>
           {isLoadingPayPal ? <div className="flex items-center justify-center py-4"><Loader2 className="h-6 w-6 animate-spin" /></div> : (
             <Table>
-              <TableHeader><TableRow><TableHead>Apodo</TableHead><TableHead>Estado</TableHead><TableHead>Activo</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Apodo</TableHead><TableHead>Modo</TableHead><TableHead>Estado</TableHead><TableHead>Activo</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
               <TableBody>
                 {paypalConfigs.map((config) => (
                   <TableRow key={config.id}>
                     <TableCell className="font-medium">{config.nickname}</TableCell>
+                    <TableCell><Badge variant={config.mode === 'sandbox' ? 'outline' : 'default'}>{config.mode}</Badge></TableCell>
                     <TableCell>{config.status === 'verified' && <Badge><CheckCircle2 className="h-3 w-3 mr-1" /> Verificado</Badge>}{config.status === 'unverified' && <Badge variant="secondary">Sin verificar</Badge>}{config.status === 'failed' && <Badge variant="destructive"><AlertCircle className="h-3 w-3 mr-1" /> Falló</Badge>}</TableCell>
                     <TableCell>{config.is_active ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : null}</TableCell>
                     <TableCell className="text-right space-x-2">
@@ -187,7 +190,26 @@ export function PaymentsServicesTab() {
       <Dialog open={isPayPalDialogOpen} onOpenChange={setIsPayPalDialogOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>{editingPayPalConfig ? 'Editar' : 'Añadir'} Configuración de PayPal</DialogTitle></DialogHeader>
-          <Form {...paypalForm}><form onSubmit={paypalForm.handleSubmit(onPayPalSubmit)} className="space-y-4 py-4"><FormField control={paypalForm.control} name="nickname" render={({ field }) => (<FormItem><FormLabel>Apodo</FormLabel><FormControl><Input placeholder="Cuenta Principal" {...field} disabled={isSubmittingPayPal} /></FormControl></FormItem>)} /><FormField control={paypalForm.control} name="client_id" render={({ field }) => (<FormItem><FormLabel>Client ID</FormLabel><FormControl><Input {...field} disabled={isSubmittingPayPal} /></FormControl></FormItem>)} /><FormField control={paypalForm.control} name="client_secret" render={({ field }) => (<FormItem><FormLabel>Client Secret</FormLabel><FormControl><Input type="password" placeholder={editingPayPalConfig ? "Dejar en blanco para no cambiar" : "••••••••"} {...field} disabled={isSubmittingPayPal} /></FormControl></FormItem>)} /><FormField control={paypalForm.control} name="is_active" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm"><FormLabel>Activar</FormLabel><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSubmittingPayPal} /></FormControl></FormItem>)} /><DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={isSubmittingPayPal}>Cancelar</Button></DialogClose><Button type="submit" disabled={isSubmittingPayPal}>{isSubmittingPayPal ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Guardar</Button></DialogFooter></form></Form>
+          <Form {...paypalForm}><form onSubmit={paypalForm.handleSubmit(onPayPalSubmit)} className="space-y-4 py-4">
+            <FormField control={paypalForm.control} name="nickname" render={({ field }) => (<FormItem><FormLabel>Apodo</FormLabel><FormControl><Input placeholder="Cuenta Principal" {...field} disabled={isSubmittingPayPal} /></FormControl></FormItem>)} />
+            <FormField control={paypalForm.control} name="mode" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Modo</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmittingPayPal}>
+                  <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un modo" /></SelectTrigger></FormControl>
+                  <SelectContent>
+                    <SelectItem value="sandbox">Sandbox (Pruebas)</SelectItem>
+                    <SelectItem value="live">Live (Producción)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={paypalForm.control} name="client_id" render={({ field }) => (<FormItem><FormLabel>Client ID</FormLabel><FormControl><Input {...field} disabled={isSubmittingPayPal} /></FormControl></FormItem>)} />
+            <FormField control={paypalForm.control} name="client_secret" render={({ field }) => (<FormItem><FormLabel>Client Secret</FormLabel><FormControl><Input type="password" placeholder={editingPayPalConfig ? "Dejar en blanco para no cambiar" : "••••••••"} {...field} disabled={isSubmittingPayPal} /></FormControl></FormItem>)} />
+            <FormField control={paypalForm.control} name="is_active" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm"><FormLabel>Activar</FormLabel><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSubmittingPayPal} /></FormControl></FormItem>)} />
+            <DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={isSubmittingPayPal}>Cancelar</Button></DialogClose><Button type="submit" disabled={isSubmittingPayPal}>{isSubmittingPayPal ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Guardar</Button></DialogFooter>
+          </form></Form>
         </DialogContent>
       </Dialog>
     </div>

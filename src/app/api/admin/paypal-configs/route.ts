@@ -13,6 +13,7 @@ const configSchema = z.object({
   client_id: z.string().min(1, 'El Client ID es requerido.'),
   client_secret: z.string().optional(),
   is_active: z.boolean().optional(),
+  mode: z.enum(['sandbox', 'live']).default('sandbox'), // New field
 });
 
 async function getIsSuperAdmin(): Promise<boolean> {
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
   try {
     const { data, error } = await supabaseAdmin
       .from('paypal_configs')
-      .select('id, nickname, is_active, status, last_tested_at, created_at')
+      .select('id, nickname, is_active, status, last_tested_at, created_at, mode') // Include mode
       .order('created_at', { ascending: true });
 
     if (error) throw error;

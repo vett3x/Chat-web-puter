@@ -3,11 +3,10 @@ export const runtime = 'nodejs';
 import { NextResponse } from 'next/server';
 import { getPayPalAccessToken } from '@/lib/paypal';
 
-const PAYPAL_API_URL = 'https://api-m.sandbox.paypal.com'; // O la URL de producción
-
 export async function GET() {
   try {
-    const accessToken = await getPayPalAccessToken();
+    const { accessToken, mode } = await getPayPalAccessToken();
+    const PAYPAL_API_URL = mode === 'sandbox' ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
 
     const response = await fetch(`${PAYPAL_API_URL}/v1/identity/generate-token`, {
       method: 'POST',

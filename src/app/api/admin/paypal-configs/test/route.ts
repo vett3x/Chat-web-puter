@@ -44,10 +44,10 @@ export async function POST(req: NextRequest) {
 
     if (!clientId || !clientSecret) throw new Error('No se pudieron desencriptar las credenciales.');
 
-    const PAYPAL_API_URL = 'https://api-m.sandbox.paypal.com/v1/oauth2/token'; // Use sandbox for testing
+    const PAYPAL_API_URL = config.mode === 'sandbox' ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
     const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
-    const response = await fetch(PAYPAL_API_URL, {
+    const response = await fetch(`${PAYPAL_API_URL}/v1/oauth2/token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
