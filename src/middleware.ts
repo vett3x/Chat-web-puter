@@ -48,7 +48,7 @@ export async function middleware(req: NextRequest) {
   const adminsDisabled = globalSettings?.admins_disabled ?? false;
   const isSuperAdmin = userRole === 'super_admin';
 
-  const publicPaths = ['/login', '/maintenance'];
+  const publicPaths = ['/', '/login', '/maintenance'];
 
   if (maintenanceModeEnabled && !isSuperAdmin && !publicPaths.includes(req.nextUrl.pathname)) {
     const redirectUrl = req.nextUrl.clone();
