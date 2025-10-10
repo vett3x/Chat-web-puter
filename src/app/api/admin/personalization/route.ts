@@ -20,7 +20,10 @@ const personalizationSchema = z.object({
   chat_bubble_border_color: z.string().optional(),
   chat_bubble_blur: z.coerce.number().min(0).max(32).optional(),
   liquid_ether_opacity: z.coerce.number().min(0).max(1).optional(),
+  login_background_url: z.string().url('Debe ser una URL válida.').optional().or(z.literal('')).or(z.literal(null)), // Allow direct URL or null
 });
+
+type PersonalizationFormValues = z.infer<typeof personalizationSchema>; // NEW: Infer type from schema
 
 async function getIsSuperAdmin(): Promise<boolean> {
   const cookieStore = cookies() as any;
@@ -63,20 +66,24 @@ export async function POST(req: NextRequest) {
     const appLogoFile = formData.get('app_logo') as File | null;
     const appFaviconFile = formData.get('app_favicon') as File | null;
     const settings = formData.get('settings');
-    let parsedSettings = {};
+    let parsedSettings: PersonalizationFormValues = {};
     if (typeof settings === 'string') {
       parsedSettings = personalizationSchema.parse(JSON.parse(settings));
     }
 
-    let login_background_url: string | undefined = undefined;
-    let app_logo_url: string | undefined = undefined;
-    let app_favicon_url: string | undefined = undefined;
+    let login_background_url: string | null | undefined = undefined;
+    let app_logo_url: string | null | undefined = undefined;
+    let app_favicon_url: string | null | undefined = undefined;
 
+    // Handle login background
     if (loginBackgroundFile) {
       const filePath = `public/login-background-${Date.now()}-${loginBackgroundFile.name}`;
       const { error } = await supabaseAdmin.storage.from('app_assets').upload(filePath, loginBackgroundFile, { upsert: true });
       if (error) throw error;
       login_background_url = supabaseAdmin.storage.from('app_assets').getPublicUrl(filePath).data.publicUrl;
+    } else if (parsedSettings.login_background_url !== undefined) {
+      // If no file uploaded, but URL is provided in settings (or explicitly empty)
+      login_background_url = parsedSettings.login_background_url === '' ? null : parsedSettings.login_background_url;
     }
 
     if (appLogoFile) {
@@ -93,12 +100,19 @@ export async function POST(req: NextRequest) {
       app_favicon_url = supabaseAdmin.storage.from('app_assets').getPublicUrl(filePath).data.publicUrl;
     }
 
-    const updateData = {
+    const updateData: { [key: string]: any } = {
       ...parsedSettings,
-      ...(login_background_url && { login_background_url }),
-      ...(app_logo_url && { app_logo_url }),
-      ...(app_favicon_url && { app_favicon_url }),
+      ...(login_background_url !== undefined && { login_background_url }),
+      ...(app_logo_url !== undefined && { app_logo_url }),
+      ...(app_favicon_url !== undefined && { app_favicon_url }),
     };
+
+    // Remove undefined values to prevent overwriting with undefined
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] === undefined) {
+        delete updateData[key];
+      }
+    });
 
     if (Object.keys(updateData).length > 0) {
       const { error: updateError } = await supabaseAdmin
@@ -140,7 +154,8 @@ export async function DELETE(req: NextRequest) {
     if (fetchError) throw fetchError;
 
     const currentUrl = (currentSettings as any)?.[urlColumn];
-    if (currentUrl) {
+    if (currentUrl && currentUrl.includes(supabaseAdmin.storage.from('app_assets').getPublicUrl('').data.publicUrl)) {
+      // Only attempt to delete from storage if it's a Supabase Storage URL
       const urlParts = currentUrl.split('/');
       const filePath = urlParts.slice(urlParts.indexOf('public')).join('/');
       await supabaseAdmin.storage.from('app_assets').remove([filePath]);

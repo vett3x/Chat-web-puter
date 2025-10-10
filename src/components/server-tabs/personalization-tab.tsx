@@ -32,6 +32,7 @@ const personalizationSchema = z.object({
   chat_bubble_border_color: z.string().optional(),
   chat_bubble_blur: z.coerce.number().min(0).max(32).optional(),
   liquid_ether_opacity: z.coerce.number().min(0).max(1).optional(),
+  login_background_url: z.string().url('Debe ser una URL válida.').optional().or(z.literal('')).or(z.literal(null)), // Allow direct URL or null
 });
 
 type PersonalizationFormValues = z.infer<typeof personalizationSchema>;
@@ -82,7 +83,7 @@ export function PersonalizationTab() {
 
   const { userApiKeys, aiKeyGroups, isLoadingApiKeys } = useUserApiKeys();
 
-  const loginBgInputRef = useRef<HTMLInputElement>(null);
+  const loginBgFileInputRef = useRef<HTMLInputElement>(null);
   const appLogoInputRef = useRef<HTMLInputElement>(null);
   const appFaviconInputRef = useRef<HTMLInputElement>(null);
 
@@ -102,6 +103,7 @@ export function PersonalizationTab() {
       chat_bubble_border_color: 'hsla(0, 0%, 100%, 0.2)',
       chat_bubble_blur: 4,
       liquid_ether_opacity: 0.5,
+      login_background_url: '', // Initialize as empty string
     },
   });
 
@@ -126,6 +128,7 @@ export function PersonalizationTab() {
         chat_bubble_border_color: data.chat_bubble_border_color || 'hsla(0, 0%, 100%, 0.2)',
         chat_bubble_blur: data.chat_bubble_blur || 4,
         liquid_ether_opacity: data.liquid_ether_opacity || 0.5,
+        login_background_url: data.login_background_url || '', // Set from fetched data
       });
       setLoginBgPreview(data.login_background_url);
       setAppLogoPreview(data.app_logo_url);
@@ -155,6 +158,7 @@ export function PersonalizationTab() {
       if (type === 'login_background') {
         setLoginBgFile(file);
         setLoginBgPreview(URL.createObjectURL(file));
+        form.setValue('login_background_url', ''); // Clear URL if file is selected
       } else if (type === 'app_logo') {
         setAppLogoFile(file);
         setAppLogoPreview(URL.createObjectURL(file));
@@ -165,11 +169,47 @@ export function PersonalizationTab() {
     }
   };
 
+  const handleRemoveAsset = async (type: 'login_background' | 'app_logo' | 'app_favicon') => {
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/admin/personalization?type=${type}`, { method: 'DELETE' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message);
+      toast.success('Recurso eliminado.');
+      if (type === 'login_background') {
+        setLoginBgFile(null);
+        setLoginBgPreview(null);
+        form.setValue('login_background_url', null); // Clear URL in form to null
+      } else if (type === 'app_logo') {
+        setAppLogoFile(null);
+        setAppLogoPreview(null);
+      } else {
+        setAppFaviconFile(null);
+        setAppFaviconPreview(null);
+      }
+      fetchSettings();
+    } catch (err: any) {
+      toast.error(`Error al eliminar: ${err.message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleSave = async (values: PersonalizationFormValues) => {
     setIsSaving(true);
     const formData = new FormData();
-    formData.append('settings', JSON.stringify(values));
-    if (loginBgFile) formData.append('login_background', loginBgFile);
+    
+    // Handle login_background_url explicitly
+    const settingsToSubmit = { ...values };
+    if (loginBgFile) {
+      formData.append('login_background', loginBgFile);
+      settingsToSubmit.login_background_url = undefined; // Ensure URL is not sent if file is uploaded
+    } else if (values.login_background_url === '') {
+      settingsToSubmit.login_background_url = null; // Explicitly set to null if empty
+    }
+
+    formData.append('settings', JSON.stringify(settingsToSubmit));
+    
     if (appLogoFile) formData.append('app_logo', appLogoFile);
     if (appFaviconFile) formData.append('app_favicon', appFaviconFile);
 
@@ -184,31 +224,6 @@ export function PersonalizationTab() {
       fetchSettings();
     } catch (err: any) {
       toast.error(`Error al guardar: ${err.message}`);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleRemoveAsset = async (type: 'login_background' | 'app_logo' | 'app_favicon') => {
-    setIsSaving(true);
-    try {
-      const response = await fetch(`/api/admin/personalization?type=${type}`, { method: 'DELETE' });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message);
-      toast.success('Recurso eliminado.');
-      if (type === 'login_background') {
-        setLoginBgFile(null);
-        setLoginBgPreview(null);
-      } else if (type === 'app_logo') {
-        setAppLogoFile(null);
-        setAppLogoPreview(null);
-      } else {
-        setAppFaviconFile(null);
-        setAppFaviconPreview(null);
-      }
-      fetchSettings();
-    } catch (err: any) {
-      toast.error(`Error al eliminar: ${err.message}`);
     } finally {
       setIsSaving(false);
     }
@@ -278,14 +293,32 @@ export function PersonalizationTab() {
                 </div>
               </PersonalizationItem>
               <PersonalizationItem id="login_background" icon={<ImageIcon className="h-5 w-5" />} label="Fondo de Inicio de Sesión" description="Imagen de fondo para la página de login." isOpen={openItemId === 'login_background'} onToggle={() => handleToggle('login_background')}>
-                <input type="file" ref={loginBgInputRef} onChange={(e) => handleFileChange(e, 'login_background')} accept="image/*" hidden />
+                <input type="file" ref={loginBgFileInputRef} onChange={(e) => handleFileChange(e, 'login_background')} accept="image/*" hidden />
                 <div className="relative w-full h-24 bg-muted rounded-md overflow-hidden mb-2">
                   {loginBgPreview ? <Image src={loginBgPreview} alt="Vista previa del fondo" layout="fill" objectFit="cover" /> : <div className="flex flex-col items-center justify-center h-full text-muted-foreground"><ImageIcon className="h-8 w-8" /><p className="text-xs mt-1">Sin fondo</p></div>}
                 </div>
-                <div className="flex gap-2">
-                  <Button type="button" size="sm" variant="outline" onClick={() => loginBgInputRef.current?.click()} disabled={isSaving}><Upload className="mr-2 h-4 w-4" /> Cambiar</Button>
-                  <Button type="button" size="sm" variant="destructive" onClick={() => handleRemoveAsset('login_background')} disabled={!currentSettings.login_background_url || isSaving}><Trash2 className="mr-2 h-4 w-4" /> Eliminar</Button>
+                <div className="flex gap-2 mb-4">
+                  <Button type="button" size="sm" variant="outline" onClick={() => loginBgFileInputRef.current?.click()} disabled={isSaving}><Upload className="mr-2 h-4 w-4" /> Subir Archivo</Button>
+                  <Button type="button" size="sm" variant="destructive" onClick={() => handleRemoveAsset('login_background')} disabled={!currentSettings.login_background_url && !loginBgFile || isSaving}><Trash2 className="mr-2 h-4 w-4" /> Eliminar</Button>
                 </div>
+                <FormField control={form.control} name="login_background_url" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>URL de Fondo de Inicio de Sesión (Opcional)</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="https://ejemplo.com/mi-fondo.jpg"
+                        {...field}
+                        value={field.value || ''} // Ensure value is always a string
+                        disabled={isSaving || !!loginBgFile} // Disable if a file is selected
+                        onChange={(e) => {
+                          field.onChange(e);
+                          setLoginBgPreview(e.target.value || null); // Update preview directly from URL
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
               </PersonalizationItem>
               <PersonalizationItem id="theme_colors" icon={<Palette className="h-5 w-5" />} label="Colores del Tema" description="Personaliza la paleta de colores de la interfaz." isOpen={openItemId === 'theme_colors'} onToggle={() => handleToggle('theme_colors')}>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
