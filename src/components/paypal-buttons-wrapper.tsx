@@ -10,9 +10,10 @@ interface PayPalButtonsWrapperProps {
     price: string;
     name: string;
   };
+  onPaymentSuccess?: () => void; // New prop
 }
 
-export function PayPalButtonsWrapper({ plan }: PayPalButtonsWrapperProps) {
+export function PayPalButtonsWrapper({ plan, onPaymentSuccess }: PayPalButtonsWrapperProps) {
   const [{ isPending }] = usePayPalScriptReducer();
 
   const createOrder = async (): Promise<string> => {
@@ -42,7 +43,7 @@ export function PayPalButtonsWrapper({ plan }: PayPalButtonsWrapperProps) {
       const result = await response.json();
       if (!response.ok) throw new Error(result.message);
       toast.success(`¡Gracias por suscribirte al plan ${plan.name}!`);
-      // Aquí podrías redirigir al usuario o actualizar su estado en la UI
+      onPaymentSuccess?.(); // Call the success handler
     } catch (error: any) {
       toast.error(`Error al procesar el pago: ${error.message}`);
       throw error;

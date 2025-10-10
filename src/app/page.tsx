@@ -17,8 +17,8 @@ import { useRouter } from 'next/navigation';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import Autoplay from "embla-carousel-autoplay";
 import { gsap } from 'gsap';
-import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
-import { PayPalButtonsWrapper } from '@/components/paypal-buttons-wrapper'; // Importar el nuevo componente
+import { Skeleton } from '@/components/ui/skeleton';
+import { PaymentDialog } from '@/components/payment-dialog'; // Importar el nuevo componente
 
 interface PricingPlan {
   id: string;
@@ -38,6 +38,8 @@ export default function LandingPage() {
   const mainContentRef = useRef(null);
   const [pricingPlans, setPricingPlans] = useState<PricingPlan[]>([]);
   const [isLoadingPlans, setIsLoadingPlans] = useState(true);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<PricingPlan | null>(null);
 
   useEffect(() => {
     const fetchPlans = async () => {
@@ -48,7 +50,6 @@ export default function LandingPage() {
         setPricingPlans(data);
       } catch (error) {
         console.error(error);
-        // You might want to set some default plans here as a fallback
       } finally {
         setIsLoadingPlans(false);
       }
@@ -79,6 +80,15 @@ export default function LandingPage() {
         router.push('/login');
       }
     });
+  };
+
+  const handleCtaClick = (plan: PricingPlan) => {
+    if (plan.price === 'Gratis') {
+      router.push(plan.cta_href);
+    } else {
+      setSelectedPlan(plan);
+      setIsPaymentDialogOpen(true);
+    }
   };
 
   const testimonials = [
@@ -289,13 +299,9 @@ export default function LandingPage() {
                         </ul>
                       </div>
                       <div className="mt-auto pt-6">
-                        {plan.price === 'Gratis' ? (
-                          <Button asChild className={`w-full ${plan.highlight ? 'bg-primary-light-purple hover:bg-primary-light-purple/90 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
-                            <Link href={plan.cta_href}>{plan.cta_text}</Link>
-                          </Button>
-                        ) : (
-                          <PayPalButtonsWrapper plan={plan} />
-                        )}
+                        <Button onClick={() => handleCtaClick(plan)} className={`w-full ${plan.highlight ? 'bg-primary-light-purple hover:bg-primary-light-purple/90 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
+                          {plan.cta_text}
+                        </Button>
                       </div>
                     </div>
                   </ElectricBorder>
@@ -371,6 +377,11 @@ export default function LandingPage() {
         />
       </main>
       <LandingFooter ref={footerRef} />
+      <PaymentDialog 
+        open={isPaymentDialogOpen}
+        onOpenChange={setIsPaymentDialogOpen}
+        plan={selectedPlan}
+      />
     </div>
   );
 }
