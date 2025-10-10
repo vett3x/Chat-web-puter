@@ -189,6 +189,7 @@
   body.login-page {
     /* Remove specific background image, let bg-background handle it */
     background-image: none;
+    background-color: hsl(var(--background)); /* Ensure it uses the theme background */
   }
 }
 
