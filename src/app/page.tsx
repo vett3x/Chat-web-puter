@@ -4,13 +4,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Wand2, Check } from 'lucide-react';
 import Aurora from '@/components/Aurora';
-import { LandingHeader } from '@/components/landing-header';
 import { LandingFooter } from '@/components/landing-footer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import Link from 'next/link';
 import ElectricBorder from '@/components/ElectricBorder';
 import { BentoCard } from '@/components/BentoCard';
 import GradualBlur from '@/components/GradualBlur';
+import PillNav from '@/components/PillNav';
 
 export default function LandingPage() {
   const pricingPlans = [
@@ -107,7 +107,21 @@ export default function LandingPage() {
 
   return (
     <div className="bg-[#060010] text-white">
-      <LandingHeader />
+      <PillNav
+        logo="/logo.svg"
+        logoAlt="DeepAI Coder Logo"
+        items={[
+          { label: 'Características', href: '#features' },
+          { label: 'Precios', href: '#pricing' },
+          { label: 'Contacto', href: '#contact' },
+          { label: 'Iniciar Sesión', href: '/login' }
+        ]}
+        activeHref="/"
+        baseColor="#0A021A"
+        pillColor="hsl(var(--primary-light-purple))"
+        hoveredPillTextColor="#FFFFFF"
+        pillTextColor="#FFFFFF"
+      />
       <main className="overflow-hidden">
         {/* Hero Section */}
         <section className="relative flex flex-col items-center justify-center min-h-screen pt-16">
