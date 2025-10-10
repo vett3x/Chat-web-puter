@@ -17,10 +17,43 @@ import { useRouter } from 'next/navigation';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import Autoplay from "embla-carousel-autoplay";
 import { gsap } from 'gsap';
+import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
+
+interface PricingPlan {
+  id: string;
+  name: string;
+  price: string;
+  price_period: string | null;
+  description: string;
+  features: string[];
+  cta_text: string;
+  cta_href: string;
+  highlight: boolean;
+  badge_text: string | null;
+}
 
 export default function LandingPage() {
   const router = useRouter();
   const mainContentRef = useRef(null);
+  const [pricingPlans, setPricingPlans] = useState<PricingPlan[]>([]);
+  const [isLoadingPlans, setIsLoadingPlans] = useState(true);
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        const response = await fetch('/api/pricing-plans');
+        if (!response.ok) throw new Error('Failed to fetch pricing plans');
+        const data = await response.json();
+        setPricingPlans(data);
+      } catch (error) {
+        console.error(error);
+        // You might want to set some default plans here as a fallback
+      } finally {
+        setIsLoadingPlans(false);
+      }
+    };
+    fetchPlans();
+  }, []);
 
   const handleStartClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
@@ -46,50 +79,6 @@ export default function LandingPage() {
       }
     });
   };
-
-  const pricingPlans = [
-    {
-      name: 'Hobby',
-      price: '$0',
-      description: 'Para proyectos personales y experimentación.',
-      features: [
-        '1 Proyecto Activo',
-        'Asistente de IA y Notas Inteligentes',
-        'Recursos Limitados (0.5 CPU, 512MB RAM)',
-        '250 MB de Almacenamiento',
-        'Despliegue con Subdominio',
-        'Soporte Comunitario',
-      ],
-      cta: 'Empezar Gratis',
-      href: '/start'
-    },
-    {
-      name: 'Pro',
-      price: '$25',
-      description: 'Para desarrolladores serios y freelancers.',
-      features: [
-        '10 Proyectos Activos',
-        'Recursos Ampliados (2 CPU, 2GB RAM)',
-        '5 GB de Almacenamiento',
-        'Proyectos Siempre Activos',
-        'Dominio Personalizado',
-        'Backups Automáticos',
-        'Soporte Prioritario',
-      ],
-      cta: 'Empezar Ahora',
-      href: '/start',
-      highlight: true,
-      badge: 'Más Popular',
-    },
-    {
-      name: 'Enterprise',
-      price: 'Contacto',
-      description: 'Para equipos y empresas que necesitan más.',
-      features: ['Proyectos Ilimitados', 'Soporte Dedicado 24/7', 'Infraestructura Personalizada', 'SSO y Seguridad Avanzada'],
-      cta: 'Contactar Ventas',
-      href: '#contact'
-    },
-  ];
 
   const testimonials = [
     {
@@ -252,45 +241,61 @@ export default function LandingPage() {
               Nuestros planes de suscripción están diseñados para crecer contigo, garantizando un servicio de primera, seguro y en constante mejora.
             </p>
             <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8">
-              {pricingPlans.map((plan) => (
-                <ElectricBorder
-                  key={plan.name}
-                  color={plan.highlight ? 'hsl(var(--primary-light-purple))' : 'rgba(255, 255, 255, 0.3)'}
-                  speed={1}
-                  chaos={0.5}
-                  thickness={1}
-                  style={{ borderRadius: 'var(--radius)' }}
-                  className="bg-[#0A021A] h-full relative"
-                >
-                  {plan.badge && (
-                    <div className="absolute -top-3 right-4 bg-primary-light-purple text-white text-xs font-bold px-3 py-1 rounded-full">
-                      {plan.badge}
+              {isLoadingPlans ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="bg-[#0A021A] border border-white/10 rounded-lg p-6 flex flex-col">
+                    <Skeleton className="h-6 w-1/2 mb-4" />
+                    <Skeleton className="h-4 w-3/4 mb-6" />
+                    <Skeleton className="h-10 w-1/3 mb-6" />
+                    <div className="space-y-3 flex-1">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-5/6" />
+                      <Skeleton className="h-4 w-full" />
                     </div>
-                  )}
-                  <div className="text-left flex flex-col h-full p-6">
-                    <div className="mb-6">
-                      <h3 className="text-xl font-bold">{plan.name}</h3>
-                      <p className="text-white/60">{plan.description}</p>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-4xl font-bold mb-6">{plan.price}<span className="text-lg font-normal text-white/60">{plan.price.startsWith('$') ? '/mes' : ''}</span></p>
-                      <ul className="space-y-3">
-                        {plan.features.map((feature) => (
-                          <li key={feature} className="flex items-center gap-2 text-sm">
-                            <Check className="h-4 w-4 text-green-500" />
-                            <span className="text-white/80">{feature}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    <div className="mt-auto pt-6">
-                      <Button asChild className={`w-full ${plan.highlight ? 'bg-primary-light-purple hover:bg-primary-light-purple/90 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
-                        <Link href={plan.href}>{plan.cta}</Link>
-                      </Button>
-                    </div>
+                    <Skeleton className="h-12 w-full mt-6" />
                   </div>
-                </ElectricBorder>
-              ))}
+                ))
+              ) : (
+                pricingPlans.map((plan) => (
+                  <ElectricBorder
+                    key={plan.id}
+                    color={plan.highlight ? 'hsl(var(--primary-light-purple))' : 'rgba(255, 255, 255, 0.3)'}
+                    speed={1}
+                    chaos={0.5}
+                    thickness={1}
+                    style={{ borderRadius: 'var(--radius)' }}
+                    className="bg-[#0A021A] h-full relative"
+                  >
+                    {plan.badge_text && (
+                      <div className="absolute -top-3 right-4 bg-primary-light-purple text-white text-xs font-bold px-3 py-1 rounded-full">
+                        {plan.badge_text}
+                      </div>
+                    )}
+                    <div className="text-left flex flex-col h-full p-6">
+                      <div className="mb-6">
+                        <h3 className="text-xl font-bold">{plan.name}</h3>
+                        <p className="text-white/60">{plan.description}</p>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-4xl font-bold mb-6">{plan.price}<span className="text-lg font-normal text-white/60">{plan.price_period}</span></p>
+                        <ul className="space-y-3">
+                          {plan.features.map((feature) => (
+                            <li key={feature} className="flex items-center gap-2 text-sm">
+                              <Check className="h-4 w-4 text-green-500" />
+                              <span className="text-white/80">{feature}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div className="mt-auto pt-6">
+                        <Button asChild className={`w-full ${plan.highlight ? 'bg-primary-light-purple hover:bg-primary-light-purple/90 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
+                          <Link href={plan.cta_href}>{plan.cta_text}</Link>
+                        </Button>
+                      </div>
+                    </div>
+                  </ElectricBorder>
+                ))
+              )}
             </div>
           </div>
         </section>
