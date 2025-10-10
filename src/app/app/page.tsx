@@ -14,6 +14,8 @@ import { TechnologyLogos } from '@/components/landing/TechnologyLogos';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useRouter } from 'next/navigation';
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+import Autoplay from "embla-carousel-autoplay";
 
 export default function LandingPage() {
   const router = useRouter();
@@ -280,23 +282,42 @@ export default function LandingPage() {
         <section className="py-24">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-3xl font-bold tracking-tight text-center sm:text-4xl">Amado por Desarrolladores y Creadores</h2>
-            <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8">
-              {testimonials.map((testimonial) => (
-                <div key={testimonial.name} className="bg-black/30 border border-white/10 p-6 rounded-lg">
-                  <div className="flex items-center gap-4 mb-4">
-                    <Avatar>
-                      <AvatarImage src={testimonial.avatar} />
-                      <AvatarFallback>{testimonial.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-semibold">{testimonial.name.split(',')[0]}</p>
-                      <p className="text-sm text-white/60">{testimonial.name.split(',')[1]}</p>
+            <Carousel
+              opts={{
+                align: "start",
+                loop: true,
+              }}
+              plugins={[
+                Autoplay({
+                  delay: 5000,
+                }),
+              ]}
+              className="w-full max-w-4xl mx-auto mt-12"
+            >
+              <CarouselContent>
+                {testimonials.map((testimonial, index) => (
+                  <CarouselItem key={index} className="md:basis-1/2 lg:basis-1/3">
+                    <div className="p-1 h-full">
+                      <div className="bg-black/30 border border-white/10 p-6 rounded-lg h-full flex flex-col">
+                        <div className="flex items-center gap-4 mb-4">
+                          <Avatar>
+                            <AvatarImage src={testimonial.avatar} />
+                            <AvatarFallback>{testimonial.name.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-semibold">{testimonial.name.split(',')[0]}</p>
+                            <p className="text-sm text-white/60">{testimonial.name.split(',')[1]}</p>
+                          </div>
+                        </div>
+                        <p className="text-white/80 flex-1">"{testimonial.quote}"</p>
+                      </div>
                     </div>
-                  </div>
-                  <p className="text-white/80">"{testimonial.quote}"</p>
-                </div>
-              ))}
-            </div>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious className="left-[-50px] text-white bg-white/10 border-white/20 hover:bg-white/20" />
+              <CarouselNext className="right-[-50px] text-white bg-white/10 border-white/20 hover:bg-white/20" />
+            </Carousel>
           </div>
         </section>
 
@@ -304,11 +325,11 @@ export default function LandingPage() {
         <section className="py-24">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-3xl">
             <h2 className="text-3xl font-bold tracking-tight text-center sm:text-4xl">Preguntas Frecuentes</h2>
-            <Accordion type="single" collapsible className="w-full mt-12">
+            <Accordion type="single" collapsible className="w-full mt-12 space-y-4">
               {faqs.map((faq, index) => (
-                <AccordionItem key={index} value={`item-${index}`}>
-                  <AccordionTrigger className="text-left">{faq.question}</AccordionTrigger>
-                  <AccordionContent className="text-white/70">
+                <AccordionItem key={index} value={`item-${index}`} className="bg-white/5 border border-white/10 rounded-lg px-6">
+                  <AccordionTrigger className="text-left hover:no-underline">{faq.question}</AccordionTrigger>
+                  <AccordionContent className="text-white/70 pt-2">
                     {faq.answer}
                   </AccordionContent>
                 </AccordionItem>
