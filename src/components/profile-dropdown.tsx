@@ -135,7 +135,7 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAccountSettings }
           </div>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56 bg-popover text-popover-foreground border-border">
+      <DropdownMenuContent className="w-56">
         <DropdownMenuLabel>Mi Cuenta</DropdownMenuLabel>
         <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem onClick={onOpenProfileSettings} className="flex items-center cursor-pointer">

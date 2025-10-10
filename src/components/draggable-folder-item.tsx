@@ -216,7 +216,7 @@ export function DraggableFolderItem({
             ) : (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><MoreVertical className="h-3.5 w-3.5" /></Button></DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48 bg-popover text-popover-foreground border-border">
+                <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCreateSubfolder(folder.id); }} disabled={level >= MAX_FOLDER_NESTING_LEVEL} className={level >= MAX_FOLDER_NESTING_LEVEL ? "opacity-50 cursor-not-allowed" : ""}><Plus className="mr-2 h-4 w-4" /> Crear Subcarpeta</DropdownMenuItem>
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}><Edit className="mr-2 h-4 w-4" /> Renombrar</DropdownMenuItem>
                   <DropdownMenuSeparator />

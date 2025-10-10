@@ -99,7 +99,7 @@ export function ModelSelectorDropdown({
           <SelectedModelIcon className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="top" align="end" className="w-64 bg-popover text-popover-foreground border-border rounded-lg">
+      <DropdownMenuContent side="top" align="end" className="w-64 rounded-lg">
         <DropdownMenuLabel className="text-sm font-semibold">Seleccionar Modelo de IA</DropdownMenuLabel>
         <div className="p-2" onPointerDown={(e) => e.stopPropagation()}>
           <div className="relative">

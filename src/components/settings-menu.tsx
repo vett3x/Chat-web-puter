@@ -58,7 +58,7 @@ export function SettingsMenu({
           <Settings className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 bg-popover text-popover-foreground border-border">
+      <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel>Administración</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onOpenAdminPanel} className="cursor-pointer">

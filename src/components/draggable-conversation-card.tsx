@@ -254,7 +254,7 @@ export function DraggableConversationCard({
                 <MoreVertical className="h-3 w-3" /> {/* Smaller icon */}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 bg-popover text-popover-foreground border-border">
+            <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem onClick={(e: React.MouseEvent) => { e.stopPropagation(); onSelectConversation(conversation.id); }}>
                 <MessageSquare className="mr-2 h-4 w-4" /> Abrir
               </DropdownMenuItem>
