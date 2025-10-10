@@ -101,7 +101,7 @@ export default function StartPage() {
 
   const handleGoBackToLanding = () => {
     animateOut(() => {
-      router.push('/app');
+      router.push('/');
     });
   };
 
