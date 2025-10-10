@@ -35,6 +35,18 @@ export default function LandingPage() {
     });
   };
 
+  const handleLoginCtaClick = () => {
+    gsap.to(mainContentRef.current, {
+      opacity: 0,
+      y: -20,
+      duration: 0.5,
+      ease: 'power2.in',
+      onComplete: () => {
+        router.push('/login');
+      }
+    });
+  };
+
   const pricingPlans = [
     {
       name: 'Hobby',
@@ -153,6 +165,7 @@ export default function LandingPage() {
         pillColor="hsl(var(--primary-light-purple))"
         hoveredPillTextColor="#FFFFFF"
         pillTextColor="#FFFFFF"
+        onCtaClick={handleLoginCtaClick}
       />
       <main className="overflow-hidden" ref={mainContentRef}>
         {/* Hero Section */}
