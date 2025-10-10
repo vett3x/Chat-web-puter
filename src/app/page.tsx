@@ -142,8 +142,6 @@ export default function LandingPage() {
     <div className="bg-[#060010] text-white">
       <PillNav
         items={[
-          { label: 'Precios', href: '#pricing' },
-          { label: 'Contacto', href: '#contact' },
           { label: 'Iniciar Sesión', href: '/login' }
         ]}
         activeHref="/"
