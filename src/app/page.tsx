@@ -68,8 +68,6 @@ export default function LandingPage() {
   return (
     <div className="bg-[#060010] text-white">
       <PillNav
-        logo="/logo.svg"
-        logoAlt="DeepAI Coder Logo"
         items={[
           { label: 'Precios', href: '#pricing' },
           { label: 'Contacto', href: '#contact' },

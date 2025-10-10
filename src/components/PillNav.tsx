@@ -12,8 +12,6 @@ export type PillNavItem = {
 };
 
 export interface PillNavProps {
-  logo: string;
-  logoAlt?: string;
   items: PillNavItem[];
   activeHref?: string;
   className?: string;
@@ -27,8 +25,6 @@ export interface PillNavProps {
 }
 
 const PillNav: React.FC<PillNavProps> = ({
-  logo,
-  logoAlt = 'Logo',
   items,
   activeHref,
   className = '',
@@ -45,12 +41,9 @@ const PillNav: React.FC<PillNavProps> = ({
   const circleRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const tlRefs = useRef<Array<gsap.core.Timeline | null>>([]);
   const activeTweenRefs = useRef<Array<gsap.core.Tween | null>>([]);
-  const logoImgRef = useRef<HTMLImageElement | null>(null);
-  const logoTweenRef = useRef<gsap.core.Tween | null>(null);
   const hamburgerRef = useRef<HTMLButtonElement | null>(null);
   const mobileMenuRef = useRef<HTMLDivElement | null>(null);
   const navItemsRef = useRef<HTMLDivElement | null>(null);
-  const logoRef = useRef<HTMLAnchorElement | HTMLElement | null>(null);
 
   useEffect(() => {
     const layout = () => {
@@ -117,18 +110,7 @@ const PillNav: React.FC<PillNavProps> = ({
     }
 
     if (initialLoadAnimation) {
-      const logo = logoRef.current;
       const navItems = navItemsRef.current;
-
-      if (logo) {
-        gsap.set(logo, { scale: 0 });
-        gsap.to(logo, {
-          scale: 1,
-          duration: 0.6,
-          ease
-        });
-      }
-
       if (navItems) {
         gsap.set(navItems, { width: 0, overflow: 'hidden' });
         gsap.to(navItems, {
@@ -158,19 +140,6 @@ const PillNav: React.FC<PillNavProps> = ({
     if (!tl) return;
     activeTweenRefs.current[i]?.kill();
     activeTweenRefs.current[i] = tl.tweenTo(0, {
-      duration: 0.2,
-      ease,
-      overwrite: 'auto'
-    });
-  };
-
-  const handleLogoEnter = () => {
-    const img = logoImgRef.current;
-    if (!img) return;
-    logoTweenRef.current?.kill();
-    gsap.set(img, { rotate: 0 });
-    logoTweenRef.current = gsap.to(img, {
-      rotate: 360,
       duration: 0.2,
       ease,
       overwrite: 'auto'
@@ -253,27 +222,10 @@ const PillNav: React.FC<PillNavProps> = ({
     <header className={cn("fixed top-4 left-0 right-0 z-50", className)}>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <nav
-          className="flex items-center justify-between h-16"
+          className="flex items-center justify-center h-16 relative"
           aria-label="Primary"
           style={cssVars}
         >
-          <Link
-            href="/"
-            aria-label="Home"
-            onMouseEnter={handleLogoEnter}
-            role="menuitem"
-            ref={el => {
-              logoRef.current = el;
-            }}
-            className="rounded-full p-1 inline-flex items-center justify-center overflow-hidden bg-black/30 backdrop-blur-md border border-white/10"
-            style={{
-              width: 'var(--nav-h)',
-              height: 'var(--nav-h)',
-            }}
-          >
-            <img src={logo} alt={logoAlt} ref={logoImgRef} className="w-full h-full object-cover block" />
-          </Link>
-
           <div
             ref={navItemsRef}
             className="relative items-center rounded-full hidden md:flex"
@@ -300,7 +252,8 @@ const PillNav: React.FC<PillNavProps> = ({
                     <span
                       className="hover-circle absolute left-1/2 bottom-0 rounded-full z-[1] block pointer-events-none"
                       style={{
-                        background: 'var(--base, #000)',
+                        background: 'hsla(0, 0%, 100%, 0.1)',
+                        backdropFilter: 'blur(4px)',
                         willChange: 'transform'
                       }}
                       aria-hidden="true"
@@ -377,7 +330,7 @@ const PillNav: React.FC<PillNavProps> = ({
             onClick={toggleMobileMenu}
             aria-label="Toggle menu"
             aria-expanded={isMobileMenuOpen}
-            className="md:hidden rounded-full border-0 flex flex-col items-center justify-center gap-1 cursor-pointer p-0 relative bg-black/30 backdrop-blur-md border border-white/10"
+            className="md:hidden absolute right-0 rounded-full border-0 flex flex-col items-center justify-center gap-1 cursor-pointer p-0 bg-black/30 backdrop-blur-md border border-white/10"
             style={{
               width: 'var(--nav-h)',
               height: 'var(--nav-h)',
