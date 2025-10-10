@@ -14,7 +14,7 @@ export function StarBorder({
   children,
   className,
   color = 'hsl(var(--primary-light-purple))',
-  speed = '4s',
+  speed = '6s',
 }: StarBorderProps) {
   return (
     <div className={cn("relative w-full h-full group overflow-hidden", className)}>
@@ -32,7 +32,9 @@ export function StarBorder({
           animationDuration: speed,
         }}
       />
-      {children}
+      <div className="relative z-10 w-full h-full">
+        {children}
+      </div>
     </div>
   );
 }
