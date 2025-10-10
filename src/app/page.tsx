@@ -169,11 +169,11 @@ export default function LandingPage() {
             />
           </div>
           <div className="text-center z-10 p-4">
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight">
-              Tu Asistente Personal para Crear, Chatear y Organizar.
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-4">
+              Tu Visión, Potenciada por IA.
             </h1>
             <p className="mt-4 max-w-3xl mx-auto text-lg text-white/70">
-              Crea aplicaciones, chatea con tus documentos, organiza tus ideas y gestiona tu infraestructura. Todo en un solo lugar, impulsado por IA.
+              Crea aplicaciones, chatea con tus documentos, organiza tus ideas y gestiona tu infraestructura. Todo en un solo lugar.
             </p>
             <div className="mt-8">
               <Button asChild size="lg" className="bg-primary-light-purple/20 hover:bg-primary-light-purple/30 backdrop-blur-md border border-primary-light-purple/30 text-white font-semibold text-lg px-8 py-6 rounded-full">
