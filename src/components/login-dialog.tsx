@@ -112,17 +112,7 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
         <div className="w-full h-full" style={backgroundUrl ? {} : { backgroundImage: 'url(/background-pattern.svg)' }}>
           <div className="w-full h-full p-0" style={backgroundStyle}>
             <div className="relative w-full backdrop-blur-xl border-2 border-[hsl(var(--primary-color-login))] rounded-[15px] pt-[7.5em] pb-[4em] px-[1.5em] sm:px-[2.5em] text-[hsl(var(--second-color-login))] shadow-lg shadow-black/20">
-              {isMounted && (
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  className="absolute top-4 right-4 h-10 w-10 rounded-full text-white bg-black/20 border-white/50 hover:bg-white/20" 
-                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} 
-                  aria-label="Toggle theme"
-                >
-                  {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-                </Button>
-              )}
+              
               <div className="login-header absolute top-0 left-1/2 -translate-x-1/2 flex items-center justify-center bg-[hsl(var(--primary-color-login))] w-[100px] h-[70px] rounded-b-[20px] z-10">
                 <LogIn className="h-10 w-10 text-black" />
               </div>
