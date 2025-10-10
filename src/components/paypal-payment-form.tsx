@@ -5,6 +5,7 @@ import {
   PayPalHostedFieldsProvider,
   PayPalHostedField,
   usePayPalHostedFields,
+  usePayPalScriptReducer,
 } from "@paypal/react-paypal-js";
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
@@ -95,6 +96,21 @@ const HostedFields = ({ plan, onPaymentSuccess }: { plan: any, onPaymentSuccess?
 
 // Este es el componente principal que proporciona el contexto.
 export function PayPalPaymentForm({ plan, onPaymentSuccess }: { plan: any, onPaymentSuccess?: () => void }) {
+  const [{ isPending, options }] = usePayPalScriptReducer();
+  const clientToken = options['data-client-token'];
+
+  if (isPending) {
+    return <div className="flex justify-center items-center h-24"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+  }
+
+  if (!clientToken) {
+    return (
+      <div className="text-destructive text-sm text-center p-4 bg-destructive/10 rounded-md">
+        No se pudo inicializar el pago con tarjeta. Es posible que la configuración de PayPal no esté completa en el panel de administración.
+      </div>
+    );
+  }
+
   const createOrder = async (): Promise<string> => {
     try {
       const priceValue = plan.price.replace(/[^0-9.]/g, '');

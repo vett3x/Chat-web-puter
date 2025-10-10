@@ -33,12 +33,16 @@ export function PayPalProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (clientId) {
-          setInitialOptions({
+          const options: any = {
             clientId: clientId,
             currency: 'USD',
             intent: 'capture',
-            "data-client-token": clientToken, // Pass the client token here
-          });
+          };
+          // Only add the data-client-token if it exists
+          if (clientToken) {
+            options['data-client-token'] = clientToken;
+          }
+          setInitialOptions(options);
         }
       } catch (error) {
         console.error("Error al obtener la configuración de PayPal:", error);
