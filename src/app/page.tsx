@@ -107,7 +107,7 @@ export default function LandingPage() {
         </section>
 
         {/* Features Section with CardSwap */}
-        <section id="features" className="py-24 bg-black/20">
+        <section id="features" className="py-24">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center gap-16">
             <div className="md:w-1/2 text-center md:text-left">
               <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Una Plataforma, Infinitas Posibilidades</h2>
@@ -142,7 +142,7 @@ export default function LandingPage() {
         </section>
 
         {/* Pricing Section */}
-        <section id="pricing" className="py-24 bg-black/20">
+        <section id="pricing" className="py-24">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Planes Flexibles para Cada Necesidad</h2>
             <p className="mt-4 max-w-2xl mx-auto text-lg text-white/70">
