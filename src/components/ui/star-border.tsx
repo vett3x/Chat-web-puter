@@ -8,6 +8,7 @@ interface StarBorderProps {
   className?: string;
   color?: string;
   speed?: React.CSSProperties['animationDuration'];
+  thickness?: number;
 }
 
 export function StarBorder({
@@ -15,9 +16,15 @@ export function StarBorder({
   className,
   color = 'hsl(var(--primary-light-purple))',
   speed = '6s',
+  thickness = 1,
 }: StarBorderProps) {
   return (
-    <div className={cn("relative w-full h-full group overflow-hidden", className)}>
+    <div
+      className={cn(
+        "relative inline-block overflow-hidden rounded-[20px] group",
+        className
+      )}
+    >
       <div
         className="absolute w-[300%] h-[50%] opacity-0 group-focus-within:opacity-70 bottom-[-11px] right-[-250%] rounded-full animate-star-movement-bottom z-0 transition-opacity duration-300 pointer-events-none"
         style={{
@@ -32,7 +39,12 @@ export function StarBorder({
           animationDuration: speed,
         }}
       />
-      <div className="relative z-10 w-full h-full">
+      <div 
+        className="relative z-10 bg-[var(--chat-bubble-background-color)] backdrop-blur-[var(--chat-bubble-blur)] border border-[var(--chat-bubble-border-color)] rounded-[20px] group-focus-within:border-primary-light-purple transition-colors duration-300"
+        style={{
+          borderWidth: `${thickness}px`,
+        }}
+      >
         {children}
       </div>
     </div>
