@@ -128,7 +128,7 @@ export default function StartPage() {
       const { prompt, placeholder } = appCreationQuestions[currentQuestionIndex];
       return (
         <div className="w-full max-w-xl mx-auto text-center relative">
-          <Button variant="ghost" onClick={handleGoBack} className="absolute -top-16 left-0 text-white/70 hover:text-white">
+          <Button variant="ghost" onClick={handleGoBack} className="absolute top-0 left-0 text-white/70 hover:text-white">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Volver
           </Button>
