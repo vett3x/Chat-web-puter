@@ -111,12 +111,12 @@ export default function LandingPage() {
                   thickness={1}
                   style={{ borderRadius: 'var(--radius)' }}
                 >
-                  <Card className="bg-[#0A021A] border-transparent text-left flex flex-col h-full">
-                    <CardHeader>
-                      <CardTitle>{plan.name}</CardTitle>
-                      <CardDescription className="text-white/60">{plan.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex-1">
+                  <div className="bg-[#0A021A] text-left flex flex-col h-full p-6 rounded-[var(--radius)]">
+                    <div className="mb-6">
+                      <h3 className="text-xl font-bold">{plan.name}</h3>
+                      <p className="text-white/60">{plan.description}</p>
+                    </div>
+                    <div className="flex-1">
                       <p className="text-4xl font-bold mb-6">{plan.price}<span className="text-lg font-normal text-white/60">{plan.price.startsWith('$') ? '/mes' : ''}</span></p>
                       <ul className="space-y-3">
                         {plan.features.map((feature) => (
@@ -126,13 +126,13 @@ export default function LandingPage() {
                           </li>
                         ))}
                       </ul>
-                    </CardContent>
-                    <CardFooter>
+                    </div>
+                    <div className="mt-auto pt-6">
                       <Button asChild className={`w-full ${plan.highlight ? 'bg-primary-light-purple hover:bg-primary-light-purple/90 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
                         <Link href={plan.href}>{plan.cta}</Link>
                       </Button>
-                    </CardFooter>
-                  </Card>
+                    </div>
+                  </div>
                 </ElectricBorder>
               ))}
             </div>
