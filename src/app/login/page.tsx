@@ -1,21 +1,36 @@
 "use client";
 
-import { Auth } from '@supabase/auth-ui-react';
-import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { ShieldAlert, Loader2, Ban, LogOut, LogIn, Wand2, Star, ArrowLeft, ArrowRight } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ShieldAlert, Loader2, Ban, LogOut, Wand2, Star, ArrowLeft, ArrowRight } from 'lucide-react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { formatDistanceToNow, addMinutes } from 'date-fns';
 import { es } from 'date-fns/locale';
 import Image from 'next/image';
 import Link from 'next/link';
 import { gsap } from 'gsap';
-import { useTheme } from 'next-themes';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { toast } from 'sonner';
+import { GoogleLogo } from '@/components/google-logo';
+import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
+
+const loginSchema = z.object({
+  email: z.string().email({ message: 'Por favor, introduce un email válido.' }),
+  password: z.string().min(1, { message: 'La contraseña es requerida.' }),
+  remember: z.boolean().default(false).optional(),
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const { theme } = useTheme();
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [usersDisabled, setUsersDisabled] = useState(false);
@@ -32,6 +47,15 @@ export default function LoginPage() {
 
   const leftColumnRef = useRef(null);
   const rightColumnRef = useRef(null);
+
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+      remember: false,
+    },
+  });
 
   useEffect(() => {
     setIsMounted(true);
@@ -100,6 +124,31 @@ export default function LoginPage() {
     }
   }, [isMounted]);
 
+  const onSubmit = async (data: LoginFormValues) => {
+    setIsLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: data.email,
+      password: data.password,
+    });
+
+    if (error) {
+      toast.error(error.message || 'Error al iniciar sesión.');
+    } else {
+      toast.success('Inicio de sesión exitoso.');
+      router.push('/app');
+    }
+    setIsLoading(false);
+  };
+
+  const handleGoogleSignIn = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/app`,
+      },
+    });
+  };
+
   return (
     <div className="min-h-screen w-full bg-background text-foreground grid grid-cols-1 lg:grid-cols-2">
       {/* Left Column: Form */}
@@ -112,7 +161,7 @@ export default function LoginPage() {
             </Link>
           </div>
           <h1 className="text-2xl font-bold">Bienvenido de nuevo</h1>
-          <p className="text-muted-foreground mt-2 mb-6">Por favor, introduce tus datos para continuar.</p>
+          <p className="text-muted-foreground mt-2 mb-6">¡Bienvenido de nuevo! Por favor, introduce tus datos.</p>
 
           {isLoadingStatus ? <Loader2 className="h-8 w-8 animate-spin mx-auto" /> : (
             <>
@@ -155,24 +204,73 @@ export default function LoginPage() {
                 </div>
               )}
 
-              <Auth
-                supabaseClient={supabase}
-                providers={[]}
-                appearance={{ theme: ThemeSupa }}
-                theme={theme === 'dark' ? 'dark' : 'light'}
-                localization={{
-                  variables: {
-                    sign_in: { email_label: 'Correo electrónico', password_label: 'Contraseña', button_label: 'Iniciar Sesión', link_text: '¿No tienes una cuenta? Regístrate' },
-                    sign_up: { email_label: 'Correo electrónico', password_label: 'Contraseña', button_label: 'Registrarse', link_text: '¿Ya tienes una cuenta? Inicia sesión', confirmation_text: 'Revisa tu correo para el enlace de confirmación.' },
-                    forgotten_password: { email_label: 'Correo electrónico', button_label: 'Enviar instrucciones', link_text: '¿Olvidaste tu contraseña?', confirmation_text: 'Revisa tu correo para el enlace de recuperación.' },
-                    update_password: { password_label: 'Nueva contraseña', button_label: 'Actualizar contraseña', confirmation_text: 'Tu contraseña ha sido actualizada.' },
-                  },
-                }}
-                redirectTo={typeof window !== 'undefined' ? `${window.location.origin}/app` : undefined}
-              />
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <Label htmlFor="email">Email</Label>
+                        <FormControl>
+                          <Input id="email" placeholder="Introduce tu email" {...field} disabled={isLoading} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <Label htmlFor="password">Contraseña</Label>
+                        <FormControl>
+                          <Input id="password" type="password" placeholder="••••••••" {...field} disabled={isLoading} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="flex items-center justify-between">
+                    <FormField
+                      control={form.control}
+                      name="remember"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center space-x-2">
+                          <FormControl>
+                            <Checkbox id="remember" checked={field.value} onCheckedChange={field.onChange} disabled={isLoading} />
+                          </FormControl>
+                          <Label htmlFor="remember" className="text-sm font-medium leading-none">Recordarme por 30 días</Label>
+                        </FormItem>
+                      )}
+                    />
+                    <Link href="#" className="text-sm font-semibold text-primary-light-purple hover:underline">
+                      Olvidé mi contraseña
+                    </Link>
+                  </div>
+                  <div className="space-y-4">
+                    <Button type="submit" className="w-full bg-primary-light-purple hover:bg-primary-light-purple/90 text-white" disabled={isLoading}>
+                      {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Iniciar Sesión
+                    </Button>
+                    <Button variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={isLoading}>
+                      <GoogleLogo className="mr-2" />
+                      Iniciar sesión con Google
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+              <p className="mt-8 text-center text-sm text-muted-foreground">
+                ¿No tienes una cuenta?{' '}
+                <Link href="#" className="font-semibold text-primary-light-purple hover:underline">
+                  Regístrate
+                </Link>
+              </p>
             </>
           )}
         </div>
+        <p className="absolute bottom-4 left-4 text-sm text-muted-foreground">© DeepAI Coder {new Date().getFullYear()}</p>
       </div>
 
       {/* Right Column: Image & Testimonial */}
