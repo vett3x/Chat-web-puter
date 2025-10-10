@@ -13,6 +13,9 @@ import { es } from 'date-fns/locale';
 import {
   Dialog,
   DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 
 interface LoginDialogProps {
@@ -109,6 +112,12 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="p-0 border-0 bg-transparent max-w-[450px] w-[95vw] overflow-hidden">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Iniciar Sesión o Registrarse</DialogTitle>
+          <DialogDescription>
+            Accede a tu cuenta o crea una nueva para empezar a construir con IA.
+          </DialogDescription>
+        </DialogHeader>
         <div className="w-full h-full" style={backgroundUrl ? {} : { backgroundImage: 'url(/background-pattern.svg)' }}>
           <div className="w-full h-full p-0" style={backgroundStyle}>
             <div className="relative w-full backdrop-blur-xl border-2 border-[hsl(var(--primary-color-login))] rounded-[15px] pt-[7.5em] pb-[4em] px-[1.5em] sm:px-[2.5em] text-[hsl(var(--second-color-login))] shadow-lg shadow-black/20">
