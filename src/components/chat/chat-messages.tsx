@@ -129,16 +129,15 @@ export function ChatMessages({ messages, isLoading, aiResponseSpeed, onRegenerat
         )}
         {messages.length === 0 && !isLoading ? (
           <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground py-8 max-w-2xl mx-auto">
-            <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
             {appPrompt ? (
               <>
-                <h2 className="text-2xl font-semibold text-foreground">¡Todo listo para empezar a construir!</h2>
-                <p className="mt-2">Tu proyecto es: <span className="font-medium text-primary">"{appPrompt}"</span></p>
+                <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">¡Todo listo para empezar a construir!</h2>
+                <p className="mt-4 text-lg text-white/70 mb-12">Tu proyecto es: <span className="font-medium text-primary-light-purple">"{appPrompt}"</span></p>
               </>
             ) : (
               <>
-                <h2 className="text-2xl font-semibold text-foreground">Hola, soy tu Asistente de IA</h2>
-                <p className="mt-2">¿Cómo puedo ayudarte hoy?</p>
+                <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground mb-4">Hola, soy tu Asistente de IA</h2>
+                <p className="text-lg text-white/70 mb-12">¿Cómo puedo ayudarte hoy?</p>
               </>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8 text-left w-full">
