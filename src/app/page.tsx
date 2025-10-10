@@ -18,6 +18,7 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import Autoplay from "embla-carousel-autoplay";
 import { gsap } from 'gsap';
 import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
+import { PayPalButtonsWrapper } from '@/components/paypal-buttons-wrapper'; // Importar el nuevo componente
 
 interface PricingPlan {
   id: string;
@@ -288,9 +289,13 @@ export default function LandingPage() {
                         </ul>
                       </div>
                       <div className="mt-auto pt-6">
-                        <Button asChild className={`w-full ${plan.highlight ? 'bg-primary-light-purple hover:bg-primary-light-purple/90 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
-                          <Link href={plan.cta_href}>{plan.cta_text}</Link>
-                        </Button>
+                        {plan.price === 'Gratis' ? (
+                          <Button asChild className={`w-full ${plan.highlight ? 'bg-primary-light-purple hover:bg-primary-light-purple/90 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
+                            <Link href={plan.cta_href}>{plan.cta_text}</Link>
+                          </Button>
+                        ) : (
+                          <PayPalButtonsWrapper plan={plan} />
+                        )}
                       </div>
                     </div>
                   </ElectricBorder>

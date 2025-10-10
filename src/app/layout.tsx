@@ -6,6 +6,7 @@ import { SessionContextProvider } from "@/components/session-context-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SuppressWarnings } from "@/components/suppress-warnings"; // Importar el nuevo componente
+import { PayPalProvider } from "@/components/paypal-provider"; // Importar PayPalProvider
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -44,7 +45,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <SessionContextProvider>
-            {children}
+            <PayPalProvider>
+              {children}
+            </PayPalProvider>
           </SessionContextProvider>
           <Toaster
             position="top-right" // Cambiado a top-right

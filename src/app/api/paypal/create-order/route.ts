@@ -1,0 +1,44 @@
+export const runtime = 'nodejs';
+
+import { NextResponse, type NextRequest } from 'next/server';
+import { getPayPalAccessToken } from '@/lib/paypal';
+
+const PAYPAL_API_URL = 'https://api-m.sandbox.paypal.com';
+
+export async function POST(req: NextRequest) {
+  try {
+    const { amount } = await req.json();
+    if (!amount || isNaN(parseFloat(amount))) {
+      return NextResponse.json({ message: 'El monto es inválido.' }, { status: 400 });
+    }
+
+    const accessToken = await getPayPalAccessToken();
+
+    const response = await fetch(`${PAYPAL_API_URL}/v2/checkout/orders`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        intent: 'CAPTURE',
+        purchase_units: [{
+          amount: {
+            currency_code: 'USD',
+            value: amount.toString(),
+          },
+        }],
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || 'Error al crear la orden en PayPal.');
+    }
+
+    return NextResponse.json({ id: data.id });
+  } catch (error: any) {
+    console.error('[API PayPal Create Order] Error:', error);
+    return NextResponse.json({ message: error.message }, { status: 500 });
+  }
+}
