@@ -18,17 +18,29 @@ export default function LandingPage() {
   const pricingPlans = [
     {
       name: 'Hobby',
-      price: '$10',
+      price: '$0',
       description: 'Para proyectos personales y experimentación.',
-      features: ['1 Proyecto Activo', 'Soporte Básico', 'Despliegue con Subdominio'],
-      cta: 'Empezar Ahora',
+      features: [
+        '1 Proyecto Activo',
+        'Recursos Limitados (0.5 CPU, 512MB RAM)',
+        'Despliegue con Subdominio',
+        'Soporte Comunitario',
+      ],
+      cta: 'Empezar Gratis',
       href: '/login'
     },
     {
       name: 'Pro',
-      price: '$49',
+      price: '$25',
       description: 'Para desarrolladores serios y freelancers.',
-      features: ['10 Proyectos Activos', 'Soporte Prioritario', 'Dominio Personalizado', 'Bases de Datos Dedicadas'],
+      features: [
+        '10 Proyectos Activos',
+        'Recursos Ampliados (2 CPU, 2GB RAM)',
+        'Dominio Personalizado',
+        'Proyectos Siempre Activos',
+        'Soporte Prioritario',
+        'Backups Automáticos',
+      ],
       cta: 'Empezar Ahora',
       href: '/login',
       highlight: true,
