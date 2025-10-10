@@ -184,9 +184,9 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
         <div 
           className="group w-full max-w-3xl"
         >
-          <StarBorder className="rounded-xl overflow-hidden">
+          <StarBorder className="rounded-xl">
             <div 
-              className="bg-[var(--chat-bubble-background-color)] backdrop-blur-[var(--chat-bubble-blur)] border border-[var(--chat-bubble-border-color)] p-2 flex flex-col gap-2 transition-all duration-200"
+              className="bg-[var(--chat-bubble-background-color)] backdrop-blur-[var(--chat-bubble-blur)] border border-[var(--chat-bubble-border-color)] p-2 flex flex-col gap-2 transition-all duration-200 rounded-xl"
             >
               <FileAttachmentPreview selectedFiles={selectedFiles} onRemoveFile={removeFile} />
               
