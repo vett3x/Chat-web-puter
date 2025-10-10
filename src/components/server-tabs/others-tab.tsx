@@ -80,7 +80,7 @@ export function OthersTab() {
     <div className="space-y-8 p-1">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
-          <Card className="bg-black/20 border-white/10">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Settings2 className="h-6 w-6" />

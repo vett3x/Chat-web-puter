@@ -65,7 +65,7 @@ export function UsageHistoryTab() {
   };
 
   return (
-    <Card className="bg-black/20 border-white/10">
+    <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="flex items-center gap-2">
           <History className="h-5 w-5" /> Historial de Uso

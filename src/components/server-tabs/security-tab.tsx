@@ -161,7 +161,7 @@ export function SecurityTab() {
 
   return (
     <div className="space-y-8 h-full overflow-y-auto p-1">
-      <Card className="bg-black/20 border-white/10">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Shield className="h-6 w-6" /> Controles de Seguridad Global</CardTitle>
           <CardDescription>Gestiona el estado general de la aplicación y las restricciones de acceso.</CardDescription>
@@ -178,7 +178,7 @@ export function SecurityTab() {
         </CardContent>
       </Card>
 
-      <Card className="bg-black/20 border-white/10">
+      <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <CardTitle className="flex items-center gap-2"><Ban className="h-6 w-6" /> Comandos Permitidos por la IA</CardTitle>

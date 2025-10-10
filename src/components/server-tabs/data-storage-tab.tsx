@@ -149,7 +149,7 @@ export function DataStorageTab() {
   const handleDeleteBackup = async (key: string) => { setIsActioningBackup(key); try { const res = await fetch(`/api/admin/s3-backups?key=${encodeURIComponent(key)}`, { method: 'DELETE' }); if (!res.ok) throw new Error((await res.json()).message); toast.success('Backup eliminado.'); fetchBackups(); } catch (e: any) { toast.error(`Error al eliminar: ${e.message}`); } finally { setIsActioningBackup(null); } };
 
   return (
-    <Card className="bg-black/20 border-white/10">
+    <Card>
       <CardHeader>
         <CardTitle>Gestión de Datos y Almacenamiento</CardTitle>
         <CardDescription>Configura tus servidores de bases de datos, almacenamiento S3 y gestiona los backups.</CardDescription>

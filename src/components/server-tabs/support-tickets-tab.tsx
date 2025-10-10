@@ -237,7 +237,7 @@ export function SupportTicketsTab() {
   );
 
   return (
-    <Card className="bg-black/20 border-white/10">
+    <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2"><LifeBuoy className="h-6 w-6" /> Tickets de Soporte</CardTitle>
         <Button variant="ghost" size="icon" onClick={fetchTickets} disabled={isLoading} className="bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10">

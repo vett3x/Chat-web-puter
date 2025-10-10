@@ -99,88 +99,54 @@
     --liquid-ether-opacity: 0.5;
   }
   .dark {
+    --background: 240 100% 2%;
+    --foreground: 0 0% 98%;
 
-    --background: 240 100% 2%; /* Very dark blue-purple background */
-
-    --foreground: 0 0% 98%; /* White text */
-
-    --card: 240 100% 2%; /* Same as background for the form column */
-
+    /* --- GLASSMORPHISM OVERRIDE --- */
+    --card: 0 0% 100% / 0.05;
     --card-foreground: 0 0% 98%;
-
     --popover: 220 10% 7%;
-
     --popover-foreground: 0 0% 98%;
-
-    --primary: 220 10% 15%; /* Darker gray for primary buttons */
-
-    --primary-foreground: 0 0% 98%; /* White text on primary */
-
-    --primary-light-purple: 259 92% 69%; /* New color variable */
-
-    --secondary: 220 10% 10%; /* Dark gray for secondary elements */
-
+    --primary: 0 0% 100% / 0.1;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 100% / 0.08;
     --secondary-foreground: 0 0% 98%;
-
-    --muted: 220 10% 10%; /* Dark gray for muted backgrounds */
-
-    --muted-foreground: 220 10% 60%; /* Lighter gray for muted text */
-
-    --accent: 220 10% 10%; /* Dark gray for accent backgrounds */
-
+    --muted: 0 0% 100% / 0.05;
+    --muted-foreground: 220 10% 60%;
+    --accent: 0 0% 100% / 0.1;
     --accent-foreground: 0 0% 98%;
+    --border: 0 0% 100% / 0.1;
+    --input: 0 0% 100% / 0.05;
+    --ring: 259 92% 69%;
+    /* --- END OVERRIDE --- */
 
-    --destructive: 0 62.8% 30.6%; /* Keep destructive as is for now */
-
+    --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-
     --info: 216 91% 25%;
-
     --info-foreground: 214 91% 85%;
-
     --warning: 38 92% 50%;
-
     --warning-foreground: 0 0% 0%;
-
-    --border: 220 10% 15%; /* Darker gray for borders */
-
-    --input: 220 10% 10%; /* Dark gray for input fields */
-
-    --ring: 220 10% 30%; /* Slightly lighter ring for focus */
-
     --chart-1: 220 70% 50%;
-
     --chart-2: 160 60% 45%;
-
     --chart-3: 30 80% 55%;
-
     --chart-4: 280 65% 60%;
-
-    --chart-5: 340 75% 55%
-  ;
-
-    /* Sidebar specific colors */
-    --sidebar-background: 0 0% 100% / 0.1; /* White with 10% opacity for frosted glass */
-    --sidebar-foreground: 0 0% 98%; /* White text */
-    --sidebar-primary: 0 0% 100% / 0.15; /* Slightly more opaque white for selected item */
-    --sidebar-primary-foreground: 0 0% 98%; /* White text on selected item */
-    --sidebar-accent: 0 0% 100% / 0.1; /* Subtle transparent white for hover */
+    --chart-5: 340 75% 55%;
+    --sidebar-background: 0 0% 100% / 0.1;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 0 0% 100% / 0.15;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 0 0% 100% / 0.1;
     --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 0 0% 100% / 0.15; /* Subtle white border */
+    --sidebar-border: 0 0% 100% / 0.15;
     --sidebar-ring: 220 10% 30%;
-
-    --user-avatar-shadow: 210 90% 50%; /* Blue for user avatar shadow */
-    --ai-avatar-shadow: 30 90% 50%;   /* Orange for AI avatar shadow */
-
-    /* New variables for modern login - Mapped to theme */
-    --primary-color-login: 220 10% 15%; /* --border */
-    --second-color-login: 0 0% 98%; /* --foreground */
-    --black-color-login: 0 0% 98%; /* --primary-foreground */
-
-    /* New variables for chat glassmorphism */
-    --chat-bubble-background-color: 0 0% 100% / 0.1; /* Increased opacity for frosted glass */
-    --chat-bubble-border-color: 0 0% 100% / 0.1; /* Subtle border */
-    --chat-bubble-blur: 24px; /* Significantly increased blur */
+    --user-avatar-shadow: 210 90% 50%;
+    --ai-avatar-shadow: 30 90% 50%;
+    --primary-color-login: 220 10% 15%;
+    --second-color-login: 0 0% 98%;
+    --black-color-login: 0 0% 98%;
+    --chat-bubble-background-color: 0 0% 100% / 0.1;
+    --chat-bubble-border-color: 0 0% 100% / 0.1;
+    --chat-bubble-blur: 24px;
     --liquid-ether-opacity: 0.5;
   }
 

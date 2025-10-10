@@ -136,7 +136,7 @@ export function PaymentsServicesTab() {
 
   return (
     <div className="space-y-8 p-1">
-      <Card className="bg-black/20 border-white/10">
+      <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle className="flex items-center gap-2"><CreditCard className="h-6 w-6" /> Planes de Precios</CardTitle>

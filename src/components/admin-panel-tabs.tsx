@@ -38,7 +38,11 @@ export function AdminPanelTabs({ onOpenAlerts, initialTab }: AdminPanelTabsProps
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col flex-1 py-4 overflow-hidden">
       <TabsList className="h-auto flex-col sm:h-10 sm:flex-row">
         {tabs.map(tab => (
-          <TabsTrigger key={tab.value} value={tab.value} className="w-full justify-start sm:w-auto sm:justify-center flex items-center gap-2">
+          <TabsTrigger
+            key={tab.value}
+            value={tab.value}
+            className="w-full justify-start sm:w-auto sm:justify-center flex items-center gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white"
+          >
             {tab.icon} {tab.label}
           </TabsTrigger>
         ))}
