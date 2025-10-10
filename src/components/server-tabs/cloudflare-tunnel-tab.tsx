@@ -232,7 +232,7 @@ export function CloudflareTunnelTab() {
                 </Form>
               </DialogContent>
             </Dialog>
-            <Button variant="ghost" size="icon" onClick={fetchCloudflareDomains} disabled={isLoadingDomains} title="Refrescar">
+            <Button variant="ghost" size="icon" onClick={fetchCloudflareDomains} disabled={isLoadingDomains} title="Refrescar" className="bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10">
               {isLoadingDomains ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             </Button>
           </div>
@@ -300,7 +300,7 @@ export function CloudflareTunnelTab() {
       <Card className="bg-black/20 border-white/10">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2"><Cloud className="h-6 w-6" /> Túneles Docker de Cloudflare</CardTitle>
-          <Button variant="ghost" size="icon" onClick={fetchDockerTunnels} disabled={isLoadingTunnels} title="Refrescar">
+          <Button variant="ghost" size="icon" onClick={fetchDockerTunnels} disabled={isLoadingTunnels} title="Refrescar" className="bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10">
             {isLoadingTunnels ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           </Button>
         </CardHeader>

@@ -240,7 +240,7 @@ export function SupportTicketsTab() {
     <Card className="bg-black/20 border-white/10">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2"><LifeBuoy className="h-6 w-6" /> Tickets de Soporte</CardTitle>
-        <Button variant="ghost" size="icon" onClick={fetchTickets} disabled={isLoading}>
+        <Button variant="ghost" size="icon" onClick={fetchTickets} disabled={isLoading} className="bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10">
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
         </Button>
       </CardHeader>

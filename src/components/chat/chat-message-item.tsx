@@ -118,16 +118,16 @@ const ChatMessageItemComponent: React.FC<ChatMessageItemProps> = ({
         </div>
         {message.role === 'assistant' && !message.isTyping && !message.isConstructionPlan && (
           <div className="absolute top-1/2 -translate-y-1/2 left-full ml-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopy(message.content)} title="Copiar">
+            <Button variant="ghost" size="icon" className="h-6 w-6 bg-background/50 backdrop-blur-sm border border-border" onClick={() => handleCopy(message.content)} title="Copiar">
               {isCopied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Clipboard className="h-3.5 w-3.5" />}
             </Button>
             {hasFiles && (
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onReapplyFiles(message)} disabled={isLoading} title="Reaplicar archivos">
+              <Button variant="ghost" size="icon" className="h-6 w-6 bg-background/50 backdrop-blur-sm border border-border" onClick={() => onReapplyFiles(message)} disabled={isLoading} title="Reaplicar archivos">
                 <Upload className="h-3.5 w-3.5" />
               </Button>
             )}
             {isLastMessage && (
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onRegenerate} disabled={isLoading} title="Regenerar">
+              <Button variant="ghost" size="icon" className="h-6 w-6 bg-background/50 backdrop-blur-sm border border-border" onClick={onRegenerate} disabled={isLoading} title="Regenerar">
                 <RefreshCw className="h-3.5 w-3.5" />
               </Button>
             )}

@@ -113,7 +113,7 @@ export function AdminPanelDialog({ open, onOpenChange, onOpenAlerts, initialTab 
         <AdminPanelTabs onOpenAlerts={onOpenAlerts} initialTab={initialTab} />
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline">Cerrar</Button>
+            <Button variant="ghost" className="bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10">Cerrar</Button>
           </DialogClose>
         </DialogFooter>
       </DialogContent>

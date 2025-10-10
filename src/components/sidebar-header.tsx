@@ -181,11 +181,11 @@ export function SidebarHeader({
             )}
           </Button>
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
             onClick={onNewNote}
             disabled={isCreatingNote}
-            className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7"
+            className="text-sidebar-foreground bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10 hover:text-sidebar-accent-foreground rounded-full h-7 w-7"
             title="Nueva nota"
           >
             {isCreatingNote ? (
@@ -195,11 +195,11 @@ export function SidebarHeader({
             )}
           </Button>
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
             onClick={() => onNewFolder()}
             disabled={isCreatingFolder}
-            className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7"
+            className="text-sidebar-foreground bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10 hover:text-sidebar-accent-foreground rounded-full h-7 w-7"
             title="Nueva carpeta"
           >
             {isCreatingFolder ? (
@@ -212,13 +212,13 @@ export function SidebarHeader({
           {/* New Support Ticket Button */}
           {isAdmin && (
             <Button
-              variant="outline"
+              variant="ghost"
               size="icon"
               onClick={() => {
                 setHasNewSupportTickets(false); // Reset alert when clicked
                 onOpenSupportTicket();
               }}
-              className="relative text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-full h-7 w-7"
+              className="relative text-muted-foreground bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10 hover:text-sidebar-accent-foreground rounded-full h-7 w-7"
               title="Tickets de Soporte"
             >
               {hasNewSupportTickets && (

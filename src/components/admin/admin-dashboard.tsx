@@ -87,7 +87,7 @@ export function AdminDashboardTab({ onOpenAlerts }: AdminDashboardTabProps) {
     <div className="space-y-6 p-1">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Panel de Control de Super Admin</h2>
-        <Button variant="ghost" size="icon" onClick={fetchData} disabled={isLoading}><RefreshCw className="h-5 w-5" /></Button>
+        <Button variant="ghost" size="icon" onClick={fetchData} disabled={isLoading} className="bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10"><RefreshCw className="h-5 w-5" /></Button>
       </div>
 
       {/* KPIs */}

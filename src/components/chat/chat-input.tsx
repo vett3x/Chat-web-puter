@@ -203,14 +203,14 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
                 onValueChange={(value: ChatMode) => {
                   if (value) onChatModeChange(value);
                 }}
-                className="flex-shrink-0"
+                className="flex-shrink-0 border border-[var(--chat-bubble-border-color)] rounded-md"
                 disabled={isLoading}
               >
-                <ToggleGroupItem value="build" aria-label="Modo Build" className="h-8 px-2.5">
+                <ToggleGroupItem value="build" aria-label="Modo Build" className="h-8 px-2.5 data-[state=on]:bg-white/20">
                   <Wrench className="h-4 w-4 mr-1.5" />
                   <span className="text-xs">Build</span>
                 </ToggleGroupItem>
-                <ToggleGroupItem value="chat" aria-label="Modo Chat" className="h-8 px-2.5">
+                <ToggleGroupItem value="chat" aria-label="Modo Chat" className="h-8 px-2.5 data-[state=on]:bg-white/20">
                   <MessageSquare className="h-4 w-4 mr-1.5" />
                   <span className="text-xs">Chat</span>
                 </ToggleGroupItem>

@@ -100,7 +100,7 @@ export function AllDockerContainersTab() {
               <AlertCircle className="h-4 w-4" /> Error
             </span>
           )}
-          <Button variant="ghost" size="icon" onClick={fetchAllDockerStats} disabled={isLoading} title="Refrescar">
+          <Button variant="ghost" size="icon" onClick={fetchAllDockerStats} disabled={isLoading} title="Refrescar" className="bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10">
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           </Button>
         </div>
