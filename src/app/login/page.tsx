@@ -3,16 +3,19 @@
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Moon, Sun, ShieldAlert, Loader2, Ban, LogOut, LogIn } from 'lucide-react';
-import { useTheme } from 'next-themes';
+import { ShieldAlert, Loader2, Ban, LogOut, LogIn, Wand2, Star, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { formatDistanceToNow, addMinutes } from 'date-fns';
 import { es } from 'date-fns/locale';
+import Image from 'next/image';
+import Link from 'next/link';
+import { gsap } from 'gsap';
+import { useTheme } from 'next-themes';
 
 export default function LoginPage() {
-  const { theme, setTheme } = useTheme();
+  const { theme } = useTheme();
   const [isMounted, setIsMounted] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [usersDisabled, setUsersDisabled] = useState(false);
@@ -26,6 +29,9 @@ export default function LoginPage() {
   const kickReason = searchParams.get('reason');
   const kickedAt = searchParams.get('kicked_at');
   const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
+
+  const leftColumnRef = useRef(null);
+  const rightColumnRef = useRef(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -81,54 +87,55 @@ export default function LoginPage() {
     };
   }, [accountKickedError, kickedAt]);
 
-  const backgroundStyle = backgroundUrl ? {
-    backgroundImage: `url(${backgroundUrl})`,
-  } : {};
+  useEffect(() => {
+    if (isMounted) {
+      gsap.fromTo(leftColumnRef.current, 
+        { opacity: 0, x: -50 },
+        { opacity: 1, x: 0, duration: 0.8, ease: 'power3.out' }
+      );
+      gsap.fromTo(rightColumnRef.current, 
+        { opacity: 0, x: 50 },
+        { opacity: 1, x: 0, duration: 0.8, ease: 'power3.out', delay: 0.2 }
+      );
+    }
+  }, [isMounted]);
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#060010] text-white p-4">
-      <div className="absolute inset-0 z-0 bg-cover bg-center" style={backgroundUrl ? backgroundStyle : { backgroundImage: 'url(/background-pattern.svg)' }} />
-      <div className="absolute inset-0 z-10 bg-black/50" />
-      
-      <div className="relative z-20 w-full max-w-md">
-        <div className="relative w-full backdrop-blur-xl border-2 border-[hsl(var(--primary-color-login))] rounded-[15px] pt-[7.5em] pb-[4em] px-[1.em] sm:px-[2.5em] text-[hsl(var(--second-color-login))] shadow-lg shadow-black/20">
-          {isMounted && (
-            <Button 
-              variant="outline" 
-              size="icon" 
-              className="absolute top-4 right-4 h-10 w-10 rounded-full text-white bg-black/20 border-white/50 hover:bg-white/20" 
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} 
-              aria-label="Toggle theme"
-            >
-              {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </Button>
-          )}
-          <div className="login-header absolute top-0 left-1/2 -translate-x-1/2 flex items-center justify-center bg-[hsl(var(--primary-color-login))] w-[100px] h-[70px] rounded-b-[20px] z-10">
-            <LogIn className="h-10 w-10 text-black" />
+    <div className="min-h-screen w-full bg-background text-foreground grid grid-cols-1 lg:grid-cols-2">
+      {/* Left Column: Form */}
+      <div ref={leftColumnRef} className="flex flex-col justify-center items-center p-4 sm:p-8 lg:p-12">
+        <div className="w-full max-w-sm">
+          <div className="mb-8">
+            <Link href="/" className="flex items-center gap-2 text-foreground">
+              <Wand2 className="h-7 w-7 text-primary-light-purple" />
+              <span className="text-xl font-bold">DeepAI Coder</span>
+            </Link>
           </div>
+          <h1 className="text-2xl font-bold">Bienvenido de nuevo</h1>
+          <p className="text-muted-foreground mt-2 mb-6">Por favor, introduce tus datos para continuar.</p>
 
           {isLoadingStatus ? <Loader2 className="h-8 w-8 animate-spin mx-auto" /> : (
             <>
               {maintenanceMode && (
-                <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-center text-sm text-yellow-200 flex items-center gap-2">
+                <div className="mb-4 p-3 bg-yellow-100 border border-yellow-200 rounded-md text-center text-sm text-yellow-800 flex items-center gap-2 dark:bg-yellow-900/20 dark:border-yellow-800/30 dark:text-yellow-200">
                   <ShieldAlert className="h-5 w-5" />
                   <span>Modo Mantenimiento: Solo personal autorizado puede iniciar sesión.</span>
                 </div>
               )}
               {accountDisabledError && (
-                <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-center text-sm text-white flex items-center gap-2">
+                <div className="mb-4 p-3 bg-red-100 border border-red-200 rounded-md text-center text-sm text-red-800 flex items-center gap-2 dark:bg-red-900/20 dark:border-red-800/30 dark:text-red-200">
                   <Ban className="h-5 w-5" />
                   <span>El inicio de sesión para tu tipo de cuenta está temporalmente desactivado.</span>
                 </div>
               )}
               {accountBannedError && (
-                <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-center text-sm text-white flex items-center gap-2">
+                <div className="mb-4 p-3 bg-red-100 border border-red-200 rounded-md text-center text-sm text-red-800 flex items-center gap-2 dark:bg-red-900/20 dark:border-red-800/30 dark:text-red-200">
                   <Ban className="h-5 w-5" />
                   <span>Tu cuenta ha sido baneada. {kickReason && `Razón: ${kickReason}`}</span>
                 </div>
               )}
               {accountKickedError && (
-                <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-center text-sm text-yellow-200 flex flex-col items-center gap-2">
+                <div className="mb-4 p-3 bg-yellow-100 border border-yellow-200 rounded-md text-center text-sm text-yellow-800 flex flex-col items-center gap-2 dark:bg-yellow-900/20 dark:border-yellow-800/30 dark:text-yellow-200">
                   <LogOut className="h-5 w-5" />
                   <span>Has sido expulsado del sistema.</span>
                   {kickReason && <span className="font-semibold">Razón: {kickReason}</span>}
@@ -136,13 +143,13 @@ export default function LoginPage() {
                 </div>
               )}
               {usersDisabled && !maintenanceMode && (
-                <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-center text-sm text-yellow-200 flex items-center gap-2">
+                <div className="mb-4 p-3 bg-yellow-100 border border-yellow-200 rounded-md text-center text-sm text-yellow-800 flex items-center gap-2 dark:bg-yellow-900/20 dark:border-yellow-800/30 dark:text-yellow-200">
                   <Ban className="h-5 w-5" />
                   <span>El inicio de sesión para cuentas de <strong>Usuario</strong> está desactivado.</span>
                 </div>
               )}
               {adminsDisabled && !maintenanceMode && (
-                <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-center text-sm text-yellow-200 flex items-center gap-2">
+                <div className="mb-4 p-3 bg-yellow-100 border border-yellow-200 rounded-md text-center text-sm text-yellow-800 flex items-center gap-2 dark:bg-yellow-900/20 dark:border-yellow-800/30 dark:text-yellow-200">
                   <Ban className="h-5 w-5" />
                   <span>El inicio de sesión para cuentas de <strong>Admin</strong> está desactivado.</span>
                 </div>
@@ -151,87 +158,58 @@ export default function LoginPage() {
               <Auth
                 supabaseClient={supabase}
                 providers={[]}
-                appearance={{
-                  theme: ThemeSupa,
-                  variables: {
-                    default: {
-                      colors: {
-                        brand: 'hsl(var(--primary-color-login))',
-                        brandAccent: 'hsl(var(--black-color-login))',
-                        brandButtonText: 'hsl(var(--black-color-login))',
-                        defaultButtonBackground: 'transparent',
-                        defaultButtonBackgroundHover: 'hsl(var(--primary-color-login) / 0.1)',
-                        defaultButtonBorder: 'hsl(var(--primary-color-login))',
-                        defaultButtonText: 'hsl(var(--second-color-login))',
-                        inputBackground: 'transparent',
-                        inputBorder: 'hsl(var(--primary-color-login))',
-                        inputBorderHover: 'hsl(var(--primary-color-login))',
-                        inputBorderFocus: 'hsl(var(--second-color-login))',
-                        inputText: 'hsl(var(--second-color-login))',
-                        inputLabelText: 'hsl(var(--second-color-login))',
-                        inputPlaceholder: 'hsl(var(--primary-color-login))',
-                        messageText: 'hsl(var(--second-color-login))',
-                        messageTextDanger: 'hsl(var(--destructive))',
-                        anchorTextColor: 'hsl(var(--second-color-login))',
-                        anchorTextHoverColor: 'hsl(var(--primary-color-login))',
-                      },
-                      space: {
-                        inputPadding: '1rem 1.5rem',
-                        buttonPadding: '0.75rem 1.5rem',
-                      },
-                      radii: {
-                        borderRadiusButton: '30px',
-                        buttonBorderRadius: '30px',
-                        inputBorderRadius: '30px',
-                      },
-                    },
-                  },
-                }}
+                appearance={{ theme: ThemeSupa }}
+                theme={theme === 'dark' ? 'dark' : 'light'}
                 localization={{
                   variables: {
-                    sign_in: {
-                      email_label: 'Correo electrónico',
-                      password_label: 'Contraseña',
-                      email_input_placeholder: 'Tu correo electrónico',
-                      password_input_placeholder: 'Tu contraseña',
-                      button_label: 'Iniciar Sesión',
-                      link_text: '¿No tienes una cuenta? Regístrate',
-                      loading_button_label: 'Iniciando sesión...',
-                      social_provider_text: 'Iniciar sesión con {{provider}}',
-                    },
-                    sign_up: {
-                      email_label: 'Correo electrónico',
-                      password_label: 'Contraseña',
-                      email_input_placeholder: 'Tu correo electrónico',
-                      password_input_placeholder: 'Tu nueva contraseña',
-                      button_label: 'Registrarse',
-                      link_text: '¿Ya tienes una cuenta? Inicia sesión',
-                      loading_button_label: 'Registrando...',
-                      social_provider_text: 'Registrarse con {{provider}}',
-                      confirmation_text: 'Revisa tu correo para el enlace de confirmación.',
-                    },
-                    forgotten_password: {
-                      email_label: 'Correo electrónico',
-                      password_label: 'Tu contraseña',
-                      button_label: 'Enviar instrucciones',
-                      link_text: '¿Olvidaste tu contraseña?',
-                      loading_button_label: 'Enviando instrucciones...',
-                      confirmation_text: 'Revisa tu correo para el enlace de recuperación.',
-                    },
-                    update_password: {
-                      password_label: 'Nueva contraseña',
-                      password_input_placeholder: 'Tu nueva contraseña',
-                      button_label: 'Actualizar contraseña',
-                      loading_button_label: 'Actualizando contraseña...',
-                      confirmation_text: 'Tu contraseña ha sido actualizada.',
-                    },
+                    sign_in: { email_label: 'Correo electrónico', password_label: 'Contraseña', button_label: 'Iniciar Sesión', link_text: '¿No tienes una cuenta? Regístrate' },
+                    sign_up: { email_label: 'Correo electrónico', password_label: 'Contraseña', button_label: 'Registrarse', link_text: '¿Ya tienes una cuenta? Inicia sesión', confirmation_text: 'Revisa tu correo para el enlace de confirmación.' },
+                    forgotten_password: { email_label: 'Correo electrónico', button_label: 'Enviar instrucciones', link_text: '¿Olvidaste tu contraseña?', confirmation_text: 'Revisa tu correo para el enlace de recuperación.' },
+                    update_password: { password_label: 'Nueva contraseña', button_label: 'Actualizar contraseña', confirmation_text: 'Tu contraseña ha sido actualizada.' },
                   },
                 }}
-                theme="dark"
                 redirectTo={typeof window !== 'undefined' ? `${window.location.origin}/app` : undefined}
               />
             </>
           )}
+        </div>
+      </div>
+
+      {/* Right Column: Image & Testimonial */}
+      <div ref={rightColumnRef} className="hidden lg:block relative">
+        <Image
+          src={backgroundUrl || "/login-background.png"}
+          alt="Mujer trabajando en un proyecto"
+          layout="fill"
+          objectFit="cover"
+          className="opacity-90"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 p-12 text-white">
+          <div className="bg-white/10 backdrop-blur-md rounded-lg p-8 border border-white/20">
+            <blockquote className="text-xl font-medium leading-relaxed">
+              "Hemos estado usando DeepAI Coder para iniciar cada nuevo proyecto y no podemos imaginar trabajar sin él. Es increíble."
+            </blockquote>
+            <div className="mt-6 flex justify-between items-center">
+              <div>
+                <p className="font-semibold">Fleur Cook</p>
+                <p className="text-sm text-white/70">Fundadora, Catalog</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex gap-1">
+                  {[...Array(5)].map((_, i) => <Star key={i} className="h-5 w-5 text-yellow-400 fill-yellow-400" />)}
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="icon" className="rounded-full bg-white/10 border-white/20 hover:bg-white/20">
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="icon" className="rounded-full bg-white/10 border-white/20 hover:bg-white/20">
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
