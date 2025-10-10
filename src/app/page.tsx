@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Wand2, Check } from 'lucide-react';
+import { Wand2, Check, Play } from 'lucide-react';
 import Aurora from '@/components/Aurora';
 import { LandingFooter } from '@/components/landing-footer';
 import Link from 'next/link';
@@ -10,6 +10,9 @@ import ElectricBorder from '@/components/ElectricBorder';
 import GradualBlur from '@/components/GradualBlur';
 import PillNav from '@/components/PillNav';
 import CardSwap, { Card } from '@/components/CardSwap';
+import { TechnologyLogos } from '@/components/landing/TechnologyLogos';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 export default function LandingPage() {
   const pricingPlans = [
@@ -29,6 +32,7 @@ export default function LandingPage() {
       cta: 'Empezar Ahora',
       href: '/login',
       highlight: true,
+      badge: 'Más Popular',
     },
     {
       name: 'Enterprise',
@@ -40,6 +44,43 @@ export default function LandingPage() {
     },
   ];
 
+  const testimonials = [
+    {
+      name: 'Ana, Desarrolladora Full-Stack',
+      avatar: '/avatars/ana.jpg',
+      quote: 'DeepAI Coder redujo mi tiempo de prototipado a la mitad. Es como tener un desarrollador junior súper rápido a mi lado, permitiéndome enfocar en la lógica de negocio compleja.'
+    },
+    {
+      name: 'Carlos, Freelancer',
+      avatar: '/avatars/carlos.jpg',
+      quote: 'La capacidad de gestionar servidores, bases de datos y despliegues desde un solo lugar es increíble. Me ahorra horas de configuración y mantenimiento cada semana.'
+    },
+    {
+      name: 'Sofía, Manager de Producto',
+      avatar: '/avatars/sofia.jpg',
+      quote: 'Pude validar una idea de producto y tener un MVP funcional en un fin de semana, sin escribir una sola línea de código yo misma. ¡Absolutamente revolucionario!'
+    }
+  ];
+
+  const faqs = [
+    {
+      question: '¿Puedo exportar el código generado por la IA?',
+      answer: '¡Sí! En cualquier momento puedes descargar un archivo .tar.gz con todo el código fuente de tu proyecto. Eres el dueño de tu código.'
+    },
+    {
+      question: '¿Qué tecnologías puedo usar?',
+      answer: 'Actualmente, nos especializamos en el stack de Next.js, TypeScript y Tailwind CSS, desplegado en un entorno Docker. Esto nos permite ofrecer una experiencia optimizada y de alto rendimiento. Estamos trabajando para añadir más tecnologías en el futuro.'
+    },
+    {
+      question: '¿Cómo funciona el despliegue?',
+      answer: 'El despliegue es automático. Utilizamos Cloudflare Tunnels para exponer de forma segura tu aplicación al mundo a través de un subdominio o tu propio dominio personalizado, dependiendo de tu plan.'
+    },
+    {
+      question: '¿Es seguro?',
+      answer: 'La seguridad es nuestra máxima prioridad. Cada aplicación se ejecuta en un contenedor Docker aislado. Además, contamos con una lista blanca de comandos seguros que la IA puede ejecutar para prevenir cualquier acción maliciosa.'
+    }
+  ];
+
   const [showFooterBlur, setShowFooterBlur] = useState(true);
   const footerRef = useRef<HTMLElement>(null);
 
@@ -48,7 +89,6 @@ export default function LandingPage() {
       if (footerRef.current) {
         const footerTop = footerRef.current.getBoundingClientRect().top;
         const windowHeight = window.innerHeight;
-        // Start fading out when the top of the footer is visible
         if (footerTop < windowHeight) {
           setShowFooterBlur(false);
         } else {
@@ -58,7 +98,7 @@ export default function LandingPage() {
     };
 
     window.addEventListener('scroll', handleScroll);
-    handleScroll(); // Initial check
+    handleScroll();
 
     return () => {
       window.removeEventListener('scroll', handleScroll);
@@ -93,15 +133,16 @@ export default function LandingPage() {
           <div className="text-center z-10 p-4">
             <Wand2 className="h-12 w-12 mx-auto mb-4 text-primary-light-purple" />
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight">
-              Crea y Despliega Aplicaciones con tu Copiloto de IA
+              De la Idea al Despliegue en Minutos, con IA.
             </h1>
-            <p className="mt-4 max-w-2xl mx-auto text-lg text-white/70">
-              La plataforma todo en uno que convierte tus ideas en software real. Escribe, gestiona y despliega, todo desde una única interfaz.
+            <p className="mt-4 max-w-3xl mx-auto text-lg text-white/70">
+              Olvida la configuración compleja. Describe tu app, y deja que la IA construya, gestione y despliegue por ti.
             </p>
             <div className="mt-8">
               <Button asChild size="lg" className="bg-primary-light-purple/20 hover:bg-primary-light-purple/30 backdrop-blur-md border border-primary-light-purple/30 text-white font-semibold text-lg px-8 py-6 rounded-full">
                 <Link href="/login">Empezar a Construir Ahora</Link>
               </Button>
+              <p className="mt-3 text-sm text-white/50">No se requiere tarjeta de crédito para el plan Hobby.</p>
             </div>
           </div>
         </section>
@@ -125,18 +166,43 @@ export default function LandingPage() {
                 pauseOnHover={true}
               >
                 <Card className="p-6 flex flex-col justify-center items-center text-center bg-black/50 border-white/20 backdrop-blur-sm pointer-events-auto">
-                  <h3 className="text-xl font-bold text-primary-light-purple mb-2">Desarrollo con IA</h3>
+                  <h3 className="text-xl font-bold text-primary-light-purple mb-2">1. Describe tu Idea</h3>
                   <p className="text-white/80">Transforma tus ideas en código funcional con un copiloto que escribe y depura por ti.</p>
                 </Card>
                 <Card className="p-6 flex flex-col justify-center items-center text-center bg-black/50 border-white/20 backdrop-blur-sm pointer-events-auto">
-                  <h3 className="text-xl font-bold text-primary-light-purple mb-2">Plataforma Integrada</h3>
+                  <h3 className="text-xl font-bold text-primary-light-purple mb-2">2. La IA Construye por Ti</h3>
                   <p className="text-white/80">Gestiona servidores, bases de datos y despliegues desde una única interfaz.</p>
                 </Card>
                 <Card className="p-6 flex flex-col justify-center items-center text-center bg-black/50 border-white/20 backdrop-blur-sm pointer-events-auto">
-                  <h3 className="text-xl font-bold text-primary-light-purple mb-2">Despliegue Simplificado</h3>
+                  <h3 className="text-xl font-bold text-primary-light-purple mb-2">3. Despliega al Instante</h3>
                   <p className="text-white/80">Publica tus aplicaciones en la web con un solo clic, sin configuraciones complejas.</p>
                 </Card>
               </CardSwap>
+            </div>
+          </div>
+        </section>
+
+        {/* Demo Video Section */}
+        <section className="py-24">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Ver para Creer</h2>
+            <p className="mt-4 max-w-2xl mx-auto text-lg text-white/70">
+              Observa cómo DeepAI Coder transforma un simple prompt en una aplicación funcional en tiempo real.
+            </p>
+            <div className="mt-12 aspect-video max-w-4xl mx-auto bg-black/30 border border-white/20 rounded-xl flex items-center justify-center cursor-pointer group">
+              <div className="bg-white/10 group-hover:bg-white/20 transition-colors rounded-full p-6">
+                <Play className="h-12 w-12 text-white" />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Trusted Technologies Section */}
+        <section className="py-16">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h3 className="text-sm font-semibold text-white/60 tracking-wider uppercase">Construido con Tecnologías de Confianza</h3>
+            <div className="mt-8">
+              <TechnologyLogos />
             </div>
           </div>
         </section>
@@ -157,8 +223,13 @@ export default function LandingPage() {
                   chaos={0.5}
                   thickness={1}
                   style={{ borderRadius: 'var(--radius)' }}
-                  className="bg-[#0A021A] h-full"
+                  className="bg-[#0A021A] h-full relative"
                 >
+                  {plan.badge && (
+                    <div className="absolute -top-3 right-4 bg-primary-light-purple text-white text-xs font-bold px-3 py-1 rounded-full">
+                      {plan.badge}
+                    </div>
+                  )}
                   <div className="text-left flex flex-col h-full p-6">
                     <div className="mb-6">
                       <h3 className="text-xl font-bold">{plan.name}</h3>
@@ -186,6 +257,48 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
+
+        {/* Testimonials Section */}
+        <section className="py-24">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 className="text-3xl font-bold tracking-tight text-center sm:text-4xl">Amado por Desarrolladores y Creadores</h2>
+            <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8">
+              {testimonials.map((testimonial) => (
+                <div key={testimonial.name} className="bg-black/30 border border-white/10 p-6 rounded-lg">
+                  <div className="flex items-center gap-4 mb-4">
+                    <Avatar>
+                      <AvatarImage src={testimonial.avatar} />
+                      <AvatarFallback>{testimonial.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-semibold">{testimonial.name.split(',')[0]}</p>
+                      <p className="text-sm text-white/60">{testimonial.name.split(',')[1]}</p>
+                    </div>
+                  </div>
+                  <p className="text-white/80">"{testimonial.quote}"</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* FAQ Section */}
+        <section className="py-24">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-3xl">
+            <h2 className="text-3xl font-bold tracking-tight text-center sm:text-4xl">Preguntas Frecuentes</h2>
+            <Accordion type="single" collapsible className="w-full mt-12">
+              {faqs.map((faq, index) => (
+                <AccordionItem key={index} value={`item-${index}`}>
+                  <AccordionTrigger className="text-left">{faq.question}</AccordionTrigger>
+                  <AccordionContent className="text-white/70">
+                    {faq.answer}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </div>
+        </section>
+
         <GradualBlur 
           preset="page-footer" 
           style={{ opacity: showFooterBlur ? 1 : 0, transition: 'opacity 0.3s ease-in-out' }} 
