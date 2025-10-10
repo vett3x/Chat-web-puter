@@ -4,10 +4,20 @@ import React from 'react';
 import MagicBento from '@/components/MagicBento';
 import { Button } from '@/components/ui/button';
 import { Wand2 } from 'lucide-react';
+import Aurora from '@/components/Aurora';
 
 export default function LandingPage() {
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen bg-[#060010] text-white p-4 sm:p-8 overflow-hidden">
+    <main className="flex flex-col items-center justify-center min-h-screen bg-[#060010] text-white p-4 sm:p-8 overflow-hidden relative">
+      <div className="absolute inset-0 z-0">
+        <Aurora
+          colorStops={["#3A29FF", "#FF94B4", "#FF3232"]}
+          blend={0.5}
+          amplitude={1.0}
+          speed={0.5}
+        />
+      </div>
+      
       <div className="text-center z-10 mb-12">
         <Wand2 className="h-12 w-12 mx-auto mb-4 text-primary-light-purple" />
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight">
@@ -43,7 +53,7 @@ export default function LandingPage() {
         </p>
       </div>
 
-      <footer className="mt-16 text-center text-white/50 text-sm">
+      <footer className="mt-16 text-center text-white/50 text-sm z-10">
         <p>&copy; {new Date().getFullYear()} DeepAI Coder. Todos los derechos reservados.</p>
       </footer>
     </main>
