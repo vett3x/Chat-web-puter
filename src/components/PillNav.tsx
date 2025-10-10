@@ -250,7 +250,7 @@ const PillNav: React.FC<PillNavProps> = ({
   } as React.CSSProperties;
 
   return (
-    <header className={cn("fixed top-0 left-0 right-0 z-50 bg-black/30 backdrop-blur-lg border-b border-white/10", className)}>
+    <header className={cn("fixed top-4 left-0 right-0 z-50", className)}>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <nav
           className="flex items-center justify-between h-16"
@@ -265,11 +265,10 @@ const PillNav: React.FC<PillNavProps> = ({
             ref={el => {
               logoRef.current = el;
             }}
-            className="rounded-full p-1 inline-flex items-center justify-center overflow-hidden"
+            className="rounded-full p-1 inline-flex items-center justify-center overflow-hidden bg-black/30 backdrop-blur-md border border-white/10"
             style={{
               width: 'var(--nav-h)',
               height: 'var(--nav-h)',
-              background: 'var(--base, #000)'
             }}
           >
             <img src={logo} alt={logoAlt} ref={logoImgRef} className="w-full h-full object-cover block" />
@@ -280,7 +279,6 @@ const PillNav: React.FC<PillNavProps> = ({
             className="relative items-center rounded-full hidden md:flex"
             style={{
               height: 'var(--nav-h)',
-              background: 'var(--base, #000)'
             }}
           >
             <ul
@@ -292,7 +290,6 @@ const PillNav: React.FC<PillNavProps> = ({
                 const isActive = activeHref === item.href;
 
                 const pillStyle: React.CSSProperties = {
-                  background: 'var(--pill-bg, #fff)',
                   color: 'var(--pill-text, var(--base, #000))',
                   paddingLeft: 'var(--pill-pad-x)',
                   paddingRight: 'var(--pill-pad-x)'
@@ -340,7 +337,7 @@ const PillNav: React.FC<PillNavProps> = ({
                 );
 
                 const basePillClasses =
-                  'relative overflow-hidden inline-flex items-center justify-center h-full no-underline rounded-full box-border font-semibold text-[16px] leading-[0] uppercase tracking-[0.2px] whitespace-nowrap cursor-pointer px-0';
+                  'relative overflow-hidden inline-flex items-center justify-center h-full no-underline rounded-full box-border font-semibold text-[16px] leading-[0] uppercase tracking-[0.2px] whitespace-nowrap cursor-pointer px-0 bg-primary-light-purple/20 backdrop-blur-md border border-primary-light-purple/30';
 
                 return (
                   <li key={item.href} role="none" className="flex h-full">
@@ -380,11 +377,10 @@ const PillNav: React.FC<PillNavProps> = ({
             onClick={toggleMobileMenu}
             aria-label="Toggle menu"
             aria-expanded={isMobileMenuOpen}
-            className="md:hidden rounded-full border-0 flex flex-col items-center justify-center gap-1 cursor-pointer p-0 relative"
+            className="md:hidden rounded-full border-0 flex flex-col items-center justify-center gap-1 cursor-pointer p-0 relative bg-black/30 backdrop-blur-md border border-white/10"
             style={{
               width: 'var(--nav-h)',
               height: 'var(--nav-h)',
-              background: 'var(--base, #000)'
             }}
           >
             <span
@@ -409,7 +405,7 @@ const PillNav: React.FC<PillNavProps> = ({
       >
         <ul className="list-none m-0 p-4 flex flex-col gap-2">
           {items.map(item => {
-            const linkClasses = 'block py-3 px-4 text-[16px] font-medium rounded-full transition-all duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)] text-center';
+            const linkClasses = 'block py-3 px-4 text-[16px] font-medium rounded-full transition-all duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)] text-center bg-primary-light-purple/20 backdrop-blur-md border border-primary-light-purple/30';
             return (
               <li key={item.href}>
                 {isRouterLink(item.href) ? (
@@ -417,7 +413,6 @@ const PillNav: React.FC<PillNavProps> = ({
                     href={item.href}
                     className={linkClasses}
                     style={{
-                      background: 'var(--pill-bg, #fff)',
                       color: 'var(--pill-text, #000)'
                     }}
                     onClick={() => setIsMobileMenuOpen(false)}
@@ -429,7 +424,6 @@ const PillNav: React.FC<PillNavProps> = ({
                     href={item.href}
                     className={linkClasses}
                     style={{
-                      background: 'var(--pill-bg, #fff)',
                       color: 'var(--pill-text, #000)'
                     }}
                     onClick={() => setIsMobileMenuOpen(false)}
