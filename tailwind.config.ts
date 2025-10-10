@@ -137,6 +137,14 @@ export default {
           from: { opacity: '1', transform: 'translateY(0)' },
           to: { opacity: '0', transform: 'translateY(-10px)' },
         },
+        'star-movement-bottom': {
+          '0%': { transform: 'translate(0%, 0%)', opacity: '1' },
+          '100%': { transform: 'translate(-100%, 0%)', opacity: '0' },
+        },
+        'star-movement-top': {
+          '0%': { transform: 'translate(0%, 0%)', opacity: '1' },
+          '100%': { transform: 'translate(100%, 0%)', opacity: '0' },
+        },
         'star-orbit-clockwise': {
           '0%': { top: '0', left: '0', transform: 'translate(-50%, -50%)' },
           '25%': { top: '0', left: '100%', transform: 'translate(-50%, -50%)' },
@@ -162,6 +170,8 @@ export default {
         'lightsaber-pulse': 'lightsaber-pulse 2s ease-in-out infinite alternate',
         'fade-in': 'fade-in 0.3s ease-out forwards',
         'fade-out': 'fade-out 0.3s ease-in forwards',
+        'star-movement-bottom': 'star-movement-bottom linear infinite alternate',
+        'star-movement-top': 'star-movement-top linear infinite alternate',
         'star-orbit-clockwise': 'star-orbit-clockwise linear infinite',
         'star-orbit-counter-clockwise': 'star-orbit-counter-clockwise linear infinite',
   		},

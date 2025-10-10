@@ -3,46 +3,57 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 
-interface StarBorderProps {
-  children: React.ReactNode;
+type StarBorderProps<T extends React.ElementType> = React.ComponentPropsWithoutRef<T> & {
+  as?: T;
   className?: string;
+  children?: React.ReactNode;
   color?: string;
   speed?: React.CSSProperties['animationDuration'];
-}
+  thickness?: number;
+  contentClassName?: string; // Nueva prop para el div de contenido interno
+};
 
-export function StarBorder({
-  children,
-  className,
-  color = 'hsl(var(--primary-light-purple))',
+const StarBorder = <T extends React.ElementType = 'button'>({
+  as,
+  className = '',
+  color = 'white',
   speed = '6s',
-}: StarBorderProps) {
+  thickness = 1,
+  children,
+  contentClassName, // Desestructuramos la nueva prop
+  ...rest
+}: StarBorderProps<T>) => {
+  const Component = as || 'button';
+
   return (
-    <div className={cn("relative w-full h-full group", className)}>
-      {/* The static border element that changes color on focus */}
-      <div className="absolute inset-0 rounded-[20px] border border-[var(--chat-bubble-border-color)] group-focus-within:border-primary-light-purple transition-colors duration-300 pointer-events-none" />
-      
-      {/* Star 1 */}
+    <Component
+      className={cn(`relative inline-block overflow-hidden rounded-[20px]`, className)}
+      {...(rest as any)}
+      style={{
+        padding: `${thickness}px 0`,
+        ...(rest as any).style
+      }}
+    >
       <div
-        className="absolute h-3 w-3 rounded-full opacity-0 group-focus-within:opacity-100 transition-opacity duration-300 pointer-events-none animate-star-orbit-clockwise"
+        className="absolute w-[300%] h-[50%] opacity-70 bottom-[-11px] right-[-250%] rounded-full animate-star-movement-bottom z-0"
         style={{
-          background: `radial-gradient(circle, ${color} 10%, transparent 60%)`,
-          animationDuration: speed,
+          background: `radial-gradient(circle, ${color}, transparent 10%)`,
+          animationDuration: speed
         }}
-      />
-      {/* Star 2 */}
+      ></div>
       <div
-        className="absolute h-3 w-3 rounded-full opacity-0 group-focus-within:opacity-100 transition-opacity duration-300 pointer-events-none animate-star-orbit-counter-clockwise"
+        className="absolute w-[300%] h-[50%] opacity-70 top-[-10px] left-[-250%] rounded-full animate-star-movement-top z-0"
         style={{
-          background: `radial-gradient(circle, ${color} 10%, transparent 60%)`,
-          animationDuration: speed,
-          animationDelay: `-${parseFloat(speed) / 2}s`,
+          background: `radial-gradient(circle, ${color}, transparent 10%)`,
+          animationDuration: speed
         }}
-      />
-      
-      {/* The content */}
-      <div className="relative z-10 w-full h-full">
+      ></div>
+      {/* Aplicamos contentClassName aquí, sin estilos por defecto */}
+      <div className={cn("relative z-1", contentClassName)}>
         {children}
       </div>
-    </div>
+    </Component>
   );
-}
+};
+
+export default StarBorder;

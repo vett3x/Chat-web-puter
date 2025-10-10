@@ -23,7 +23,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { StarBorder } from '@/components/ui/star-border';
+import StarBorder from '@/components/ui/star-border'; // Importar el nuevo componente StarBorder
 
 interface PuterTextContentPart { type: 'text'; text: string; }
 interface PuterImageContentPart { type: 'image_url'; image_url: { url: string; }; }
@@ -181,76 +181,76 @@ export function ChatInput({ isLoading, selectedModel, onModelChange, sendMessage
   return (
     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/80 to-transparent pt-8">
       <div className="flex justify-center px-4 pb-4">
-        <StarBorder className="w-full max-w-3xl">
-          <div 
-            className="p-2 flex flex-col gap-2"
-          >
-            <FileAttachmentPreview selectedFiles={selectedFiles} onRemoveFile={removeFile} />
+        <StarBorder
+          as="div"
+          className="w-full max-w-3xl rounded-lg" // Aplicamos rounded-lg al componente StarBorder
+          contentClassName="p-2 flex flex-col gap-2 bg-[var(--chat-bubble-background-color)] backdrop-blur-[var(--chat-bubble-blur)] border border-[var(--chat-bubble-border-color)] rounded-lg" // Aplicamos estilos de glassmorphism y padding al contenido interno
+        >
+          <FileAttachmentPreview selectedFiles={selectedFiles} onRemoveFile={removeFile} />
+          
+          <div className="flex items-center gap-2">
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} multiple className="hidden" />
+            <Button variant="ghost" onClick={() => fileInputRef.current?.click()} disabled={isLoading || selectedFiles.length >= 10} className="flex-shrink-0 text-muted-foreground hover:text-foreground h-8 w-8 p-0" aria-label="Adjuntar archivo">
+              <Paperclip className="h-4 w-4" />
+            </Button>
+            <Textarea value={inputMessage} onChange={(e) => setInputMessage(e.target.value)} onKeyPress={handleKeyPress} onPaste={handlePaste} placeholder="Pregunta a la IA..." disabled={isLoading} className="flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none max-h-[200px] overflow-y-auto bg-transparent px-3 py-1.5 min-h-8" />
             
-            <div className="flex items-center gap-2">
-              <input type="file" ref={fileInputRef} onChange={handleFileChange} multiple className="hidden" />
-              <Button variant="ghost" onClick={() => fileInputRef.current?.click()} disabled={isLoading || selectedFiles.length >= 10} className="flex-shrink-0 text-muted-foreground hover:text-foreground h-8 w-8 p-0" aria-label="Adjuntar archivo">
-                <Paperclip className="h-4 w-4" />
-              </Button>
-              <Textarea value={inputMessage} onChange={(e) => setInputMessage(e.target.value)} onKeyPress={handleKeyPress} onPaste={handlePaste} placeholder="Pregunta a la IA..." disabled={isLoading} className="flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none max-h-[200px] overflow-y-auto bg-transparent px-3 py-1.5 min-h-8" />
-              
-              {isAppChat && (
-                <ToggleGroup
-                  type="single"
-                  value={chatMode}
-                  onValueChange={(value: ChatMode) => {
-                    if (value) onChatModeChange(value);
-                  }}
-                  className="flex-shrink-0"
-                  disabled={isLoading}
-                >
-                  <ToggleGroupItem value="build" aria-label="Modo Build" className="h-8 px-2.5">
-                    <Wrench className="h-4 w-4 mr-1.5" />
-                    <span className="text-xs">Build</span>
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="chat" aria-label="Modo Chat" className="h-8 px-2.5">
-                    <MessageSquare className="h-4 w-4 mr-1.5" />
-                    <span className="text-xs">Chat</span>
-                  </ToggleGroupItem>
-                </ToggleGroup>
-              )}
+            {isAppChat && (
+              <ToggleGroup
+                type="single"
+                value={chatMode}
+                onValueChange={(value: ChatMode) => {
+                  if (value) onChatModeChange(value);
+                }}
+                className="flex-shrink-0"
+                disabled={isLoading}
+              >
+                <ToggleGroupItem value="build" aria-label="Modo Build" className="h-8 px-2.5">
+                  <Wrench className="h-4 w-4 mr-1.5" />
+                  <span className="text-xs">Build</span>
+                </ToggleGroupItem>
+                <ToggleGroupItem value="chat" aria-label="Modo Chat" className="h-8 px-2.5">
+                  <MessageSquare className="h-4 w-4 mr-1.5" />
+                  <span className="text-xs">Chat</span>
+                </ToggleGroupItem>
+              </ToggleGroup>
+            )}
 
-              <ModelSelectorDropdown
-                selectedModel={selectedModel}
-                onModelChange={onModelChange}
-                isLoading={isLoading}
-                userApiKeys={userApiKeys}
-                aiKeyGroups={aiKeyGroups}
-                isAppChat={isAppChat}
-                SelectedModelIcon={SelectedModelIcon}
-              />
+            <ModelSelectorDropdown
+              selectedModel={selectedModel}
+              onModelChange={onModelChange}
+              isLoading={isLoading}
+              userApiKeys={userApiKeys}
+              aiKeyGroups={aiKeyGroups}
+              isAppChat={isAppChat}
+              SelectedModelIcon={SelectedModelIcon}
+            />
 
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive" disabled={isLoading} title="Limpiar chat">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>¿Estás seguro de limpiar este chat?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Esta acción eliminará permanentemente todos los mensajes de esta conversación.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={onClearChat} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                      Limpiar Chat
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive" disabled={isLoading} title="Limpiar chat">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Estás seguro de limpiar este chat?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta acción eliminará permanentemente todos los mensajes de esta conversación.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={onClearChat} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Limpiar Chat
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
-              <Button onClick={handleSendMessage} disabled={isLoading || (!inputMessage.trim() && selectedFiles.length === 0)} className="flex-shrink-0 h-8 w-8 p-0">
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              </Button>
-            </div>
+            <Button onClick={handleSendMessage} disabled={isLoading || (!inputMessage.trim() && selectedFiles.length === 0)} className="flex-shrink-0 h-8 w-8 p-0">
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </Button>
           </div>
         </StarBorder>
       </div>
