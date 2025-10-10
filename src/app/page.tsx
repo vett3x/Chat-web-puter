@@ -8,7 +8,7 @@ import { LandingFooter } from '@/components/landing-footer';
 import Link from 'next/link';
 import ElectricBorder from '@/components/ElectricBorder';
 import GradualBlur from '@/components/GradualBlur';
-import PillNav from '@/components/PillNav';
+import { LandingHeader } from '@/components/landing/LandingHeader';
 import CardSwap, { Card } from '@/components/CardSwap';
 import { TechnologyLogos } from '@/components/landing/TechnologyLogos';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -31,18 +31,6 @@ export default function LandingPage() {
       ease: 'power2.in',
       onComplete: () => {
         router.push('/start');
-      }
-    });
-  };
-
-  const handleLoginCtaClick = () => {
-    gsap.to(mainContentRef.current, {
-      opacity: 0,
-      y: -20,
-      duration: 0.5,
-      ease: 'power2.in',
-      onComplete: () => {
-        router.push('/login');
       }
     });
   };
@@ -154,19 +142,7 @@ export default function LandingPage() {
 
   return (
     <div className="bg-background text-white">
-      <PillNav
-        items={[
-          { label: 'Precios', href: '#pricing' },
-          { label: 'Contacto', href: '#contact' },
-          { label: 'Iniciar Sesión', href: '/login' }
-        ]}
-        activeHref="/"
-        baseColor="#0A021A"
-        pillColor="hsl(var(--primary-light-purple))"
-        hoveredPillTextColor="#FFFFFF"
-        pillTextColor="#FFFFFF"
-        onCtaClick={handleLoginCtaClick}
-      />
+      <LandingHeader />
       <main className="overflow-hidden" ref={mainContentRef}>
         {/* Hero Section */}
         <section className="relative flex flex-col items-center justify-center min-h-screen pt-16">
