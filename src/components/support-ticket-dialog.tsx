@@ -68,7 +68,7 @@ export function SupportTicketDialog({ open, onOpenChange }: SupportTicketDialogP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg bg-[var(--sidebar-background)] backdrop-blur-[var(--chat-bubble-blur)] border-[var(--sidebar-border)]">
         <DialogHeader>
           <DialogTitle>Abrir un Ticket de Soporte</DialogTitle>
           <DialogDescription>
@@ -107,7 +107,7 @@ export function SupportTicketDialog({ open, onOpenChange }: SupportTicketDialogP
             )} />
             <DialogFooter>
               <DialogClose asChild><Button type="button" variant="outline" disabled={isSubmitting}>Cancelar</Button></DialogClose>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting} className="bg-primary-light-purple hover:bg-primary-light-purple/90 text-white">
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
                 Enviar Ticket
               </Button>
