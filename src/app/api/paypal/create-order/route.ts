@@ -27,38 +27,40 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         intent: 'CAPTURE',
         purchase_units: [{
-          // Provide a detailed breakdown of the items being purchased.
-          // This is crucial for PayPal's validation during the capture step.
+          description: `Suscripción al plan ${planName} en DeepAI Coder`,
           items: [
             {
-              name: planName, // The name of the subscription plan
+              name: planName,
               quantity: '1',
               unit_amount: {
                 currency_code: 'USD',
-                value: formattedAmount, // The price of this single item
+                value: formattedAmount,
               },
             },
           ],
-          // The total amount object, which must match the sum of the items.
           amount: {
             currency_code: 'USD',
-            value: formattedAmount, // The final total
-            // The breakdown explicitly states how the total is calculated.
+            value: formattedAmount,
             breakdown: {
               item_total: {
                 currency_code: 'USD',
-                value: formattedAmount, // Sum of all items (in our case, just one)
+                value: formattedAmount,
               },
             },
           },
         }],
+        application_context: {
+          brand_name: 'DeepAI Coder',
+          user_action: 'PAY_NOW',
+          return_url: `${req.nextUrl.origin}/payment-success`,
+          cancel_url: `${req.nextUrl.origin}/payment-cancel`,
+        }
       }),
     });
 
     const data = await response.json();
     if (!response.ok) {
       console.error('[API PayPal Create Order] PayPal Error Response:', data);
-      // Provide more detailed error from PayPal if available
       const errorMessage = data.details?.[0]?.description || data.message || 'Error al crear la orden en PayPal.';
       throw new Error(errorMessage);
     }
