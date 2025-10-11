@@ -27,7 +27,7 @@ const HostedFields = ({ plan, onPaymentSuccess }: { plan: any, onPaymentSuccess?
     setIsProcessing(true);
     try {
       const state = await cardFields.getState();
-      const isFormValid = Object.values(state.fields).every(field => field.isValid);
+      const isFormValid = Object.values(state.fields).every((field: any) => field.isValid);
       if (!isFormValid) {
         toast.error('Por favor, revisa los datos de tu tarjeta.');
         setIsProcessing(false);
@@ -59,31 +59,31 @@ const HostedFields = ({ plan, onPaymentSuccess }: { plan: any, onPaymentSuccess?
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-1">
         <Label htmlFor="card-number">Número de tarjeta</Label>
+        <div id="card-number" className="p-3 border rounded-md bg-background h-[40px]" />
         <PayPalHostedField
-          id="card-number"
+          id="card-number-field"
           hostedFieldType="number"
           options={{ selector: '#card-number' }}
-          className="p-3 border rounded-md bg-background h-[40px]"
         />
       </div>
       
       <div className="flex gap-4">
         <div className="w-1/2 space-y-1">
           <Label htmlFor="expiration-date">Vencimiento</Label>
+          <div id="expiration-date" className="p-3 border rounded-md bg-background h-[40px]" />
           <PayPalHostedField
-            id="expiration-date"
+            id="expiration-date-field"
             hostedFieldType="expirationDate"
             options={{ selector: '#expiration-date' }}
-            className="p-3 border rounded-md bg-background h-[40px]"
           />
         </div>
         <div className="w-1/2 space-y-1">
           <Label htmlFor="cvv">CSC</Label>
+          <div id="cvv" className="p-3 border rounded-md bg-background h-[40px]" />
           <PayPalHostedField
-            id="cvv"
+            id="cvv-field"
             hostedFieldType="cvv"
             options={{ selector: '#cvv' }}
-            className="p-3 border rounded-md bg-background h-[40px]"
           />
         </div>
       </div>

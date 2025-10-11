@@ -32,6 +32,9 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.0.1
         version: 5.0.1(react-hook-form@7.56.4(react@19.1.0))
+      '@paypal/paypal-js':
+        specifier: ^9.0.1
+        version: 9.0.1
       '@paypal/react-paypal-js':
         specifier: ^8.9.2
         version: 8.9.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
