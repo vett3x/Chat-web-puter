@@ -63,7 +63,7 @@ const HostedFields = ({ plan, onPaymentSuccess }: { plan: any, onPaymentSuccess?
         <PayPalHostedField
           id="card-number-field"
           hostedFieldType="number"
-          options={{ selector: '#card-number' }}
+          options={{ selector: '#card-number', placeholder: '1111 1111 1111 1111' }}
         />
       </div>
       
@@ -74,7 +74,7 @@ const HostedFields = ({ plan, onPaymentSuccess }: { plan: any, onPaymentSuccess?
           <PayPalHostedField
             id="expiration-date-field"
             hostedFieldType="expirationDate"
-            options={{ selector: '#expiration-date' }}
+            options={{ selector: '#expiration-date', placeholder: 'MM/YY' }}
           />
         </div>
         <div className="w-1/2 space-y-1">
@@ -83,7 +83,7 @@ const HostedFields = ({ plan, onPaymentSuccess }: { plan: any, onPaymentSuccess?
           <PayPalHostedField
             id="cvv-field"
             hostedFieldType="cvv"
-            options={{ selector: '#cvv' }}
+            options={{ selector: '#cvv', placeholder: '123', maskInput: true }}
           />
         </div>
       </div>
@@ -149,8 +149,11 @@ export function PayPalPaymentForm({ plan, onPaymentSuccess }: { plan: any, onPay
       styles={{
         '.valid': { color: 'hsl(var(--foreground))' },
         '.invalid': { color: 'hsl(var(--destructive))' },
+        'input': {
+          'font-family': 'var(--font-geist-mono)',
+          'font-size': '16px',
+        }
       }}
-      dataClientToken={clientToken}
     >
       <HostedFields plan={plan} onPaymentSuccess={onPaymentSuccess} />
     </PayPalHostedFieldsProvider>
