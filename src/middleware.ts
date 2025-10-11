@@ -49,6 +49,7 @@ export async function middleware(req: NextRequest) {
   const isSuperAdmin = userRole === 'super_admin';
 
   const publicPaths = ['/', '/start', '/login', '/register', '/maintenance', '/check-email'];
+  const authRoutes = ['/login', '/register', '/start', '/check-email']; // Routes only for unauthenticated users
   const isPublicPath = publicPaths.some(path => req.nextUrl.pathname === path);
 
   if (maintenanceModeEnabled && !isSuperAdmin && !isPublicPath) {
@@ -100,18 +101,18 @@ export async function middleware(req: NextRequest) {
     }
   }
 
+  // If authenticated and trying to access an auth-only path (like /login), redirect to /app
+  if (session && authRoutes.includes(req.nextUrl.pathname)) {
+    const redirectUrl = req.nextUrl.clone();
+    redirectUrl.pathname = '/app';
+    return NextResponse.redirect(redirectUrl);
+  }
+
   // If not authenticated and trying to access /app, redirect to /login
   if (!session && req.nextUrl.pathname.startsWith('/app')) {
     const redirectUrl = req.nextUrl.clone();
     redirectUrl.pathname = '/login';
     redirectUrl.searchParams.set(`redirectedFrom`, req.nextUrl.pathname);
-    return NextResponse.redirect(redirectUrl);
-  }
-
-  // If authenticated and trying to access a public path (like /, /login, /start), redirect to /app
-  if (session && isPublicPath) {
-    const redirectUrl = req.nextUrl.clone();
-    redirectUrl.pathname = '/app';
     return NextResponse.redirect(redirectUrl);
   }
 

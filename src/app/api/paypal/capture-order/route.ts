@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     {
       cookies: {
         get(name: string) {
-          return cookies().get(name)?.value;
+          return req.cookies.get(name)?.value;
         },
         set(name: string, value: string, options: CookieOptions) {
           // In a Route Handler, you would use `cookies().set(...)` on the response
