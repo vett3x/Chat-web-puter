@@ -35,8 +35,8 @@ export const LandingFooter = React.forwardRef<HTMLElement>((props, ref) => {
           <div>
             <h3 className="text-sm font-semibold text-white/80 tracking-wider uppercase">Legal</h3>
             <ul className="mt-4 space-y-2">
-              <li><Link href="#" className="text-sm text-white/60 hover:text-white">Privacidad</Link></li>
-              <li><Link href="#" className="text-sm text-white/60 hover:text-white">Términos</Link></li>
+              <li><Link href="/privacy" className="text-sm text-white/60 hover:text-white">Privacidad</Link></li>
+              <li><Link href="/terms" className="text-sm text-white/60 hover:text-white">Términos</Link></li>
             </ul>
           </div>
         </div>

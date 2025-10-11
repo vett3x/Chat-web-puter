@@ -15,13 +15,17 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
 import { GoogleLogo } from '@/components/google-logo';
-import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const registerSchema = z.object({
   first_name: z.string().optional(),
   last_name: z.string().optional(),
   email: z.string().email({ message: 'Por favor, introduce un email válido.' }),
   password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
+  terms: z.boolean().refine(val => val === true, {
+    message: 'Debes aceptar los términos y la política de privacidad.',
+  }),
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
@@ -41,6 +45,7 @@ export default function RegisterPage() {
       last_name: '',
       email: '',
       password: '',
+      terms: false,
     },
   });
 
@@ -169,6 +174,35 @@ export default function RegisterPage() {
                       <Input id="password" type="password" placeholder="••••••••" {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="terms"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={isLoading}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>
+                        Acepto los{' '}
+                        <Link href="/terms" target="_blank" className="underline hover:text-primary-light-purple">
+                          Términos de Servicio
+                        </Link>{' '}
+                        y la{' '}
+                        <Link href="/privacy" target="_blank" className="underline hover:text-primary-light-purple">
+                          Política de Privacidad
+                        </Link>
+                        .
+                      </FormLabel>
+                      <FormMessage />
+                    </div>
                   </FormItem>
                 )}
               />
