@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { gsap } from 'gsap';
+import { useSession } from '@/components/session-context-provider';
 
 interface PillNavProps {
   onCtaClick: () => void;
@@ -13,6 +14,7 @@ interface PillNavProps {
 
 export default function PillNav({ onCtaClick }: PillNavProps) {
   const router = useRouter();
+  const { session } = useSession();
 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     e.preventDefault();
@@ -34,12 +36,20 @@ export default function PillNav({ onCtaClick }: PillNavProps) {
         <span className="font-bold text-lg">DeepAI Coder</span>
       </Link>
       <div className="flex items-center gap-2">
-        <Button variant="ghost" asChild className="text-white hover:bg-white/10">
-          <Link href="/login" onClick={(e) => handleNavClick(e, '/login')}>Iniciar Sesión</Link>
-        </Button>
-        <Button asChild className="bg-primary-light-purple hover:bg-primary-light-purple/90 text-white rounded-full">
-          <Link href="/register" onClick={(e) => handleNavClick(e, '/register')}>Registrarse</Link>
-        </Button>
+        {session ? (
+          <Button asChild className="bg-primary-light-purple hover:bg-primary-light-purple/90 text-white rounded-full">
+            <Link href="/app" onClick={(e) => handleNavClick(e, '/app')}>Ir a la App</Link>
+          </Button>
+        ) : (
+          <>
+            <Button variant="ghost" asChild className="text-white hover:bg-white/10">
+              <Link href="/login" onClick={(e) => handleNavClick(e, '/login')}>Iniciar Sesión</Link>
+            </Button>
+            <Button asChild className="bg-primary-light-purple hover:bg-primary-light-purple/90 text-white rounded-full">
+              <Link href="/register" onClick={(e) => handleNavClick(e, '/register')}>Registrarse</Link>
+            </Button>
+          </>
+        )}
       </div>
     </nav>
   );
