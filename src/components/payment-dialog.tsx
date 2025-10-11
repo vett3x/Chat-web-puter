@@ -12,9 +12,10 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { PayPalButtonsWrapper } from './paypal-buttons-wrapper';
-import { Check, CreditCard } from 'lucide-react';
+import { Check, CreditCard, AlertCircle } from 'lucide-react';
 import { PayPalPaymentForm } from './paypal-payment-form';
 import { cn } from '@/lib/utils';
+import { usePayPalConfig } from './paypal-provider';
 
 interface PricingPlan {
   id: string;
@@ -32,6 +33,7 @@ interface PaymentDialogProps {
 
 export function PaymentDialog({ open, onOpenChange, plan }: PaymentDialogProps) {
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'paypal'>('card');
+  const { isPayPalConfigured } = usePayPalConfig();
 
   if (!plan) return null;
 
@@ -63,37 +65,46 @@ export function PaymentDialog({ open, onOpenChange, plan }: PaymentDialogProps) 
           </ul>
         </div>
 
-        <div className="flex border-b mb-4">
-          <button
-            onClick={() => setPaymentMethod('card')}
-            className={cn(
-              "flex-1 py-2 text-sm font-medium flex items-center justify-center gap-2",
-              paymentMethod === 'card' ? 'border-b-2 border-primary-light-purple text-primary-light-purple' : 'text-muted-foreground'
-            )}
-          >
-            <CreditCard className="h-4 w-4" />
-            Tarjeta
-          </button>
-          <button
-            onClick={() => setPaymentMethod('paypal')}
-            className={cn(
-              "flex-1 py-2 text-sm font-medium",
-              paymentMethod === 'paypal' ? 'border-b-2 border-primary-light-purple text-primary-light-purple' : 'text-muted-foreground'
-            )}
-          >
-            PayPal
-          </button>
-        </div>
-
-        {paymentMethod === 'card' && (
-          <PayPalPaymentForm plan={plan} onPaymentSuccess={handlePaymentSuccess} />
-        )}
-
-        {paymentMethod === 'paypal' && (
-          <div className="px-4">
-            <p className="text-center text-sm text-muted-foreground mb-4">Serás redirigido a PayPal para completar tu compra de forma segura.</p>
-            <PayPalButtonsWrapper plan={plan} onPaymentSuccess={handlePaymentSuccess} fundingSource="paypal" />
+        {!isPayPalConfigured ? (
+          <div className="text-destructive text-sm text-center p-4 bg-destructive/10 rounded-md flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" />
+            <span>Los pagos no están configurados. Por favor, contacta al administrador.</span>
           </div>
+        ) : (
+          <>
+            <div className="flex border-b mb-4">
+              <button
+                onClick={() => setPaymentMethod('card')}
+                className={cn(
+                  "flex-1 py-2 text-sm font-medium flex items-center justify-center gap-2",
+                  paymentMethod === 'card' ? 'border-b-2 border-primary-light-purple text-primary-light-purple' : 'text-muted-foreground'
+                )}
+              >
+                <CreditCard className="h-4 w-4" />
+                Tarjeta
+              </button>
+              <button
+                onClick={() => setPaymentMethod('paypal')}
+                className={cn(
+                  "flex-1 py-2 text-sm font-medium",
+                  paymentMethod === 'paypal' ? 'border-b-2 border-primary-light-purple text-primary-light-purple' : 'text-muted-foreground'
+                )}
+              >
+                PayPal
+              </button>
+            </div>
+
+            {paymentMethod === 'card' && (
+              <PayPalPaymentForm plan={plan} onPaymentSuccess={handlePaymentSuccess} />
+            )}
+
+            {paymentMethod === 'paypal' && (
+              <div className="px-4">
+                <p className="text-center text-sm text-muted-foreground mb-4">Serás redirigido a PayPal para completar tu compra de forma segura.</p>
+                <PayPalButtonsWrapper plan={plan} onPaymentSuccess={handlePaymentSuccess} fundingSource="paypal" />
+              </div>
+            )}
+          </>
         )}
 
         <DialogFooter className="sm:justify-start mt-4">

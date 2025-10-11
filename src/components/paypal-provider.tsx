@@ -1,25 +1,34 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, createContext, useContext } from 'react';
 import { PayPalScriptProvider } from '@paypal/react-paypal-js';
 import { Loader2 } from 'lucide-react';
+
+interface PayPalConfigContextType {
+  isPayPalConfigured: boolean;
+}
+
+const PayPalConfigContext = createContext<PayPalConfigContextType>({ isPayPalConfigured: false });
+
+export const usePayPalConfig = () => useContext(PayPalConfigContext);
 
 export function PayPalProvider({ children }: { children: React.ReactNode }) {
   const [initialOptions, setInitialOptions] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPayPalConfigured, setIsPayPalConfigured] = useState(false);
 
   useEffect(() => {
     const fetchPayPalConfig = async () => {
       try {
-        // Fetch both client ID and client token in parallel
         const [clientIdRes, clientTokenRes] = await Promise.all([
           fetch('/api/paypal/client-id'),
           fetch('/api/paypal/client-token')
         ]);
 
         if (!clientIdRes.ok) {
-          // If client ID fails, we can't do anything with PayPal
-          throw new Error('No se pudo cargar la configuración de PayPal (Client ID).');
+          console.warn('No se pudo cargar el Client ID de PayPal. Los pagos de PayPal estarán deshabilitados.');
+          setIsPayPalConfigured(false);
+          return;
         }
         const clientIdData = await clientIdRes.json();
         const clientId = clientIdData.clientId;
@@ -38,14 +47,15 @@ export function PayPalProvider({ children }: { children: React.ReactNode }) {
             currency: 'USD',
             intent: 'capture',
           };
-          // Only add the data-client-token if it exists
           if (clientToken) {
             options['data-client-token'] = clientToken;
           }
           setInitialOptions(options);
+          setIsPayPalConfigured(true);
         }
       } catch (error) {
         console.error("Error al obtener la configuración de PayPal:", error);
+        setIsPayPalConfigured(false);
       } finally {
         setIsLoading(false);
       }
@@ -61,14 +71,19 @@ export function PayPalProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!initialOptions) {
-    // Render children without PayPal if no config is found
-    return <>{children}</>;
+  if (!isPayPalConfigured || !initialOptions) {
+    return (
+      <PayPalConfigContext.Provider value={{ isPayPalConfigured: false }}>
+        {children}
+      </PayPalConfigContext.Provider>
+    );
   }
 
   return (
-    <PayPalScriptProvider options={initialOptions}>
-      {children}
-    </PayPalScriptProvider>
+    <PayPalConfigContext.Provider value={{ isPayPalConfigured: true }}>
+      <PayPalScriptProvider options={initialOptions}>
+        {children}
+      </PayPalScriptProvider>
+    </PayPalConfigContext.Provider>
   );
 }
