@@ -68,7 +68,7 @@ export function PaymentDialog({ open, onOpenChange, plan }: PaymentDialogProps) 
         {!isPayPalConfigured ? (
           <div className="text-destructive text-sm text-center p-4 bg-destructive/10 rounded-md flex items-center gap-2">
             <AlertCircle className="h-4 w-4" />
-            <span>Los pagos no están configurados. Por favor, contacta al administrador.</span>
+            <span>Los pagos no están configurados correctamente. Verifica la configuración de PayPal en el panel de administración.</span>
           </div>
         ) : (
           <>

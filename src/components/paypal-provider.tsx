@@ -26,35 +26,32 @@ export function PayPalProvider({ children }: { children: React.ReactNode }) {
         ]);
 
         if (!clientIdRes.ok) {
-          console.warn('No se pudo cargar el Client ID de PayPal. Los pagos de PayPal estarán deshabilitados.');
-          setIsPayPalConfigured(false);
-          return;
+          throw new Error('No se pudo cargar la configuración de PayPal (Client ID).');
         }
         const clientIdData = await clientIdRes.json();
         const clientId = clientIdData.clientId;
 
-        let clientToken = null;
-        if (clientTokenRes.ok) {
-          const clientTokenData = await clientTokenRes.json();
-          clientToken = clientTokenData.clientToken;
-        } else {
-          console.warn("No se pudo obtener el client token de PayPal. Los pagos con tarjeta pueden no funcionar.");
+        if (!clientTokenRes.ok) {
+          const errorData = await clientTokenRes.json();
+          throw new Error(errorData.message || 'No se pudo generar el token de autorización de PayPal para pagos con tarjeta.');
         }
+        const clientTokenData = await clientTokenRes.json();
+        const clientToken = clientTokenData.clientToken;
 
-        if (clientId) {
+        if (clientId && clientToken) {
           const options: any = {
             clientId: clientId,
             currency: 'USD',
             intent: 'capture',
+            'data-client-token': clientToken,
           };
-          if (clientToken) {
-            options['data-client-token'] = clientToken;
-          }
           setInitialOptions(options);
           setIsPayPalConfigured(true);
+        } else {
+          throw new Error('Faltan el Client ID o el Client Token de PayPal.');
         }
-      } catch (error) {
-        console.error("Error al obtener la configuración de PayPal:", error);
+      } catch (error: any) {
+        console.error("Error al obtener la configuración de PayPal:", error.message);
         setIsPayPalConfigured(false);
       } finally {
         setIsLoading(false);

@@ -48,7 +48,11 @@ export async function getPayPalAccessToken(): Promise<{ accessToken: string; mod
 
   const data = await response.json();
   if (!response.ok) {
-    throw new Error(data.error_description || 'Error al obtener el token de acceso de PayPal.');
+    let errorMessage = data.error_description || 'Error al obtener el token de acceso de PayPal.';
+    if (data.error === 'invalid_client') {
+      errorMessage = 'Credenciales de PayPal inválidas. Asegúrate de que el Client ID y el Client Secret son correctos y que el modo (Sandbox/Live) coincide con las credenciales.';
+    }
+    throw new Error(errorMessage);
   }
 
   return { accessToken: data.access_token, mode };
