@@ -6,7 +6,7 @@ import { Wand2 } from 'lucide-react';
 
 export const LandingFooter = React.forwardRef<HTMLElement>((props, ref) => {
   return (
-    <footer ref={ref} id="contact" className="w-full border-t border-white/10 mt-24 z-10">
+    <footer ref={ref} className="w-full border-t border-white/10 mt-24 z-10">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="md:col-span-1">
