@@ -12,7 +12,7 @@ interface PayPalCredentials {
 
 async function getPayPalCredentials(): Promise<PayPalCredentials> {
   if (!ENCRYPTION_KEY) {
-    throw new Error('La clave de encriptación no está configurada en el servidor.');
+    throw new Error('La clave de encriptación (ENCRYPTION_KEY) no está configurada en el servidor.');
   }
 
   const { data: config, error } = await supabaseAdmin
@@ -29,7 +29,7 @@ async function getPayPalCredentials(): Promise<PayPalCredentials> {
   const clientSecret = CryptoJS.AES.decrypt(config.client_secret, ENCRYPTION_KEY).toString(CryptoJS.enc.Utf8);
 
   if (!clientId || !clientSecret) {
-    throw new Error('No se pudieron desencriptar las credenciales de PayPal.');
+    throw new Error('No se pudieron desencriptar las credenciales de PayPal. Verifica que la ENCRYPTION_KEY sea correcta y que las credenciales se guardaron correctamente.');
   }
 
   return { clientId, clientSecret, mode: config.mode as 'sandbox' | 'live' };

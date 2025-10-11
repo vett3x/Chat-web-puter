@@ -42,7 +42,9 @@ export async function POST(req: NextRequest) {
     const clientId = CryptoJS.AES.decrypt(config.client_id, ENCRYPTION_KEY).toString(CryptoJS.enc.Utf8);
     const clientSecret = CryptoJS.AES.decrypt(config.client_secret, ENCRYPTION_KEY).toString(CryptoJS.enc.Utf8);
 
-    if (!clientId || !clientSecret) throw new Error('No se pudieron desencriptar las credenciales.');
+    if (!clientId || !clientSecret) {
+      throw new Error('No se pudieron desencriptar las credenciales. Verifica tu ENCRYPTION_KEY.');
+    }
 
     const PAYPAL_API_URL = config.mode === 'sandbox' ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
     const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
