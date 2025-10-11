@@ -45,6 +45,7 @@ export function PayPalProvider({ children }: { children: React.ReactNode }) {
             intent: 'capture',
             'data-client-token': clientToken,
             components: 'buttons,hosted-fields',
+            'data-sdk-integration-source': 'react-paypal-js',
           };
           setInitialOptions(options);
           setIsPayPalConfigured(true);
