@@ -28,25 +28,9 @@ export async function POST(req: NextRequest) {
         intent: 'CAPTURE',
         purchase_units: [{
           description: `Suscripción al plan ${planName} en DeepAI Coder`,
-          items: [
-            {
-              name: planName,
-              quantity: '1',
-              unit_amount: {
-                currency_code: 'USD',
-                value: formattedAmount,
-              },
-            },
-          ],
           amount: {
             currency_code: 'USD',
             value: formattedAmount,
-            breakdown: {
-              item_total: {
-                currency_code: 'USD',
-                value: formattedAmount,
-              },
-            },
           },
         }],
         application_context: {
