@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
-import { Moon, Sun, Settings, LogOut, User as UserIcon, Bot, Ban, LogOut as LogOutIcon, Crown, Shield, LifeBuoy } from 'lucide-react';
+import { Moon, Sun, Settings, LogOut, User as UserIcon, Bot, Ban, LogOut as LogOutIcon, Crown, Shield, CreditCard } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useSession } from '@/components/session-context-provider';
 import { supabase } from '@/integrations/supabase/client';
@@ -166,6 +166,10 @@ export function ProfileDropdown({ onOpenProfileSettings, onOpenAccountSettings }
           {hasNewUserSupportTickets && ( // NEW: Alert indicator for user support tickets
             <span className="flex h-2 w-2 rounded-full bg-red-500" />
           )}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push('/#pricing')} className="cursor-pointer">
+          <CreditCard className="mr-2 h-4 w-4" />
+          <span>Ver Planes / Upgrade</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-border" />
         <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive" onClick={handleSignOut}>
