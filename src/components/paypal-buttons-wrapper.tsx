@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react';
 
 interface PayPalButtonsWrapperProps {
   plan: {
+    id: string;
     price: string;
     name: string;
   };
@@ -42,7 +43,10 @@ export function PayPalButtonsWrapper({ plan, onPaymentSuccess, fundingSource }: 
       const response = await fetch('/api/paypal/capture-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderID: data.orderID }),
+        body: JSON.stringify({ 
+          orderID: data.orderID,
+          planId: plan.id, // Pass the plan ID
+        }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message);

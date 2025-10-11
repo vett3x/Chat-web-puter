@@ -18,7 +18,9 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import Autoplay from "embla-carousel-autoplay";
 import { gsap } from 'gsap';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PaymentDialog } from '@/components/payment-dialog'; // Importar el nuevo componente
+import { PaymentDialog } from '@/components/payment-dialog';
+import { useSession } from '@/components/session-context-provider';
+import { toast } from 'sonner';
 
 interface PricingPlan {
   id: string;
@@ -35,6 +37,7 @@ interface PricingPlan {
 
 export default function LandingPage() {
   const router = useRouter();
+  const { session } = useSession();
   const mainContentRef = useRef(null);
   const [pricingPlans, setPricingPlans] = useState<PricingPlan[]>([]);
   const [isLoadingPlans, setIsLoadingPlans] = useState(true);
@@ -86,8 +89,13 @@ export default function LandingPage() {
     if (plan.price === 'Gratis') {
       router.push(plan.cta_href);
     } else {
-      setSelectedPlan(plan);
-      setIsPaymentDialogOpen(true);
+      if (session) {
+        setSelectedPlan(plan);
+        setIsPaymentDialogOpen(true);
+      } else {
+        toast.info('Por favor, crea una cuenta para continuar con la compra.');
+        router.push('/register');
+      }
     }
   };
 
