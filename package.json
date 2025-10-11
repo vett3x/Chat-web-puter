@@ -100,7 +100,7 @@
   },
   "devDependencies": {
     "@dyad-sh/nextjs-webpack-component-tagger": "latest",
-    "@types/cors": "latest",
+    "@types/cors": "^8.9.2",
     "@types/express": "^5.0.3",
     "@types/node": "^20",
     "@types/react": "^19",
