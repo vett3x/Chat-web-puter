@@ -2,7 +2,6 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import CryptoJS from 'crypto-js';
 import { executeSshCommand } from './ssh-utils';
 import fs from 'fs/promises';
 import path from 'path';
@@ -14,11 +13,8 @@ import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 
 export async function getActiveS3Client() {
-  if (!ENCRYPTION_KEY) throw new Error('La clave de encriptación no está configurada.');
-
   const { data: config, error } = await supabaseAdmin
     .from('s3_storage_configs')
     .select('*')
@@ -27,10 +23,10 @@ export async function getActiveS3Client() {
 
   if (error || !config) throw new Error('No hay una configuración de almacenamiento S3 activa o verificada.');
 
-  const accessKeyId = CryptoJS.AES.decrypt(config.access_key_id, ENCRYPTION_KEY).toString(CryptoJS.enc.Utf8);
-  const secretAccessKey = CryptoJS.AES.decrypt(config.secret_access_key, ENCRYPTION_KEY).toString(CryptoJS.enc.Utf8);
+  const accessKeyId = config.access_key_id;
+  const secretAccessKey = config.secret_access_key;
 
-  if (!accessKeyId || !secretAccessKey) throw new Error('No se pudieron desencriptar las credenciales S3.');
+  if (!accessKeyId || !secretAccessKey) throw new Error('Las credenciales S3 no están completas.');
 
   const s3Client = new S3Client({
     endpoint: config.endpoint,

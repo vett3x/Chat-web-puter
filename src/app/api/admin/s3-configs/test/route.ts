@@ -5,7 +5,6 @@ import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3';
-import CryptoJS from 'crypto-js';
 
 async function getIsSuperAdmin(): Promise<boolean> {
   const cookieStore = cookies() as any;
@@ -21,12 +20,10 @@ async function getIsSuperAdmin(): Promise<boolean> {
 }
 
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 
 export async function POST(req: NextRequest) {
   const isSuperAdmin = await getIsSuperAdmin();
   if (!isSuperAdmin) return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
-  if (!ENCRYPTION_KEY) return NextResponse.json({ message: 'La clave de encriptación no está configurada.' }, { status: 500 });
 
   const { id } = await req.json();
   if (!id) return NextResponse.json({ message: 'ID de configuración no proporcionado.' }, { status: 400 });
@@ -40,10 +37,10 @@ export async function POST(req: NextRequest) {
 
     if (fetchError || !config) throw new Error('Configuración no encontrada.');
 
-    const accessKeyId = CryptoJS.AES.decrypt(config.access_key_id, ENCRYPTION_KEY).toString(CryptoJS.enc.Utf8);
-    const secretAccessKey = CryptoJS.AES.decrypt(config.secret_access_key, ENCRYPTION_KEY).toString(CryptoJS.enc.Utf8);
+    const accessKeyId = config.access_key_id;
+    const secretAccessKey = config.secret_access_key;
 
-    if (!accessKeyId || !secretAccessKey) throw new Error('No se pudieron desencriptar las credenciales. Verifica tu ENCRYPTION_KEY.');
+    if (!accessKeyId || !secretAccessKey) throw new Error('Las credenciales de S3 no están completas.');
 
     const s3Client = new S3Client({
       endpoint: config.endpoint,

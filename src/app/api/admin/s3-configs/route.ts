@@ -5,7 +5,6 @@ import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
-import CryptoJS from 'crypto-js';
 
 const configSchema = z.object({
   id: z.string().uuid().optional(),
@@ -32,7 +31,6 @@ async function getIsSuperAdmin(): Promise<boolean> {
 }
 
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 
 export async function GET(req: NextRequest) {
   const isSuperAdmin = await getIsSuperAdmin();
@@ -54,7 +52,6 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const isSuperAdmin = await getIsSuperAdmin();
   if (!isSuperAdmin) return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
-  if (!ENCRYPTION_KEY) return NextResponse.json({ message: 'La clave de encriptación no está configurada en el servidor.' }, { status: 500 });
 
   try {
     const body = await req.json();
@@ -72,8 +69,8 @@ export async function POST(req: NextRequest) {
       .from('s3_storage_configs')
       .insert({
         ...config,
-        access_key_id: CryptoJS.AES.encrypt(config.access_key_id!, ENCRYPTION_KEY).toString(),
-        secret_access_key: CryptoJS.AES.encrypt(config.secret_access_key, ENCRYPTION_KEY).toString(),
+        access_key_id: config.access_key_id,
+        secret_access_key: config.secret_access_key,
       })
       .select()
       .single();
@@ -89,7 +86,6 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const isSuperAdmin = await getIsSuperAdmin();
   if (!isSuperAdmin) return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
-  if (!ENCRYPTION_KEY) return NextResponse.json({ message: 'La clave de encriptación no está configurada en el servidor.' }, { status: 500 });
 
   try {
     const body = await req.json();
@@ -99,8 +95,8 @@ export async function PUT(req: NextRequest) {
     const updateData: any = { ...config, updated_at: new Date().toISOString() };
     delete updateData.id;
 
-    if (config.access_key_id) updateData.access_key_id = CryptoJS.AES.encrypt(config.access_key_id, ENCRYPTION_KEY).toString();
-    if (config.secret_access_key) updateData.secret_access_key = CryptoJS.AES.encrypt(config.secret_access_key, ENCRYPTION_KEY).toString();
+    if (config.access_key_id) updateData.access_key_id = config.access_key_id;
+    if (config.secret_access_key) updateData.secret_access_key = config.secret_access_key;
     else delete updateData.secret_access_key;
 
     if (config.is_active) {
