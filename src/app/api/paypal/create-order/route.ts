@@ -13,6 +13,9 @@ export async function POST(req: NextRequest) {
     const { accessToken, mode } = await getPayPalAccessToken();
     const PAYPAL_API_URL = mode === 'sandbox' ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
 
+    // Ensure the amount is a string with two decimal places
+    const formattedAmount = parseFloat(amount).toFixed(2);
+
     const response = await fetch(`${PAYPAL_API_URL}/v2/checkout/orders`, {
       method: 'POST',
       headers: {
@@ -24,7 +27,7 @@ export async function POST(req: NextRequest) {
         purchase_units: [{
           amount: {
             currency_code: 'USD',
-            value: amount.toString(),
+            value: formattedAmount,
           },
         }],
       }),
