@@ -1,37 +1,49 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import ProfileCard from '@/components/ProfileCard';
 import '@/components/ProfileCard.css';
 import { LandingFooter } from '@/components/landing-footer';
 import PillNav from '@/components/PillNav';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { Loader2 } from 'lucide-react';
 
-const teamMembers = [
-  {
-    name: "Javi A. Torres",
-    title: "Software Engineer & Founder",
-    handle: "javicodes",
-    status: "Online",
-    contactText: "Contactar",
-    avatarUrl: "https://i.pravatar.cc/500?u=javier",
-    showUserInfo: true,
-    enableTilt: true,
-  },
-  {
-    name: "Sofía Pérez",
-    title: "AI Specialist & Co-Founder",
-    handle: "sofia_ai",
-    status: "Developing",
-    contactText: "Contactar",
-    avatarUrl: "https://i.pravatar.cc/500?u=sofia",
-    showUserInfo: true,
-    enableTilt: true,
-  },
-];
+interface TeamMember {
+  id: string;
+  name: string;
+  title: string;
+  handle: string;
+  status: string;
+  contact_text: string;
+  avatar_url: string;
+}
 
 export default function AboutPage() {
   const router = useRouter();
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTeamMembers = async () => {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('team_members')
+        .select('*')
+        .order('order_index', { ascending: true });
+
+      if (error) {
+        toast.error('No se pudo cargar la información del equipo.');
+        console.error(error);
+      } else {
+        setTeamMembers(data);
+      }
+      setIsLoading(false);
+    };
+
+    fetchTeamMembers();
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-white">
@@ -45,15 +57,28 @@ export default function AboutPage() {
             Conoce a las mentes creativas detrás de DeepAI Coder.
           </p>
         </div>
-        <div className="flex flex-wrap justify-center items-center gap-16">
-          {teamMembers.map((member, index) => (
-            <ProfileCard
-              key={index}
-              {...member}
-              onContactClick={() => console.log(`Contact clicked for ${member.name}`)}
-            />
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="flex justify-center">
+            <Loader2 className="h-12 w-12 animate-spin" />
+          </div>
+        ) : (
+          <div className="flex flex-wrap justify-center items-center gap-16">
+            {teamMembers.map((member) => (
+              <ProfileCard
+                key={member.id}
+                name={member.name}
+                title={member.title}
+                handle={member.handle}
+                status={member.status}
+                contactText={member.contact_text}
+                avatarUrl={member.avatar_url}
+                showUserInfo={true}
+                enableTilt={true}
+                onContactClick={() => console.log(`Contact clicked for ${member.name}`)}
+              />
+            ))}
+          </div>
+        )}
       </main>
       <LandingFooter />
     </div>

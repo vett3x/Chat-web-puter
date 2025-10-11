@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Settings2, Tag, Hash, Save, Loader2, ChevronDown, ChevronRight, FileText } from 'lucide-react';
+import { Settings2, Tag, Hash, Save, Loader2, ChevronDown, ChevronRight, FileText, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import MDEditor from '@uiw/react-md-editor';
 import { useTheme } from 'next-themes';
+import { TeamMembersManager } from '../admin/team-members-manager'; // Import the new component
 
 // Version Schema
 const versionSchema = z.object({
@@ -151,7 +152,7 @@ function LegalDocumentsEditor() {
 }
 
 export function OthersTab() {
-  const [openItemId, setOpenItemId] = useState<string | null>('version');
+  const [openItemId, setOpenItemId] = useState<string | null>('team');
 
   const handleToggle = (id: string) => {
     setOpenItemId(prev => (prev === id ? null : id));
@@ -165,6 +166,25 @@ export function OthersTab() {
           <CardDescription>Configuraciones adicionales y herramientas para la gestión de la aplicación.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
+          <Collapsible open={openItemId === 'team'} onOpenChange={() => handleToggle('team')} className="border rounded-lg">
+            <CollapsibleTrigger asChild>
+              <button type="button" className="flex items-center justify-between w-full p-4 text-left">
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0"><Users className="h-5 w-5" /></div>
+                  <div>
+                    <h4 className="font-semibold">Gestión de Equipo</h4>
+                    <p className="text-xs text-muted-foreground">Añade, edita o elimina miembros del equipo de la página "Sobre Nosotros".</p>
+                  </div>
+                </div>
+                {openItemId === 'team' ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
+              <div className="border-t px-4 pt-4 pb-4">
+                <TeamMembersManager />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
           <Collapsible open={openItemId === 'version'} onOpenChange={() => handleToggle('version')} className="border rounded-lg">
             <CollapsibleTrigger asChild>
               <button type="button" className="flex items-center justify-between w-full p-4 text-left">
