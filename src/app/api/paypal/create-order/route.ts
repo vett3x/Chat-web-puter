@@ -27,7 +27,6 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         intent: 'CAPTURE',
         purchase_units: [{
-          description: `Suscripción al plan: ${planName}`,
           items: [
             {
               name: planName,

@@ -132,7 +132,7 @@ export function PayPalPaymentForm({ plan, onPaymentSuccess }: { plan: any, onPay
       const response = await fetch('/api/paypal/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: priceValue }),
+        body: JSON.stringify({ amount: priceValue, planName: plan.name }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message);
