@@ -192,11 +192,11 @@ export default function RegisterPage() {
                     <div className="space-y-1 leading-none">
                       <FormLabel>
                         Acepto los{' '}
-                        <Link href="/terms" target="_blank" className="underline hover:text-primary-light-purple">
+                        <Link href="/legal/terms-of-service" target="_blank" className="underline hover:text-primary-light-purple">
                           Términos de Servicio
                         </Link>{' '}
                         y la{' '}
-                        <Link href="/privacy" target="_blank" className="underline hover:text-primary-light-purple">
+                        <Link href="/legal/privacy-policy" target="_blank" className="underline hover:text-primary-light-purple">
                           Política de Privacidad
                         </Link>
                         .
