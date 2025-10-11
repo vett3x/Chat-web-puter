@@ -21,6 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { PaymentDialog } from '@/components/payment-dialog';
 import { useSession } from '@/components/session-context-provider';
 import { toast } from 'sonner';
+import { ContactForm } from '@/components/landing/ContactForm'; // Import the new component
 
 interface PricingPlan {
   id: string;
@@ -376,6 +377,19 @@ export default function LandingPage() {
                 </AccordionItem>
               ))}
             </Accordion>
+          </div>
+        </section>
+
+        {/* Contact Section */}
+        <section id="contact" className="py-24">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-3xl">
+            <h2 className="text-3xl font-bold tracking-tight text-center sm:text-4xl">¿Tienes alguna pregunta?</h2>
+            <p className="mt-4 max-w-2xl mx-auto text-lg text-white/70 text-center">
+              Estamos aquí para ayudarte. Envíanos un mensaje y nos pondremos en contacto contigo.
+            </p>
+            <div className="mt-12">
+              <ContactForm />
+            </div>
           </div>
         </section>
 
