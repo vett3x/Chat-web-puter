@@ -5,7 +5,6 @@ import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
-import CryptoJS from 'crypto-js';
 
 const configSchema = z.object({
   id: z.string().uuid().optional(),
@@ -13,7 +12,7 @@ const configSchema = z.object({
   client_id: z.string().min(1, 'El Client ID es requerido.'),
   client_secret: z.string().optional(),
   is_active: z.boolean().optional(),
-  mode: z.enum(['sandbox', 'live']).default('sandbox'), // New field
+  mode: z.enum(['sandbox', 'live']).default('sandbox'),
 });
 
 async function getIsSuperAdmin(): Promise<boolean> {
@@ -30,7 +29,6 @@ async function getIsSuperAdmin(): Promise<boolean> {
 }
 
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 
 export async function GET(req: NextRequest) {
   const isSuperAdmin = await getIsSuperAdmin();
@@ -39,7 +37,7 @@ export async function GET(req: NextRequest) {
   try {
     const { data, error } = await supabaseAdmin
       .from('paypal_configs')
-      .select('id, nickname, is_active, status, last_tested_at, created_at, mode') // Include mode
+      .select('id, nickname, is_active, status, last_tested_at, created_at, mode')
       .order('created_at', { ascending: true });
 
     if (error) throw error;
@@ -52,7 +50,6 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const isSuperAdmin = await getIsSuperAdmin();
   if (!isSuperAdmin) return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
-  if (!ENCRYPTION_KEY) return NextResponse.json({ message: 'La clave de encriptación no está configurada en el servidor.' }, { status: 500 });
 
   try {
     const body = await req.json();
@@ -70,8 +67,8 @@ export async function POST(req: NextRequest) {
       .from('paypal_configs')
       .insert({
         ...config,
-        client_id: CryptoJS.AES.encrypt(config.client_id, ENCRYPTION_KEY).toString(),
-        client_secret: CryptoJS.AES.encrypt(config.client_secret, ENCRYPTION_KEY).toString(),
+        client_id: config.client_id,
+        client_secret: config.client_secret,
       })
       .select()
       .single();
@@ -87,7 +84,6 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const isSuperAdmin = await getIsSuperAdmin();
   if (!isSuperAdmin) return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
-  if (!ENCRYPTION_KEY) return NextResponse.json({ message: 'La clave de encriptación no está configurada en el servidor.' }, { status: 500 });
 
   try {
     const body = await req.json();
@@ -97,8 +93,8 @@ export async function PUT(req: NextRequest) {
     const updateData: any = { ...config, updated_at: new Date().toISOString() };
     delete updateData.id;
 
-    if (config.client_id) updateData.client_id = CryptoJS.AES.encrypt(config.client_id, ENCRYPTION_KEY).toString();
-    if (config.client_secret) updateData.client_secret = CryptoJS.AES.encrypt(config.client_secret, ENCRYPTION_KEY).toString();
+    if (config.client_id) updateData.client_id = config.client_id;
+    if (config.client_secret) updateData.client_secret = config.client_secret;
     else delete updateData.client_secret;
 
     if (config.is_active) {

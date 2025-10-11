@@ -4,7 +4,6 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
-import CryptoJS from 'crypto-js';
 
 async function getIsSuperAdmin(): Promise<boolean> {
   const cookieStore = cookies() as any;
@@ -20,12 +19,10 @@ async function getIsSuperAdmin(): Promise<boolean> {
 }
 
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 
 export async function POST(req: NextRequest) {
   const isSuperAdmin = await getIsSuperAdmin();
   if (!isSuperAdmin) return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
-  if (!ENCRYPTION_KEY) return NextResponse.json({ message: 'La clave de encriptación no está configurada.' }, { status: 500 });
 
   const { id } = await req.json();
   if (!id) return NextResponse.json({ message: 'ID de configuración no proporcionado.' }, { status: 400 });
@@ -39,11 +36,11 @@ export async function POST(req: NextRequest) {
 
     if (fetchError || !config) throw new Error('Configuración no encontrada.');
 
-    const clientId = CryptoJS.AES.decrypt(config.client_id, ENCRYPTION_KEY).toString(CryptoJS.enc.Utf8);
-    const clientSecret = CryptoJS.AES.decrypt(config.client_secret, ENCRYPTION_KEY).toString(CryptoJS.enc.Utf8);
+    const clientId = config.client_id;
+    const clientSecret = config.client_secret;
 
     if (!clientId || !clientSecret) {
-      throw new Error('No se pudieron desencriptar las credenciales. Verifica tu ENCRYPTION_KEY.');
+      throw new Error('Las credenciales de PayPal no están completas en la base de datos.');
     }
 
     const PAYPAL_API_URL = config.mode === 'sandbox' ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';

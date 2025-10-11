@@ -1,8 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
-import CryptoJS from 'crypto-js';
 
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 
 interface PayPalCredentials {
   clientId: string;
@@ -11,10 +9,6 @@ interface PayPalCredentials {
 }
 
 async function getPayPalCredentials(): Promise<PayPalCredentials> {
-  if (!ENCRYPTION_KEY) {
-    throw new Error('La clave de encriptación (ENCRYPTION_KEY) no está configurada en el servidor.');
-  }
-
   const { data: config, error } = await supabaseAdmin
     .from('paypal_configs')
     .select('client_id, client_secret, mode')
@@ -25,14 +19,13 @@ async function getPayPalCredentials(): Promise<PayPalCredentials> {
     throw new Error('No se encontró una configuración de PayPal activa.');
   }
 
-  const clientId = CryptoJS.AES.decrypt(config.client_id, ENCRYPTION_KEY).toString(CryptoJS.enc.Utf8);
-  const clientSecret = CryptoJS.AES.decrypt(config.client_secret, ENCRYPTION_KEY).toString(CryptoJS.enc.Utf8);
+  const { client_id: clientId, client_secret: clientSecret, mode } = config;
 
   if (!clientId || !clientSecret) {
-    throw new Error('No se pudieron desencriptar las credenciales de PayPal. Verifica que la ENCRYPTION_KEY sea correcta y que las credenciales se guardaron correctamente.');
+    throw new Error('Las credenciales de PayPal (Client ID o Client Secret) no están configuradas en la base de datos.');
   }
 
-  return { clientId, clientSecret, mode: config.mode as 'sandbox' | 'live' };
+  return { clientId, clientSecret, mode: mode as 'sandbox' | 'live' };
 }
 
 function getPayPalApiUrl(mode: 'sandbox' | 'live'): string {
