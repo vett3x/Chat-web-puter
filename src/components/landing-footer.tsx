@@ -4,7 +4,11 @@ import React from 'react';
 import Link from 'next/link';
 import { Wand2 } from 'lucide-react';
 
-export const LandingFooter = React.forwardRef<HTMLElement>((props, ref) => {
+interface LandingFooterProps {
+  onContactClick: () => void;
+}
+
+export const LandingFooter = React.forwardRef<HTMLElement, LandingFooterProps>(({ onContactClick }, ref) => {
   return (
     <footer ref={ref} className="w-full border-t border-white/10 mt-24 z-10">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -29,7 +33,11 @@ export const LandingFooter = React.forwardRef<HTMLElement>((props, ref) => {
             <h3 className="text-sm font-semibold text-white/80 tracking-wider uppercase">Compañía</h3>
             <ul className="mt-4 space-y-2">
               <li><Link href="/about" className="text-sm text-white/60 hover:text-white">Sobre Nosotros</Link></li>
-              <li><Link href="/contact" className="text-sm text-white/60 hover:text-white">Contacto</Link></li>
+              <li>
+                <button onClick={onContactClick} className="text-sm text-white/60 hover:text-white text-left w-full">
+                  Contacto
+                </button>
+              </li>
             </ul>
           </div>
           <div>

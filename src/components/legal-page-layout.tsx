@@ -1,8 +1,11 @@
-import React from 'react';
+"use client";
+
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
-import { LandingFooter } from './landing-footer'; // Assuming this is the correct path
+import { LandingFooter } from './landing-footer';
+import { ContactDialog } from './landing/ContactDialog';
 
 interface LegalPageLayoutProps {
   title: string;
@@ -10,6 +13,8 @@ interface LegalPageLayoutProps {
 }
 
 export function LegalPageLayout({ title, children }: LegalPageLayoutProps) {
+  const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-32">
@@ -26,7 +31,8 @@ export function LegalPageLayout({ title, children }: LegalPageLayoutProps) {
           </div>
         </div>
       </main>
-      <LandingFooter />
+      <LandingFooter onContactClick={() => setIsContactDialogOpen(true)} />
+      <ContactDialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen} />
     </div>
   );
 }

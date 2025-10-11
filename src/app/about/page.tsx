@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { ContactDialog } from '@/components/landing/ContactDialog';
 
 interface TeamMember {
   id: string;
@@ -25,6 +26,7 @@ export default function AboutPage() {
   const router = useRouter();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
 
   useEffect(() => {
     const fetchTeamMembers = async () => {
@@ -124,7 +126,8 @@ export default function AboutPage() {
           )}
         </div>
       </main>
-      <LandingFooter />
+      <LandingFooter onContactClick={() => setIsContactDialogOpen(true)} />
+      <ContactDialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen} />
     </div>
   );
 }

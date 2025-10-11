@@ -21,7 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { PaymentDialog } from '@/components/payment-dialog';
 import { useSession } from '@/components/session-context-provider';
 import { toast } from 'sonner';
-import { ContactForm } from '@/components/landing/ContactForm'; // Import the new component
+import { ContactDialog } from '@/components/landing/ContactDialog';
 
 interface PricingPlan {
   id: string;
@@ -44,6 +44,7 @@ export default function LandingPage() {
   const [isLoadingPlans, setIsLoadingPlans] = useState(true);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<PricingPlan | null>(null);
+  const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
 
   useEffect(() => {
     const fetchPlans = async () => {
@@ -380,30 +381,18 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Contact Section */}
-        <section id="contact" className="py-24">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-3xl">
-            <h2 className="text-3xl font-bold tracking-tight text-center sm:text-4xl">¿Tienes alguna pregunta?</h2>
-            <p className="mt-4 max-w-2xl mx-auto text-lg text-white/70 text-center">
-              Estamos aquí para ayudarte. Envíanos un mensaje y nos pondremos en contacto contigo.
-            </p>
-            <div className="mt-12">
-              <ContactForm />
-            </div>
-          </div>
-        </section>
-
         <GradualBlur 
           preset="page-footer" 
           style={{ opacity: showFooterBlur ? 1 : 0, transition: 'opacity 0.3s ease-in-out' }} 
         />
       </main>
-      <LandingFooter ref={footerRef} />
+      <LandingFooter ref={footerRef} onContactClick={() => setIsContactDialogOpen(true)} />
       <PaymentDialog 
         open={isPaymentDialogOpen}
         onOpenChange={setIsPaymentDialogOpen}
         plan={selectedPlan}
       />
+      <ContactDialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen} />
     </div>
   );
 }
