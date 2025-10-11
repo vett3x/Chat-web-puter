@@ -59,17 +59,32 @@ const HostedFields = ({ plan, onPaymentSuccess }: { plan: any, onPaymentSuccess?
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-1">
         <Label htmlFor="card-number">Número de tarjeta</Label>
-        <div id="card-number" className="p-3 border rounded-md bg-background h-[40px]" />
+        <PayPalHostedField
+          id="card-number"
+          hostedFieldType="number"
+          options={{ selector: '#card-number' }}
+          className="p-3 border rounded-md bg-background h-[40px]"
+        />
       </div>
       
       <div className="flex gap-4">
         <div className="w-1/2 space-y-1">
           <Label htmlFor="expiration-date">Vencimiento</Label>
-          <div id="expiration-date" className="p-3 border rounded-md bg-background h-[40px]" />
+          <PayPalHostedField
+            id="expiration-date"
+            hostedFieldType="expirationDate"
+            options={{ selector: '#expiration-date' }}
+            className="p-3 border rounded-md bg-background h-[40px]"
+          />
         </div>
         <div className="w-1/2 space-y-1">
           <Label htmlFor="cvv">CSC</Label>
-          <div id="cvv" className="p-3 border rounded-md bg-background h-[40px]" />
+          <PayPalHostedField
+            id="cvv"
+            hostedFieldType="cvv"
+            options={{ selector: '#cvv' }}
+            className="p-3 border rounded-md bg-background h-[40px]"
+          />
         </div>
       </div>
 
@@ -135,6 +150,7 @@ export function PayPalPaymentForm({ plan, onPaymentSuccess }: { plan: any, onPay
         '.valid': { color: 'hsl(var(--foreground))' },
         '.invalid': { color: 'hsl(var(--destructive))' },
       }}
+      dataClientToken={clientToken}
     >
       <HostedFields plan={plan} onPaymentSuccess={onPaymentSuccess} />
     </PayPalHostedFieldsProvider>
