@@ -27,32 +27,17 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         intent: 'CAPTURE',
         purchase_units: [{
-          items: [
-            {
-              name: planName,
-              quantity: '1',
-              unit_amount: {
-                currency_code: 'USD',
-                value: formattedAmount,
-              },
-            },
-          ],
           amount: {
             currency_code: 'USD',
             value: formattedAmount,
-            breakdown: {
-              item_total: {
-                currency_code: 'USD',
-                value: formattedAmount,
-              },
-            },
-          },
+          }
         }],
       }),
     });
 
     const data = await response.json();
     if (!response.ok) {
+      console.error('[API PayPal Create Order] PayPal Error Response:', data);
       throw new Error(data.message || 'Error al crear la orden en PayPal.');
     }
 
