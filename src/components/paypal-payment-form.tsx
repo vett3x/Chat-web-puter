@@ -150,7 +150,6 @@ export function PayPalPaymentForm({ plan, onPaymentSuccess }: { plan: any, onPay
         '.valid': { color: 'hsl(var(--foreground))' },
         '.invalid': { color: 'hsl(var(--destructive))' },
       }}
-      dataClientToken={clientToken}
     >
       <HostedFields plan={plan} onPaymentSuccess={onPaymentSuccess} />
     </PayPalHostedFieldsProvider>
