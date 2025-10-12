@@ -13,7 +13,7 @@ import { LegalDocumentsManager } from '../admin/LegalDocumentsManager'; // Renam
 import { EmailTemplateManager } from '../admin/EmailTemplateManager'; // New import
 
 export function OthersTab() {
-  const [openItemId, setOpenItemId] = useState<string | null>('team');
+  const [openItemId, setOpenItemId] = useState<string | null>(null);
 
   const handleToggle = (id: string) => {
     setOpenItemId(prev => (prev === id ? null : id));
