@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Settings2, Tag, Hash, Save, Loader2, ChevronDown, ChevronRight, FileText, Users, KeyRound, Image as ImageIcon } from 'lucide-react';
+import { Settings2, Tag, Hash, Save, Loader2, ChevronDown, ChevronRight, FileText, Users, KeyRound, Image as ImageIcon, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -16,6 +16,7 @@ import { useTheme } from 'next-themes';
 import { TeamMembersManager } from '../admin/team-members-manager';
 import { AuthConfigManager } from '../admin/auth-config-manager';
 import { TechnologyLogosManager } from '../admin/TechnologyLogosManager';
+import { SmtpConfigManager } from '../admin/smtp-config-manager'; // Import the new component
 
 // Version Schema
 const versionSchema = z.object({
@@ -168,6 +169,25 @@ export function OthersTab() {
           <CardDescription>Configuraciones adicionales y herramientas para la gestión de la aplicación.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
+          <Collapsible open={openItemId === 'smtp'} onOpenChange={() => handleToggle('smtp')} className="border rounded-lg">
+            <CollapsibleTrigger asChild>
+              <button type="button" className="flex items-center justify-between w-full p-4 text-left">
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0"><Mail className="h-5 w-5" /></div>
+                  <div>
+                    <h4 className="font-semibold">Configuración SMTP</h4>
+                    <p className="text-xs text-muted-foreground">Gestiona las credenciales del servidor de correo para enviar emails.</p>
+                  </div>
+                </div>
+                {openItemId === 'smtp' ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
+              <div className="border-t px-4 pt-4 pb-4">
+                <SmtpConfigManager />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
           <Collapsible open={openItemId === 'team'} onOpenChange={() => handleToggle('team')} className="border rounded-lg">
             <CollapsibleTrigger asChild>
               <button type="button" className="flex items-center justify-between w-full p-4 text-left">
