@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { AppProvisioningStatusPanel } from './app-provisioning-status-panel';
-import { DomainManagementTab } from './domain-management-tab'; // Corrected import path
+import { DomainManagementTab } from '@/components/app-tabs/domain-management-tab';
 
 interface AppBrowserPanelProps {
   appId: string | null;
@@ -177,7 +177,7 @@ export const AppBrowserPanel = forwardRef<
           {appUrl || 'about:blank'}
         </div>
         <Button variant="outline" size="sm" onClick={handleRestart} disabled={!appId || isRestarting}>
-          {isRestarting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Power className="h-4 w-4 mr-2" />}
+          {isRestarting ? <Loader2 className="mr-2 h-4 w-4 animate-spin mr-2" /> : <Power className="h-4 w-4 mr-2" />}
           Reiniciar
         </Button>
         <a href={appUrl || '#'} target="_blank" rel="noopener noreferrer">
