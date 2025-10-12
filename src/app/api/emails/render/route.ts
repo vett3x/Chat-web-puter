@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { render } from 'react-email';
+import { render } from '@react-email/render';
 import WelcomeEmail from '@/emails/WelcomeEmail';
 import ResetPasswordEmail from '@/emails/ResetPasswordEmail';
 
