@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { render } from '@react-email/render';
+import * as React from 'react';
 import WelcomeEmail from '@/emails/WelcomeEmail';
 import ResetPasswordEmail from '@/emails/ResetPasswordEmail';
 
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ message: 'Plantilla de correo no válida. Usa ?template=welcome o ?template=reset-password' }, { status: 400 });
     }
 
-    emailHtml = render(emailComponent);
+    emailHtml = await render(emailComponent);
 
     return new Response(emailHtml, {
       headers: {
