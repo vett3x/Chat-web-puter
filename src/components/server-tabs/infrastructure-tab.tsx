@@ -8,8 +8,9 @@ import { CloudflareTunnelTab } from './cloudflare-tunnel-tab';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Wand2 } from 'lucide-react';
-import { DataStorageTab } from './data-storage-tab'; // Import the new unified component
-import { CloudflareManagementTab } from './cloudflare-management-tab'; // Import the new component
+import { DataStorageTab } from './data-storage-tab';
+import { CloudflareManagementTab } from './cloudflare-management-tab';
+import { DomainRegistrarManager } from '../admin/domain-registrar-manager'; // Import the new component
 
 function ProvisioningTemplateCard() {
   // This component remains the same
@@ -22,6 +23,18 @@ export function InfrastructureTab() {
       <ServerListTab />
       <Separator />
       <CloudflareManagementTab />
+      <Separator />
+      <Card>
+        <CardHeader>
+          <CardTitle>Proveedores de Dominios</CardTitle>
+          <CardDescription>
+            Gestiona las credenciales de API para tus revendedores de dominios como Dinahosting.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <DomainRegistrarManager />
+        </CardContent>
+      </Card>
       <Separator />
       <AllDockerContainersTab />
       <Separator />
