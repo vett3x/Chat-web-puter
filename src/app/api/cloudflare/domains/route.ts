@@ -86,9 +86,9 @@ export async function GET(req: NextRequest) {
   if (!session || !userRole) {
     return NextResponse.json({ message: 'Acceso denegado. No autenticado.' }, { status: 401 });
   }
-  // Allow Admins and Super Admins to view Cloudflare domains
-  if (userRole !== 'admin' && userRole !== 'super_admin') {
-    return NextResponse.json({ message: 'Acceso denegado. Se requiere rol de Admin o Super Admin.' }, { status: 403 });
+  // Only Super Admins can view Cloudflare domains
+  if (userRole !== 'super_admin') {
+    return NextResponse.json({ message: 'Acceso denegado. Se requiere rol de Super Admin.' }, { status: 403 });
   }
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -105,7 +105,7 @@ export async function GET(req: NextRequest) {
     .from('cloudflare_domains')
     .select('id, domain_name, zone_id, account_id, created_at'); // Select account_id
 
-  // Both Admins and Super Admins see all domains, so no user_id filter is applied here.
+  // Super Admins see all domains, so no user_id filter is applied here.
 
   const { data: domains, error } = await query;
 
@@ -145,7 +145,6 @@ export async function POST(req: NextRequest) {
     const { data: existingDomain, error: checkError } = await supabaseAdmin
       .from('cloudflare_domains')
       .select('id')
-      .eq('user_id', session.user.id)
       .eq('domain_name', newDomainData.domain_name)
       .single();
 
@@ -220,7 +219,7 @@ export async function DELETE(req: NextRequest) {
   const { count: tunnelsCount, error: tunnelsError } = await supabaseAdmin
     .from('docker_tunnels')
     .select('id', { count: 'exact', head: true })
-    .eq('cloudflare_domain_id', id); // Removed user_id filter here as Super Admins can delete any tunnel
+    .eq('cloudflare_domain_id', id);
 
   if (tunnelsError) {
     console.error('Error checking for associated tunnels:', tunnelsError);
@@ -234,7 +233,7 @@ export async function DELETE(req: NextRequest) {
   const { error } = await supabaseAdmin
     .from('cloudflare_domains')
     .delete()
-    .eq('id', id); // Removed user_id filter here as Super Admins can delete any domain
+    .eq('id', id);
 
   if (error) {
     console.error('Error deleting Cloudflare domain from Supabase (admin):', error);

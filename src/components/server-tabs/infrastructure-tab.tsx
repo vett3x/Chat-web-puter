@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Wand2 } from 'lucide-react';
 import { DataStorageTab } from './data-storage-tab'; // Import the new unified component
+import { CloudflareManagementTab } from './cloudflare-management-tab'; // Import the new component
 
 function ProvisioningTemplateCard() {
   // This component remains the same
@@ -19,6 +20,8 @@ export function InfrastructureTab() {
   return (
     <div className="space-y-8 p-1">
       <ServerListTab />
+      <Separator />
+      <CloudflareManagementTab />
       <Separator />
       <AllDockerContainersTab />
       <Separator />
