@@ -86,10 +86,7 @@ export async function GET(req: NextRequest) {
   if (!session || !userRole) {
     return NextResponse.json({ message: 'Acceso denegado. No autenticado.' }, { status: 401 });
   }
-  // Only Super Admins can view Cloudflare domains
-  if (userRole !== 'super_admin') {
-    return NextResponse.json({ message: 'Acceso denegado. Se requiere rol de Super Admin.' }, { status: 403 });
-  }
+  // Any authenticated user can list the available domains.
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     console.error('SUPABASE_SERVICE_ROLE_KEY is not set in environment variables.');
