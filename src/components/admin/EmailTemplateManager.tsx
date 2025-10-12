@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Save, PlusCircle, Trash2, Edit, Eye } from 'lucide-react';
+import { Loader2, Save, PlusCircle, Trash2, Edit, Eye, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import MDEditor from '@uiw/react-md-editor';
 import { useTheme } from 'next-themes';
@@ -35,6 +35,7 @@ export function EmailTemplateManager() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
   const form = useForm<TemplateFormValues>({
     resolver: zodResolver(templateSchema),
@@ -82,13 +83,29 @@ export function EmailTemplateManager() {
   };
 
   const handleDelete = async (slug: string) => {
+    setActionInProgress(slug);
     try {
       const response = await fetch(`/api/admin/email-templates?slug=${slug}`, { method: 'DELETE' });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message);
       toast.success(result.message);
       fetchTemplates();
-    } catch (err: any) { toast.error(`Error al eliminar: ${err.message}`); }
+    } catch (err: any) { toast.error(`Error al eliminar: ${err.message}`); } finally { setActionInProgress(null); }
+  };
+
+  const handleDuplicate = async (slug: string) => {
+    setActionInProgress(slug);
+    try {
+      const response = await fetch(`/api/admin/email-templates/${slug}/duplicate`, { method: 'POST' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message);
+      toast.success(result.message);
+      fetchTemplates();
+    } catch (err: any) {
+      toast.error(`Error al duplicar: ${err.message}`);
+    } finally {
+      setActionInProgress(null);
+    }
   };
 
   return (
@@ -105,11 +122,18 @@ export function EmailTemplateManager() {
                 <TableCell className="font-medium">{template.name}</TableCell>
                 <TableCell className="font-mono text-xs">{template.slug}</TableCell>
                 <TableCell className="text-right space-x-2">
-                  <a href={`/api/emails/render?template=${template.slug}`} target="_blank" rel="noopener noreferrer">
-                    <Button variant="outline" size="icon" className="h-8 w-8"><Eye className="h-4 w-4" /></Button>
-                  </a>
-                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleEdit(template)}><Edit className="h-4 w-4" /></Button>
-                  <AlertDialog><AlertDialogTrigger asChild><Button variant="destructive" size="icon" className="h-8 w-8"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Eliminar esta plantilla?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(template.slug!)} className="bg-destructive">Eliminar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+                  {actionInProgress === template.slug ? (
+                    <Loader2 className="h-4 w-4 animate-spin inline-block" />
+                  ) : (
+                    <>
+                      <a href={`/api/emails/render?template=${template.slug}`} target="_blank" rel="noopener noreferrer">
+                        <Button variant="outline" size="icon" className="h-8 w-8"><Eye className="h-4 w-4" /></Button>
+                      </a>
+                      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleDuplicate(template.slug!)}><Copy className="h-4 w-4" /></Button>
+                      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleEdit(template)}><Edit className="h-4 w-4" /></Button>
+                      <AlertDialog><AlertDialogTrigger asChild><Button variant="destructive" size="icon" className="h-8 w-8"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Eliminar esta plantilla?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(template.slug!)} className="bg-destructive">Eliminar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+                    </>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
