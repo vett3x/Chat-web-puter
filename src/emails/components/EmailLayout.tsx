@@ -4,6 +4,7 @@ import {
   Head,
   Heading,
   Html,
+  Img,
   Preview,
   Section,
   Text,
@@ -17,24 +18,35 @@ interface EmailLayoutProps {
   children: React.ReactNode;
 }
 
+const baseUrl = process.env.VERCEL_URL
+  ? `https://juxrggowingqlchwfuct.supabase.co`
+  : 'http://localhost:3000';
+
 const EmailLayout = ({ preview, title, children }: EmailLayoutProps) => {
   return (
     <Html>
       <Head />
       <Preview>{preview}</Preview>
       <Tailwind>
-        <Body className="bg-gray-100 my-auto mx-auto font-sans">
-          <Container className="border border-solid border-gray-200 rounded my-10 mx-auto p-5 w-[465px] bg-white">
-            <Section className="mt-8">
-              <Heading className="text-black text-2xl font-normal text-center p-0 my-8 mx-0">
-                DeepAI Coder
+        <Body className="bg-gray-50 font-sans">
+          <Container className="max-w-xl mx-auto my-10 p-8 rounded-lg shadow-md bg-white">
+            <Section className="text-center">
+              <Img
+                src={`${baseUrl}/logo.svg`}
+                width="40"
+                height="40"
+                alt="DeepAI Coder Logo"
+                className="mx-auto"
+              />
+              <Heading className="text-2xl font-bold text-gray-800 mt-4">
+                {title}
               </Heading>
             </Section>
-            <Heading className="text-black text-xl font-normal text-center p-0 my-8 mx-0">
-              {title}
-            </Heading>
             {children}
             <Section className="text-center mt-10 text-gray-500 text-xs">
+              <Text>
+                Si tienes alguna pregunta, no dudes en contactar con nuestro equipo de soporte.
+              </Text>
               <Text>&copy; {new Date().getFullYear()} DeepAI Coder. Todos los derechos reservados.</Text>
             </Section>
           </Container>
