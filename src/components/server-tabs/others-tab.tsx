@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Settings2, Tag, Hash, Save, Loader2, ChevronDown, ChevronRight, FileText, Users, KeyRound } from 'lucide-react';
+import { Settings2, Tag, Hash, Save, Loader2, ChevronDown, ChevronRight, FileText, Users, KeyRound, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -15,6 +15,7 @@ import MDEditor from '@uiw/react-md-editor';
 import { useTheme } from 'next-themes';
 import { TeamMembersManager } from '../admin/team-members-manager';
 import { AuthConfigManager } from '../admin/auth-config-manager';
+import { TechnologyLogosManager } from '../admin/TechnologyLogosManager';
 
 // Version Schema
 const versionSchema = z.object({
@@ -183,6 +184,25 @@ export function OthersTab() {
             <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
               <div className="border-t px-4 pt-4 pb-4">
                 <TeamMembersManager />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+          <Collapsible open={openItemId === 'tech_logos'} onOpenChange={() => handleToggle('tech_logos')} className="border rounded-lg">
+            <CollapsibleTrigger asChild>
+              <button type="button" className="flex items-center justify-between w-full p-4 text-left">
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0"><ImageIcon className="h-5 w-5" /></div>
+                  <div>
+                    <h4 className="font-semibold">Gestión de Logos de Tecnologías</h4>
+                    <p className="text-xs text-muted-foreground">Gestiona los logos que se muestran en la sección "Tecnologías de Confianza" de la landing page.</p>
+                  </div>
+                </div>
+                {openItemId === 'tech_logos' ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
+              <div className="border-t px-4 pt-4 pb-4">
+                <TechnologyLogosManager />
               </div>
             </CollapsibleContent>
           </Collapsible>
