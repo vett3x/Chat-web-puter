@@ -20,7 +20,7 @@ async function getIsSuperAdmin(): Promise<boolean> {
 
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
-export async function POST(req: NextRequest, context: { params: { slug: string } }) {
+export async function POST(req: NextRequest, context: any) {
   const isSuperAdmin = await getIsSuperAdmin();
   if (!isSuperAdmin) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 403 });
