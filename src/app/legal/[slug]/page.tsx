@@ -23,7 +23,7 @@ async function getLegalDocument(slug: string) {
   return data;
 }
 
-export default async function LegalDocumentPage({ params }: { params: { slug: string } }) {
+export default async function LegalDocumentPage({ params }: any) {
   const doc = await getLegalDocument(params.slug);
 
   if (!doc) {
