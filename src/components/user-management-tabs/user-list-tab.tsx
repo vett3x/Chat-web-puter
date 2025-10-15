@@ -238,7 +238,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
                   const remainingTime = kickedUsersTimeRemaining.get(user.id);
 
                   return (
-                    <TableRow key={user.id} className={cn(user.status === 'banned' && 'bg-destructive/10 opacity-60', user.status === 'kicked' && 'bg-warning/10 opacity-60')}>
+                    <TableRow key={user.id} className={cn('bg-black/20 border-white/10', user.status === 'banned' && 'bg-destructive/10 opacity-60', user.status === 'kicked' && 'bg-warning/10 opacity-60')}>
                       <TableCell className="flex items-center gap-2">
                         <Avatar className="h-8 w-8"><AvatarImage src={user.avatar_url || ''} alt="Avatar" /><AvatarFallback className="bg-primary text-primary-foreground"><Bot className="h-4 w-4" /></AvatarFallback></Avatar>
                         <div><p className="font-medium">{user.first_name || 'N/A'} {user.last_name || ''}</p></div>
