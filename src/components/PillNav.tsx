@@ -51,10 +51,10 @@ export default function PillNav({ onCtaClick }: PillNavProps) {
   };
 
   return (
-    <nav className="flex items-center justify-between max-w-4xl mx-auto p-2 rounded-full bg-black/30 backdrop-blur-lg border border-white/10">
+    <nav className="flex items-center justify-between w-full max-w-[95vw] md:max-w-4xl mx-auto p-2 rounded-full bg-black/30 backdrop-blur-lg border border-white/10">
       <Link href="/" className="flex items-center gap-2 text-white pl-4">
         <Wand2 className="h-6 w-6 text-primary-light-purple" />
-        <span className="font-bold text-lg">DeepAI Coder</span>
+        <span className="font-bold text-lg hidden sm:inline">DeepAI Coder</span>
       </Link>
       <div className="flex items-center gap-2">
         {session ? (
@@ -96,10 +96,10 @@ export default function PillNav({ onCtaClick }: PillNavProps) {
           </DropdownMenu>
         ) : (
           <>
-            <Button variant="ghost" asChild className="text-white hover:bg-white/10">
+            <Button variant="ghost" asChild size="sm" className="text-white hover:bg-white/10">
               <Link href="/login" onClick={(e) => handleNavClick(e, '/login')}>Iniciar Sesión</Link>
             </Button>
-            <Button asChild className="bg-primary-light-purple hover:bg-primary-light-purple/90 text-white rounded-full">
+            <Button asChild size="sm" className="bg-primary-light-purple hover:bg-primary-light-purple/90 text-white rounded-full">
               <Link href="/register" onClick={(e) => handleNavClick(e, '/register')}>Registrarse</Link>
             </Button>
           </>
