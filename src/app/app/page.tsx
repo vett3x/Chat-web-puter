@@ -35,7 +35,7 @@ export default function AppPage() {
 
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [fileTreeRefreshKey, setFileTreeRefreshKey] = useState(0);
 
   // Dialog states
@@ -63,6 +63,7 @@ export default function AppPage() {
   const isMobile = useIsMobile();
 
   useEffect(() => {
+    // Set initial sidebar state based on screen size after client-side check
     setIsSidebarOpen(!isMobile);
   }, [isMobile]);
 
@@ -238,9 +239,13 @@ export default function AppPage() {
         </MobileHeader>
       )}
       <aside className={cn(
-        "flex-shrink-0 transition-all duration-300 ease-in-out z-20", // Added z-20
-        isMobile ? "absolute top-14 left-0 h-[calc(100%-56px)]" : "relative",
-        isSidebarOpen ? "w-72" : "w-0"
+        "transition-all duration-300 ease-in-out z-20",
+        // Mobile-first: absolute overlay by default
+        "absolute top-14 left-0 h-[calc(100dvh-56px)]",
+        // On desktop, make it relative and part of the layout
+        "md:relative md:top-0 md:h-full md:flex-shrink-0",
+        // Visibility controlled by JS state
+        isSidebarOpen ? "w-72" : "w-0 overflow-hidden"
       )}>
         <ConversationSidebar
           selectedItem={selectedItem}
