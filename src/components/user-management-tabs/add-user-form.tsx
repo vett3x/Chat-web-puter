@@ -86,7 +86,7 @@ export function AddUserForm({ onUserAdded, isUserTemporarilyDisabled }: AddUserF
   };
 
   return (
-    <Card className="h-full bg-transparent border-none shadow-none">
+    <Card className="h-full bg-black/20 border-white/10 shadow-none">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <UserPlus className="h-6 w-6" /> Añadir Nuevo Usuario
@@ -102,7 +102,7 @@ export function AddUserForm({ onUserAdded, isUserTemporarilyDisabled }: AddUserF
                 <FormItem>
                   <FormLabel>Correo Electrónico</FormLabel>
                   <FormControl>
-                    <Input placeholder="usuario@ejemplo.com" {...field} disabled={isAddingUser || isUserTemporarilyDisabled} />
+                    <Input placeholder="usuario@ejemplo.com" {...field} disabled={isAddingUser || isUserTemporarilyDisabled} className="bg-black/20 border-white/10" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -115,7 +115,7 @@ export function AddUserForm({ onUserAdded, isUserTemporarilyDisabled }: AddUserF
                 <FormItem>
                   <FormLabel>Contraseña</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="••••••••" {...field} disabled={isAddingUser || isUserTemporarilyDisabled} />
+                    <Input type="password" placeholder="••••••••" {...field} disabled={isAddingUser || isUserTemporarilyDisabled} className="bg-black/20 border-white/10" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -128,7 +128,7 @@ export function AddUserForm({ onUserAdded, isUserTemporarilyDisabled }: AddUserF
                 <FormItem>
                   <FormLabel>Nombre (Opcional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="Nombre del usuario" {...field} disabled={isAddingUser || isUserTemporarilyDisabled} />
+                    <Input placeholder="Nombre del usuario" {...field} disabled={isAddingUser || isUserTemporarilyDisabled} className="bg-black/20 border-white/10" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -141,7 +141,7 @@ export function AddUserForm({ onUserAdded, isUserTemporarilyDisabled }: AddUserF
                 <FormItem>
                   <FormLabel>Apellido (Opcional)</FormLabel> {/* Corrected closing tag */}
                   <FormControl>
-                    <Input placeholder="Apellido del usuario" {...field} disabled={isAddingUser || isUserTemporarilyDisabled} />
+                    <Input placeholder="Apellido del usuario" {...field} disabled={isAddingUser || isUserTemporarilyDisabled} className="bg-black/20 border-white/10" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -155,7 +155,7 @@ export function AddUserForm({ onUserAdded, isUserTemporarilyDisabled }: AddUserF
                   <FormLabel>Rol</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isAddingUser || isUserTemporarilyDisabled}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="bg-black/20 border-white/10">
                         <SelectValue placeholder="Seleccionar rol" />
                       </SelectTrigger>
                     </FormControl>

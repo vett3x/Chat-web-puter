@@ -333,9 +333,7 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
                                         <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive" disabled={isUserTemporarilyDisabled}><Trash2 className="mr-2 h-4 w-4" /> Eliminar</DropdownMenuItem></AlertDialogTrigger>
                                         <AlertDialogContent>
                                           <AlertDialogHeader><AlertDialogTitle>¿Seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción eliminará permanentemente al usuario "{user.first_name || user.email}".</AlertDialogDescription></AlertDialogHeader>
-                                          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteUser(user.id)} className="bg-destructive">Eliminar</AlertDialogAction></AlertDialogFooter>
-                                        </AlertDialogContent>
-                                      </AlertDialog>
+                                          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteUser(user.id)} className="bg-destructive">Eliminar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
                                     </>
                                   )}
                                 </DropdownMenuContent>
@@ -422,13 +420,13 @@ export const UserListTab = React.forwardRef<UserListTabRef, UserListTabProps>(({
     <Card className="h-full flex flex-col bg-transparent border-none shadow-none">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" /> Lista de Usuarios</CardTitle>
-        <Button variant="ghost" size="icon" onClick={fetchUsers} disabled={isLoadingUsers || isUserTemporarilyDisabled}><RefreshCw className="h-4 w-4" /></Button>
+        <Button variant="ghost" size="icon" onClick={fetchUsers} disabled={isLoadingUsers || isUserTemporarilyDisabled} className="bg-transparent border border-[var(--chat-bubble-border-color)] hover:bg-white/10"><RefreshCw className="h-4 w-4" /></Button>
       </CardHeader>
       <CardContent className="flex-1 overflow-hidden pt-0">
         <div className="flex flex-col sm:flex-row gap-4 mb-4">
-          <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" disabled={isUserTemporarilyDisabled} /></div>
-          <Select value={roleFilter} onValueChange={(v: any) => setRoleFilter(v)} disabled={isUserTemporarilyDisabled}><SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filtrar por rol" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los Roles</SelectItem><SelectItem value="super_admin">Super Admin</SelectItem><SelectItem value="admin">Admin</SelectItem><SelectItem value="user">Usuario</SelectItem></SelectContent></Select>
-          <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)} disabled={isUserTemporarilyDisabled}><SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filtrar por estado" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los Estados</SelectItem><SelectItem value="active">Activo</SelectItem><SelectItem value="banned">Baneado</SelectItem><SelectItem value="kicked">Expulsado</SelectItem></SelectContent></Select>
+          <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 bg-black/20 border-white/10" disabled={isUserTemporarilyDisabled} /></div>
+          <Select value={roleFilter} onValueChange={(v: any) => setRoleFilter(v)} disabled={isUserTemporarilyDisabled}><SelectTrigger className="w-full sm:w-[180px] bg-black/20 border-white/10"><SelectValue placeholder="Filtrar por rol" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los Roles</SelectItem><SelectItem value="super_admin">Super Admin</SelectItem><SelectItem value="admin">Admin</SelectItem><SelectItem value="user">Usuario</SelectItem></SelectContent></Select>
+          <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)} disabled={isUserTemporarilyDisabled}><SelectTrigger className="w-full sm:w-[180px] bg-black/20 border-white/10"><SelectValue placeholder="Filtrar por estado" /></SelectTrigger><SelectContent><SelectItem value="all">Todos los Estados</SelectItem><SelectItem value="active">Activo</SelectItem><SelectItem value="banned">Baneado</SelectItem><SelectItem value="kicked">Expulsado</SelectItem></SelectContent></Select>
         </div>
         {isLoadingUsers && filteredUsers.length === 0 ? (
           <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>
