@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { KeyRound, PlusCircle, Trash2, Loader2, RefreshCw, Edit, Upload, XCircle, Search, Folder, CheckCircle2, AlertCircle, Ban, ChevronDown, ChevronRight, ArrowLeft, TestTube2 } from 'lucide-react';
+import { KeyRound, PlusCircle, Trash2, Loader2, RefreshCw, Edit, Upload, XCircle, Search, Folder, CheckCircle2, AlertCircle, Ban, ChevronDown, ChevronRight, ArrowLeft, TestTube2, MoreVertical } from 'lucide-react';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -54,6 +54,24 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { SUPERUSER_EMAILS } from '@/lib/constants';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 // Schemas
 const apiKeySchema = z.object({
@@ -959,13 +977,39 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                           <Badge variant="secondary">{group.api_keys && group.api_keys.length > 0 ? `${activeKeysCount} activas` : 'Sin claves'}</Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                            <Button variant="outline" size="icon" onClick={() => handleEditGroup(group)} disabled={!canManageGroup} title={!canManageGroup ? "No tienes permiso para editar este grupo" : "Editar grupo"}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="destructive" size="icon" onClick={() => handleDelete(group.id, 'group')} disabled={!canManageGroup} title={!canManageGroup ? "No tienes permiso para eliminar este grupo" : "Eliminar grupo"}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" disabled={!canManageGroup}>
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleEditGroup(group)} disabled={!canManageGroup}>
+                                  <Edit className="mr-2 h-4 w-4" /> Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive" disabled={!canManageGroup}>
+                                      <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                                    </DropdownMenuItem>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>¿Eliminar este grupo?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Esta acción eliminará el grupo "{group.name}". Las claves API dentro del grupo no se eliminarán, pero quedarán sin asignar.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDelete(group.id, 'group')} className="bg-destructive">Eliminar</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1000,17 +1044,42 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                             {isSuperAdmin && <TableCell>{key.is_global ? 'Sí' : 'No'}</TableCell>}
                             <TableCell>{renderStatusBadge(key)}</TableCell>
                             <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <Button variant="outline" size="icon" onClick={() => handleTestKey(key.id)} disabled={isTestingId === key.id} title="Probar conexión">
-                                  {isTestingId === key.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <TestTube2 className="h-4 w-4" />}
-                                </Button>
-                                <Button variant="outline" size="icon" onClick={() => handleEditKey(key)} disabled={!canManageKey} title={!canManageKey ? "No tienes permiso para editar esta clave" : "Editar clave"}>
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button variant="destructive" size="icon" onClick={() => handleDelete(key.id, 'key')} disabled={!canManageKey} title={!canManageKey ? "No tienes permiso para eliminar esta clave" : "Eliminar clave"}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8" disabled={!canManageKey}>
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleTestKey(key.id)} disabled={isTestingId === key.id}>
+                                    {isTestingId === key.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TestTube2 className="mr-2 h-4 w-4" />}
+                                    Probar Conexión
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleEditKey(key)} disabled={!canManageKey}>
+                                    <Edit className="mr-2 h-4 w-4" /> Editar
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive" disabled={!canManageKey}>
+                                        <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                                      </DropdownMenuItem>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>¿Eliminar esta clave?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Esta acción eliminará permanentemente la clave API "{key.nickname || key.id}".
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDelete(key.id, 'key')} className="bg-destructive">Eliminar</AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </TableCell>
                           </TableRow>
                         );
@@ -1058,17 +1127,42 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                       {isSuperAdmin && <TableCell>{key.is_global ? 'Sí' : 'No'}</TableCell>}
                       <TableCell>{renderStatusBadge(key)}</TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="outline" size="icon" onClick={() => handleTestKey(key.id)} disabled={isTestingId === key.id} title="Probar conexión">
-                            {isTestingId === key.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <TestTube2 className="h-4 w-4" />}
-                          </Button>
-                          <Button variant="outline" size="icon" onClick={() => handleEditKey(key)} disabled={!canManageKey} title={!canManageKey ? "No tienes permiso para editar esta clave" : "Editar clave"}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="destructive" size="icon" onClick={() => handleDelete(key.id, 'key')} disabled={!canManageKey} title={!canManageKey ? "No tienes permiso para eliminar esta clave" : "Eliminar clave"}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" disabled={!canManageKey}>
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleTestKey(key.id)} disabled={isTestingId === key.id}>
+                              {isTestingId === key.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TestTube2 className="mr-2 h-4 w-4" />}
+                              Probar Conexión
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditKey(key)} disabled={!canManageKey}>
+                              <Edit className="mr-2 h-4 w-4" /> Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive" disabled={!canManageKey}>
+                                  <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                                </DropdownMenuItem>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>¿Eliminar esta clave?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Esta acción eliminará permanentemente la clave API "{key.nickname || key.id}".
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDelete(key.id, 'key')} className="bg-destructive">Eliminar</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   );
