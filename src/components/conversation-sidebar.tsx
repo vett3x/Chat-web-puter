@@ -49,6 +49,7 @@ interface SelectedItem {
 }
 
 interface ConversationSidebarProps {
+  isContentVisible: boolean;
   selectedItem: SelectedItem | null;
   onSelectItem: (id: string | null, type: SelectedItem['type'] | null) => void;
   onFileSelect: (path: string) => void;
@@ -69,6 +70,7 @@ interface ConversationSidebarProps {
 }
 
 export const ConversationSidebar = React.memo(({
+  isContentVisible,
   selectedItem,
   onSelectItem,
   onFileSelect,
@@ -202,77 +204,80 @@ export const ConversationSidebar = React.memo(({
       "flex flex-col h-full p-4 border-r backdrop-blur-[var(--chat-bubble-blur)] text-sidebar-foreground",
       "bg-[var(--sidebar-background)] border-[var(--sidebar-border)]"
     )}>
-      <SidebarHeader
-        onNewConversation={handleCreateConversation}
-        onNewFolder={handleCreateFolder}
-        onNewNote={handleCreateNote}
-        isCreatingConversation={isCreatingConversation}
-        isCreatingFolder={isCreatingFolder}
-        isCreatingNote={isCreatingNote}
-        onOpenProfileSettings={onOpenProfileSettings}
-        onOpenAccountSettings={onOpenAccountSettings}
-        onOpenAdminPanel={onOpenAdminPanel}
-        onOpenUserManagement={onOpenUserManagement}
-        onOpenDeepAiCoder={onOpenDeepAiCoder}
-        onOpenUpdateManager={onOpenUpdateManager}
-        onOpenApiManagement={onOpenApiManagement}
-        onOpenAlerts={onOpenAlerts}
-        onOpenSupportTicket={onOpenSupportTicket}
-      />
+      <div className={cn(
+        "flex flex-col h-full transition-opacity duration-200",
+        isContentVisible ? "opacity-100 delay-200" : "opacity-0"
+      )}>
+        <SidebarHeader
+          onNewConversation={handleCreateConversation}
+          onNewFolder={handleCreateFolder}
+          onNewNote={handleCreateNote}
+          isCreatingConversation={isCreatingConversation}
+          isCreatingFolder={isCreatingFolder}
+          isCreatingNote={isCreatingNote}
+          onOpenProfileSettings={onOpenProfileSettings}
+          onOpenAccountSettings={onOpenAccountSettings}
+          onOpenAdminPanel={onOpenAdminPanel}
+          onOpenUserManagement={onOpenUserManagement}
+          onOpenDeepAiCoder={onOpenDeepAiCoder}
+          onOpenUpdateManager={onOpenUpdateManager}
+          onOpenApiManagement={onOpenApiManagement}
+          onOpenAlerts={onOpenAlerts}
+          onOpenSupportTicket={onOpenSupportTicket}
+        />
 
-      {/* El botón grande "Ver Archivos" se ha movido al SidebarFooter */}
-
-      <ScrollArea className="flex-1" onDrop={(e) => handleDrop(e, null)} onDragOver={(e) => e.preventDefault()} onDragEnter={(e) => handleDragEnter(e, null)} onDragLeave={(e) => handleDragLeave(e, null)}>
-        <div className="space-y-2">
-          {isLoading ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />) : (
-            <>
-              {renderSection("PROYECTOS DeepAI CODER", <Wand2 className="h-4 w-4" />, "apps", apps.map(app => {
-                const isSelected = selectedItem?.type === 'app' && selectedItem.id === app.id;
-                return (
-                  <div key={app.id}>
-                    <DraggableAppItem
-                      app={app}
-                      selected={isSelected}
-                      onSelect={() => onSelectItem(app.id, 'app')}
-                      onDelete={onDeleteApp}
-                      isDeleting={isDeletingAppId === app.id}
-                    />
-                    {isSelected && (
-                      <div className="border-l-2 border-sidebar-primary ml-2 pl-2 pt-1">
-                        {app.status === 'ready' ? (
-                          <FileTree key={fileTreeRefreshKey} appId={app.id} onFileSelect={onFileSelect} />
-                        ) : (
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground p-1">
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                            <span>Aprovisionando archivos...</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              }))}
-              <Separator className="my-4 bg-sidebar-border" />
-              {renderSection("Notas", <FileText className="h-4 w-4" />, "notes", notes.filter(n => !n.folder_id).map(note => (
-                <DraggableNoteItem key={note.id} note={note} selected={selectedItem?.type === 'note' && selectedItem.id === note.id} onSelect={() => onSelectItem(note.id, 'note')} onDragStart={(e) => handleDragStart(e, note.id, 'note')} level={0} onNoteUpdated={(id, data) => updateLocalItem(id, 'note', data)} onNoteDeleted={(id) => removeLocalItem(id, 'note')} />
-              )))}
-              <Separator className="my-4 bg-sidebar-border" />
-              {renderSection("Chats", <MessageSquare className="h-4 w-4" />, "chats", conversations.filter(c => !c.folder_id).map(conv => (
-                <DraggableConversationCard key={conv.id} conversation={conv} selectedConversationId={selectedItem?.type === 'conversation' ? selectedItem.id : null} onSelectConversation={(id) => onSelectItem(id!, 'conversation')} onConversationUpdated={(id, data) => updateLocalItem(id, 'conversation', data)} onConversationDeleted={(id) => removeLocalItem(id, 'conversation')} onConversationMoved={() => {}} onConversationReordered={() => {}} allFolders={[]} level={0} onDragStart={(e) => handleDragStart(e, conv.id, 'conversation')} isDraggingOver={false} dropPosition={null} />
-              )))}
-              <Separator className="my-4 bg-sidebar-border" />
-              {renderSection("Carpetas", <FolderIcon className="h-4 w-4" />, "folders", folders.filter(f => !f.parent_id).map(folder => (
-                <DraggableFolderItem key={folder.id} folder={folder} level={0} selectedItem={selectedItem} onSelectItem={(id, type) => onSelectItem(id, type)} conversations={conversations} notes={notes} subfolders={folders} onFolderUpdated={(id, data) => updateLocalItem(id, 'folder', data)} onFolderDeleted={(id, refresh) => refresh ? refreshData() : removeLocalItem(id, 'folder')} onItemMoved={moveItem} onCreateSubfolder={handleCreateFolder} onDragStart={handleDragStart} onDrop={handleDrop} isDraggingOver={draggedOverFolder === folder.id} onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} draggedItemType={draggedItem?.type || null} onConversationUpdated={(id, data) => updateLocalItem(id, 'conversation', data)} onConversationDeleted={(id) => removeLocalItem(id, 'conversation')} onNoteUpdated={(id, data) => updateLocalItem(id, 'note', data)} onNoteDeleted={(id) => removeLocalItem(id, 'note')} />
-              )))}
-            </>
-          )}
-        </div>
-      </ScrollArea>
-      <SidebarFooter 
-        onOpenSupportTicket={onOpenSupportTicket}
-        onOpenStorageManagement={onOpenStorageManagement}
-        hasNewUserSupportTickets={hasNewUserSupportTickets}
-      />
+        <ScrollArea className="flex-1" onDrop={(e) => handleDrop(e, null)} onDragOver={(e) => e.preventDefault()} onDragEnter={(e) => handleDragEnter(e, null)} onDragLeave={(e) => handleDragLeave(e, null)}>
+          <div className="space-y-2">
+            {isLoading ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />) : (
+              <>
+                {renderSection("PROYECTOS DeepAI CODER", <Wand2 className="h-4 w-4" />, "apps", apps.map(app => {
+                  const isSelected = selectedItem?.type === 'app' && selectedItem.id === app.id;
+                  return (
+                    <div key={app.id}>
+                      <DraggableAppItem
+                        app={app}
+                        selected={isSelected}
+                        onSelect={() => onSelectItem(app.id, 'app')}
+                        onDelete={onDeleteApp}
+                        isDeleting={isDeletingAppId === app.id}
+                      />
+                      {isSelected && (
+                        <div className="border-l-2 border-sidebar-primary ml-2 pl-2 pt-1">
+                          {app.status === 'ready' ? (
+                            <FileTree key={fileTreeRefreshKey} appId={app.id} onFileSelect={onFileSelect} />
+                          ) : (
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground p-1">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              <span>Aprovisionando archivos...</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }))}
+                <Separator className="my-4 bg-sidebar-border" />
+                {renderSection("Notas", <FileText className="h-4 w-4" />, "notes", notes.filter(n => !n.folder_id).map(note => (
+                  <DraggableNoteItem key={note.id} note={note} selected={selectedItem?.type === 'note' && selectedItem.id === note.id} onSelect={() => onSelectItem(note.id, 'note')} onDragStart={(e) => handleDragStart(e, note.id, 'note')} level={0} onNoteUpdated={(id, data) => updateLocalItem(id, 'note', data)} onNoteDeleted={(id) => removeLocalItem(id, 'note')} />
+                )))}
+                <Separator className="my-4 bg-sidebar-border" />
+                {renderSection("Chats", <MessageSquare className="h-4 w-4" />, "chats", conversations.filter(c => !c.folder_id).map(conv => (
+                  <DraggableConversationCard key={conv.id} conversation={conv} selectedConversationId={selectedItem?.type === 'conversation' ? selectedItem.id : null} onSelectConversation={(id) => onSelectItem(id!, 'conversation')} onConversationUpdated={(id, data) => updateLocalItem(id, 'conversation', data)} onConversationDeleted={(id) => removeLocalItem(id, 'conversation')} onConversationMoved={() => {}} onConversationReordered={() => {}} allFolders={[]} level={0} onDragStart={(e) => handleDragStart(e, conv.id, 'conversation')} isDraggingOver={false} dropPosition={null} />
+                )))}
+                <Separator className="my-4 bg-sidebar-border" />
+                {renderSection("Carpetas", <FolderIcon className="h-4 w-4" />, "folders", folders.filter(f => !f.parent_id).map(folder => (
+                  <DraggableFolderItem key={folder.id} folder={folder} level={0} selectedItem={selectedItem} onSelectItem={(id, type) => onSelectItem(id, type)} conversations={conversations} notes={notes} subfolders={folders} onFolderUpdated={(id, data) => updateLocalItem(id, 'folder', data)} onFolderDeleted={(id, refresh) => refresh ? refreshData() : removeLocalItem(id, 'folder')} onItemMoved={moveItem} onCreateSubfolder={handleCreateFolder} onDragStart={handleDragStart} onDrop={handleDrop} isDraggingOver={draggedOverFolder === folder.id} onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} draggedItemType={draggedItem?.type || null} onConversationUpdated={(id, data) => updateLocalItem(id, 'conversation', data)} onConversationDeleted={(id) => removeLocalItem(id, 'conversation')} onNoteUpdated={(id, data) => updateLocalItem(id, 'note', data)} onNoteDeleted={(id) => removeLocalItem(id, 'note')} />
+                )))}
+              </>
+            )}
+          </div>
+        </ScrollArea>
+        <SidebarFooter 
+          onOpenSupportTicket={onOpenSupportTicket}
+          onOpenStorageManagement={onOpenStorageManagement}
+          hasNewUserSupportTickets={hasNewUserSupportTickets}
+        />
+      </div>
     </div>
   );
 });

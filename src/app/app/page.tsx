@@ -36,6 +36,7 @@ export default function AppPage() {
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarContentVisible, setIsSidebarContentVisible] = useState(false);
   const [fileTreeRefreshKey, setFileTreeRefreshKey] = useState(0);
 
   // Dialog states
@@ -66,6 +67,17 @@ export default function AppPage() {
     // Set initial sidebar state based on screen size after client-side check
     setIsSidebarOpen(!isMobile);
   }, [isMobile]);
+
+  useEffect(() => {
+    if (isSidebarOpen) {
+      const timer = setTimeout(() => {
+        setIsSidebarContentVisible(true);
+      }, 200); // Delay should be slightly less than or equal to the transition duration
+      return () => clearTimeout(timer);
+    } else {
+      setIsSidebarContentVisible(false);
+    }
+  }, [isSidebarOpen]);
 
   const handleSelectItem = (id: string | null, type: SelectedItem['type'] | null) => {
     if (id && type) {
@@ -248,6 +260,7 @@ export default function AppPage() {
         isSidebarOpen ? "w-72" : "w-0 overflow-hidden"
       )}>
         <ConversationSidebar
+          isContentVisible={isSidebarContentVisible}
           selectedItem={selectedItem}
           onSelectItem={handleSelectItem}
           onFileSelect={handleFileSelect}
