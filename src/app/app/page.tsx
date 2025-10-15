@@ -223,7 +223,7 @@ export default function AppPage() {
   };
 
   return (
-    <div className="relative h-[100dvh] w-screen flex flex-col md:flex-row bg-background text-foreground overflow-hidden">
+    <div className="relative h-[100svh] w-screen flex flex-col md:flex-row bg-background text-foreground overflow-hidden">
       <div className="absolute inset-0 z-0" style={{ opacity: 'var(--liquid-ether-opacity, 0.5)' }}>
         <LiquidEther
           colors={[ '#5227FF', '#FF9FFC', '#B19EEF' ]}
@@ -253,14 +253,14 @@ export default function AppPage() {
       <aside className={cn(
         "transition-all duration-300 ease-in-out z-20",
         // Mobile-first: absolute overlay by default
-        "absolute top-14 left-0 h-[calc(100dvh-56px)]",
+        "absolute top-14 left-0 h-[calc(100svh-56px)]",
         // On desktop, make it relative and part of the layout
         "md:relative md:top-0 md:h-full md:flex-shrink-0",
         // Visibility controlled by JS state
         isSidebarOpen ? "w-72" : "w-0 overflow-hidden"
       )}>
         <ConversationSidebar
-          isContentVisible={isSidebarContentVisible}
+          isContentVisible={isSidebarOpen}
           selectedItem={selectedItem}
           onSelectItem={handleSelectItem}
           onFileSelect={handleFileSelect}
