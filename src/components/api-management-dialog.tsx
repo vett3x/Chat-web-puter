@@ -47,7 +47,13 @@ import {
   TabsContent,
 } from '@/components/ui/tabs';
 import { useIsMobile } from '@/hooks/use-mobile';
-
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { SUPERUSER_EMAILS } from '@/lib/constants';
 
 // Schemas
 const apiKeySchema = z.object({
@@ -121,7 +127,7 @@ interface ApiManagementDialogProps {
 
 export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogProps) {
   const { session, userRole } = useSession();
-  const isSuperAdmin = userRole === 'super_admin';
+  const isSuperAdmin = userRole === 'super_admin' || SUPERUSER_EMAILS.includes(session?.user?.email || '');
   const currentUserId = session?.user?.id;
   const isMobile = useIsMobile();
 
@@ -478,17 +484,37 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         return <Badge className="bg-green-500 text-white">Activa</Badge>;
       case 'failed':
         return (
-          <Badge variant="destructive" className="flex items-center gap-1">
-            <AlertCircle className="h-3 w-3" /> Fallida
-            {key.status_message && <span className="ml-1 text-xs opacity-80" title={key.status_message}>({key.status_message.substring(0, 20)}...)</span>}
-          </Badge>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="destructive" className="flex items-center gap-1 cursor-help">
+                  <AlertCircle className="h-3 w-3" /> Fallida
+                </Badge>
+              </TooltipTrigger>
+              {key.status_message && (
+                <TooltipContent>
+                  <p className="max-w-xs">{key.status_message}</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
         );
       case 'blocked':
         return (
-          <Badge variant="destructive" className="flex items-center gap-1">
-            <Ban className="h-3 w-3" /> Bloqueada
-            {key.status_message && <span className="ml-1 text-xs opacity-80" title={key.status_message}>({key.status_message.substring(0, 20)}...)</span>}
-          </Badge>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="destructive" className="flex items-center gap-1 cursor-help">
+                  <Ban className="h-3 w-3" /> Bloqueada
+                </Badge>
+              </TooltipTrigger>
+              {key.status_message && (
+                <TooltipContent>
+                  <p className="max-w-xs">{key.status_message}</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
         );
       default:
         return <Badge variant="secondary">{key.status}</Badge>;
