@@ -6,6 +6,8 @@ import { cookies } from 'next/headers';
 import { z } from 'zod';
 import { SUPERUSER_EMAILS, PERMISSION_KEYS, UserPermissions } from '@/lib/constants'; // Importación actualizada
 import { createClient } from '@supabase/supabase-js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleAuth } from 'google-auth-library';
 
 // Define unified part types for internal API handling
 interface TextPart { type: 'text'; text: string; }
@@ -99,19 +101,68 @@ async function getSessionAndRole(): Promise<{ session: any; userRole: 'user' | '
   return { session, userRole };
 }
 
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+async function testApiKey(keyDetails: any) {
+  try {
+    if (keyDetails.provider === 'google_gemini') {
+      if (keyDetails.use_vertex_ai) {
+        if (!keyDetails.json_key_content || !keyDetails.project_id || !keyDetails.location_id) {
+          throw new Error('Configuración de Vertex AI incompleta.');
+        }
+        const auth = new GoogleAuth({
+          credentials: JSON.parse(keyDetails.json_key_content),
+          scopes: 'https://www.googleapis.com/auth/cloud-platform',
+        });
+        const client = await auth.getClient();
+        const accessToken = (await client.getAccessToken()).token;
+        if (!accessToken) throw new Error('No se pudo obtener el token de acceso de Vertex AI.');
+        const response = await fetch(`https://${keyDetails.location_id}-aiplatform.googleapis.com/v1/projects/${keyDetails.project_id}/locations`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`Error de API de Vertex AI: ${errorData.error?.message || response.statusText}`);
+        }
+      } else {
+        if (!keyDetails.api_key) throw new Error('API Key no proporcionada.');
+        const genAI = new GoogleGenerativeAI(keyDetails.api_key);
+        await genAI.getGenerativeModel({ model: keyDetails.model_name || 'gemini-pro' });
+      }
+    } else if (keyDetails.provider === 'custom_endpoint') {
+      if (!keyDetails.api_endpoint || !keyDetails.model_name) throw new Error('Configuración de endpoint personalizado incompleta.');
+      const response = await fetch(keyDetails.api_endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(keyDetails.api_key && { 'Authorization': `Bearer ${keyDetails.api_key}` }),
+        },
+        body: JSON.stringify({ model: keyDetails.model_name, messages: [{ role: 'user', content: 'test' }], max_tokens: 1 }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`El endpoint personalizado devolvió un error ${response.status}: ${errorText.substring(0, 100)}`);
+      }
+    } else {
+      if (!keyDetails.api_key) throw new Error('API Key no proporcionada.');
+    }
+    await supabaseAdmin.from('user_api_keys').update({ status: 'active', status_message: null }).eq('id', keyDetails.id);
+  } catch (error: any) {
+    await supabaseAdmin.from('user_api_keys').update({ status: 'failed', status_message: error.message }).eq('id', keyDetails.id);
+  }
+}
+
 export async function GET(req: NextRequest) {
   const { session, userRole } = await getSessionAndRole();
   if (!session) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 401 });
   }
 
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
   try {
-    // Fetch AI Key Groups
     let groupsQuery = supabaseAdmin
       .from('ai_key_groups')
       .select('id, user_id, name, provider, model_name, is_global, created_at, updated_at')
@@ -121,47 +172,35 @@ export async function GET(req: NextRequest) {
       groupsQuery = groupsQuery.or(`user_id.eq.${session.user.id},is_global.eq.true`);
     }
     const { data: aiKeyGroups, error: groupsError } = await groupsQuery;
-    if (groupsError) {
-      console.error("[API /ai-keys GET] Error fetching AI key groups:", groupsError);
-      throw new Error(groupsError.message);
-    }
+    if (groupsError) throw new Error(groupsError.message);
 
-    // Fetch individual API Keys
     let keysQuery = supabaseAdmin
       .from('user_api_keys')
       .select('id, user_id, nickname, api_key, is_active, created_at, last_used_at, usage_count, api_endpoint, model_name, provider, project_id, location_id, use_vertex_ai, json_key_content, is_global, group_id, status, status_message')
       .order('created_at', { ascending: false });
 
     if (userRole !== 'super_admin') {
-      // Filter keys to include only those owned by the user, or global keys, or keys belonging to groups the user can see
       const accessibleGroupIds = aiKeyGroups.map(g => g.id);
       keysQuery = keysQuery.or(`user_id.eq.${session.user.id},is_global.eq.true,group_id.in.(${accessibleGroupIds.join(',')})`);
     }
     const { data: apiKeys, error: keysError } = await keysQuery;
-    if (keysError) {
-      console.error("[API /ai-keys GET] Error fetching API keys:", keysError);
-      throw new Error(keysError.message);
-    }
+    if (keysError) throw new Error(keysError.message);
 
-    // Mask sensitive data
     const maskedApiKeys = apiKeys.map(key => ({
       ...key,
       api_key: key.api_key ? `${key.api_key.substring(0, 4)}...${key.api_key.substring(key.api_key.length - 4)}` : null,
-      json_key_content: key.json_key_content ? 'Subido' : null, // Indicate if content exists
+      json_key_content: key.json_key_content ? 'Subido' : null,
     }));
 
-    // Attach keys to their respective groups
     const groupsWithKeys = aiKeyGroups.map(group => ({
       ...group,
       api_keys: maskedApiKeys.filter(key => key.group_id === group.id),
     }));
 
-    // Return both groups (with their keys) and any standalone keys (those without a group_id)
     const standaloneApiKeys = maskedApiKeys.filter(key => !key.group_id);
 
     return NextResponse.json({ aiKeyGroups: groupsWithKeys, apiKeys: standaloneApiKeys });
   } catch (error: any) {
-    console.error("[API /ai-keys GET] Unhandled error:", error);
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
 }
@@ -172,75 +211,42 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 401 });
   }
 
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
   try {
     const body = await req.json();
-    const { group_id, is_global: isKeyGlobal, ...keyData } = apiKeySchema.parse(body); // Extract group_id and is_global for key
+    const { group_id, is_global: isKeyGlobal, ...keyData } = apiKeySchema.parse(body);
 
-    // Determine if the key itself is global (overrides group's global status if set)
     const finalIsKeyGlobal = isKeyGlobal !== undefined ? isKeyGlobal : false;
-
     if (finalIsKeyGlobal && userRole !== 'super_admin') {
       return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden crear claves globales.' }, { status: 403 });
     }
 
     let targetGroupId = group_id;
-    let groupIsGlobal = finalIsKeyGlobal; // Default group global status to key's global status
+    let groupIsGlobal = finalIsKeyGlobal;
 
-    // If a group_id is provided, verify it and get its global status
     if (targetGroupId) {
-      const { data: existingGroup, error: groupError } = await supabaseAdmin
-        .from('ai_key_groups')
-        .select('id, is_global, user_id')
-        .eq('id', targetGroupId)
-        .single();
-
-      if (groupError || !existingGroup) {
-        throw new Error('Grupo de claves no encontrado o acceso denegado.');
-      }
-
-      // Check if user has permission to add to this group
+      const { data: existingGroup, error: groupError } = await supabaseAdmin.from('ai_key_groups').select('id, is_global, user_id').eq('id', targetGroupId).single();
+      if (groupError || !existingGroup) throw new Error('Grupo de claves no encontrado o acceso denegado.');
       const isGroupOwner = existingGroup.user_id === session.user.id;
-      if (!existingGroup.is_global && !isGroupOwner && userRole !== 'super_admin') {
-        throw new Error('Acceso denegado. No tienes permiso para añadir claves a este grupo.');
-      }
-      if (existingGroup.is_global && userRole !== 'super_admin') {
-        throw new Error('Acceso denegado. Solo los Super Admins pueden añadir claves a grupos globales.');
-      }
-
-      groupIsGlobal = existingGroup.is_global; // Inherit global status from group
-    } else if (keyData.provider === 'google_gemini') { // If no group_id, but it's a Google Gemini key, create a new group
+      if (!existingGroup.is_global && !isGroupOwner && userRole !== 'super_admin') throw new Error('Acceso denegado. No tienes permiso para añadir claves a este grupo.');
+      if (existingGroup.is_global && userRole !== 'super_admin') throw new Error('Acceso denegado. Solo los Super Admins pueden añadir claves a grupos globales.');
+      groupIsGlobal = existingGroup.is_global;
+    } else if (keyData.provider === 'google_gemini') {
       const newGroupName = keyData.nickname || `${keyData.model_name || 'Google Gemini'} Group`;
-      const { data: newGroup, error: newGroupError } = await supabaseAdmin
-        .from('ai_key_groups')
-        .insert({
-          user_id: finalIsKeyGlobal ? null : session.user.id,
-          name: newGroupName,
-          provider: keyData.provider,
-          model_name: keyData.model_name,
-          is_global: finalIsKeyGlobal,
-        })
-        .select('id, is_global')
-        .single();
-
+      const { data: newGroup, error: newGroupError } = await supabaseAdmin.from('ai_key_groups').insert({ user_id: finalIsKeyGlobal ? null : session.user.id, name: newGroupName, provider: keyData.provider, model_name: keyData.model_name, is_global: finalIsKeyGlobal }).select('id, is_global').single();
       if (newGroupError) throw new Error(`Error al crear el grupo de claves: ${newGroupError.message}`);
       targetGroupId = newGroup.id;
       groupIsGlobal = newGroup.is_global;
     }
 
     const insertData: any = {
-      user_id: finalIsKeyGlobal || groupIsGlobal ? null : session.user.id, // User ID is null if key or its group is global
+      user_id: finalIsKeyGlobal || groupIsGlobal ? null : session.user.id,
       group_id: targetGroupId,
       provider: keyData.provider,
       nickname: keyData.nickname || null,
       model_name: keyData.model_name || null,
       is_active: true,
-      is_global: finalIsKeyGlobal || groupIsGlobal, // Key is global if itself or its group is global
-      status: 'active', // Default status
+      is_global: finalIsKeyGlobal || groupIsGlobal,
+      status: 'active',
       status_message: null,
     };
 
@@ -263,23 +269,15 @@ export async function POST(req: NextRequest) {
       insertData.use_vertex_ai = false;
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('user_api_keys')
-      .insert(insertData)
-      .select()
-      .single();
+    const { data, error } = await supabaseAdmin.from('user_api_keys').insert(insertData).select().single();
+    if (error) throw error;
 
-    if (error) {
-      console.error("[API /ai-keys POST] Error inserting key:", error);
-      throw error;
-    }
+    // Don't await, run in background
+    testApiKey(data);
 
-    return NextResponse.json({ message: 'API Key guardada correctamente.', key: data }, { status: 201 });
+    return NextResponse.json({ message: 'API Key guardada y en proceso de verificación.', key: data }, { status: 201 });
   } catch (error: any) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ message: 'Error de validación', errors: error.errors }, { status: 400 });
-    }
-    console.error("[API /ai-keys POST] Unhandled error:", error);
+    if (error instanceof z.ZodError) return NextResponse.json({ message: 'Error de validación', errors: error.errors }, { status: 400 });
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
 }
@@ -290,11 +288,6 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 401 });
   }
 
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
   try {
     const body = await req.json();
     const { id, group_id, is_global: isKeyGlobal, status, status_message, ...keyData } = apiKeySchema.parse(body);
@@ -303,47 +296,26 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ message: 'ID de clave es requerido para actualizar.' }, { status: 400 });
     }
 
-    // Fetch current key details to determine existing provider, use_vertex_ai status, user_id, is_global, and group_id
-    const { data: currentKey, error: currentKeyError } = await supabaseAdmin
-      .from('user_api_keys')
-      .select('provider, use_vertex_ai, user_id, is_global, group_id')
-      .eq('id', id)
-      .single();
-
+    const { data: currentKey, error: currentKeyError } = await supabaseAdmin.from('user_api_keys').select('provider, use_vertex_ai, user_id, is_global, group_id').eq('id', id).single();
     if (currentKeyError || !currentKey) throw new Error('Clave no encontrada para verificar el estado.');
 
-    // Authorization checks
     const isOwner = currentKey.user_id === session.user.id;
     const isGroupOwner = currentKey.group_id ? (await supabaseAdmin.from('ai_key_groups').select('user_id').eq('id', currentKey.group_id).single())?.data?.user_id === session.user.id : false;
 
-    if (currentKey.is_global && userRole !== 'super_admin') {
-      return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden modificar claves globales.' }, { status: 403 });
-    }
-    if (!currentKey.is_global && !isOwner && !isGroupOwner && userRole !== 'super_admin') {
-      return NextResponse.json({ message: 'Acceso denegado. No tienes permiso para modificar esta clave.' }, { status: 403 });
-    }
-    // Prevent non-super-admins from changing global status
-    if (isKeyGlobal !== undefined && isKeyGlobal !== currentKey.is_global && userRole !== 'super_admin') {
-      return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden cambiar el estado global de una clave.' }, { status: 403 });
-    }
-    // Prevent non-super-admins from changing group_id
-    if (group_id !== undefined && group_id !== currentKey.group_id && userRole !== 'super_admin') {
-      return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden cambiar el grupo de una clave.' }, { status: 403 });
-    }
-    // Prevent non-super-admins from changing status/status_message to 'blocked' or 'failed'
-    if (status && (status === 'blocked' || status === 'failed') && userRole !== 'super_admin') {
-      return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden establecer el estado de una clave como fallida o bloqueada.' }, { status: 403 });
-    }
-
+    if (currentKey.is_global && userRole !== 'super_admin') return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden modificar claves globales.' }, { status: 403 });
+    if (!currentKey.is_global && !isOwner && !isGroupOwner && userRole !== 'super_admin') return NextResponse.json({ message: 'Acceso denegado. No tienes permiso para modificar esta clave.' }, { status: 403 });
+    if (isKeyGlobal !== undefined && isKeyGlobal !== currentKey.is_global && userRole !== 'super_admin') return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden cambiar el estado global de una clave.' }, { status: 403 });
+    if (group_id !== undefined && group_id !== currentKey.group_id && userRole !== 'super_admin') return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden cambiar el grupo de una clave.' }, { status: 403 });
+    if (status && (status === 'blocked' || status === 'failed') && userRole !== 'super_admin') return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden establecer el estado de una clave como fallida o bloqueada.' }, { status: 403 });
 
     const updateData: any = {
       nickname: keyData.nickname || null,
       model_name: keyData.model_name || null,
       is_global: isKeyGlobal !== undefined ? isKeyGlobal : currentKey.is_global,
-      user_id: (isKeyGlobal || currentKey.is_global) ? null : session.user.id, // If key becomes global, user_id is null
-      group_id: group_id !== undefined ? group_id : currentKey.group_id, // Update group_id if provided
-      status: status !== undefined ? status : 'active', // Update status if provided, default to active
-      status_message: status_message !== undefined ? status_message : null, // Update status_message if provided
+      user_id: (isKeyGlobal || currentKey.is_global) ? null : session.user.id,
+      group_id: group_id !== undefined ? group_id : currentKey.group_id,
+      status: status !== undefined ? status : 'active',
+      status_message: status_message !== undefined ? status_message : null,
     };
     
     if (keyData.api_key !== undefined && keyData.api_key !== '') {
@@ -379,24 +351,15 @@ export async function PUT(req: NextRequest) {
       updateData.api_endpoint = null;
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('user_api_keys')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single();
+    const { data, error } = await supabaseAdmin.from('user_api_keys').update(updateData).eq('id', id).select().single();
+    if (error) throw error;
 
-    if (error) {
-      console.error("[API /ai-keys PUT] Error updating key:", error);
-      throw error;
-    }
+    // Don't await, run in background
+    testApiKey(data);
 
-    return NextResponse.json({ message: 'API Key actualizada correctamente.', key: data });
+    return NextResponse.json({ message: 'API Key actualizada y en proceso de verificación.', key: data });
   } catch (error: any) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ message: 'Error de validación', errors: error.errors }, { status: 400 });
-    }
-    console.error("[API /ai-keys PUT] Unhandled error:", error);
+    if (error instanceof z.ZodError) return NextResponse.json({ message: 'Error de validación', errors: error.errors }, { status: 400 });
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
 }
@@ -406,11 +369,6 @@ export async function DELETE(req: NextRequest) {
   if (!session) {
     return NextResponse.json({ message: 'Acceso denegado.' }, { status: 401 });
   }
-
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
 
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
@@ -422,69 +380,26 @@ export async function DELETE(req: NextRequest) {
 
   try {
     if (type === 'group') {
-      // Fetch group details for authorization
-      const { data: currentGroup, error: groupError } = await supabaseAdmin
-        .from('ai_key_groups')
-        .select('user_id, is_global')
-        .eq('id', id)
-        .single();
-
+      const { data: currentGroup, error: groupError } = await supabaseAdmin.from('ai_key_groups').select('user_id, is_global').eq('id', id).single();
       if (groupError || !currentGroup) throw new Error('Grupo no encontrado para verificar el estado.');
-
-      // Authorization checks for group deletion
       const isGroupOwner = currentGroup.user_id === session.user.id;
-      if (currentGroup.is_global && userRole !== 'super_admin') {
-        return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden eliminar grupos globales.' }, { status: 403 });
-      }
-      if (!currentGroup.is_global && !isGroupOwner && userRole !== 'super_admin') {
-        return NextResponse.json({ message: 'Acceso denegado. No tienes permiso para eliminar este grupo.' }, { status: 403 });
-      }
-
-      const { error } = await supabaseAdmin
-        .from('ai_key_groups')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        console.error("[API /ai-keys DELETE] Error deleting group:", error);
-        throw error;
-      }
+      if (currentGroup.is_global && userRole !== 'super_admin') return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden eliminar grupos globales.' }, { status: 403 });
+      if (!currentGroup.is_global && !isGroupOwner && userRole !== 'super_admin') return NextResponse.json({ message: 'Acceso denegado. No tienes permiso para eliminar este grupo.' }, { status: 403 });
+      const { error } = await supabaseAdmin.from('ai_key_groups').delete().eq('id', id);
+      if (error) throw error;
       return NextResponse.json({ message: 'Grupo de API Keys eliminado correctamente.' });
-
-    } else { // Default to deleting an individual key
-      // Fetch current key details for authorization
-      const { data: currentKey, error: keyError } = await supabaseAdmin
-        .from('user_api_keys')
-        .select('user_id, is_global, group_id')
-        .eq('id', id)
-        .single();
-
+    } else {
+      const { data: currentKey, error: keyError } = await supabaseAdmin.from('user_api_keys').select('user_id, is_global, group_id').eq('id', id).single();
       if (keyError || !currentKey) throw new Error('Clave no encontrada para verificar el estado.');
-
-      // Authorization checks for key deletion
       const isOwner = currentKey.user_id === session.user.id;
       const isGroupOwner = currentKey.group_id ? (await supabaseAdmin.from('ai_key_groups').select('user_id').eq('id', currentKey.group_id).single())?.data?.user_id === session.user.id : false;
-
-      if (currentKey.is_global && userRole !== 'super_admin') {
-        return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden eliminar claves globales.' }, { status: 403 });
-      }
-      if (!currentKey.is_global && !isOwner && !isGroupOwner && userRole !== 'super_admin') {
-        return NextResponse.json({ message: 'Acceso denegado. No tienes permiso para eliminar esta clave.' }, { status: 403 });
-      }
-
-      const { error } = await supabaseAdmin
-        .from('user_api_keys')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        console.error("[API /ai-keys DELETE] Error deleting key:", error);
-        throw error;
-      }
+      if (currentKey.is_global && userRole !== 'super_admin') return NextResponse.json({ message: 'Acceso denegado. Solo los Super Admins pueden eliminar claves globales.' }, { status: 403 });
+      if (!currentKey.is_global && !isOwner && !isGroupOwner && userRole !== 'super_admin') return NextResponse.json({ message: 'Acceso denegado. No tienes permiso para eliminar esta clave.' }, { status: 403 });
+      const { error } = await supabaseAdmin.from('user_api_keys').delete().eq('id', id);
+      if (error) throw error;
       return NextResponse.json({ message: 'API Key eliminada correctamente.' });
     }
   } catch (error: any) {
-    console.error("[API /ai-keys DELETE] Unhandled error:", error);
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
 }

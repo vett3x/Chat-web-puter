@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { KeyRound, PlusCircle, Trash2, Loader2, RefreshCw, Edit, Upload, XCircle, Search, Folder, CheckCircle2, AlertCircle, Ban, ChevronDown, ChevronRight, ArrowLeft } from 'lucide-react';
+import { KeyRound, PlusCircle, Trash2, Loader2, RefreshCw, Edit, Upload, XCircle, Search, Folder, CheckCircle2, AlertCircle, Ban, ChevronDown, ChevronRight, ArrowLeft, TestTube2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -144,6 +144,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
   const [mobileView, setMobileView] = useState<'list' | 'form'>('list');
+  const [isTestingId, setIsTestingId] = useState<string | null>(null);
 
   const toggleGroupExpansion = (groupId: string) => {
     setExpandedGroups(prev => {
@@ -402,7 +403,7 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
         }
         throw new Error(result.message || `Error HTTP: ${response.status}`);
       }
-      toast.success(`API Key ${editingKeyId ? 'actualizada' : 'guardada'}.`);
+      toast.success(`API Key ${editingKeyId ? 'actualizada' : 'guardada'}. Verificando conexión...`);
       handleCancelEdit();
       fetchKeysAndGroups();
     } catch (error: any) {
@@ -445,6 +446,22 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
       }
     } catch (error: any) {
       toast.error(`Error al eliminar: ${error.message}`);
+    }
+  };
+
+  const handleTestKey = async (keyId: string) => {
+    setIsTestingId(keyId);
+    const toastId = toast.loading('Probando conexión...');
+    try {
+      const response = await fetch(`/api/ai-keys/${keyId}/test`, { method: 'POST' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message);
+      toast.success(result.message, { id: toastId });
+      fetchKeysAndGroups();
+    } catch (error: any) {
+      toast.error(error.message, { id: toastId, duration: 10000 });
+    } finally {
+      setIsTestingId(null);
     }
   };
 
@@ -984,6 +1001,9 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                             <TableCell>{renderStatusBadge(key)}</TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
+                                <Button variant="outline" size="icon" onClick={() => handleTestKey(key.id)} disabled={isTestingId === key.id} title="Probar conexión">
+                                  {isTestingId === key.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <TestTube2 className="h-4 w-4" />}
+                                </Button>
                                 <Button variant="outline" size="icon" onClick={() => handleEditKey(key)} disabled={!canManageKey} title={!canManageKey ? "No tienes permiso para editar esta clave" : "Editar clave"}>
                                   <Edit className="h-4 w-4" />
                                 </Button>
@@ -1039,6 +1059,9 @@ export function ApiManagementDialog({ open, onOpenChange }: ApiManagementDialogP
                       <TableCell>{renderStatusBadge(key)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
+                          <Button variant="outline" size="icon" onClick={() => handleTestKey(key.id)} disabled={isTestingId === key.id} title="Probar conexión">
+                            {isTestingId === key.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <TestTube2 className="h-4 w-4" />}
+                          </Button>
                           <Button variant="outline" size="icon" onClick={() => handleEditKey(key)} disabled={!canManageKey} title={!canManageKey ? "No tienes permiso para editar esta clave" : "Editar clave"}>
                             <Edit className="h-4 w-4" />
                           </Button>
