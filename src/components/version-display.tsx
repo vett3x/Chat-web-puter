@@ -39,7 +39,7 @@ export function VersionDisplay() {
       ) : (
         <>
           <p>
-            Versión: <span className="font-semibold">{version}</span>
+            Versión: <span className="font-semibold">next-template@{version}</span>
           </p>
           <p>
             Compilación: <span className="font-semibold">{buildNumber}</span>
