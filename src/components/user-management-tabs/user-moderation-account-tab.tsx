@@ -20,6 +20,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Progress } from '@/components/ui/progress';
+import { UserManagementItem } from './UserManagementItem'; // Import the new component
 
 // Schemas
 const emailSchema = z.object({ email: z.string().email('Correo electrónico inválido.') });
@@ -127,23 +128,20 @@ function UserAccountSection({ userId, userEmail, currentUserRole, targetUserRole
   };
 
   return (
-    <Card>
-      <CardHeader><CardTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5" /> Cuenta</CardTitle></CardHeader>
-      <CardContent className="space-y-4">
-        <Form {...emailForm}>
-          <form onSubmit={emailForm.handleSubmit((data) => handleSubmit('email', data))} className="flex items-end gap-2">
-            <FormField control={emailForm.control} name="email" render={({ field }) => (<FormItem className="flex-1"><FormLabel>Correo Electrónico</FormLabel><FormControl><Input {...field} disabled={!canEdit || isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
-            <Button type="submit" disabled={!canEdit || isSubmitting}>{isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}</Button>
-          </form>
-        </Form>
-        <Form {...passwordForm}>
-          <form onSubmit={passwordForm.handleSubmit((data) => handleSubmit('password', data))} className="flex items-end gap-2">
-            <FormField control={passwordForm.control} name="password" render={({ field }) => (<FormItem className="flex-1"><FormLabel>Nueva Contraseña</FormLabel><FormControl><Input type="password" placeholder="••••••••" {...field} disabled={!canEdit || isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
-            <Button type="submit" disabled={!canEdit || isSubmitting}>{isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}</Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+    <div className="space-y-4">
+      <Form {...emailForm}>
+        <form onSubmit={emailForm.handleSubmit((data) => handleSubmit('email', data))} className="flex items-end gap-2">
+          <FormField control={emailForm.control} name="email" render={({ field }) => (<FormItem className="flex-1"><FormLabel>Correo Electrónico</FormLabel><FormControl><Input {...field} disabled={!canEdit || isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
+          <Button type="submit" disabled={!canEdit || isSubmitting}>{isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}</Button>
+        </form>
+      </Form>
+      <Form {...passwordForm}>
+        <form onSubmit={passwordForm.handleSubmit((data) => handleSubmit('password', data))} className="flex items-end gap-2">
+          <FormField control={passwordForm.control} name="password" render={({ field }) => (<FormItem className="flex-1"><FormLabel>Nueva Contraseña</FormLabel><FormControl><Input type="password" placeholder="••••••••" {...field} disabled={!canEdit || isSubmitting} /></FormControl><FormMessage /></FormItem>)} />
+          <Button type="submit" disabled={!canEdit || isSubmitting}>{isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}</Button>
+        </form>
+      </Form>
+    </div>
   );
 }
 
@@ -195,24 +193,21 @@ function UserPermissionsSection({ userId, targetUserRole, currentUserRole, onPer
   };
 
   return (
-    <Card>
-      <CardHeader><CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5" /> Permisos</CardTitle></CardHeader>
-      <CardContent>
-        {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : (
-          <div className="space-y-4">
-            {Object.entries(PERMISSION_KEYS).map(([key, value]) => (
-              <div key={value} className="flex items-center justify-between">
-                <Label htmlFor={value} className="capitalize">{value.replace(/_/g, ' ')}</Label>
-                <Switch id={value} checked={permissions[value] || false} onCheckedChange={(checked) => handlePermissionChange(value, checked)} disabled={!canEdit || isSaving} />
-              </div>
-            ))}
-            <Button onClick={handleSaveChanges} disabled={!canEdit || isSaving}>
-              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Guardar Permisos
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <div className="space-y-4">
+      {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : (
+        <>
+          {Object.entries(PERMISSION_KEYS).map(([key, value]) => (
+            <div key={value} className="flex items-center justify-between">
+              <Label htmlFor={value} className="capitalize">{value.replace(/_/g, ' ')}</Label>
+              <Switch id={value} checked={permissions[value] || false} onCheckedChange={(checked) => handlePermissionChange(value, checked)} disabled={!canEdit || isSaving} />
+            </div>
+          ))}
+          <Button onClick={handleSaveChanges} disabled={!canEdit || isSaving}>
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Guardar Permisos
+          </Button>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -266,26 +261,21 @@ function UserQuotasSection({ userId, userName, currentUserRole, targetUserRole, 
   };
 
   return (
-    <Card>
-      <CardHeader><CardTitle className="flex items-center gap-2"><HardDrive className="h-5 w-5" /> Cuotas de Recursos</CardTitle></CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField control={form.control} name="max_servers" render={({ field }) => (<FormItem><FormLabel>Max Servidores</FormLabel><FormControl><Input type="number" {...field} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="max_containers" render={({ field }) => (<FormItem><FormLabel>Max Contenedores</FormLabel><FormControl><Input type="number" {...field} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="max_tunnels" render={({ field }) => (<FormItem><FormLabel>Max Túneles</FormLabel><FormControl><Input type="number" {...field} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="cpu_limit" render={({ field }) => (<FormItem><FormLabel>Límite de CPU (cores)</FormLabel><FormControl><Input type="number" step="0.1" {...field} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="memory_limit_mb" render={({ field }) => (<FormItem><FormLabel>Límite de Memoria (MB)</FormLabel><FormControl><Input type="number" {...field} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="storage_limit_mb" render={({ field }) => (<FormItem><FormLabel>Límite de Almacenamiento (MB)</FormLabel><FormControl><Input type="number" {...field} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
-            </div>
-            <Button type="submit" disabled={!canEdit || isSaving}>
-              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Guardar Cuotas
-            </Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField control={form.control} name="max_servers" render={({ field }) => (<FormItem><FormLabel>Max Servidores</FormLabel><FormControl><Input type="number" {...field} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
+          <FormField control={form.control} name="max_containers" render={({ field }) => (<FormItem><FormLabel>Max Contenedores</FormLabel><FormControl><Input type="number" {...field} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
+          <FormField control={form.control} name="max_tunnels" render={({ field }) => (<FormItem><FormLabel>Max Túneles</FormLabel><FormControl><Input type="number" {...field} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
+          <FormField control={form.control} name="cpu_limit" render={({ field }) => (<FormItem><FormLabel>Límite de CPU (cores)</FormLabel><FormControl><Input type="number" step="0.1" {...field} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
+          <FormField control={form.control} name="memory_limit_mb" render={({ field }) => (<FormItem><FormLabel>Límite de Memoria (MB)</FormLabel><FormControl><Input type="number" {...field} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
+          <FormField control={form.control} name="storage_limit_mb" render={({ field }) => (<FormItem><FormLabel>Límite de Almacenamiento (MB)</FormLabel><FormControl><Input type="number" {...field} disabled={!canEdit || isSaving} /></FormControl><FormMessage /></FormItem>)} />
+        </div>
+        <Button type="submit" disabled={!canEdit || isSaving}>
+          {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Guardar Cuotas
+        </Button>
+      </form>
+    </Form>
   );
 }
 
@@ -322,9 +312,9 @@ function UserModerationHistorySection({ userId, currentUserRole }: any) {
   };
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2"><History className="h-5 w-5" /> Historial de Moderación</CardTitle>
+    <div className="space-y-4">
+      <div className="flex flex-row items-center justify-between">
+        <h4 className="font-semibold">Historial de Moderación</h4>
         {currentUserRole === 'super_admin' && (
           <AlertDialog>
             <AlertDialogTrigger asChild><Button variant="destructive" size="sm" disabled={history.length === 0}><Trash2 className="mr-2 h-4 w-4" /> Limpiar</Button></AlertDialogTrigger>
@@ -334,25 +324,23 @@ function UserModerationHistorySection({ userId, currentUserRole }: any) {
             </AlertDialogContent>
           </AlertDialog>
         )}
-      </CardHeader>
-      <CardContent>
-        {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : history.length === 0 ? <p className="text-sm text-muted-foreground">No hay acciones de moderación registradas.</p> : (
-          <Table>
-            <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Acción</TableHead><TableHead>Moderador</TableHead><TableHead>Razón</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {history.map(event => (
-                <TableRow key={event.id}>
-                  <TableCell className="text-xs">{format(new Date(event.created_at), 'dd/MM/yyyy HH:mm', { locale: es })}</TableCell>
-                  <TableCell className="capitalize">{event.action}</TableCell>
-                  <TableCell>{event.moderator_name}</TableCell>
-                  <TableCell>{event.reason}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
-    </Card>
+      </div>
+      {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : history.length === 0 ? <p className="text-sm text-muted-foreground">No hay acciones de moderación registradas.</p> : (
+        <Table>
+          <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Acción</TableHead><TableHead>Moderador</TableHead><TableHead>Razón</TableHead></TableRow></TableHeader>
+          <TableBody>
+            {history.map(event => (
+              <TableRow key={event.id}>
+                <TableCell className="text-xs">{format(new Date(event.created_at), 'dd/MM/yyyy HH:mm', { locale: es })}</TableCell>
+                <TableCell className="capitalize">{event.action}</TableCell>
+                <TableCell>{event.moderator_name}</TableCell>
+                <TableCell>{event.reason}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </div>
   );
 }
 
@@ -360,44 +348,36 @@ function UserModerationHistorySection({ userId, currentUserRole }: any) {
 
 export function UserModerationAccountTab({ user, currentUserRole, onAccountUpdated }: UserModerationAccountTabProps) {
   const userName = user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.email;
+  const [openItemId, setOpenItemId] = useState<string | null>(null);
+
+  const handleToggle = (id: string) => {
+    setOpenItemId(prev => (prev === id ? null : id));
+  };
+
+  const sections = [
+    { id: 'account', icon: <KeyRound className="h-5 w-5" />, title: 'Cuenta', description: 'Actualiza el email y la contraseña del usuario.', component: <UserAccountSection userId={user.id} userEmail={user.email} currentUserRole={currentUserRole} targetUserRole={user.role} onAccountUpdated={onAccountUpdated} /> },
+    { id: 'storage', icon: <HardDrive className="h-5 w-5" />, title: 'Almacenamiento', description: 'Visualiza el uso de almacenamiento del usuario.', component: <UserStorageUsage userId={user.id} /> },
+    { id: 'quotas', icon: <HardDrive className="h-5 w-5" />, title: 'Cuotas de Recursos', description: 'Gestiona los límites de recursos asignados al usuario.', component: <UserQuotasSection userId={user.id} userName={userName} currentUserRole={currentUserRole} targetUserRole={user.role} onQuotasUpdated={onAccountUpdated} /> },
+    { id: 'permissions', icon: <ShieldCheck className="h-5 w-5" />, title: 'Permisos', description: 'Configura los permisos específicos del usuario.', component: <UserPermissionsSection userId={user.id} targetUserRole={user.role} currentUserRole={currentUserRole} onPermissionsUpdated={onAccountUpdated} /> },
+    { id: 'moderation-history', icon: <History className="h-5 w-5" />, title: 'Historial de Moderación', description: 'Revisa las acciones de moderación aplicadas al usuario.', component: <UserModerationHistorySection userId={user.id} currentUserRole={currentUserRole} /> },
+  ];
 
   return (
     <ScrollArea className="h-full w-full p-1">
       <div className="space-y-8">
-        <UserAccountSection
-          userId={user.id}
-          userEmail={user.email}
-          currentUserRole={currentUserRole}
-          targetUserRole={user.role}
-          onAccountUpdated={onAccountUpdated}
-        />
-        <Separator />
-        <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><HardDrive className="h-5 w-5" /> Almacenamiento</CardTitle></CardHeader>
-          <CardContent>
-            <UserStorageUsage userId={user.id} />
-          </CardContent>
-        </Card>
-        <Separator />
-        <UserQuotasSection
-          userId={user.id}
-          userName={userName}
-          currentUserRole={currentUserRole}
-          targetUserRole={user.role}
-          onQuotasUpdated={onAccountUpdated}
-        />
-        <Separator />
-        <UserPermissionsSection
-          userId={user.id}
-          targetUserRole={user.role}
-          currentUserRole={currentUserRole}
-          onPermissionsUpdated={onAccountUpdated}
-        />
-        <Separator />
-        <UserModerationHistorySection
-          userId={user.id}
-          currentUserRole={currentUserRole}
-        />
+        {sections.map(({ id, icon, title, description, component }) => (
+          <UserManagementItem
+            key={id}
+            id={id}
+            icon={icon}
+            label={title}
+            description={description}
+            isOpen={openItemId === id}
+            onToggle={() => handleToggle(id)}
+          >
+            {component}
+          </UserManagementItem>
+        ))}
       </div>
     </ScrollArea>
   );
