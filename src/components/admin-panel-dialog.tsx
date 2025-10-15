@@ -68,7 +68,7 @@ export function AdminPanelDialog({ open, onOpenChange, onOpenAlerts, initialTab 
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={onOpenChange}>
-        <DrawerContent className="h-[95dvh] flex flex-col bg-[var(--sidebar-background)] backdrop-blur-[var(--chat-bubble-blur)] border-t-[var(--sidebar-border)]">
+        <DrawerContent className="h-[95dvh] flex flex-col">
           <DrawerHeader className="flex flex-row items-center justify-between p-4 border-b border-b-[var(--sidebar-border)]">
             <DrawerTitle className="flex items-center gap-2 text-lg font-semibold">
               <Server className="h-5 w-5" /> Panel de Admin
