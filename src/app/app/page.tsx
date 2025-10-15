@@ -210,7 +210,7 @@ export default function AppPage() {
   };
 
   return (
-    <div className="relative h-screen w-screen flex flex-col md:flex-row bg-background text-foreground overflow-hidden">
+    <div className="relative h-[100dvh] w-screen flex flex-col md:flex-row bg-background text-foreground overflow-hidden">
       <div className="absolute inset-0 z-0" style={{ opacity: 'var(--liquid-ether-opacity, 0.5)' }}>
         <LiquidEther
           colors={[ '#5227FF', '#FF9FFC', '#B19EEF' ]}
